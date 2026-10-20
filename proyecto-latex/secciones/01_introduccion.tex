@@ -1,0 +1,24 @@
+% ---------------------------------------------------------------------
+% 1. Introducción  (criterio de la rúbrica: Planteamiento del problema, 10 pts)
+% ---------------------------------------------------------------------
+\section{Introducción}
+\label{sec:introduccion}
+
+Cada año nacen más de 15 millones de niños prematuros y cerca de 20 millones con bajo peso al nacer; estas condiciones concentran una parte importante de la mortalidad neonatal y dejan secuelas en el crecimiento y el neurodesarrollo de quienes sobreviven \cite{oms2022,victora2021,fundacion2026}. El Método Madre Canguro (MMC), que combina la posición canguro, la nutrición basada en leche materna y un seguimiento ambulatorio de alto riesgo hasta los 12 meses de edad corregida, es hoy una de las intervenciones recomendadas por la OMS para esta población \cite{oms2022}, y su efecto se ha documentado hasta la edad adulta \cite{charpak2017}.
+
+La Fundación Canguro ha consolidado en su Observatorio una cohorte longitudinal que, en la extracción analizada (corte del 24 de julio de 2026), reúne 62.043 niños y 13.884.056 mediciones organizadas por etapas: nacimiento, entrada al programa, 40 semanas de edad gestacional y 3, 6, 9 y 12 meses de edad corregida \cite{fundacion2026,charpak2023}. Cada visita añade datos que podrían anticipar problemas, pero hoy se analizan de forma descriptiva y retrospectiva.
+
+El análisis exploratorio de la cohorte, realizado como primera fase de este proyecto, muestra que el problema tiene dos partes:
+
+\begin{itemize}
+\item \textbf{No se puede confiar en el dato sin revisarlo.} Once rangos del diccionario de variables se calcularon de los mismos datos, por lo que nunca fallan; el código $-1$ ocupa el 68\,\% de los valores de hematocrito; hay 33 fechas imposibles y 985 eventos registrados antes del parto, y el cambio de sistema de registro de 2022 alteró formatos y patrones de redondeo. La regla vigente, el rango del diccionario, detecta entre el 1\,\% y el 97\,\% de los errores según su tipo (sección~\ref{sec:res-anomalias}).
+\item \textbf{El riesgo del niño se ve tarde.} De los niños que entran al programa con fecha, el 78\,\% llega a la visita de 40 semanas y solo el 46\,\% a la de 12 meses. A esa edad, el 10,7\,\% de los pesos y el 18,6\,\% de las tallas registrados están por debajo de $-2$ desviaciones estándar (DE) de la OMS: la señal aparece cuando la alteración ya se consolidó.
+\end{itemize}
+
+Ambas partes están ligadas: un modelo que aprende de datos con errores sistemáticos los toma como normales, y una alerta clínica basada en un dato erróneo desgasta la confianza del equipo tratante. De ahí la pregunta que guía este trabajo:
+
+\emph{¿En qué medida un sistema de inteligencia artificial interpretable de dos etapas ---detección de anomalías en el dato y estimación calibrada del riesgo clínico--- permite anticipar, en cada visita de seguimiento, desenlaces adversos y desviaciones del crecimiento en niños prematuros y de bajo peso, con mejor desempeño que una regla clínica simple y con explicaciones clínicamente plausibles?}
+
+Los aportes del trabajo son cuatro: (i) una caracterización cuantitativa de la calidad y la cobertura de la cohorte, con hallazgos ya reportados a la Fundación; (ii) un modelo de anomalías genérico, guiado por un diccionario que mantienen los expertos, que admite variables nuevas sin cambiar código; (iii) alertas clínicas calibradas e interpretables para 14 desenlaces y para el crecimiento frente a la OMS; y (iv) un despliegue reproducible que separa el entorno público, con datos simulados, del entorno con datos reales.
+
+El resto del artículo se organiza así: la sección~\ref{sec:estado} revisa el estado del arte; la sección~\ref{sec:metodologia} describe datos, modelos, validación y despliegue; la sección~\ref{sec:resultados} presenta los resultados; la sección~\ref{sec:discusion} los discute, y la sección~\ref{sec:conclusiones} concluye.

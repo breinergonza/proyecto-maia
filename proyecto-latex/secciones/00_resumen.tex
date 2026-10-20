@@ -1,0 +1,10 @@
+% ---------------------------------------------------------------------
+% Resumen y palabras clave
+% ---------------------------------------------------------------------
+\begin{abstract}
+El seguimiento de niños prematuros y de bajo peso al nacer produce registros longitudinales de calidad heterogénea que rara vez se usan para anticipar riesgos. Este trabajo presenta un sistema de inteligencia artificial interpretable de dos etapas, construido sobre la cohorte del Observatorio Canguro de la Fundación Canguro (62.043 niños y 13,9 millones de mediciones, corte del 24 de julio de 2026). La primera etapa detecta anomalías en cada dato mediante cinco capas: contrato, valor, contexto con regresión por cuantiles calibrada por predicción conformal, trayectoria y vigilancia temporal. La segunda estima en cada visita el riesgo calibrado de 14 desenlaces adversos, explica cada riesgo con contribuciones TreeSHAP y compara el crecimiento con los estándares de la Organización Mundial de la Salud (OMS). Con errores inyectados, el modelo de anomalías detecta el 75\,\% de los errores con 18,8 alertas por cada 1.000 datos limpios, mientras que la regla de rangos vigente detecta entre el 1\,\% y el 97\,\% según el tipo de error. El modelo clínico supera a una regla basada en edad gestacional y peso en 13 de 14 desenlaces, con AUC entre 0,56 y 0,91; la oxigenodependencia con diagnóstico a los tres meses alcanza 0,91. La solución se despliega como servicio con registro de modelos, API de inferencia y tablero web, en un entorno público con datos simulados y uno interno con los datos reales. Se discuten sus aplicaciones para priorizar el seguimiento clínico y sus límites: la pérdida de seguimiento y la deriva de la calibración.
+\end{abstract}
+
+\begin{IEEEkeywords}
+prematuridad, Método Madre Canguro, detección de anomalías, predicción de riesgo clínico, aprendizaje automático interpretable, calidad de datos, MLOps.
+\end{IEEEkeywords}

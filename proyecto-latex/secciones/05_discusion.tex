@@ -1,0 +1,39 @@
+% ---------------------------------------------------------------------
+% 5. Discusión y aportes  (criterio: Discusión y aportes, 15 pts)
+%    Interpretación crítica, aportes, limitaciones y posibles aplicaciones.
+% ---------------------------------------------------------------------
+\section{Discusión y aportes}
+\label{sec:discusion}
+
+\textbf{Interpretación.} Los resultados respaldan la separación en dos etapas. El modelo de anomalías gana sobre todo en los errores que son plausibles por sí solos (desvíos, etapas intercambiadas), que ninguna regla de rangos puede ver; ese es el aporte del contexto del niño, y coincide con la crítica de que los marcos de calidad basados en reglas fijas ignoran al paciente \cite{kahn2016,weiskopf2013}. El costo es moderado: 4,1 alertas más por cada 1.000 datos limpios que la regla vigente, una parte de las cuales son errores reales todavía sin etiqueta.
+
+En la etapa clínica, el desempeño sigue la naturaleza de cada desenlace. Los que dependen del estado biológico registrado al nacer y en la hospitalización (oxigenodependencia, desarrollo psicomotor) se anticipan bien y con ventaja clara sobre la regla. Los que dependen de factores que la base apenas registra (no volver a una cita desde los 3 meses, readmisiones tardías) se anticipan poco: el AUC cercano a 0,6 indica que esa información no está en los datos, no solo que el modelo sea débil. La discrepancia en dos readmisiones tempranas, con mejor AUC pero menos casos en el decil superior que la regla, recuerda que el AUC resume todo el orden mientras que el uso clínico mira solo la parte alta; por eso el sistema no fija un umbral y reporta ambas medidas. La sobreestimación en 6 de 14 desenlaces es deriva temporal \cite{davis2017}: el orden se conserva y el nivel se desplaza. Confirma la decisión de recalibrar en cada entrenamiento y de no mostrar porcentajes a los médicos antes del periodo en silencio \cite{vancalster2019,wong2021}.
+
+\textbf{Aportes.} (i) Un sistema genérico guiado por un diccionario que gobiernan los expertos: agregar o retirar una variable no requiere cambiar código, y la entrada SEVARTI admite otras fuentes. (ii) La integración del dato con el niño: el modelo clínico aprende de datos revisados, y las alertas de crecimiento con un patrón externo (la OMS) cubren lo que un modelo entrenado en prematuros consideraría normal. (iii) Hallazgos de gobierno del dato ya entregados a la Fundación: rangos y unidades erróneos y la exposición de una llave de paciente, que se retiró. (iv) Una ruta de despliegue que mantiene los datos por niño dentro del equipo.
+
+\textbf{Posibles aplicaciones.} La Tabla~\ref{tab:usos} resume cómo puede usar la Fundación cada resultado. Todas son apoyo a la decisión: el modelo ordena a los niños y explica por qué; la decisión de a quién llamar o remitir sigue en manos del equipo clínico.
+
+\begin{table}[t]
+\centering
+\caption{Resultados y su uso potencial en el programa}
+\label{tab:usos}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabularx}{\columnwidth}{@{}>{\raggedright\arraybackslash}p{2.3cm}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{1.7cm}@{}}
+\toprule
+\textbf{Resultado} & \textbf{Uso potencial} & \textbf{Quién} \\
+\midrule
+Cola de revisión de datos & Depurar cada carga semestral antes de analizar o publicar & Analítica \\
+Defectos del diccionario & Corregir rangos, unidades y validaciones del formulario & Observatorio \\
+Alarmas por trimestre & Auditar equipos y procesos; evaluar cambios de sistema & Coordinación \\
+Riesgo de no volver & Priorizar recordatorios antes de la cita (ordena, no decide) & Seguimiento \\
+Oxigenodependencia & Planear seguimiento respiratorio desde la entrada & Pediatría \\
+Desarrollo bajo & Remitir antes a valoración del neurodesarrollo & Neurodesarrollo \\
+Caída de $z$ OMS & Alerta nutricional antes de cruzar $-2$ DE & Pediatría, nutrición \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Limitaciones.} Primero, la \emph{pérdida de seguimiento}: solo el 46\,\% llega a los 12 meses, de modo que los desenlaces tardíos se conocen solo en quienes vuelven y pueden estar sesgados; por eso no volver se modela como desenlace propio. Segundo, la \emph{deriva}, ya discutida. Tercero, sin sede ni fecha de parto, la vigilancia temporal ve el programa como un todo y un cambio en una sola sede se diluye; tampoco es posible evaluar el desempeño por sede. Cuarto, el desarrollo ``bajo'' es relativo (10\,\% inferior), no un corte clínico. Quinto, antes de las 40 semanas no se evalúa crecimiento. Sexto, los errores inyectados miden solo los errores que se nos ocurren, y la validación clínica es retrospectiva: falta una evaluación prospectiva con neonatólogos.
+
+\textbf{Consideraciones éticas.} El sistema es de apoyo y no emite diagnósticos \cite{salih2024}. Los datos están seudonimizados, no se intenta reidentificar, el repositorio no contiene datos por niño y la demostración pública usa datos simulados. Los sesgos se vigilan por edad gestacional e ingreso, y se reportan las limitaciones conforme a TRIPOD+AI \cite{collins2024}. Las explicaciones TreeSHAP describen asociaciones aprendidas, no causas \cite{ghassemi2021}, y así se presentan en el tablero.

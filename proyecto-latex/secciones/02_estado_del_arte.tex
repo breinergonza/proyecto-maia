@@ -1,0 +1,40 @@
+% ---------------------------------------------------------------------
+% 2. Estado del arte  (criterio: Estado del arte y revisión bibliográfica, 10 pts)
+% ---------------------------------------------------------------------
+\section{Estado del arte}
+\label{sec:estado}
+
+La revisión se organiza en cinco ejes. Cada uno cierra con la limitación que deja abierta para el problema planteado; la Tabla~\ref{tab:estado} resume la comparación.
+
+\textbf{Crecimiento del prematuro.} Las curvas de Fenton \cite{fenton2013} y los estándares posnatales de INTERGROWTH-21st \cite{villar2015} describen el crecimiento antes del término, y los estándares de la OMS \cite{oms2006} lo hacen desde las 40 semanas de edad corregida. Los estudios longitudinales recientes muestran que las trayectorias de los puntajes $z$ de peso, talla y perímetro cefálico conservan información que se pierde al comparar solo la primera y la última medición \cite{ren2024,nel2026}, y en Colombia se han usado modelos multinivel para la ganancia de peso en programas canguro \cite{melo2016}. Estos trabajos son explicativos: describen patrones en cohortes depuradas, pero no producen una señal por niño en el momento de la visita.
+
+\textbf{Aprendizaje automático en prematuridad.} Una revisión sistemática encontró que los modelos para predecir desenlaces del neurodesarrollo en prematuros sufren de heterogeneidad de datos, validación interna débil y poca generalización \cite{baker2023}. Trabajos posteriores han predicho retraso mental y psicomotor en muy prematuros \cite{demirci2024} y estratificado el riesgo para el seguimiento de alto riesgo \cite{mlrisk2024}, y en neonatología se han combinado bosques aleatorios con SHAP en herramientas clínicas \cite{wang2024}. Casi todos reportan discriminación en un corte aleatorio de los datos; pocos comparan contra una regla clínica simple o validan en el tiempo, que es lo que importa cuando el modelo se usa con los niños que vienen.
+
+\textbf{Calidad de datos y detección de anomalías.} La literatura de historia clínica electrónica propone marcos de calidad basados en conformidad, completitud y plausibilidad \cite{kahn2016,weiskopf2013}, y la detección de anomalías ofrece métodos estadísticos y de aprendizaje para hallar datos atípicos \cite{chandola2009}. Los marcos suelen aplicarse como reglas fijas, y los detectores genéricos tratan cada variable por separado: ninguno de los dos aprovecha el contexto del niño (su etapa, su edad corregida, sus otras medidas) ni se adapta cuando los expertos agregan variables.
+
+\textbf{Incertidumbre, calibración y deriva.} La regresión por cuantiles \cite{koenker1978} y su calibración conformal \cite{romano2019,angelopoulos2023} dan intervalos con cobertura garantizada bajo intercambiabilidad, una propiedad útil para fijar cuántas falsas alertas se toleran. En predicción clínica, la calibración es tan importante como la discriminación \cite{vancalster2019}, y se degrada cuando cambia la población o el registro \cite{davis2017}. La validación externa de un modelo de sepsis ampliamente implantado mostró un desempeño muy inferior al reportado \cite{wong2021}, lo que motiva periodos de evaluación en silencio antes de entregar riesgos a los médicos. La vigilancia de cambios en el tiempo tiene una herramienta clásica en la suma acumulada (CUSUM) \cite{page1954}.
+
+\textbf{Explicabilidad, reporte y operación.} TreeSHAP calcula contribuciones exactas por variable para modelos de árboles \cite{lundberg2020}; sin embargo, la explicabilidad no garantiza validez clínica y debe evaluarse con especialistas \cite{salih2024,ghassemi2021}. TRIPOD+AI fija qué reportar de un modelo clínico \cite{collins2024}, y las prácticas de MLOps \cite{kreuzberger2023}, con registros de modelos como MLflow \cite{zaharia2018}, permiten sostener un modelo después del experimento.
+
+\begin{table}[t]
+\centering
+\caption{Comparación de enfoques relacionados con el problema}
+\label{tab:estado}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabularx}{\columnwidth}{@{}>{\raggedright\arraybackslash}p{1.55cm}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+\textbf{Enfoque} & \textbf{Aporte} & \textbf{Límite para este problema} \\
+\midrule
+Trayectorias de crecimiento \cite{ren2024,nel2026,melo2016} & Patrones longitudinales de $z$ y ganancia de peso & Explicativos; sin señal por niño ni datos sucios \\
+ML en prematuridad \cite{baker2023,demirci2024,mlrisk2024} & Predicción de desenlaces del neurodesarrollo y riesgo & Validación aleatoria; poca comparación con reglas simples \\
+XAI neonatal \cite{wang2024,salih2024} & Explicaciones SHAP en herramientas clínicas & Explicar no valida; requiere especialistas \\
+Calidad de datos \cite{kahn2016,weiskopf2013} & Dimensiones y reglas de calidad & Reglas fijas; ignoran el contexto del paciente \\
+Conformal y calibración \cite{romano2019,vancalster2019,davis2017} & Tasas de error controladas; calibración y deriva & Poco usados juntos en registros clínicos \\
+\midrule
+\textbf{Este trabajo} & Anomalías con contexto + riesgo calibrado + OMS + despliegue & Validación clínica prospectiva pendiente \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Vacío que llena este trabajo.} No encontramos trabajos que, sobre una cohorte de seguimiento de prematuros con datos reales y sucios, combinen una etapa de calidad del dato consciente del contexto con riesgos clínicos calibrados en el tiempo, explicaciones por niño y un despliegue que proteja los datos por paciente.

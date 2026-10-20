@@ -1,0 +1,54 @@
+% Figura: arquitectura de la solución (TikZ, legible en escala de grises)
+\begin{figure*}[t]
+\centering
+\begin{tikzpicture}[
+  font=\footnotesize,
+  >={Stealth[length=2mm]},
+  caja/.style={draw=tinta, rounded corners=2pt, align=center, minimum height=11mm, inner sep=3pt, fill=niebla},
+  oscura/.style={caja, fill=tinta, text=white},
+  acento/.style={caja, fill=acento!85!black, draw=acento!85!black, text=white},
+  rotulo/.style={font=\scriptsize\bfseries, text=black!65, inner sep=0pt},
+  flecha/.style={->, draw=tinta, thick},
+]
+% --- Fuentes (columna izquierda)
+\node[rotulo, anchor=south west] at (0,3.25) {FUENTES};
+\node[caja, text width=26mm] (bd) at (1.45,2.35) {\textbf{Observatorio Canguro}\\PostgreSQL, solo lectura,\\carga semestral};
+\node[caja, text width=26mm] (dic) at (1.45,0.6) {\textbf{Diccionario}\\\textbf{de variables}\\mantenido por expertos};
+
+% --- Corrida semestral (centro)
+\node[oscura, text width=21mm] (sev) at (5.2,2.35) {\textbf{Adaptador}\\SEVARTI\\(6 tablas)};
+\node[oscura, text width=21mm] (ano) at (8.05,2.35) {\textbf{Etapa 1}\\anomalías\\(capas 0 a 4)};
+\node[acento, text width=23mm] (cli) at (11.0,2.35) {\textbf{Etapa 2}\\alertas clínicas\\(LightGBM, TreeSHAP, OMS)};
+\node[caja, text width=23mm] (mlf) at (8.05,0.6) {\textbf{MLflow}\\versiones de ambas etapas};
+\node[caja, text width=23mm] (res) at (11.0,0.6) {\textbf{Resultados}\\cola de revisión y riesgos por niño};
+\begin{scope}[on background layer]
+\node[draw=tinta, dashed, rounded corners=4pt, fit=(sev)(ano)(cli)(mlf)(res), inner sep=6pt] (pipe) {};
+\end{scope}
+\node[rotulo, anchor=south west] at ([yshift=1.2mm]pipe.north west) {CORRIDA SEMESTRAL \textperiodcentered{} DOCKER Y TAREA PROGRAMADA};
+
+% --- Servicio (columna derecha)
+\node[rotulo, anchor=south west] at (13.55,3.25) {SERVICIO};
+\node[oscura, text width=27mm] (api) at (15.05,2.35) {\textbf{API FastAPI}\\inferencia a demanda\\sobre tablas SEVARTI};
+\node[caja, text width=27mm] (tab) at (15.05,0.6) {\textbf{Tablero React}\\perfiles: administración,\\evaluación y visualización};
+\node[caja, text width=27mm, minimum height=7mm] (mail) at (15.05,-0.75) {\textbf{Correo} ante riesgo alto};
+
+% --- Flechas
+\draw[flecha] (bd) -- (sev);
+\draw[flecha] (dic.east) -- ++(0.75,0) |- ([yshift=-3.5mm]sev.west);
+\draw[flecha] (sev) -- (ano);
+\draw[flecha] (ano) -- (cli);
+\draw[flecha] (ano) -- (mlf);
+\draw[flecha] (cli) -- (res);
+\draw[flecha] (cli.south west) -- (mlf.north east);
+\draw[flecha] (res.east) -- ++(0.55,0) |- (api.west);
+\draw[flecha] (api) -- (tab);
+\draw[flecha] (tab) -- (mail);
+
+% --- Entornos
+\node[rotulo, anchor=south west] at (0,-1.35) {ENTORNOS \textperiodcentered{} MISMOS CONTENEDORES};
+\node[oscura, text width=76mm, minimum height=9mm, fill=tinta!70, draw=tinta!70, anchor=north west] (aws) at (0,-1.5) {\textbf{AWS, demostración pública:} datos del simulador SEVARTI; ningún dato real};
+\node[oscura, text width=76mm, minimum height=9mm, anchor=north east] (int) at (16.55,-1.5) {\textbf{Equipo del grupo, interno:} base real en solo lectura; los datos por niño no salen};
+\end{tikzpicture}
+\caption{Arquitectura de la solución: fuentes, corrida semestral con las dos etapas (la etapa 2 recibe los datos ya revisados por la etapa 1), registro de modelos, servicio y entornos de despliegue. \fuente{elaboración propia.}}
+\label{fig:arquitectura}
+\end{figure*}

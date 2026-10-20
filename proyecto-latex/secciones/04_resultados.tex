@@ -1,0 +1,120 @@
+% ---------------------------------------------------------------------
+% 4. Resultados  (criterio: Resultados, 15 pts)
+%    Cifras del corte del 24/07/2026; modelo de anomalías 98aaa133d1.
+% ---------------------------------------------------------------------
+\section{Resultados}
+\label{sec:resultados}
+
+Todas las cifras corresponden al corte del 24 de julio de 2026 y se calculan en la partición de prueba, salvo que se indique otra cosa.
+
+\subsection{Calidad y cobertura de la cohorte}
+\label{sec:res-datos}
+La base consultada tiene 4,0 veces más niños y 3,1 veces más mediciones que su documentación (15.641 niños y 4,5 millones de mediciones), por lo que toda cifra se reporta con su fecha de corte. El 76\,\% de las mediciones está marcado como ``sin ubicación temporal''; aun así, la edad anotada en cada visita coincide con la diferencia entre la fecha de la visita y la de parto en más del 99,7\,\% de los casos, lo que permitió construir el eje temporal. La Fig.~\ref{fig:cobertura} muestra la cobertura del peso entre los niños que ya tenían edad para cada visita: cae del 78\,\% a las 40 semanas al 49\,\% a los 12 meses. El peso al nacer solo se registra desde 2022, de ahí su baja cobertura.
+
+\input{figuras/cobertura}
+
+Los hallazgos de calidad más relevantes fueron: 11 rangos del diccionario iguales al mínimo y máximo observados; 37 variables numéricas sin unidad; una unidad mal declarada (una variable en ``semanas'' que coincide con días en el 94,2\,\% de los casos); 8 variables que fallan su propia bandera de calidad en el 95\,\% o más de sus valores, por reglas mal configuradas; una talla al nacer que disminuye más de 1~cm al entrar al programa en el 34\,\% de los pares, señal de un instrumento distinto, y un aumento de pesos redondeados a 100~g del 0,9\,\% al 5,4\,\% tras el cambio de sistema de 2022.
+
+\subsection{Modelo de anomalías}
+\label{sec:res-anomalias}
+El entrenamiento tomó 15,7 minutos en CPU y produjo 132 modelos de capa 2. La Fig.~\ref{fig:errores} compara el porcentaje de errores inyectados que detecta el modelo (cualquier capa) con el de la regla del rango del diccionario. El modelo detecta entre el 34\,\% y el 99\,\% según el tipo, frente a entre el 1\,\% y el 97\,\% de la regla vigente. La mayor ganancia está en los errores plausibles en sí mismos: un desvío de 3 DE pasa del 27\,\% al 78\,\%, y las etapas intercambiadas, del 5\,\% al 68\,\%. En los desvíos de 3 DE, la capa 1 detecta el 31\,\% y la capa 2 el 68\,\%; esa diferencia mide el aporte del contexto. El tipo más difícil es el valor de otro niño (34\,\%), porque solo se nota cuando choca con el resto de la información.
+
+\input{figuras/errores}
+
+En datos limpios, el modelo emite 18,8 alertas por cada 1.000 datos (capa 1: 4,4; capa 2: 8,9; capa 3: 7,2), frente a 14,7 de la regla vigente. La curva de $\alpha$ muestra el compromiso: con $\alpha = 0{,}001$ se emitirían 15,2 alertas por 1.000 y se detectaría el 72,7\,\% de los errores; con el valor adoptado, $\alpha = 0{,}005$, 18,8 y 75,3\,\%. La capa 2 alerta por encima de su meta (8,9 frente a 5) porque parte de los datos ``limpios'' son errores reales no marcados; solo la revisión experta puede separarlos.
+
+En la vigilancia temporal, un sesgo de báscula del tamaño de una escala de la capa 2 (unos 407~g en el peso de los 3 meses) dispara la alarma en el mismo trimestre en que empieza, con 3 alarmas falsas en el periodo sin sesgo. Al agregar una variable nueva (simulada con una talla), las capas 1 y 3 la revisan desde el primer dato y su modelo de capa 2 se entrena en 45 segundos sin cambiar los otros 131. Sobre toda la historia, el modelo envía a revisión 105.313 datos (19,4 por 1.000) de 38.466 niños; la tasa anual cae de 41,3 por 1.000 antes de 2022 a 13,0 después, coherente con un sistema de registro más controlado.
+
+\subsection{Alertas clínicas}
+\label{sec:res-clinico}
+Entrenar los 14 modelos tomó 3,5 minutos. Se excluyeron tres variables de llenado tardío; antes de quitarlas, el 62\,\% de los niños pendientes de la visita de 6 meses quedaba en el 10\,\% de mayor riesgo de no volver, un artefacto de fuga de información. De los 56.910 niños que entran al programa con fecha, el 7,5\,\% de los que ya debían volver a las 40 semanas no volvió.
+
+La Tabla~\ref{tab:clinico} resume la validación. El modelo supera a la regla simple en AUC en 13 de los 14 desenlaces y empata en el restante (oxigenodependencia a los 12 meses, 0,76). El mejor desempeño es la oxigenodependencia con diagnóstico a los 3 meses (AUC 0,91; 68\,\% de los casos en el 10\,\% de mayor riesgo, frente a 49\,\% de la regla) y el desarrollo psicomotor bajo (AUC 0,71 y 0,77; 35--39\,\% de los casos arriba frente a 20--24\,\%). ``No volver'' desde los 3 meses y la readmisión tardía apenas se anticipan (AUC 0,56--0,65).
+
+\begin{table*}[t]
+\centering
+\caption{Validación de las alertas clínicas en los niños de prueba (no vistos por el modelo)}
+\label{tab:clinico}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}llrrcccccc@{}}
+\toprule
+& & & & \multicolumn{2}{c}{\textbf{AUC}} & \multicolumn{2}{c}{\textbf{Casos en el 10\,\% superior (\%)}} & \textbf{Riesgo medio /} \\
+\cmidrule(lr){5-6}\cmidrule(lr){7-8}
+\textbf{Desenlace} & \textbf{Se calcula en} & \textbf{Niños} & \textbf{Casos (\%)} & \textbf{Modelo} & \textbf{Regla} & \textbf{Modelo} & \textbf{Regla} & \textbf{observado} \\
+\midrule
+Readmisión antes de 40 semanas & Entrada & 6.323 & 4,90 & 0,71 & 0,67 & 29,7 & 28,1 & 1,64 \\
+Readmisión 40 semanas--3 meses & 40 semanas & 3.886 & 3,68 & 0,67 & 0,58 & 22,4 & 23,1 & 1,39 \\
+Readmisión 3--6 meses & 3 meses & 3.385 & 1,60 & 0,62 & 0,53 & 16,7 & 18,5 & 2,96 \\
+Readmisión 6--9 meses & 6 meses & 2.615 & 1,99 & 0,57 & 0,48 & 15,4 & 11,5 & 1,59 \\
+Readmisión 9--12 meses & 9 meses & 2.295 & 1,57 & 0,65 & 0,50 & 19,4 & 13,9 & 2,01 \\
+\midrule
+No vuelve a 40 semanas & Entrada & 2.222 & 10,80 & 0,67 & 0,57 & 25,0 & 13,8 & 0,98 \\
+No vuelve a 3 meses & 40 semanas & 4.338 & 17,73 & 0,67 & 0,53 & 19,9 & 12,7 & 0,97 \\
+No vuelve a 6 meses & 3 meses & 4.660 & 29,55 & 0,56 & 0,49 & 13,1 & 9,6 & 0,90 \\
+No vuelve a 9 meses & 6 meses & 3.855 & 34,03 & 0,57 & 0,52 & 13,4 & 10,0 & 0,84 \\
+No vuelve a 12 meses & 9 meses & 3.150 & 29,71 & 0,58 & 0,52 & 14,7 & 10,7 & 1,06 \\
+\midrule
+Oxigenodependencia a 3 meses & Entrada & 5.315 & 3,78 & \textbf{0,91} & 0,80 & \textbf{67,7} & 49,3 & 1,58 \\
+Oxigenodependencia a 12 meses & 40 semanas & 2.140 & 0,98 & 0,76 & 0,76 & 57,1 & 33,3 & 0,98 \\
+Desarrollo psicomotor bajo a 6 meses & 3 meses & 3.187 & 4,42 & 0,71 & 0,57 & 35,5 & 19,9 & 0,99 \\
+Desarrollo psicomotor bajo a 12 meses & 6 meses & 2.343 & 4,65 & 0,77 & 0,59 & 39,5 & 23,9 & 0,91 \\
+\bottomrule
+\end{tabular}}
+\par\vspace{2pt}\raggedright\scriptsize Regla: el mismo modelo con solo edad gestacional, peso al nacer y peso a la entrada. Una razón riesgo/observado mayor que 1 indica sobreestimación. \fuente{elaboración propia.}
+\end{table*}
+
+Discriminar no es lo mismo que acertar el nivel. En 8 de los 14 desenlaces el riesgo medio está entre 0,8 y 1,25 veces lo observado, pero en 6 lo sobreestima, sobre todo en la readmisión de 3 a 6 meses (2,96 veces): los nacidos más recientes tienen menos eventos que los niños con que se calibró. El mismo patrón aparece por subgrupos: en la readmisión antes de las 40 semanas, el riesgo medio es 13,2\,\% frente a 8,0\,\% observado en menores de 32 semanas, 8,7\,\% frente a 5,4\,\% entre 32 y 36, y 6,2\,\% frente a 3,6\,\% en 37 o más; el orden entre grupos se conserva y el nivel se desplaza de forma pareja. Por ingreso del hogar la sobreestimación es mayor en el grupo de ingreso bajo (7,7\,\% frente a 3,3\,\%).
+
+En PR-AUC y días de anticipación: \pendiente{agregar PR-AUC por desenlace y la mediana de días entre el cálculo del riesgo y el evento}.
+
+\subsection{Crecimiento frente a la OMS}
+\label{sec:res-oms}
+La Tabla~\ref{tab:oms} resume el crecimiento desde las 40 semanas. La talla es el indicador más afectado (mediana de $z$ entre $-1{,}20$ y $-1{,}05$; 19--22\,\% por debajo de $-2$ DE), seguida del peso (11--12\,\%), mientras el perímetro cefálico se mantiene cerca de la mediana de la OMS. En total, 60.315 datos quedan por debajo de $-2$ DE o caen más de 1 DE entre visitas, y 770 superan el límite de dato improbable y se envían a revisión. La caída de más de 1 DE, máxima a los 3 meses (5,9\,\% de los pesos), aparece antes de que el niño cruce $-2$ DE, y es una señal que el modelo de anomalías nunca habría dado, porque en esta cohorte es común.
+
+\begin{table}[t]
+\centering
+\caption{Crecimiento frente a los estándares de la OMS por visita}
+\label{tab:oms}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}llrrrr@{}}
+\toprule
+\textbf{Visita} & \textbf{Indicador} & \textbf{Datos} & \textbf{$z$ med.} & \textbf{$<-2$ DE} & \textbf{Cae $>1$ DE} \\
+\midrule
+\multirow{3}{*}{40 sem.} & Peso & 24.120 & $-0{,}91$ & 11,7 & 0,3 \\
+ & Talla & 20.243 & $-1{,}11$ & 20,5 & 0,0 \\
+ & P. cefálico & 6.323 & 0,53 & 1,1 & 0,0 \\
+\midrule
+\multirow{3}{*}{3 meses} & Peso & 39.881 & $-0{,}66$ & 10,6 & 5,9 \\
+ & Talla & 39.808 & $-1{,}20$ & 22,4 & 5,5 \\
+ & P. cefálico & 39.712 & 0,05 & 4,2 & 2,3 \\
+\midrule
+\multirow{3}{*}{6 meses} & Peso & 33.067 & $-0{,}73$ & 12,0 & 3,6 \\
+ & Talla & 33.065 & $-1{,}14$ & 20,4 & 5,0 \\
+ & P. cefálico & 33.011 & 0,08 & 3,3 & 3,6 \\
+\midrule
+\multirow{3}{*}{9 meses} & Peso & 28.231 & $-0{,}67$ & 11,5 & 1,8 \\
+ & Talla & 28.153 & $-1{,}05$ & 18,9 & 3,8 \\
+ & P. cefálico & 28.176 & 0,14 & 3,3 & 3,0 \\
+\midrule
+\multirow{3}{*}{12 meses} & Peso & 25.660 & $-0{,}65$ & 10,7 & 1,4 \\
+ & Talla & 25.633 & $-1{,}06$ & 18,6 & 3,3 \\
+ & P. cefálico & 25.625 & 0,20 & 3,7 & 2,6 \\
+\bottomrule
+\end{tabular}
+\par\vspace{2pt}\raggedright\scriptsize Porcentajes de los datos de cada fila; $z$ por edad corregida (LMS). \fuente{elaboración propia.}
+\end{table}
+
+\textbf{Desenlaces de crecimiento a los 12 meses.} \pendiente{tabla con AUC, AUC de la regla y casos en el 10\,\% de mayor riesgo para talla baja, peso bajo, desnutrición aguda (peso para la talla) y perímetro cefálico bajo a los 12 meses, calculados desde las 40 semanas y los 3, 6 y 9 meses}.
+
+\subsection{Validación retrospectiva y plausibilidad de las explicaciones}
+\label{sec:res-silencio}
+\pendiente{periodo en silencio retrospectivo: corte usado, niños pendientes en ese corte, AUC, calibración y casos en el 10\,\% de mayor riesgo frente a lo ocurrido después, por desenlace}.
+
+\pendiente{análisis de plausibilidad: las variables con mayor contribución TreeSHAP por desenlace, contrastadas con la literatura clínica, y dos o tres casos anonimizados con su ``porqué''}.
+
+\subsection{Despliegue}
+\label{sec:res-despliegue}
+\pendiente{resultados del despliegue: corridas completas exitosas y su duración, tiempo de respuesta de la API por niño y por lote, pruebas automáticas aprobadas, pruebas de los tres perfiles y del correo, y captura del tablero con la línea temporal de un niño simulado}.

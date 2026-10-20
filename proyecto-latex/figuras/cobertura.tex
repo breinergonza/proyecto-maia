@@ -1,0 +1,23 @@
+% Figura: cobertura del peso entre los niños elegibles por visita
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=\columnwidth, height=4.6cm,
+  ybar, bar width=12pt,
+  ymin=0, ymax=110, ytick={0,25,50,75,100},
+  ylabel={Niños elegibles con peso (\%)}, ylabel style={font=\footnotesize},
+  symbolic x coords={Nacim.,Entrada,40 sem.,3 m,6 m,9 m,12 m},
+  xtick={Nacim.,Entrada,40 sem.,3 m,6 m,9 m,12 m}, xticklabel style={font=\footnotesize},
+  yticklabel style={font=\footnotesize},
+  nodes near coords, nodes near coords style={font=\scriptsize, /pgf/number format/use comma, /pgf/number format/precision=0, /pgf/number format/fixed},
+  axis lines*=left, ymajorgrids, grid style={black!12},
+  enlarge x limits=0.08,
+]
+\addplot[fill=tinta, draw=tinta] coordinates {(Entrada,99.56) (40 sem.,78.01) (3 m,72.11) (6 m,61.33) (9 m,53.18) (12 m,49.37)};
+\addplot[fill=black!25, draw=black!45, forget plot] coordinates {(Nacim.,28.65)};
+\end{axis}
+\end{tikzpicture}
+\caption{Cobertura del peso entre los niños que ya tenían edad para cada visita. El nacimiento (gris) solo se registra desde 2022. \fuente{elaboración propia.}}
+\label{fig:cobertura}
+\end{figure}

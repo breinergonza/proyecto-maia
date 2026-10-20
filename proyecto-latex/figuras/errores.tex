@@ -1,0 +1,27 @@
+% Figura: errores inyectados detectados por tipo, modelo frente a la regla vigente
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  scale only axis, width=4.3cm, height=4.4cm,
+  xbar, bar width=5pt,
+  xmin=0, xmax=112, xtick={0,25,50,75,100},
+  xlabel={Errores detectados (\%)}, xlabel style={font=\footnotesize},
+  symbolic y coords={Otro niño,Etapas intercambiadas,Dígitos invertidos,Desvío de 3 DE,Unidad,Código},
+  ytick=data, yticklabel style={font=\footnotesize},
+  xticklabel style={font=\footnotesize},
+  nodes near coords, nodes near coords style={font=\scriptsize, /pgf/number format/use comma, /pgf/number format/precision=0, /pgf/number format/fixed},
+  axis lines*=left, xmajorgrids, grid style={black!12},
+  enlarge y limits=0.12,
+  legend style={font=\scriptsize, at={(0.3,-0.22)}, anchor=north, draw=none, legend columns=1},
+  legend cell align=left,
+  reverse legend,
+]
+\addplot[fill=black!25, draw=black!45] coordinates {(0.92,Otro niño) (5.44,Etapas intercambiadas) (41.93,Dígitos invertidos) (26.65,Desvío de 3 DE) (55.83,Unidad) (97.24,Código)};
+\addplot[fill=tinta, draw=tinta] coordinates {(34.33,Otro niño) (68.30,Etapas intercambiadas) (75.55,Dígitos invertidos) (77.69,Desvío de 3 DE) (85.76,Unidad) (98.77,Código)};
+\legend{Rango del diccionario (regla vigente), Modelo de anomalías (cualquier capa)}
+\end{axis}
+\end{tikzpicture}
+\caption{Porcentaje de errores inyectados que se detectan, por tipo de error, en la partición de prueba. \fuente{elaboración propia.}}
+\label{fig:errores}
+\end{figure}
