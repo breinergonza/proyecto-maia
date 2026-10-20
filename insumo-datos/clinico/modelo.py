@@ -221,7 +221,8 @@ class ModeloClinico:
         mapa = dict(self.cfg.codigos_sexo)
         s = datos[datos.variable == self.cfg.sexo].drop_duplicates('sujeto').set_index('sujeto').valor
         sexo = s.astype(str).str.replace(r'\.0$', '', regex=True).map(mapa)
-        z = CR.puntajes_z(datos, x, sexo, self.cfg.medidas, CR.leer_referencia(), set(self.cfg.etapas_crecimiento))
+        z = CR.puntajes_z(datos, x, sexo, self.cfg.medidas, CR.leer_referencia(), set(self.cfg.etapas_crecimiento),
+                          sev.etapas)
         return Preparado(sev, datos, x, sexo, z)
 
     def _variables_tardias(self, sev: Sevarti, datos: pd.DataFrame) -> list[str]:
@@ -312,8 +313,10 @@ class ModeloClinico:
         sujetos = self._poblacion(p, des)
         if des.regla == 'no_vuelve':
             return self._no_vuelve(p, des, sujetos)
-        if des.regla == 'z_bajo':   # known for children measured at that visit; an implausible z is a data error
-            z = p.z[(p.z.concepto == des.concepto) & (p.z.etapa == des.etapa) & (p.z.z.abs() <= CR.Z_IMPROBABLE)]
+        if des.regla == 'z_bajo':   # known for children measured at that visit; an implausible z, or an age
+                                    # that is not the visit's, is a data error
+            z = p.z[(p.z.concepto == des.concepto) & (p.z.etapa == des.etapa) & (p.z.z.abs() <= CR.Z_IMPROBABLE)
+                    & p.z.en_ventana]
             z = z.groupby('sujeto').z.first()
             limite = next((m.z_bajo for m in self.cfg.medidas if m.nombre == des.concepto), CR.Z_BAJO)
             return (z < limite).astype(float).reindex(sujetos)
@@ -670,7 +673,7 @@ def crecimiento_desde(modelo: ModeloClinico, p: Preparado, desde: pd.Timestamp |
     """Growth alerts of the data recorded since a date (all of them without one)."""
     c = modelo.crecimiento(p)
     c = c.join(p.datos[['t']])
-    c = c[c.bajo | c.cae | c.improbable]
+    c = c[c.bajo | c.cae | c.revisar]
     if desde is not None:
         c = c[c.t >= desde]
     return c

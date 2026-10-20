@@ -350,7 +350,8 @@ RIESGOS = Libro(
         'calibró el sistema. Por qué: los datos del niño que más subieron su riesgo.',
         'El archivo trae a todos los niños. A cuántos se llama o se cita lo decide el equipo, no el sistema.',
         'La hoja "Crecimiento" lista las medidas por debajo de la curva de la OMS o que cayeron desde la visita '
-        'anterior. "Revisar el dato" quiere decir que el valor es tan extremo que probablemente está mal anotado.',
+        'anterior. "Revisar el dato" quiere decir que el valor es tan extremo, o la edad anotada tan lejos de la '
+        'de esa visita, que probablemente está mal anotado.',
     ),
     hojas=(
         Hoja('Riesgo', 'Un niño por fila y por desenlace, el riesgo más alto primero', (
@@ -372,7 +373,8 @@ RIESGOS = Libro(
                     formato='0.00'),
             Columna('z_previo', 'Puntaje z anterior', 'El de la visita anterior, para ver la caída.', 12,
                     formato='0.00'),
-            Columna('motivo', 'Qué pasó', 'Por debajo de la curva, cayó desde la visita anterior, o revisar el dato.',
+            Columna('motivo', 'Qué pasó', 'Por debajo de la curva, cayó desde la visita anterior, o revisar el dato '
+                    '(valor extremo o edad que no es la de esa visita).',
                     44, largo=True),
         )),
         Hoja('Resumen', 'Cuántos niños hay y su riesgo promedio, por desenlace', (
