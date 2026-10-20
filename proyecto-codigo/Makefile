@@ -116,7 +116,7 @@ sincronizar-nucleo:  ## trae la versión nueva de insumo-datos (solo lectura) y 
 	rsync -a --exclude '.git' --exclude 'salidas/' --exclude 'interno/' --exclude 'privado/' --exclude '__pycache__/' \
 	  --exclude 'entradas/retroalimentacion/' --exclude '*.parquet' --exclude '*.pkl' \
 	  --exclude 'pyproject.toml' --exclude 'parches/' "$(INSUMO)/" nucleo/
-	for p in nucleo/parches/*.patch; do patch -p1 -d nucleo --forward < "$$p" || exit 1; done
+	for p in nucleo/parches/*.patch; do patch -p1 -d nucleo --forward --binary < "$$p" || exit 1; done
 	uv run pytest nucleo/pruebas -q
 
 railway-api:  ## despliega la API en Railway (servicio "api"; ver infra/railway/README.md)
