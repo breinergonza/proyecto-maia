@@ -1,0 +1,309 @@
+"""La API de punta a punta con datos simulados: Postgres real, paquete firmado de verdad y un SMTP de prueba.
+
+Entorno ``demo`` (como Railway): cookies seguras, solo paquetes simulados y una cohorte simulada sembrada al arrancar.
+"""
+from __future__ import annotations
+
+import io
+import socket
+import tarfile
+import time
+from dataclasses import replace
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+
+pytestmark = [pytest.mark.integracion, pytest.mark.timeout(1800)]
+
+CLAVE_PAQUETE = 'clave-de-paquete-de-prueba'
+ADMIN = ('admin@maia.prueba', 'clave-admin-de-prueba')
+
+
+def _puerto_libre() -> int:
+    with socket.socket() as s:
+        s.bind(('127.0.0.1', 0))
+        return s.getsockname()[1]
+
+
+@pytest.fixture(scope='module')
+def smtp():
+    from aiosmtpd.controller import Controller
+
+    class Buzon:
+        def __init__(self):
+            self.mensajes: list = []
+
+        async def handle_DATA(self, server, session, envelope):
+            self.mensajes.append(envelope)
+            return '250 OK'
+
+    buzon = Buzon()
+    c = Controller(buzon, hostname='127.0.0.1', port=_puerto_libre())
+    c.start()
+    yield c.port, buzon
+    c.stop()
+
+
+@pytest.fixture(scope='module')
+def paquetes(tmp_path_factory):
+    """Un paquete simulado válido (modelos pequeños), uno de "kmc" y uno alterado."""
+    from anomalias import modelo as MA
+    from archivos import carpetas as CA
+    from archivos.carpetas import Carpetas
+    from maia_comun import paquete as PQ
+    from maia_comun import simulados
+    from maia_entrenamiento import datos as D
+    from maia_entrenamiento import entrenar as EN
+
+    tmp = tmp_path_factory.mktemp('paquetes')
+    mp = pytest.MonkeyPatch()
+    mp.setattr(CA, 'PROYECTO', Carpetas(tmp / 'raiz'))
+    try:
+        sev = simulados.simular(2500, semilla=5)
+        cfg_a = MA.Config(dispositivo='cpu', rondas=40)
+        a = EN.entrenar_anomalias(sev, 'simulado', cfg_a, validar=False, registrar=False)
+        cfg_c = replace(D.config_clinica('simulado'), dispositivo='cpu')
+        c = EN.entrenar_clinico(sev, 'simulado', cfg_c, validar=True, registrar=False)
+        base = EN._sevarti_base(sev, tmp / 'sevarti_base')
+        modelos = {'anomalias': {'registro': 'maia-anomalias-demo', 'version': '1'},
+                   'clinico': {'registro': 'maia-clinico-demo', 'version': '1'}}
+        valido = PQ.armar(tmp / 'valido' / PQ.NOMBRE, a.carpeta, c.carpeta, base, 'simulado', CLAVE_PAQUETE,
+                          modelos, metricas=c.metricas)
+        kmc = PQ.armar(tmp / 'kmc' / PQ.NOMBRE, a.carpeta, c.carpeta, base, 'kmc', CLAVE_PAQUETE, modelos)
+        alterado = tmp / 'alterado' / PQ.NOMBRE
+        alterado.parent.mkdir()
+        with tarfile.open(valido) as t_in, tarfile.open(alterado, 'w:gz') as t_out:
+            for m in t_in.getmembers():
+                datos = t_in.extractfile(m).read() if m.isfile() else None
+                if m.name == 'sevarti_base/corte.json':
+                    datos = b'{"corte": "1999-01-01"}'
+                    m.size = len(datos)
+                t_out.addfile(m, io.BytesIO(datos) if datos is not None else None)
+    finally:
+        mp.undo()
+    return {'valido': valido, 'kmc': kmc, 'alterado': alterado}
+
+
+@pytest.fixture(scope='module')
+def cliente(url_db_propia, smtp, tmp_path_factory):
+    from maia_api import estado as E
+    from maia_api import seguridad as SG
+    from maia_comun import config, db
+    puerto, _ = smtp
+    tmp = tmp_path_factory.mktemp('api')
+    mp = pytest.MonkeyPatch()
+    for k, v in {'DATABASE_URL': url_db_propia, 'MAIA_ENTORNO': 'demo', 'MAIA_SOLO_SIMULADO': 'true',
+                 'MAIA_PAQUETE_CLAVE': CLAVE_PAQUETE, 'MAIA_JWT_SECRETO': 'secreto-jwt-de-prueba-con-mas-de-32-caracteres',
+                 'MAIA_ADMIN_EMAIL': ADMIN[0], 'MAIA_ADMIN_CLAVE': ADMIN[1], 'MAIA_DIR_PAQUETES': str(tmp / 'paquetes'),
+                 'MAIA_DEMO_SUJETOS': '600', 'MAIA_URL_PUBLICA': 'https://maia.prueba',
+                 'SMTP_HOST': '127.0.0.1', 'SMTP_PORT': str(puerto), 'SMTP_TLS': 'false'}.items():
+        mp.setenv(k, v)
+    mp.chdir(tmp)
+    config.obtener.cache_clear()
+    db.motor.cache_clear()
+    E.limpiar()
+    SG.limite_login.limpiar()
+    from maia_api.main import crear_app
+    with TestClient(crear_app(), base_url='https://testserver') as c:
+        yield c
+    E.limpiar()
+    mp.undo()
+    config.obtener.cache_clear()
+    db.motor.cache_clear()
+
+
+def _login(c: TestClient, email: str, clave: str) -> dict:
+    from maia_api import seguridad as SG
+    SG.limite_login.limpiar()
+    r = c.post('/api/auth/login', json={'email': email, 'clave': clave})
+    assert r.status_code == 200, r.text
+    return {'Authorization': f'Bearer {r.json()["acceso"]}'}
+
+
+@pytest.fixture(scope='module')
+def admin(cliente):
+    return _login(cliente, *ADMIN)
+
+
+# ------------------------------------------------------------------ auth y roles
+
+def test_salud_y_semillas(cliente):
+    r = cliente.get('/api/salud')
+    assert r.status_code == 200
+    assert r.json() == {'db': True, 'paquete': None, 'entorno': 'demo'}
+
+
+def test_login_refresco_y_reuso(cliente):
+    from maia_api import seguridad as SG
+    SG.limite_login.limpiar()
+    assert cliente.post('/api/auth/login', json={'email': ADMIN[0], 'clave': 'otra'}).status_code == 401
+    assert cliente.get('/api/auth/yo').status_code == 401
+    cab = _login(cliente, *ADMIN)
+    assert cliente.get('/api/auth/yo', headers=cab).json()['rol'] == 'admin'
+    viejo = cliente.cookies.get(SG.COOKIE_REFRESCO)
+    assert viejo
+    r = cliente.post('/api/auth/refrescar')
+    assert r.status_code == 200 and r.json()['acceso']
+    nuevo = cliente.cookies.get(SG.COOKIE_REFRESCO)
+    assert nuevo and nuevo != viejo
+    # reusar el token ya rotado cierra todas las sesiones, también la nueva
+    cliente.cookies.clear()
+    cliente.cookies.set(SG.COOKIE_REFRESCO, viejo, path=SG.RUTA_COOKIE)
+    assert cliente.post('/api/auth/refrescar').status_code == 401
+    cliente.cookies.clear()
+    cliente.cookies.set(SG.COOKIE_REFRESCO, nuevo, path=SG.RUTA_COOKIE)
+    assert cliente.post('/api/auth/refrescar').status_code == 401
+    cliente.cookies.clear()
+
+
+def test_limite_de_intentos(cliente):
+    from maia_api import seguridad as SG
+    SG.limite_login.limpiar()
+    codigos = [cliente.post('/api/auth/login', json={'email': ADMIN[0], 'clave': 'mala'}).status_code
+               for _ in range(SG.limite_login.maximo + 1)]
+    assert codigos[-1] == 429
+    SG.limite_login.limpiar()
+
+
+def test_usuarios_y_roles(cliente, admin):
+    for email, rol in (('experta@maia.prueba', 'experto'), ('visor@maia.prueba', 'visualizador')):
+        r = cliente.post('/api/usuarios', headers=admin,
+                         json={'email': email, 'nombre': rol.title(), 'rol': rol, 'clave': 'clave-larga-123'})
+        assert r.status_code == 201, r.text
+    visor = _login(cliente, 'visor@maia.prueba', 'clave-larga-123')
+    experta = _login(cliente, 'experta@maia.prueba', 'clave-larga-123')
+    assert cliente.get('/api/usuarios', headers=visor).status_code == 403
+    assert cliente.get('/api/corridas', headers=visor).status_code == 403
+    assert cliente.get('/api/revision/datos', headers=visor).status_code == 403
+    assert cliente.get('/api/corridas', headers=experta).status_code == 403
+    assert cliente.get('/api/modelos/activo', headers=visor).status_code == 200
+    r = cliente.post('/api/usuarios', headers=admin,
+                     json={'email': 'experta@maia.prueba', 'nombre': 'Otra', 'rol': 'experto', 'clave': 'clave-larga-123'})
+    assert r.status_code == 409
+
+
+# ------------------------------------------------------------------ paquetes, corrida y resultados
+
+def _subir(c: TestClient, cab: dict, ruta: Path):
+    with open(ruta, 'rb') as f:
+        return c.post('/api/modelos/paquetes', headers=cab, files={'archivo': (ruta.name, f, 'application/gzip')})
+
+
+def test_paquetes(cliente, admin, paquetes):
+    r = _subir(cliente, admin, paquetes['kmc'])
+    assert r.status_code == 422 and 'simulados' in r.json()['detail']
+    r = _subir(cliente, admin, paquetes['alterado'])
+    assert r.status_code == 422 and 'no coinciden' in r.json()['detail']
+    r = _subir(cliente, admin, paquetes['valido'])
+    assert r.status_code == 200, r.text
+    version = r.json()['version']
+    assert _subir(cliente, admin, paquetes['valido']).status_code == 409
+    r = cliente.post(f'/api/modelos/paquetes/{version}/activar', headers=admin)
+    assert r.status_code == 200 and r.json()['activo']
+    assert cliente.get('/api/salud').json()['paquete'] == version
+    assert cliente.get('/api/modelos/activo', headers=admin).json()['version'] == version
+
+
+def test_notificaciones_config_y_prueba(cliente, admin, smtp):
+    _, buzon = smtp
+    configs = cliente.get('/api/notificaciones/config', headers=admin).json()
+    assert configs, 'al activar el paquete se crea una configuración por desenlace'
+    d = configs[0]['desenlace']
+    r = cliente.put(f'/api/notificaciones/config/{d}', headers=admin,
+                    json={'desenlace': d, 'percentil_minimo': 90, 'destinatarios': [], 'activo': True})
+    assert r.status_code == 422
+    r = cliente.put(f'/api/notificaciones/config/{d}', headers=admin,
+                    json={'desenlace': d, 'percentil_minimo': 90, 'destinatarios': ['Clinica@Maia.Prueba'],
+                          'activo': True})
+    assert r.status_code == 200 and r.json()['destinatarios'] == ['clinica@maia.prueba']
+    antes = len(buzon.mensajes)
+    assert cliente.post('/api/notificaciones/prueba', headers=admin,
+                        json={'destinatario': 'clinica@maia.prueba'}).status_code == 204
+    assert len(buzon.mensajes) == antes + 1
+
+
+@pytest.fixture(scope='module')
+def corrida(cliente, admin, paquetes):
+    r = cliente.post('/api/corridas', headers=admin, json={'tipo': 'demo'})
+    assert r.status_code == 202, r.text
+    cid = r.json()['id']
+    assert cliente.post('/api/corridas', headers=admin, json={'tipo': 'demo'}).status_code == 409
+    fin = time.time() + 900
+    while time.time() < fin:
+        c = cliente.get(f'/api/corridas/{cid}', headers=admin).json()
+        if c['estado'] != 'en_curso':
+            break
+        time.sleep(1)
+    assert c['estado'] == 'ok', c
+    return c
+
+
+def test_corrida_y_tablero(cliente, admin, corrida, smtp):
+    _, buzon = smtp
+    assert corrida['resumen']['ninos'] == 600
+    r = cliente.get('/api/tablero/resumen', headers=admin).json()
+    assert r['corrida']['id'] == corrida['id'] and r['ninos'] == 600
+    assert r['crecimiento_por_etapa']
+    d = cliente.get('/api/tablero/desempeno', headers=admin).json()
+    assert d['desenlaces'] and 'auc' in d['desenlaces'][0]
+    assert isinstance(cliente.get('/api/tablero/alarmas-grupo', headers=admin).json(), list)
+    if corrida['resumen'].get('notificaciones', {}).get('correos'):
+        assert len(buzon.mensajes) >= 2   # el de prueba y al menos uno de riesgo alto
+        h = cliente.get('/api/notificaciones/historial', headers=admin).json()
+        assert h['total'] >= 1 and h['items'][0]['estado'] == 'enviado'
+
+
+def test_ninos_y_linea_temporal(cliente, admin, corrida):
+    r = cliente.get('/api/ninos', headers=admin, params={'tamano': 5}).json()
+    assert r['total'] == 600 and len(r['items']) == 5
+    sujeto = r['items'][0]['sujeto']
+    lt = cliente.get(f'/api/ninos/{sujeto}/linea-temporal', headers=admin)
+    assert lt.status_code == 200, lt.text
+    lt = lt.json()
+    assert lt['sujeto'] == sujeto and lt['visitas']
+    assert all(lt['visitas'][i]['orden'] <= lt['visitas'][i + 1]['orden'] for i in range(len(lt['visitas']) - 1))
+    assert cliente.get('/api/ninos/no-existe/linea-temporal', headers=admin).status_code == 404
+    if r['items'][0]['percentil_max'] is not None:
+        filtrado = cliente.get('/api/ninos', headers=admin, params={'percentil_min': 90}).json()
+        assert all(i['percentil_max'] >= 90 for i in filtrado['items'])
+
+
+def test_revision(cliente, admin, corrida):
+    experta = _login(cliente, 'experta@maia.prueba', 'clave-larga-123')
+    cola = cliente.get('/api/revision/datos', headers=experta).json()
+    if cola['items']:
+        a = cola['items'][0]
+        assert cliente.post(f'/api/revision/datos/{a["id"]}', headers=experta, json={'es_error': 'si'}).status_code == 204
+        assert cliente.post(f'/api/revision/datos/{a["id"]}', headers=experta,
+                            json={'es_error': 'no', 'comentario': 'Lo confirmé'}).status_code == 204
+        revisados = cliente.get('/api/revision/datos', headers=experta, params={'estado': 'revisado'}).json()
+        assert revisados['total'] == 1 and revisados['items'][0]['es_error'] == 'no'
+        assert cola['total'] - 1 == cliente.get('/api/revision/datos', headers=experta).json()['total']
+    assert cliente.post('/api/revision/datos/999999999', headers=experta, json={'es_error': 'si'}).status_code == 404
+    muestra = cliente.get('/api/revision/riesgos', headers=experta).json()['items']
+    assert len(muestra) <= 40
+    assert all('riesgo' not in m and 'percentil' not in m for m in muestra), 'la revisión es ciega'
+    if muestra:
+        assert cliente.post(f'/api/revision/riesgos/{muestra[0]["id"]}', headers=experta,
+                            json={'preocupa': 'si'}).status_code == 204
+    res = cliente.get('/api/revision/resumen', headers=experta).json()
+    assert res['corrida_id'] == corrida['id']
+    if muestra:
+        assert sum(g['respuestas'] for g in res['riesgos_por_grupo']) == 1
+
+
+def test_inferencia(cliente, admin, corrida):
+    ej = cliente.get('/api/inferencia/ejemplo', headers=admin)
+    assert ej.status_code == 200, ej.text
+    peticion = ej.json()
+    peticion.pop('nota')
+    r = cliente.post('/api/inferencia', headers=admin, json=peticion)
+    assert r.status_code == 200, r.text
+    out = r.json()
+    assert out['crecimiento'] and isinstance(out['riesgos'], list)
+    assert all(isinstance(x['motivos'], list) for x in out['riesgos'])
+    malo = dict(peticion, mediciones=[dict(peticion['mediciones'][0], sujeto='otro')])
+    assert cliente.post('/api/inferencia', headers=admin, json=malo).status_code == 422
+    visor = _login(cliente, 'visor@maia.prueba', 'clave-larga-123')
+    assert cliente.post('/api/inferencia', headers=visor, json=peticion).status_code == 403

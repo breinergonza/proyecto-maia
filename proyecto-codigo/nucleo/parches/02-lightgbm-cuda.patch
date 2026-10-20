@@ -1,0 +1,183 @@
+--- a/anomalias/modelo.py
++++ b/anomalias/modelo.py
+@@ -23,6 +23,8 @@
+ 
+ import hashlib
+ import json
++import os
++import sys
+ import zlib
+ from dataclasses import asdict, dataclass, field, replace
+ from pathlib import Path
+@@ -59,7 +61,9 @@
+     hojas: int = 31
+     min_hoja: int = 40
+     semilla: int = 7
+-    dispositivo: str = 'cpu'        # 'gpu' needs a LightGBM build with GPU support
++    # 'cuda' needs a LightGBM build with CUDA; MAIA_LGBM_DEVICE sets it without touching code.
++    # Whatever the device cannot train falls back to CPU (``entrenar_lgb``).
++    dispositivo: str = field(default_factory=lambda: dispositivo_lgb())
+     hilos: int = 8                  # per model: one variable has a few 10,000 rows, more threads only contend
+     periodo: str = 'Q'
+     base_periodos: int = 8          # layer 4 baseline: the group's previous periods
+@@ -68,6 +72,45 @@
+     cusum_h: float = 8.0            # layer 4: CUSUM limit; ~60 series (variable x group) share it
+ 
+ 
++# ================================================================== LightGBM device
++
++def dispositivo_lgb() -> str:
++    """The device LightGBM is asked to train on: ``MAIA_LGBM_DEVICE`` (cpu, cuda or gpu), cpu by default."""
++    return (os.environ.get('MAIA_LGBM_DEVICE') or 'cpu').strip().lower()
++
++
++DISPOSITIVOS_USADOS: dict[str, set[str]] = {}   # objective -> devices it really trained on, this process
++_AVISADOS: set[str] = set()
++
++
++def entrenar_lgb(params: dict, X_tr: pd.DataFrame, y_tr, X_va: pd.DataFrame, y_va, cats: list[str],
++                 **train_kwargs) -> lgb.Booster:
++    """``lgb.train`` on the device in ``params``. If that device cannot train this model (an objective
++    the CUDA learner lacks, or a LightGBM built without it), the same model is trained on CPU and the
++    fallback is reported once per objective. The datasets are built here so a failed attempt on the
++    device leaves nothing half-constructed for the CPU one."""
++    def correr(p: dict) -> lgb.Booster:
++        tr = lgb.Dataset(X_tr, y_tr, categorical_feature=cats, free_raw_data=False)
++        va = lgb.Dataset(X_va, y_va, categorical_feature=cats, reference=tr, free_raw_data=False)
++        return lgb.train(p, tr, valid_sets=[va], **train_kwargs)
++
++    objetivo = str(params.get('objective'))
++    dispositivo = str(params.get('device_type', 'cpu'))
++    if dispositivo != 'cpu':
++        try:
++            modelo = correr(params)
++            DISPOSITIVOS_USADOS.setdefault(objetivo, set()).add(dispositivo)
++            return modelo
++        except lgb.basic.LightGBMError as e:
++            if objetivo not in _AVISADOS:
++                _AVISADOS.add(objetivo)
++                print(f'LightGBM no entrena "{objetivo}" en {dispositivo} ({str(e).splitlines()[0][:160]}); '
++                      f'esos modelos se entrenan en CPU.', file=sys.stderr, flush=True)
++    modelo = correr({**params, 'device_type': 'cpu'})
++    DISPOSITIVOS_USADOS.setdefault(objetivo, set()).add('cpu')
++    return modelo
++
++
+ # ============================================================== layer 0: contrato
+ 
+ def preparar(sev: Sevarti) -> tuple[pd.DataFrame, pd.DataFrame]:
+@@ -444,12 +487,10 @@
+     for q in cfg.cuantiles:
+         params = dict(objective='quantile', alpha=q, learning_rate=cfg.tasa, num_leaves=cfg.hojas,
+                       min_data_in_leaf=cfg.min_hoja, feature_fraction=0.8, bagging_fraction=0.8, bagging_freq=1,
+-                      max_bin=63, seed=cfg.semilla, verbose=-1, device_type=cfg.dispositivo,
++                      max_bin=63, seed=cfg.semilla, verbose=-1, device_type=getattr(cfg, 'dispositivo', 'cpu'),
+                       num_threads=cfg.hilos)
+-        tr = lgb.Dataset(X[~valid], y[~valid], categorical_feature=cats, free_raw_data=False)
+-        va = lgb.Dataset(X[valid], y[valid], categorical_feature=cats, reference=tr, free_raw_data=False)
+-        modelos.append(lgb.train(params, tr, num_boost_round=cfg.rondas, valid_sets=[va],
+-                                 callbacks=[lgb.early_stopping(30, verbose=False)]))
++        modelos.append(entrenar_lgb(params, X[~valid], y[~valid], X[valid], y[valid], cats,
++                                    num_boost_round=cfg.rondas, callbacks=[lgb.early_stopping(30, verbose=False)]))
+     return modelos
+ 
+ 
+--- a/clinico/modelo.py
++++ b/clinico/modelo.py
+@@ -70,6 +70,8 @@
+     min_hoja: int = 50
+     hilos: int = 8
+     semilla: int = 11
++    # 'cuda' with a CUDA build of LightGBM (MAIA_LGBM_DEVICE); what it cannot train falls back to CPU
++    dispositivo: str = field(default_factory=lambda: MA.dispositivo_lgb())
+     min_casos: int = 30                  # an outcome needs this many events to be modelled
+     dias_recientes: int = 90             # visits this close to the cut tell which variables arrive late
+     fraccion_calibracion: float = 0.15   # most recent children with a known outcome, to set the level
+@@ -388,11 +390,10 @@
+         cats = [c for c in X if isinstance(X[c].dtype, pd.CategoricalDtype)]
+         params = dict(objective='binary', learning_rate=cfg.tasa, num_leaves=cfg.hojas, min_data_in_leaf=cfg.min_hoja,
+                       feature_fraction=0.8, bagging_fraction=0.8, bagging_freq=1, lambda_l2=1.0, max_bin=63,
+-                      seed=cfg.semilla, verbose=-1, num_threads=cfg.hilos)
+-        tr = lgb.Dataset(X[~valid], y[~valid], categorical_feature=cats, free_raw_data=False)
+-        va = lgb.Dataset(X[valid], y[valid], categorical_feature=cats, reference=tr, free_raw_data=False)
+-        return lgb.train(params, tr, num_boost_round=cfg.rondas, valid_sets=[va],
+-                         callbacks=[lgb.early_stopping(50, verbose=False)])
++                      seed=cfg.semilla, verbose=-1, num_threads=cfg.hilos,
++                      device_type=getattr(cfg, 'dispositivo', 'cpu'))
++        return MA.entrenar_lgb(params, X[~valid], y[~valid], X[valid], y[valid], cats,
++                               num_boost_round=cfg.rondas, callbacks=[lgb.early_stopping(50, verbose=False)])
+ 
+     def ajustar(self, sev: Sevarti, progreso: bool = False, tardias: list[str] | None = None) -> ModeloClinico:
+         """Fit every outcome on ``sev``. Each outcome is calibrated on the most recent children
+--- a/pruebas/test_dispositivo.py
++++ b/pruebas/test_dispositivo.py
+@@ -0,0 +1,69 @@
++"""The LightGBM device: chosen by MAIA_LGBM_DEVICE, with a CPU fallback for whatever the device cannot train.
++
++``test_paridad_gpu_cpu`` needs an NVIDIA GPU and a CUDA build of LightGBM; it is skipped elsewhere."""
++import lightgbm as lgb
++import numpy as np
++import pandas as pd
++import pytest
++from anomalias import modelo as MA
++from clinico import modelo as AC
++
++
++def _datos(n=400, semilla=0):
++    rng = np.random.default_rng(semilla)
++    X = pd.DataFrame({'a': rng.normal(size=n), 'b': rng.normal(size=n)})
++    y = (X.a + 0.5 * X.b + rng.normal(scale=0.5, size=n) > 0).astype(float)
++    return X, y
++
++
++def _cuda_disponible() -> bool:
++    X, y = _datos(60)
++    try:
++        lgb.train(dict(objective='binary', device_type='cuda', verbose=-1), lgb.Dataset(X, y), num_boost_round=2)
++        return True
++    except lgb.basic.LightGBMError:
++        return False
++
++
++def test_dispositivo_por_variable_de_entorno(monkeypatch):
++    monkeypatch.delenv('MAIA_LGBM_DEVICE', raising=False)
++    assert MA.Config().dispositivo == 'cpu'
++    monkeypatch.setenv('MAIA_LGBM_DEVICE', 'CUDA')
++    assert MA.Config().dispositivo == 'cuda'
++    cfg = AC.ConfigClinica(desenlaces=(), sexo='sexo', codigos_sexo=(), medidas=(), etapas_crecimiento=())
++    assert cfg.dispositivo == 'cuda'
++
++
++def test_sin_cuda_entrena_en_cpu_y_avisa_una_vez(capsys):
++    if _cuda_disponible():
++        pytest.skip('esta máquina sí entrena en CUDA')
++    MA.DISPOSITIVOS_USADOS.clear()   # clean record of devices and warnings
++    MA._AVISADOS.clear()
++    X, y = _datos()
++    params = dict(objective='binary', device_type='cuda', verbose=-1, seed=1)
++    m1 = MA.entrenar_lgb(params, X[:300], y[:300], X[300:], y[300:], [], num_boost_round=20)
++    m2 = MA.entrenar_lgb(params, X[:300], y[:300], X[300:], y[300:], [], num_boost_round=20)
++    assert isinstance(m1, lgb.Booster) and isinstance(m2, lgb.Booster)
++    assert MA.DISPOSITIVOS_USADOS['binary'] == {'cpu'}
++    assert capsys.readouterr().err.count('se entrenan en CPU') == 1
++    cpu = MA.entrenar_lgb({**params, 'device_type': 'cpu'}, X[:300], y[:300], X[300:], y[300:], [], num_boost_round=20)
++    np.testing.assert_allclose(m1.predict(X), cpu.predict(X))
++
++
++@pytest.mark.gpu
++def test_paridad_gpu_cpu():
++    """A model trained on the GPU predicts on CPU (the API) like one trained on CPU: on average within
++    0.02 and with mostly the same children in the top decile."""
++    if not _cuda_disponible():
++        pytest.skip('sin GPU NVIDIA o sin LightGBM compilado con CUDA')
++    X, y = _datos(5000, semilla=3)
++    base = dict(objective='binary', verbose=-1, seed=1, learning_rate=0.05, num_leaves=31, max_bin=63)
++    gpu = MA.entrenar_lgb({**base, 'device_type': 'cuda'}, X[:4000], y[:4000], X[4000:], y[4000:], [],
++                          num_boost_round=100)
++    cpu = MA.entrenar_lgb({**base, 'device_type': 'cpu'}, X[:4000], y[:4000], X[4000:], y[4000:], [],
++                          num_boost_round=100)
++    pg, pc = gpu.predict(X), cpu.predict(X)
++    assert np.mean(np.abs(pg - pc)) < 0.02
++    k = len(X) // 10
++    arriba_g, arriba_c = set(np.argsort(-pg)[:k]), set(np.argsort(-pc)[:k])
++    assert len(arriba_g & arriba_c) / k > 0.8

@@ -1,0 +1,50 @@
+@import 'tailwindcss';
+
+/* Tokens del Observatorio. El coral se reserva para lo que pide atención (riesgo alto, dato por revisar);
+   el ocre, para el crecimiento por debajo de -2 DE. Todo lo demás vive en la gama del verde azulado. */
+@theme {
+  --font-sans: 'Atkinson Hyperlegible Next', 'Atkinson Hyperlegible', ui-sans-serif, system-ui, sans-serif;
+
+  --color-teal: #1f4e52;
+  --color-teal-hondo: #163b3e;
+  --color-teal-medio: #2e6b70;
+  --color-teal-tinte: #e2eceb;
+  --color-coral: #d9694c;
+  --color-coral-hondo: #b5502f;
+  --color-coral-tinte: #f8e5df;
+  --color-ocre: #b8862b;
+  --color-ocre-tinte: #f5ead3;
+  --color-tinta: #172a2c;
+  --color-salvia: #56736d;
+  --color-fondo: #f3f6f5;
+  --color-papel: #ffffff;
+  --color-linea: #d2dcda;
+
+  /* series de los gráficos (validadas: banda de luminosidad, croma, daltonismo y contraste sobre blanco) */
+  --color-serie-1: #008f99;
+  --color-serie-2: #a97a10;
+  --color-serie-3: #7f5cb5;
+  --color-referencia: #8a9b98;
+
+  --radius-control: 6px;
+  --radius-panel: 10px;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    color: var(--color-tinta);
+    background: var(--color-fondo);
+    font-size: 16px;
+    line-height: 1.5;
+    font-feature-settings: 'tnum' 1;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1 { font-size: 1.75rem; line-height: 1.2; font-weight: 700; letter-spacing: -0.01em; }
+  h2 { font-size: 1.25rem; line-height: 1.3; font-weight: 600; }
+  h3 { font-size: 1rem; line-height: 1.4; font-weight: 600; }
+  :focus-visible { outline: 3px solid var(--color-coral); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+}

@@ -1,0 +1,16 @@
+--- a/archivos/carpetas.py
++++ b/archivos/carpetas.py
+@@ -21,10 +21,12 @@
+ """
+ from __future__ import annotations
+ 
++import os
+ from dataclasses import dataclass
+ from pathlib import Path
+ 
+-RAIZ = Path(__file__).resolve().parent.parent
++# MAIA_RAIZ moves entradas/, salidas/ and interno/ out of the code (a container volume, for example).
++RAIZ = Path(os.environ.get('MAIA_RAIZ') or Path(__file__).resolve().parent.parent)
+ 
+ 
+ @dataclass(frozen=True)

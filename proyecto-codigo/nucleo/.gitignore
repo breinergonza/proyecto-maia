@@ -1,0 +1,12 @@
+# Data per child never leaves the team: risks, review sheets, trained models and system state.
+/salidas/
+/interno/
+/privado/
+/entradas/retroalimentacion/
+
+# Generated
+__pycache__/
+.pytest_cache/
+.ipynb_checkpoints/
+.codegraph/
+~$*

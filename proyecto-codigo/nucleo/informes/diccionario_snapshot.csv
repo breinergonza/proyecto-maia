@@ -1,0 +1,340 @@
+variable,label,kind,unit,range_min,range_max
+ac_adapseno,Adaptacion al seno,categorical,,,
+ac_admgoteo,Tecnica administracion por goteo,categorical,,,
+ac_apoyolactancia,Apoyo lactancia materna,boolean,NO/SI,,
+ac_cansaninochupando,El nino se cansa chupando,boolean,NO/SI,,
+ac_cirujiaseno,Madre tuvo cirugia de seno,boolean,,,
+ac_diasposcanguro,Dias en posicion canguro  EN HOSPITAL!! (HD),numeric,DIAS,0.0,312.0
+ac_enseposcangu,Tuvo enseNanza sobre la PC,boolean,NO/SI,,
+ac_entrenootrocuidador,Otro cuidador se entrenO,boolean,NO/SI,,
+ac_extraseno,Tecnica extracciOn de leche a la salida,categorical,B/R/M,,
+ac_lugarac,Lugar de la adaptaciOn canguro,categorical,,,
+ac_madreamamanta,Madre desea amamantar,boolean,NO/SI,,
+ac_maxhoraslogrocargar,Horas maxima en PC por dia HD,numeric,HORAS,0.0,24.0
+ac_recibiochupo,RecibiO chupo en la Hosp,boolean,NO/SI,,
+ac_sillaincubadora,Silla al lado de la incubadora,categorical,NO/SI,,
+ac_soporteposicionc,Usa soporte para posiciOn canguro,boolean,NO/SI,,
+ac_unidadabierta,Entrada de los padres en la Unidad neonatal,categorical,,,
+cp_aro,Numero de controles hechos por ARO,numeric,controles,0.0,44.0
+cp_diu,Numero de embarazos bajo planificacion con DIU,numeric,,0.0,8.0
+cp_ecoprimertrimestre,Tuvo ecografia en el primer trimestre,categorical,,,
+cp_ectopico,Numero de embarazo ectopico,numeric,embarazos,0.0,10.0
+cp_edadmaterna,Edad materna (años),numeric,años,10.0,60.0
+cp_enfermerajefe,Numero de controles hechos por enfermera,numeric,controles,0.0,30.0
+cp_estuvohosp,Numero de hosp en embarazo,numeric,hospitalizaciones,0.0,10.0
+cp_gestacion,Numero de embarazos (con este),numeric,embarazos,1.0,30.0
+cp_hormonales,Numero de embarazo bajo planificacion con hormonas,numeric,embarazos,1.0,13.0
+cp_hospitalizacionembarazoaccidentes,Hosp embarazo por Accidentes,boolean,,,
+cp_hospitalizacionembarazoanemia,Hosp embarazo por Anemia,boolean,,,
+cp_hospitalizacionembarazoapp,Hosp embarazo por Amenaza de parto prematuro,boolean,,,
+cp_hospitalizacionembarazoeclampsia,Hosp embarazo por Eclampsia,boolean,,,
+cp_hospitalizacionembarazoenfermedadrespiratoria,Hosp embarazo por Enfermedad Respiratoria,boolean,,,
+cp_hospitalizacionembarazoinfeccionginecologica,Hosp embarazo por Infeccion ginecologico,boolean,,,
+cp_hospitalizacionembarazoinfeccionurinaria,Hosp embarazo por Infeccion Urinaria,boolean,,,
+cp_hospitalizacionembarazopreeclampsia,Hosp embarazo por Preeclamsia,boolean,,,
+cp_hospitalizacionembarazosangrado,Hosp embarazo por Sangrado,boolean,,,
+cp_hospitalizacionespreparto,Fue hospitalizado en preparto,numeric,hospitalizaciones,0.0,10.0
+cp_madrealcohol,Consumio alcohol en el embarazo,boolean,,,
+cp_madredrogas,Consumio Drogas en el embarazo,boolean,,,
+cp_madrefumo,Fumo durante el embarazo,boolean,,,
+cp_medgeneral,Numero de controles hechos por medico general,numeric,consultas,0.0,50.0
+cp_medicamentos,medicamento durante el embarazo,categorical,,,
+cp_mesiniccp,Mes de inicio del control prenatal,numeric,mes,0.0,9.0
+cp_mortinato,Numero de mortinatos,numeric,mortinatos,0.0,52.0
+cp_nacidovivo,Numero de nacidos vivos,numeric,nacidos vivos,0.0,25.0
+cp_numecografias,Numero de ecografia obstetrical,numeric,ecografias,0.0,83.0
+cp_paridad,Numero de partos (incluyendo las cesareas y el parto de cada gemelo),numeric,partos,0.0,20.0
+cp_partocesarea,Numero de cesareas,numeric,cesareas,0.0,20.0
+cp_pesomadre,Peso de la madre (Kg),numeric,kg.,30.0,200.0
+cp_pesopadre,Peso del padre (Kg),numeric,kg.,30.0,200.0
+cp_prematuro,Numero de prematuros,numeric,,1.0,211.0
+cp_rhmadre,Grupo sanguimeo y RH,categorical,,,
+cp_sa_anemia,situacion de alarma por anemia,boolean,,,
+cp_sa_app,situacion de alarma por APP,boolean,,,
+cp_sa_enfrespiratoria,situacion de alarma por enfermedad respiratoria,boolean,,,
+cp_sa_infgineco,situacion de alarma por Infeccion ginecologica,boolean,,,
+cp_sa_infurinaria,situacion de alarma por Infeccion orinaria,boolean,,,
+cp_sa_preclampsia,situacion de alarma por Preeclampsia,boolean,,,
+cp_sa_rpm,tuvo una RPM,boolean,,,
+cp_sa_sangrado,situacion de alarma por sangrado,boolean,,,
+cp_tallamadre,Talla de la madre,numeric,cm,120.0,200.0
+cp_tallapadre,Talla del padre,numeric,cm,130.0,210.0
+cp_totalcpn,Numero de controles prenatales,numeric,controles,0.0,44.0
+cp_tp_hepatitisb,Hepatits B tamizado CP,categorical,,,
+cp_tp_hiv,HIV tamizado,categorical,,,
+cp_tp_orina,Parcial de orina tamizado CP,numeric,,0.0,22.0
+cp_tp_rubeola,Rubeola tamizado CP,categorical,,,
+cp_tp_sifilis,Sifilis tamizado CP,categorical,,,
+cp_tp_toxoplasmosis,Toxoplasmosis tamizado CP,categorical,,,
+csp_ayudaperm1mes,Ayuda en casa el primer mes,boolean,NO/SI,,
+csp_distanciavivienda,vive lejos?,categorical,,,
+csp_embarazodeseado,embarazo deseado y planificado,boolean,,,
+csp_escolaridadmadre,Educacion de la madre,categorical,,,
+csp_escolaridadpadre,Educacion del padre,categorical,,,
+csp_ingreso_smmlv,Ingreso del hogar en SMMLV,numeric,SMMLV,,
+csp_ingresomensual,Ingreso mensual en el hogar,numeric,COP,0.0,30000000.0
+csp_menores5vivenmadre,Numero de ninos de menos de 5 anos en el hogar (sin este),numeric,ninos,0.0,10.0
+csp_mestabajoemba,Hasta que mes trabajo en el embarazo,numeric,meses,0.0,9.0
+csp_numpersviveningmen,Numero de personas que viven en el hogar con este ingreso,numeric,personas,1.0,20.0
+csp_nutricionfam,Nutricion familiar,categorical,,,
+csp_situacionlaboralmadre,Situacion laboral madre,categorical,,,
+csp_situacionlaboralpadre,Situacion laboral padre,categorical,,,
+csp_situapareja,Situación apoyo pareja,categorical,,,
+csp_tipovivienda,Tipo de vivienda,categorical,,,
+ec_3m,Edad corregida 3m,numeric,MESES,,
+ec_9m,Edad corregida 9m,numeric,MESES,,
+ern_a_10min,APGAR a 10 min,categorical,0=EMERGENCIA; 10=MUY BIEN,,
+ern_a_1min,APGAR a 1 min,categorical,0=EMERGENCIA; 10=MUY BIEN,,
+ern_a_5min,APGAR a 5 min,categorical,0=EMERGENCIA; 10=MUY BIEN,,
+ern_adaptneonatal,adaptacion neonatal inmediata,categorical,,,
+ern_ballard,edad gestaconal segun el test de Ballard,numeric,SEMANAS,22.0,44.0
+ern_eco,Edad Gestacional con base en ECO 1er.trimestre,numeric,SEMANAS,-0.3,134.6
+ern_fum,fecha de ultima menstruacion,date,,,
+ern_lubchencofenton,clasificacion de lubchenco segun la edad gestacional y el peso al nacer,categorical,,,
+ern_pc,Perímetro Cefálico al nacer,numeric,CMS,20.0,40.0
+ern_peso,Peso al nacer,numeric,GRAMOS,400.0,5000.0
+ern_remision,Fue remitido en otra institucion,boolean,NO/SI,,
+ern_sexo,Sexo al nacer,categorical,,,
+ern_talla,Talla al nacer,numeric,CMS,20.0,70.0
+hd_c_apnea,Hizo Apnea?,categorical,,,
+hd_c_convulsiones,Tuvo convulsiones?,boolean,NO/SI,,
+hd_c_displasiabronco,DBP en los oxigenodependientes,boolean,NO/SI,,
+hd_c_examenneurologico,Examen Neurológico a las salida del Hospital,categorical,,,
+hd_c_hemorragiaintra,Tuvo y grado una hemoragia intraventricular,categorical,,,
+hd_c_hipoglicemia,Hipoglicemia,categorical,,,
+hd_c_ictericia,Ictericia Neonatal,categorical,,,
+hd_c_oxigenodependencia,Oxigenodependencia a la salida del Hospital,boolean,NO/SI,,
+hd_cicloantibio,Numero de ciclos de antibioticos,numeric,,0.0,30.0
+hd_ciclosotroantibio,Numero de ciclos otro antibioticos,numeric,,0.0,30.0
+hd_ciclosultimalinea,Ciclos antibioticos ultima linea,numeric,,0.0,30.0
+hd_diasalimentacionpar,Dias alimentacion parenteral,numeric,días,0.0,90.0
+hd_diasalojamiento,Dias alojamiento conjunto,numeric,días,0.0,100.0
+hd_diascamaracefalica,Dias camera cefalica,numeric,días,0.0,100.0
+hd_diascanulanasa,Dias canula nasal,numeric,días,0.0,121.0
+hd_diasfototerapia,Dias fototerapia,numeric,días,0.0,100.0
+hd_diasincubadora,Dias incubadora,numeric,días,0.0,136.0
+hd_diasoxigeno,Dias totales oxigeno,numeric,días,0.0,195.0
+hd_diasuci,Dias UCI,numeric,días,0.0,133.0
+hd_diasurn,Dias URN,numeric,días,0.0,145.0
+hd_diasvenmecanica,Dias totales ventilacion mecanica,numeric,días,0.0,133.0
+hd_diasvennoinvasiva,Dias ventilacion no invasiva,numeric,días,0.0,100.0
+hd_dosisamino,Dosis de aminoglucosidos,numeric,dosis,0.0,100.0
+hd_dosissurfactante,Numero de dosis de surfactante,numeric,dosis,-3.0,100.0
+hd_examenesecocardiograma,Numero de Ecocardiogramas en la hosp neonatal,numeric,,0.0,10.0
+hd_examenesecografiacerebral,Ecografia cerebral en la hosp neonatal,numeric,,0.0,10.0
+hd_examenesexamendeorina,numero de parcial de orina en la hosp neonatal,numeric,,0.0,100.0
+hd_examenesgenetico,numero de Prueba genetica en la hosp neonatal,numeric,,0.0,10.0
+hd_exameneshepatitisb,numero de Prueba de hepatitis B en el embarazo,numeric,,0.0,10.0
+hd_exameneshiv,numero de Prueba de HIV en la hosp neonatal,numeric,,0.0,10.0
+hd_examenesrmicerebral,numero de RMI cerebral en la hosp neonatal,numeric,,0.0,10.0
+hd_examenesrubeola,Prueba de rubeola en la hosp neonatal,numeric,,0.0,10.0
+hd_examenessifilis,numero de prueba de sifilis,numeric,,0.0,10.0
+hd_examenestoxoplasmosis,Numero de Prueba de toxoplasmosis en la hosp neonatal,numeric,,0.0,10.0
+hd_examenestsh_tiroides,numero de TSH en la hosp neonatal,numeric,,0.0,10.0
+hd_fechaentrada,Fecha de Entrada en la URN,date,,,
+hd_fechasalida,Fecha de salida de la URN,date,,,
+hd_fechaultimatrans,fecha ultima transfusion,date,,,
+hd_numtrassanguineas,Numero de transfusiones sanguineas,numeric,,0.0,100.0
+hd_pesosalida,Peso de salida de hospitalización,numeric,GRAMOS,400.0,3500.0
+hd_rhnino,Grupo y Rh del nino,categorical,,,
+hd_tipoalimentacions,Tipo de alimentacion a la salida del Hosp,categorical,,,
+hd_totaldiashospital,Días totales de Hospitalización,numeric,,0.0,195.0
+hd_ultimvalorhemaglobina,Ultimo valor Hemoglobina,numeric,,0.0,100.0
+hd_ultivalorhematocrito,ultimo valor hematocrito,numeric,,0.0,667.0
+hd_valormasaltobilirubina,Pico mas alto bilirubina,numeric,,0.0,10.0
+iden_embarazomultiple,si fue un embarazo multiple,boolean,,,
+iden_fechaparto,Fecha del parto,date,,,
+iden_sede,sede del PMC,numeric,,1.0,4.0
+pa_atendioparto,Quién atendio el parto,categorical,,,
+pa_complicacionspartoabrupcio,Complicacion del parto abrupcio,boolean,NO/SI,,
+pa_complicacionspartoamnionitis,Complicacion del parto Amnionitis,boolean,NO/SI,,
+pa_complicacionspartoeclampsia,Complicacion del parto Eclampsia,boolean,NO/SI,,
+pa_complicacionspartomultiples,Complicacion del parto Embarazo multiple,boolean,NO/SI,,
+pa_complicacionspartopatologiacordon,Complicacion del parto Patologia del cordon,boolean,NO/SI,,
+pa_complicacionspartoplacentaprevia,Complicacion del parto placenta previa,boolean,NO/SI,,
+pa_complicacionspartopreeclampsia,Complicacion del parto Preeclampsia,boolean,NO/SI,,
+pa_complicacionspartosindromedehellp,Complicacion del parto Sindrome de Hellp,boolean,NO/SI,,
+pa_diashospimadre,Dias de hospitalizacion madre,numeric,Días,0.0,200.0
+pa_diasucimadre,Dias UCI madre post parto,numeric,Días,0.0,200.0
+pa_duracionrpm,Duracion ruptura prematura de membranas (horas),numeric,Horas,0.0,1500.0
+pa_duraciontraparto,Duracion Trabajo de parto (horas),numeric,Horas,0.0,100.0
+pa_estactualmadre,estado de la madre en post parto,categorical,,,
+pa_liqamnioticomeconiado,liquido amniotico meconiado,categorical,NO/SI,,
+pa_lugarnacimiento,Lugar del nacimiento (parto)-CONDICIONES,categorical,,,
+pa_monitoreo,Monitoreo parto (normal/anormal),categorical,Normal/Anormal,,
+pa_movimientodisminuido,Movimientos disminuidos,categorical,NO/SI/NHD,,
+pa_numdosiscorticoides,numero de dosis de corticoides en preparto,numeric,,0.0,10.0
+pa_presentacionnino,PresentacionNinoParto,categorical,,,
+pa_ritmocardiaco,ritmo cardiaco fetal anormal,categorical,NO/SI/NHD,,
+pa_sufrimientofetalagudo,sufrimiento fetal agudo,categorical,NO/SI/NHD,,
+pa_tipoparto,Tipo de Parto,categorical,,,
+v195,Fechas de salida a la casa,date,dd.mm.aaaa,,
+v195a,Fecha de entrada al PMC ambulatorio,date,dd.mm.aaaa,,
+v196,Edad a la salida (estancia hospitalaria total),numeric,días,0.0,199.0
+v196a,Peso a la entrada (al PMC),numeric,GRAMOS,500.0,6000.0
+v196b,Talla a la entrada (al PMC),numeric,CMS,25.0,90.0
+v196c,PC en cms a la entrada (al PMC),numeric,CMS,20.0,45.0
+v196d,"Edad, en sem, a la entrada (al PMC)",numeric,SEMANAS,1.0,395.0
+v196e,Cumple con criterios de elegibilidad,categorical,SI/NO,,
+v196f,Presenta Desnutrición,categorical,SI/NO,,
+v197,LH  Leche Humana,categorical,,,
+v198,LH  Leche Humana + LA Leche Artificial,categorical,,,
+v199,LA Leche Artificial,categorical,,,
+v204,SC Oxígeno dependencia,categorical,SI/NO,,
+v204a,SC Diagnóstico DBP,categorical,,,
+v205,SC Disfunción Neurológica al egreso,categorical,,,
+v206,SC Aminofilina,categorical,,,
+v207,SC Multivitaminas,categorical,,,
+v208,SC Drogas Antireflujo,categorical,SI/NO,,
+v209,Compromiso familiar con el PMC,categorical,SI/NO,,
+v215,Fecha de visita 40 sem EG,date,dd.mm.aaaa,,
+v216,Edad post natal a las 40 semanas EG (días),numeric,DIAS,0.0,120.0
+v218,Peso  vis 40 sem,numeric,GRAMOS,1000.0,6000.0
+v219,Talla  vis 40 sem,numeric,CMS,30.0,70.0
+v220,Perímetro C. a 40 sem,numeric,CMS,20.0,40.0
+v221,Alim Leche Humana a 40 sem,categorical,SI/NO,,
+v222,Alim LH+LA a 40 sem,categorical,SI/NO,,
+v223,Alim LecheArtificial a 40 sem,categorical,SI/NO,,
+v232,Fecha de abandono de la posición canguro,date,dd.mm.aaaa,,
+v233,dias de vida salida de PC,numeric,DIAS,0.0,200.0
+v234,Peso a la salida de la PC,numeric,GRAMOS,1000.0,6000.0
+v235,#  consultas desde el egreso hasta 40 sem,numeric,,0.0,20.0
+v236f,Tiene Oxígeno ambulatorio a 40sEG?,categorical,,,
+v236g,Diagnóstico de oxigenodependencia40,categorical,,,
+v236i,40 Peso destete,numeric,GRAMOS,1500.0,5000.0
+v236j,Resultado Ecografía Cerebral,categorical,,,
+v237,40semEG Número de readmisiones desde el egreso,numeric,,0.0,5.0
+v238,40semEG Total en días de permanencia en la(s) readmisión(es),numeric,,0.0,163.0
+v239,40 Enfermedad Infecciosa?,categorical,SI/NO,,
+v243,40 Falla en el Crecimiento?,categorical,SI/NO,,
+v244a,40 Ictericia?,categorical,SI/NO,,
+v244b,40 Apnea?,categorical,SI/NO,,
+v244c,40 Infección Pulmonar,categorical,SI/NO,,
+v245,OtraEnf40semEG,text,,,
+v246,40 Tono Anormal?,categorical,,,
+v259,Fecha de la visita de los 3 meses,date,dd.mm.aaaa,,
+v260,Edad a la visita de los 3 meses,numeric,DIAS,79.0,206.0
+v261,3mEC Peso,numeric,GRAMOS,3000.0,9000.0
+v262,3mEC Talla,numeric,CMS,35.0,70.0
+v263,3mEC PC,numeric,CMS,30.0,45.0
+v264,Alim Leche Humana a 3mEC,categorical,,,
+v265,Alim LH+LA a 3mEC,categorical,,,
+v266,Alim LA a 3mEC,categorical,,,
+v271,Fecha de abandono de la posición canguro,date,dd.mm.aaaa,,
+v272,3md dias,numeric,DIAS,1.0,193.0
+v273,3md Peso,numeric,GRAMOS,2000.0,8395.0
+v274,3m Número de consultas desde las 40 sem PC,numeric,,0.0,15.0
+v275d,3m Tiene Oxígeno ambulatorio (?),categorical,,,
+v275e,Diagnóstico de la oxigenodependencia 3m,categorical,,,
+v275f,3m dias,numeric,DIAS,10.0,204.0
+v275g,3m Peso,numeric,GRAMOS,2010.0,8130.0
+v276,3m Número de readmisiones desde las 40 sem PC,numeric,,0.0,10.0
+v277,3m Total en dias de permanencia de la(s) readmisión(es),numeric,DIAS,0.0,152.0
+v278,3m Enfermedad Respiratoria Aguda,categorical,,,
+v279,3m Enfermedad Gastro Intestinal Aguda,categorical,,,
+v280,3m Otras,text,,,
+v281,3mEC Normal,categorical,,,
+v282,3mEC Anormal,categorical,,,
+v283,3mEC Transitorio,categorical,,,
+v297,3m DPT-Polio,categorical,,,
+v298,3m Hemofilus,categorical,,,
+v299,3m Hep B,categorical,,,
+v300,3m BCG,categorical,,,
+v301,3m Sarampión,categorical,,,
+v301a,Nota de evolución 3m,text,,,
+v301b,3m Rotavirus,categorical,,,
+v301c,3m Neumococo,categorical,,,
+v301d,3m A cuál programa social pertenece,categorical,,,
+v302,Fecha de la visita de los 6 meses,date,dd.mm.aaaa,,
+v303,Edad a la visita de los 6 meses,numeric,DIAS,80.0,295.0
+v304,6mEC Peso,numeric,GRAMOS,3000.0,11000.0
+v305,6mEC Talla,numeric,CMS,40.0,80.0
+v306,6mEC Perímetro Cefálico,numeric,CMS,32.0,50.0
+v307,6mEC Alim Leche Humana,categorical,,,
+v308,6mEC Alim LecheHumana+LecheArtificial,categorical,,,
+v309,6mEC Leche Artificial,categorical,,,
+v316,6mEC Número de consultas desde los 3 meses,numeric,,0.0,8.0
+v317d,6mEC Tiene Oxígeno ambulatorio (?),categorical,SI/NO,,
+v317e,6mEC Diagnóstico de la oxigenodependencia 3m,categorical,,,
+v317f,6mEC dias,numeric,DIAS,30.0,287.0
+v317g,6mEC Peso,numeric,GRAMOS,2500.0,10620.0
+v318,6mEC Número de readmisiones desde los 3mEC,numeric,,0.0,10.0
+v319,6mEC Total en dias de permanencia de la(s) readmisión(es),numeric,DIAS,0.0,134.0
+v320,6mEC Enfermedad Respiratoria Aguda,categorical,SI/NO,,
+v321,6mEC Enfermedad Gastro Intestinal Aguda,categorical,SI/NO,,
+v322,6mEC Otras,text,,,
+v323,6mEC Normal,categorical,,,
+v324,6mEC Anormal,categorical,,,
+v325,6mEC Transitorio,categorical,,,
+v339,6mEC DPT-Polio,categorical,SI/NO,,
+v340,6mEC Hemofilus,categorical,SI/NO,,
+v341,6mEC Hep B,categorical,SI/NO,,
+v342,6mEC BCG,categorical,SI/NO,,
+v343,6mEC Sarampión,categorical,SI/NO,,
+v343a,6mEC Rotavirus,categorical,SI/NO,,
+v343b,6mEC Neumococo,categorical,SI/NO,,
+v344a,6mEC Nota de evolución 6m,text,,,
+v344b,6mEC Puntaje Test Desarrollo Psicomotor,numeric,,4.0,150.0
+v344c,6m Edad corregida de aplicación del test,numeric,SEMANAS,5.53333333333333,100.0
+v345,Fecha de la visita de los 9mEC,date,dd.mm.aaaa,,
+v346,Edad a la visita de los 9 meses,numeric,DIAS,180.0,400.0
+v347,9mEC Peso,numeric,GRAMOS,5000.0,12000.0
+v348,9mEC Talla,numeric,CMS,40.0,80.0
+v349,9mEC Perímetro Cefálico,numeric,CMS,30.0,50.0
+v350,9mEC Alim Leche Humana,categorical,SI/NO,,
+v351,9mEC Alim LecheHumana+LecheArtificial,categorical,SI/NO,,
+v352,9mEC Leche Artificial,categorical,SI/NO,,
+v359,9mEC Número de consultas desde los 3 meses,numeric,,0.0,7.0
+v360d,9mEC Tiene Oxígeno ambulatorio (?),categorical,SI/NO,,
+v360e,9mEC Diagnóstico de la oxigenodependencia,categorical,Displasia Broncopulmonar/HTP,,
+v360f,9mEC dias,numeric,DIAS,30.0,379.0
+v360g,9mEC Peso,numeric,GRAMOS,2330.0,10390.0
+v361,9mEC Número de readmisiones desde los 6mEC,numeric,,0.0,10.0
+v362,9mEC Total en dias de permanencia de la(s) readmisión(es),numeric,DIAS,0.0,100.0
+v363,9mEC Enfermedad Respiratoria Aguda,categorical,SI/NO,,
+v364,9mEC Enfermedad Gastro Intestinal Aguda,categorical,SI/NO,,
+v365,9mEC Otras,text,,,
+v366,9mEC Normal,categorical,SI/NO,,
+v367,9mEC Anormal,categorical,SI/NO,,
+v368,9mEC Transitorio,categorical,SI/NO,,
+v382,9mEC DPT-Polio,categorical,SI/NO,,
+v383,9mEC Hemofilus,categorical,SI/NO,,
+v384,9mEC Hep B,categorical,SI/NO,,
+v385,9mEC BCG,categorical,SI/NO,,
+v386,9mEC Sarampión,categorical,SI/NO,,
+v386a,9mEC Rotavirus,categorical,SI/NO,,
+v386b,9mEC Neumococo,categorical,SI/NO,,
+v386c,9mEC A cuál programa social pertenece,categorical,,,
+v387,12mEC Fecha de la visita,date,dd.mm.aaaa,,
+v388,12mEC Edad a la visita,numeric,DIAS,300.0,500.0
+v389,12mEC Peso,numeric,GRAMOS,4000.0,14000.0
+v390,12mEC Talla,numeric,CMS,50.0,110.0
+v391,12mEC Perímetro Cefálico,numeric,CMS,30.0,55.0
+v392,12mEC Alim Leche Humana,categorical,SI/NO,,
+v393,12mEC Alim LecheHumana+LecheArtificial,categorical,SI/NO,,
+v394,12mEC Leche Artificial,categorical,SI/NO,,
+v401,12mEC Número de consultas desde los 9 meses,numeric,,0.0,10.0
+v402d,12mEC Tiene Oxígeno ambulatorio (?),categorical,SI/NO,,
+v402e,12mEC Diagnóstico de la oxigenodependencia,categorical,Displasia Broncopulmonar/HTP,,
+v402f,12mEC dias cuándo?),numeric,DIAS,30.0,457.0
+v402g,12mEC Peso (Cuándo?),numeric,GRAMOS,2500.0,11000.0
+v403,12mEC Número de readmisiones desde los 9mEC,numeric,,0.0,10.0
+v404,12mEC Total en dias en la(s) readmisión(es) desde 9mEC,numeric,DIAS,0.0,103.0
+v405,12mEC Enfermedad Respiratoria Aguda,categorical,SI/NO,,
+v406,12mEC Enfermedad Gastro Intestinal Aguda,categorical,SI/NO,,
+v407,12mEC Otras Enf,text,,,
+v408,6mEC Normal,categorical,SI/NO,,
+v409,12mEC Anormal,categorical,SI/NO,,
+v410,12mEC Transitorio,categorical,SI/NO,,
+v424,12mEC DPT-Polio,categorical,SI/NO,,
+v425,12mEC Hemofilus,categorical,SI/NO,,
+v426,12mEC Hep B,categorical,SI/NO,,
+v427,12mEC BCG,categorical,SI/NO,,
+v428,12mEC Sarampión,categorical,SI/NO,,
+v428a,12mEC Rotavirus,categorical,SI/NO,,
+v428b,12mEC Neumococo,categorical,SI/NO,,
+v429a,12mEC Displasia de caderas(?),categorical,SI/NO,,
+v430,12mEC Riesgo Parálisis Cerebral,categorical,SI/NO,,
+v430a,12mEC Nota de evolución 12m,text,,,
+v430b,12mEC Puntaje Test Desarrollo Psicomotor,numeric,,10.0,180.0
+v430c,12m Edad corregida de aplicación del test,numeric,SEMANAS,11.7,100.0

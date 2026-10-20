@@ -1,0 +1,27 @@
+# Lo que nunca sube a Railway con "railway up". Railway solo tiene datos simulados: ningún dato real,
+# modelo, secreto ni dependencia local viaja desde aquí.
+.env
+.env.*
+.venv/
+**/node_modules/
+**/dist/
+**/__pycache__/
+**/.pytest_cache/
+.ruff_cache/
+respaldos/
+datos/
+mlruns/
+**/*.parquet
+**/*.pkl
+**/*.tar.gz
+**/*.xlsx
+!nucleo/entradas/diccionario.xlsx
+nucleo/salidas/
+nucleo/interno/
+nucleo/cortes/
+nucleo/paquetes/
+nucleo/privado/
+nucleo/entradas/retroalimentacion/
+nucleo/informes/*.ipynb
+nucleo/informes/*.html
+nucleo/pruebas/esperado_kmc/

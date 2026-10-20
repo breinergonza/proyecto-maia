@@ -1,0 +1,2357 @@
+{
+ "openapi": "3.1.0",
+ "info": {
+  "title": "MAIA · Observatorio de alertas clínicas",
+  "description": "Apoyo a la decisión, no diagnóstico. Solo códigos seudonimizados.",
+  "version": "0.1.0"
+ },
+ "paths": {
+  "/api/salud": {
+   "get": {
+    "tags": [
+     "salud"
+    ],
+    "summary": "Salud",
+    "operationId": "salud_api_salud_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Salud Api Salud Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/auth/login": {
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Login",
+    "operationId": "login_api_auth_login_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/Login"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RespuestaLogin"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/auth/refrescar": {
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Refrescar",
+    "operationId": "refrescar_api_auth_refrescar_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RespuestaLogin"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/auth/salir": {
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Salir",
+    "operationId": "salir_api_auth_salir_post",
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     }
+    }
+   }
+  },
+  "/api/auth/yo": {
+   "get": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Yo",
+    "operationId": "yo_api_auth_yo_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UsuarioSalida"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/usuarios": {
+   "get": {
+    "tags": [
+     "usuarios"
+    ],
+    "summary": "Listar",
+    "operationId": "listar_api_usuarios_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/UsuarioSalida"
+         },
+         "type": "array",
+         "title": "Response Listar Api Usuarios Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   },
+   "post": {
+    "tags": [
+     "usuarios"
+    ],
+    "summary": "Crear",
+    "operationId": "crear_api_usuarios_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/UsuarioNuevo"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UsuarioSalida"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/usuarios/{usuario_id}": {
+   "patch": {
+    "tags": [
+     "usuarios"
+    ],
+    "summary": "Cambiar",
+    "operationId": "cambiar_api_usuarios__usuario_id__patch",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "usuario_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Usuario Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/UsuarioCambio"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UsuarioSalida"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/modelos/activo": {
+   "get": {
+    "tags": [
+     "modelos"
+    ],
+    "summary": "Activo",
+    "operationId": "activo_api_modelos_activo_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/PaqueteSalida"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Response Activo Api Modelos Activo Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/modelos/paquetes": {
+   "get": {
+    "tags": [
+     "modelos"
+    ],
+    "summary": "Listar",
+    "operationId": "listar_api_modelos_paquetes_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/PaqueteSalida"
+         },
+         "type": "array",
+         "title": "Response Listar Api Modelos Paquetes Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   },
+   "post": {
+    "tags": [
+     "modelos"
+    ],
+    "summary": "Subir",
+    "operationId": "subir_api_modelos_paquetes_post",
+    "requestBody": {
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_subir_api_modelos_paquetes_post"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PaqueteSalida"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/modelos/paquetes/{version}/activar": {
+   "post": {
+    "tags": [
+     "modelos"
+    ],
+    "summary": "Activar",
+    "operationId": "activar_api_modelos_paquetes__version__activar_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "version",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Version"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PaqueteSalida"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/corridas": {
+   "get": {
+    "tags": [
+     "corridas"
+    ],
+    "summary": "Listar",
+    "operationId": "listar_api_corridas_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/CorridaSalida"
+         },
+         "type": "array",
+         "title": "Response Listar Api Corridas Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   },
+   "post": {
+    "tags": [
+     "corridas"
+    ],
+    "summary": "Ejecutar",
+    "operationId": "ejecutar_api_corridas_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CorridaNueva"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "202": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CorridaSalida"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/corridas/{corrida_id}": {
+   "get": {
+    "tags": [
+     "corridas"
+    ],
+    "summary": "Una",
+    "operationId": "una_api_corridas__corrida_id__get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "corrida_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Corrida Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CorridaSalida"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/tablero/resumen": {
+   "get": {
+    "tags": [
+     "tablero"
+    ],
+    "summary": "Resumen",
+    "operationId": "resumen_api_tablero_resumen_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "corrida_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Corrida Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Resumen Api Tablero Resumen Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/tablero/alarmas-grupo": {
+   "get": {
+    "tags": [
+     "tablero"
+    ],
+    "summary": "Alarmas Grupo",
+    "operationId": "alarmas_grupo_api_tablero_alarmas_grupo_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "variable",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Variable"
+      }
+     },
+     {
+      "name": "corrida_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Corrida Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "additionalProperties": true
+         },
+         "title": "Response Alarmas Grupo Api Tablero Alarmas Grupo Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/tablero/desempeno": {
+   "get": {
+    "tags": [
+     "tablero"
+    ],
+    "summary": "Desempeno",
+    "description": "Validación de los modelos de la corrida: por desenlace (AUC del modelo y de la regla simple, casos en el 10 %\nde mayor riesgo, PR-AUC) y por tipo de error inyectado (porcentaje detectado).",
+    "operationId": "desempeno_api_tablero_desempeno_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "corrida_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Corrida Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Desempeno Api Tablero Desempeno Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/ninos": {
+   "get": {
+    "tags": [
+     "niños"
+    ],
+    "summary": "Listar",
+    "operationId": "listar_api_ninos_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "buscar",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Buscar"
+      }
+     },
+     {
+      "name": "desenlace",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Desenlace"
+      }
+     },
+     {
+      "name": "percentil_min",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "number",
+         "maximum": 100,
+         "minimum": 0
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Percentil Min"
+      }
+     },
+     {
+      "name": "pagina",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "default": 1,
+       "title": "Pagina"
+      }
+     },
+     {
+      "name": "tamano",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 200,
+       "minimum": 1,
+       "default": 25,
+       "title": "Tamano"
+      }
+     },
+     {
+      "name": "corrida_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Corrida Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Listar Api Ninos Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/ninos/{sujeto}/linea-temporal": {
+   "get": {
+    "tags": [
+     "niños"
+    ],
+    "summary": "Linea Temporal",
+    "operationId": "linea_temporal_api_ninos__sujeto__linea_temporal_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "sujeto",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Sujeto"
+      }
+     },
+     {
+      "name": "corrida_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Corrida Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Linea Temporal Api Ninos  Sujeto  Linea Temporal Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/revision/datos": {
+   "get": {
+    "tags": [
+     "revisión"
+    ],
+    "summary": "Datos",
+    "operationId": "datos_api_revision_datos_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "estado",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "pattern": "^(pendiente|revisado|todos)$",
+       "default": "pendiente",
+       "title": "Estado"
+      }
+     },
+     {
+      "name": "capa",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Capa"
+      }
+     },
+     {
+      "name": "variable",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Variable"
+      }
+     },
+     {
+      "name": "pagina",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "default": 1,
+       "title": "Pagina"
+      }
+     },
+     {
+      "name": "tamano",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 200,
+       "minimum": 1,
+       "default": 25,
+       "title": "Tamano"
+      }
+     },
+     {
+      "name": "corrida_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Corrida Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Datos Api Revision Datos Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/revision/datos/{alerta_id}": {
+   "post": {
+    "tags": [
+     "revisión"
+    ],
+    "summary": "Responder Dato",
+    "operationId": "responder_dato_api_revision_datos__alerta_id__post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "alerta_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Alerta Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/RevisionDatoEntrada"
+       }
+      }
+     }
+    },
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/revision/riesgos": {
+   "get": {
+    "tags": [
+     "revisión"
+    ],
+    "summary": "Riesgos",
+    "operationId": "riesgos_api_revision_riesgos_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "corrida_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Corrida Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Riesgos Api Revision Riesgos Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/revision/riesgos/{riesgo_id}": {
+   "post": {
+    "tags": [
+     "revisión"
+    ],
+    "summary": "Responder Riesgo",
+    "operationId": "responder_riesgo_api_revision_riesgos__riesgo_id__post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "riesgo_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Riesgo Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/RevisionRiesgoEntrada"
+       }
+      }
+     }
+    },
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/revision/resumen": {
+   "get": {
+    "tags": [
+     "revisión"
+    ],
+    "summary": "Resumen",
+    "description": "Agregados de las respuestas: precisión por capa (qué parte de lo marcado era un error) y, en la revisión ciega,\nqué parte de los niños de riesgo alto y del resto preocupó.",
+    "operationId": "resumen_api_revision_resumen_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "corrida_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Corrida Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Resumen Api Revision Resumen Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/inferencia": {
+   "post": {
+    "tags": [
+     "inferencia"
+    ],
+    "summary": "Inferir",
+    "operationId": "inferir_api_inferencia_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PeticionInferencia"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Inferir Api Inferencia Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/inferencia/ejemplo": {
+   "get": {
+    "tags": [
+     "inferencia"
+    ],
+    "summary": "Ejemplo",
+    "description": "Una petición lista para probar: un niño simulado (nunca uno real), con las variables del modelo activo.",
+    "operationId": "ejemplo_api_inferencia_ejemplo_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Ejemplo Api Inferencia Ejemplo Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/notificaciones/config": {
+   "get": {
+    "tags": [
+     "notificaciones"
+    ],
+    "summary": "Config",
+    "operationId": "config_api_notificaciones_config_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "additionalProperties": true,
+          "type": "object"
+         },
+         "type": "array",
+         "title": "Response Config Api Notificaciones Config Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/notificaciones/config/{desenlace}": {
+   "put": {
+    "tags": [
+     "notificaciones"
+    ],
+    "summary": "Guardar",
+    "operationId": "guardar_api_notificaciones_config__desenlace__put",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "desenlace",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Desenlace"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ConfigNotificacionEntrada"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Guardar Api Notificaciones Config  Desenlace  Put"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/notificaciones/historial": {
+   "get": {
+    "tags": [
+     "notificaciones"
+    ],
+    "summary": "Historial",
+    "operationId": "historial_api_notificaciones_historial_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "pagina",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "default": 1,
+       "title": "Pagina"
+      }
+     },
+     {
+      "name": "tamano",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 200,
+       "minimum": 1,
+       "default": 50,
+       "title": "Tamano"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Historial Api Notificaciones Historial Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/notificaciones/prueba": {
+   "post": {
+    "tags": [
+     "notificaciones"
+    ],
+    "summary": "Prueba",
+    "operationId": "prueba_api_notificaciones_prueba_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PruebaCorreo"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  }
+ },
+ "components": {
+  "schemas": {
+   "Body_subir_api_modelos_paquetes_post": {
+    "properties": {
+     "archivo": {
+      "type": "string",
+      "contentMediaType": "application/octet-stream",
+      "title": "Archivo"
+     }
+    },
+    "type": "object",
+    "required": [
+     "archivo"
+    ],
+    "title": "Body_subir_api_modelos_paquetes_post"
+   },
+   "ConfigNotificacionEntrada": {
+    "properties": {
+     "desenlace": {
+      "type": "string",
+      "title": "Desenlace"
+     },
+     "nombre": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Nombre"
+     },
+     "percentil_minimo": {
+      "type": "number",
+      "maximum": 100.0,
+      "minimum": 0.0,
+      "title": "Percentil Minimo",
+      "default": 95
+     },
+     "destinatarios": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "maxItems": 50,
+      "title": "Destinatarios"
+     },
+     "activo": {
+      "type": "boolean",
+      "title": "Activo",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "desenlace"
+    ],
+    "title": "ConfigNotificacionEntrada"
+   },
+   "CorridaNueva": {
+    "properties": {
+     "tipo": {
+      "type": "string",
+      "const": "demo",
+      "title": "Tipo",
+      "default": "demo"
+     },
+     "silencio": {
+      "type": "boolean",
+      "title": "Silencio",
+      "default": false
+     }
+    },
+    "type": "object",
+    "title": "CorridaNueva"
+   },
+   "CorridaSalida": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "tipo": {
+      "type": "string",
+      "title": "Tipo"
+     },
+     "estado": {
+      "type": "string",
+      "title": "Estado"
+     },
+     "silencio": {
+      "type": "boolean",
+      "title": "Silencio"
+     },
+     "fuente": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Fuente"
+     },
+     "fecha_corte": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Fecha Corte"
+     },
+     "paquete": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Paquete"
+     },
+     "modelo_anomalias": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Modelo Anomalias"
+     },
+     "modelo_clinico": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Modelo Clinico"
+     },
+     "paso": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Paso"
+     },
+     "resumen": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Resumen"
+     },
+     "iniciada": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Iniciada"
+     },
+     "terminada": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Terminada"
+     },
+     "mensaje": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mensaje"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "tipo",
+     "estado",
+     "silencio"
+    ],
+    "title": "CorridaSalida"
+   },
+   "EpisodioEntrada": {
+    "properties": {
+     "sujeto": {
+      "type": "string",
+      "title": "Sujeto"
+     },
+     "tipo": {
+      "type": "string",
+      "title": "Tipo"
+     },
+     "edad_inicio": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Edad Inicio"
+     },
+     "edad_fin": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Edad Fin"
+     }
+    },
+    "type": "object",
+    "required": [
+     "sujeto",
+     "tipo"
+    ],
+    "title": "EpisodioEntrada"
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "type": "array",
+      "title": "Detail"
+     }
+    },
+    "type": "object",
+    "title": "HTTPValidationError"
+   },
+   "Login": {
+    "properties": {
+     "email": {
+      "type": "string",
+      "title": "Email"
+     },
+     "clave": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Clave"
+     }
+    },
+    "type": "object",
+    "required": [
+     "email",
+     "clave"
+    ],
+    "title": "Login"
+   },
+   "MedicionEntrada": {
+    "properties": {
+     "sujeto": {
+      "type": "string",
+      "title": "Sujeto"
+     },
+     "variable": {
+      "type": "string",
+      "title": "Variable"
+     },
+     "valor": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "number"
+       },
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Valor"
+     },
+     "fecha": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Fecha"
+     },
+     "edad_dias": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Edad Dias"
+     }
+    },
+    "type": "object",
+    "required": [
+     "sujeto",
+     "variable"
+    ],
+    "title": "MedicionEntrada"
+   },
+   "PaqueteSalida": {
+    "properties": {
+     "version": {
+      "type": "string",
+      "title": "Version"
+     },
+     "fuente": {
+      "type": "string",
+      "title": "Fuente"
+     },
+     "activo": {
+      "type": "boolean",
+      "title": "Activo"
+     },
+     "subido_en": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Subido En"
+     },
+     "corte": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Corte"
+     },
+     "creado": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Creado"
+     },
+     "modelos": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Modelos",
+      "default": {}
+     },
+     "metricas": {
+      "additionalProperties": {
+       "type": "number"
+      },
+      "type": "object",
+      "title": "Metricas",
+      "default": {}
+     }
+    },
+    "type": "object",
+    "required": [
+     "version",
+     "fuente",
+     "activo"
+    ],
+    "title": "PaqueteSalida"
+   },
+   "PeticionInferencia": {
+    "properties": {
+     "corte": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Corte"
+     },
+     "sujetos": {
+      "items": {
+       "$ref": "#/components/schemas/SujetoEntrada"
+      },
+      "type": "array",
+      "maxItems": 50,
+      "minItems": 1,
+      "title": "Sujetos"
+     },
+     "mediciones": {
+      "items": {
+       "$ref": "#/components/schemas/MedicionEntrada"
+      },
+      "type": "array",
+      "maxItems": 5000,
+      "minItems": 1,
+      "title": "Mediciones"
+     },
+     "episodios": {
+      "items": {
+       "$ref": "#/components/schemas/EpisodioEntrada"
+      },
+      "type": "array",
+      "maxItems": 500,
+      "title": "Episodios"
+     }
+    },
+    "type": "object",
+    "required": [
+     "sujetos",
+     "mediciones"
+    ],
+    "title": "PeticionInferencia"
+   },
+   "PruebaCorreo": {
+    "properties": {
+     "destinatario": {
+      "type": "string",
+      "title": "Destinatario"
+     }
+    },
+    "type": "object",
+    "required": [
+     "destinatario"
+    ],
+    "title": "PruebaCorreo"
+   },
+   "RespuestaLogin": {
+    "properties": {
+     "acceso": {
+      "type": "string",
+      "title": "Acceso"
+     },
+     "usuario": {
+      "$ref": "#/components/schemas/UsuarioSalida"
+     }
+    },
+    "type": "object",
+    "required": [
+     "acceso",
+     "usuario"
+    ],
+    "title": "RespuestaLogin"
+   },
+   "RevisionDatoEntrada": {
+    "properties": {
+     "es_error": {
+      "type": "string",
+      "enum": [
+       "si",
+       "no",
+       "no_se"
+      ],
+      "title": "Es Error"
+     },
+     "comentario": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Comentario"
+     }
+    },
+    "type": "object",
+    "required": [
+     "es_error"
+    ],
+    "title": "RevisionDatoEntrada"
+   },
+   "RevisionRiesgoEntrada": {
+    "properties": {
+     "preocupa": {
+      "type": "string",
+      "enum": [
+       "si",
+       "no",
+       "no_se"
+      ],
+      "title": "Preocupa"
+     },
+     "comentario": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Comentario"
+     }
+    },
+    "type": "object",
+    "required": [
+     "preocupa"
+    ],
+    "title": "RevisionRiesgoEntrada"
+   },
+   "SujetoEntrada": {
+    "properties": {
+     "sujeto": {
+      "type": "string",
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Sujeto"
+     },
+     "grupo": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Grupo"
+     },
+     "fecha_nacimiento": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Fecha Nacimiento"
+     },
+     "anio_nacimiento": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Anio Nacimiento"
+     },
+     "eg_semanas": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 45.0,
+        "minimum": 20.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Eg Semanas"
+     }
+    },
+    "type": "object",
+    "required": [
+     "sujeto"
+    ],
+    "title": "SujetoEntrada"
+   },
+   "UsuarioCambio": {
+    "properties": {
+     "nombre": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 120,
+        "minLength": 2
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Nombre"
+     },
+     "rol": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "admin",
+         "experto",
+         "visualizador"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Rol"
+     },
+     "activo": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Activo"
+     },
+     "clave": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "minLength": 10
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Clave"
+     }
+    },
+    "type": "object",
+    "title": "UsuarioCambio"
+   },
+   "UsuarioNuevo": {
+    "properties": {
+     "email": {
+      "type": "string",
+      "title": "Email"
+     },
+     "nombre": {
+      "type": "string",
+      "maxLength": 120,
+      "minLength": 2,
+      "title": "Nombre"
+     },
+     "rol": {
+      "type": "string",
+      "enum": [
+       "admin",
+       "experto",
+       "visualizador"
+      ],
+      "title": "Rol"
+     },
+     "clave": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 10,
+      "title": "Clave"
+     }
+    },
+    "type": "object",
+    "required": [
+     "email",
+     "nombre",
+     "rol",
+     "clave"
+    ],
+    "title": "UsuarioNuevo"
+   },
+   "UsuarioSalida": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "email": {
+      "type": "string",
+      "title": "Email"
+     },
+     "nombre": {
+      "type": "string",
+      "title": "Nombre"
+     },
+     "rol": {
+      "type": "string",
+      "enum": [
+       "admin",
+       "experto",
+       "visualizador"
+      ],
+      "title": "Rol"
+     },
+     "activo": {
+      "type": "boolean",
+      "title": "Activo",
+      "default": true
+     },
+     "creado_en": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Creado En"
+     },
+     "ultimo_ingreso": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ultimo Ingreso"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "email",
+     "nombre",
+     "rol"
+    ],
+    "title": "UsuarioSalida"
+   },
+   "ValidationError": {
+    "properties": {
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "type": "array",
+      "title": "Location"
+     },
+     "msg": {
+      "type": "string",
+      "title": "Message"
+     },
+     "type": {
+      "type": "string",
+      "title": "Error Type"
+     },
+     "input": {
+      "title": "Input"
+     },
+     "ctx": {
+      "type": "object",
+      "title": "Context"
+     }
+    },
+    "type": "object",
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError"
+   }
+  },
+  "securitySchemes": {
+   "HTTPBearer": {
+    "type": "http",
+    "scheme": "bearer"
+   }
+  }
+ }
+}

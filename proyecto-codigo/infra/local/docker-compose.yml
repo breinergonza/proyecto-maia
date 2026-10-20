@@ -1,0 +1,116 @@
+# Entorno local completo (equipo Ubuntu con GPU NVIDIA). Desde proyecto-codigo/:
+#   make arrancar          levanta postgres, minio, mlflow, mailpit, api y web
+#   make demo-entrenar     usa el trainer (con GPU) sobre datos simulados
+# Puertos: web 8080 · MLflow 5000 · consola MinIO 9001 · Mailpit 8025 · Postgres 5432 · MinIO API 9000
+name: maia
+
+x-env: &env
+  env_file: ../../.env
+
+services:
+  postgres:
+    image: postgres:16
+    <<: *env
+    environment:
+      POSTGRES_USER: maia
+      POSTGRES_DB: maia
+    volumes:
+      - pg_datos:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d:ro     # crea la base y el usuario de MLflow
+    ports: ["127.0.0.1:5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U maia -d maia"]
+      interval: 5s
+      retries: 20
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    command: server /data --console-address :9001
+    <<: *env
+    volumes: [minio_datos:/data]
+    ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      retries: 20
+    restart: unless-stopped
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    depends_on:
+      minio: {condition: service_healthy}
+    entrypoint: ["/bin/sh", "/init.sh"]
+    <<: *env
+    volumes: [./minio-init.sh:/init.sh:ro]
+
+  mlflow:
+    build: {context: ../.., dockerfile: infra/docker/mlflow.Dockerfile}
+    <<: *env
+    environment:
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: ${MLFLOW_MINIO_ACCESS_KEY:-maia-mlflow}
+      AWS_SECRET_ACCESS_KEY: ${MLFLOW_MINIO_SECRET_KEY:?defina MLFLOW_MINIO_SECRET_KEY en .env}
+    depends_on:
+      postgres: {condition: service_healthy}
+      minio-init: {condition: service_completed_successfully}
+    ports: ["127.0.0.1:5000:5000"]
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports: ["127.0.0.1:8025:8025", "127.0.0.1:1025:1025"]
+    restart: unless-stopped
+
+  trainer:
+    build: {context: ../.., dockerfile: infra/docker/trainer.Dockerfile}
+    profiles: [entrenamiento]            # no arranca con "up": se usa con "docker compose run --rm trainer ..."
+    <<: *env
+    environment:
+      MAIA_RAIZ: /datos
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      KMC_PW: ${KMC_PW:-}                      # de la terminal (export KMC_PW=...), nunca de un archivo
+    volumes:
+      - datos_maia:/datos
+      - ../../nucleo/entradas:/datos/entradas   # el diccionario que mantienen los expertos, editable en el equipo
+    deploy:
+      resources:
+        reservations:
+          devices: [{driver: nvidia, count: all, capabilities: [gpu]}]
+    depends_on:
+      postgres: {condition: service_healthy}
+      minio-init: {condition: service_completed_successfully}
+      mlflow: {condition: service_started}
+
+  api:
+    build: {context: ../.., dockerfile: infra/docker/api.Dockerfile}
+    <<: *env
+    environment:
+      MAIA_RAIZ: /datos
+      MAIA_DIR_PAQUETES: /datos/paquetes
+      MAIA_HOST: 0.0.0.0
+    volumes: [paquetes_api:/datos/paquetes]   # volumen propio: la API corre sin root y solo guarda los paquetes subidos
+    depends_on:
+      postgres: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/salud')"]
+      interval: 10s
+      retries: 30
+    restart: unless-stopped
+
+  web:
+    build: {context: ../.., dockerfile: infra/docker/web.Dockerfile}
+    environment:
+      API_INTERNA: http://api:8000
+      PORT: "8080"
+      MAIA_ENTORNO: local
+    ports: ["127.0.0.1:8080:8080"]
+    depends_on:
+      api: {condition: service_healthy}
+    restart: unless-stopped
+
+volumes:
+  pg_datos: {}
+  minio_datos: {}
+  datos_maia: {}
+  paquetes_api: {}
