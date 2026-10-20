@@ -1,5 +1,6 @@
 """Day-to-day use: saved models, the review queue, the expert loop and the command line."""
 import json
+from dataclasses import replace
 
 import numpy as np
 import pandas as pd
@@ -43,8 +44,10 @@ def test_deriva_avisa_si_una_capa_alerta_mucho_mas(puntuado):
 def test_cola_una_fila_por_dato_ordenada_por_capas_y_fuerza(modelo, puntuado):
     te, res = puntuado
     d = res.datos
-    cola = OP.cola_revision(res, te.esquema, modelo.cfg)
-    assert len(cola) == int((d.alerta1 | d.alerta2 | d.alerta3).sum())
+    cola = OP.cola_revision(res, te, modelo)
+    ventana = d.alerta3 & ~d.alerta1 & ~d.alerta2 & (d.motivo3 == OP.MOTIVO_VENTANA)
+    visitas = d[ventana].groupby(['sujeto', 'etapa', d.t.dt.date]).ngroups
+    assert len(cola) == int((d.alerta1 | d.alerta2 | d.alerta3).sum()) - int(ventana.sum()) + visitas
     assert cola.prioridad.tolist() == list(range(1, len(cola) + 1))
     assert cola.n_capas.is_monotonic_decreasing
     for _, g in cola.groupby('n_capas'):
@@ -52,11 +55,50 @@ def test_cola_una_fila_por_dato_ordenada_por_capas_y_fuerza(modelo, puntuado):
     assert (cola.fuerza >= 1 - 1e-6).all()  # every alert is at or past its own threshold
     dos = cola[cola.n_capas >= 2].iloc[0]
     assert ';' in dos.motivos and ',' in dos.capas
-    con_minimo = OP.cola_revision(res, te.esquema.assign(rango_min=0.0), modelo.cfg)
-    assert (cola.rango_bajo < 0).any() and (con_minimo.rango_bajo >= 0).all()   # nothing expected below zero
+    con_minimo = OP.cola_revision(res, replace(te, esquema=te.esquema.assign(rango_min=0.0)), modelo)
+    valores = con_minimo[con_minimo.etiqueta != OP.EDAD_DE_LA_VISITA]   # an age window can start before term
+    assert (cola.rango_bajo < 0).any() and (valores.rango_bajo.dropna() >= 0).all()   # nothing expected below zero
+    assert (valores.esperado.dropna() >= 0).all()
     desde = d.t.quantile(0.8)
-    reciente = OP.cola_revision(res, te.esquema, modelo.cfg, desde)
+    reciente = OP.cola_revision(res, te, modelo, desde)
     assert 0 < len(reciente) < len(cola) and (pd.to_datetime(reciente.fecha) >= desde.normalize()).all()
+
+
+def test_cola_muestra_lo_esperado_por_la_revision_que_lo_marco(modelo, puntuado):
+    te, res = puntuado
+    cola = OP.cola_revision(res, te, modelo)
+    con_rango = cola.dropna(subset=['esperado', 'rango_bajo', 'rango_alto'])
+    assert (con_rango.rango_bajo <= con_rango.esperado).all() and (con_rango.esperado <= con_rango.rango_alto).all()
+    valor = pd.to_numeric(con_rango.valor)
+    fuera = (valor < con_rango.rango_bajo) | (valor > con_rango.rango_alto)
+    for motivo in ('valor atípico', 'lejos de lo esperado para este caso', 'cambio atípico para el tiempo transcurrido'):
+        solo = con_rango.motivos == motivo
+        assert solo.any(), motivo
+        assert fuera[solo].all(), motivo   # what was expected never contains the value it flagged
+    sin_valor = cola.motivos.isin(['etapas en desorden', 'disminuye y no debería'])
+    assert sin_valor.any() and cola.loc[sin_valor, ['esperado', 'rango_bajo', 'rango_alto']].isna().all().all()
+
+
+def test_visita_fuera_de_su_ventana_es_una_sola_fila_con_su_edad(modelo, particion):
+    _, _, te, _ = particion
+    d, _ = MA.preparar(te)
+    etapa = d.etapa[d.variable == 'peso_6m'].iloc[0]
+    sujeto = d.sujeto[d.variable == 'peso_6m'].iloc[0]
+    visita = d.index[(d.sujeto == sujeto) & (d.etapa == etapa)]
+    med = te.mediciones.copy()
+    med.loc[visita, 'fecha'] = pd.to_datetime(med.loc[visita, 'fecha']) + pd.Timedelta(days=200)
+    med.loc[visita, 'edad_dias'] = med.loc[visita, 'edad_dias'] + 200
+    movida = replace(te, mediciones=med)
+    res = modelo.puntuar(movida)
+    assert (res.datos.loc[visita, 'motivo3'] == OP.MOTIVO_VENTANA).sum() >= 2   # every measure of the visit
+    cola = OP.cola_revision(res, movida, modelo)
+    fila = cola[(cola.sujeto == sujeto) & (cola.etapa == etapa) & (cola.motivos == OP.MOTIVO_VENTANA)]
+    assert len(fila) == 1
+    fila = fila.iloc[0]
+    et = te.etapas.set_index('etapa').loc[etapa]
+    assert fila.etiqueta == OP.EDAD_DE_LA_VISITA and fila.unidad == 'días' and fila.variable == ''
+    assert (fila.rango_bajo, fila.rango_alto) == (et.edad_min, et.edad_max)
+    assert not et.edad_min <= float(fila.valor) <= et.edad_max
 
 
 def test_evaluacion_compara_con_el_rango_del_diccionario(modelo, particion):

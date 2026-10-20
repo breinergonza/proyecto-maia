@@ -38,6 +38,8 @@ from sevarti.contrato import Sevarti, codigos_declarados, edad_corregida, nacimi
 VERSION_CODIGO = '4'  # bump when a saved model can no longer be read or scored the same way
 TOLERANCIA_EDAD_DIAS = 14  # recorded age against the age computed from the date
 SUFIJO_CODIGO = 'código especial'
+MOTIVO_VENTANA = 'fuera de la ventana de la etapa'
+MOTIVO_CAMBIO = 'cambio atípico para el tiempo transcurrido'
 
 
 @dataclass(frozen=True)
@@ -578,7 +580,7 @@ def puntuar_trayectoria(datos: pd.DataFrame, x: pd.Series, sev: Sevarti, refs: d
     lo, hi = d.etapa.map(et.edad_min).astype(float), d.etapa.map(et.edad_max).astype(float)
     fuera = (edad < lo) | (edad > hi)
     fuera = d.index[fuera.to_numpy()]
-    out.loc[fuera[(out.loc[fuera, 'motivo3'] == '').to_numpy()], 'motivo3'] = 'fuera de la ventana de la etapa'
+    out.loc[fuera[(out.loc[fuera, 'motivo3'] == '').to_numpy()], 'motivo3'] = MOTIVO_VENTANA
 
     p = _pares(datos, x, sev.etapas)
     propios = refs | {tr: r for tr, r in ajustar_trayectoria(datos, x, sev.etapas, cfg).items() if tr not in refs}
@@ -590,12 +592,16 @@ def puntuar_trayectoria(datos: pd.DataFrame, x: pd.Series, sev: Sevarti, refs: d
             med[idx] = propios[tr].velocidad
             esc[idx] = propios[tr].escala(dias[idx])
     p['z'] = (p.delta - med * dias) / esc
+    # what each datum of a pair was expected to be, given the other one and the days between them
+    p['esperado_b'] = x.reindex(p.fila_a).to_numpy() + med * dias
+    p['esperado_a'] = x.reindex(p.fila_b).to_numpy() - med * dias
+    p['margen'] = cfg.z_alerta * esc
     no_dec = p.variable_b.map(esq.no_decreciente).fillna(False).astype(bool)
     tol = p.variable_b.map(esq.tolerancia).fillna(0).astype(float)
     todos = np.ones(len(p), dtype=bool)
     reglas = (('etapas en desorden', p.desorden.to_numpy(), todos),
               ('disminuye y no debería', (no_dec & (p.delta < -tol)).to_numpy(), todos),
-              ('cambio atípico para el tiempo transcurrido', (p.z.abs() > cfg.z_alerta).to_numpy(), p.z.notna().to_numpy()))
+              (MOTIVO_CAMBIO, (p.z.abs() > cfg.z_alerta).to_numpy(), p.z.notna().to_numpy()))
     zpar = p.z.abs().to_numpy()
     zfila = pd.concat([pd.Series(zpar, index=p.fila_a), pd.Series(zpar, index=p.fila_b)]).groupby(level=0).max()
     for motivo, malo, valido in reglas:

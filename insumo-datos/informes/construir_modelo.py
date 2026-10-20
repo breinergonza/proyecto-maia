@@ -303,7 +303,7 @@ Ahora el modelo revisa toda la historia, como lo haría el primer día de uso. C
 """)
 
 code("""
-cola = OP.cola_revision(res_total, esq, modelo.cfg)
+cola = OP.cola_revision(res_total, sev, modelo)
 dt = res_total.datos
 num = dt[dt.tipo == 'numeric']
 display(OP.resumen_cola(cola))
