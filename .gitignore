@@ -1,10 +1,10 @@
 # Data per child never leaves the team: risks, review sheets, trained models and system state.
-/insumo/salidas/
-/insumo/interno/
-/insumo/privado/
-/insumo/entradas/retroalimentacion/
-/insumo/__pycache__/
-/insumo/.pytest_cache/
-/insumo/.ipynb_checkpoints/
-/insumo/.codegraph/
-/insumo/~$*
+/insumo-dados/salidas/
+/insumo-dados/interno/
+/insumo-dados/privado/
+/insumo-dados/entradas/retroalimentacion/
+/insumo-dados/__pycache__/
+/insumo-dados/.pytest_cache/
+/insumo-dados/.ipynb_checkpoints/
+/insumo-dados/.codegraph/
+/insumo-dados/~$*
