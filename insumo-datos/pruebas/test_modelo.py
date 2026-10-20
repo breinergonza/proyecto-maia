@@ -91,6 +91,26 @@ def test_cero_o_negativo_en_variable_logaritmica_es_atipico(modelo, particion):
     assert p1.loc[filas, 'atipico'].all()
 
 
+def test_atipico_que_el_contexto_explica_no_alerta_salvo_fuera_del_rango(modelo, particion):
+    _, _, te, _ = particion
+    d, _ = MA.preparar(te)
+    ref = modelo.refs1['talla_3m']
+    filas = d.index[d.variable == 'talla_3m'][:40]
+    med = te.mediciones.copy()
+    med['valor'] = med.valor.astype(object)
+    med.loc[filas, 'valor'] = ref.mediana + 4 * ref.escala
+    te2 = replace(te, mediciones=med)
+    r = modelo.puntuar(te2).datos.loc[filas]
+    assert r.atipico.all()
+    explicado = r.z2.notna() & ~r.alerta2
+    assert explicado.any() and not explicado.all()
+    assert r.alerta1.equals(~explicado)
+    assert (r.motivo1[explicado] == '').all()
+    esquema = te.esquema.copy()
+    esquema.loc[esquema.variable == 'talla_3m', 'rango_max'] = ref.mediana + 3 * ref.escala
+    assert modelo.puntuar(replace(te2, esquema=esquema)).datos.loc[filas, 'alerta1'].all()
+
+
 # ------------------------------------------------------------- training mask
 
 def test_rango_declarado_no_se_usa_como_filtro(particion):

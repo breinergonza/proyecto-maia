@@ -873,6 +873,12 @@ class ModeloAnomalias:
         out = datos.join(p1).join(p2).join(p3)
         for col in ('alerta1', 'alerta2', 'alerta3'):
             out[col] = out[col].fillna(False).astype(bool)
+        # a value that is rare for the variable alone but expected in its own context (a very
+        # preterm child's birth weight) is not an alert; outside the declared range it still is
+        explicado = (out.atipico.fillna(False).astype(bool) & out.z2.notna() & ~out.alerta2
+                     & ~fuera_de_rango(out, sev.esquema))
+        out['alerta1'] &= ~explicado
+        out.loc[explicado, 'motivo1'] = ''
         grupo = puntuar_grupo(datos, p1, p2, self.refs1, sev, cfg)
         return Resultado(out, rechazos, grupo, pares)
 
@@ -1016,8 +1022,8 @@ BASE_COMPARACION = 'rango del diccionario'
 
 
 def fuera_de_rango(datos: pd.DataFrame, esquema: pd.DataFrame) -> pd.Series:
-    """The check the source already runs: outside the declared range. The model never uses
-    it; it is the baseline the model has to beat."""
+    """The check the source already runs: outside the declared range. It is the baseline the
+    model has to beat; the model only uses it to keep a layer-1 alert the context would explain."""
     e = esquema.set_index('variable')
     lo = datos.variable.map(e.rango_min).astype(float)
     hi = datos.variable.map(e.rango_max).astype(float)

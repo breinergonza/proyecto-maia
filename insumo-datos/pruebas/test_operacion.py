@@ -66,6 +66,14 @@ def test_cola_una_fila_por_dato_ordenada_por_capas_y_fuerza(modelo, puntuado):
 
 def test_cola_muestra_lo_esperado_por_la_revision_que_lo_marco(modelo, puntuado):
     te, res = puntuado
+    # rare birth weights the context explains, past a narrowed declared range: layer 1 keeps them
+    d = res.datos
+    peso = d[d.variable == 'peso_nacer']
+    comun = peso.x[~peso[['atipico', 'unidad', 'codigo']].astype(bool).any(axis=1)]
+    esquema = te.esquema.copy()
+    esquema.loc[esquema.variable == 'peso_nacer', ['rango_min', 'rango_max']] = (comun.min(), comun.max())
+    te = replace(te, esquema=esquema)
+    res = modelo.puntuar(te)
     cola = OP.cola_revision(res, te, modelo)
     con_rango = cola.dropna(subset=['esperado', 'rango_bajo', 'rango_alto'])
     assert (con_rango.rango_bajo <= con_rango.esperado).all() and (con_rango.esperado <= con_rango.rango_alto).all()

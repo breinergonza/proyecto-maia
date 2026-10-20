@@ -23,7 +23,7 @@ Este es el modelo que planteamos en la sección 10 de `informe_analisis_datos.ip
 | Capa | Pregunta | Cómo |
 |---|---|---|
 | **0. Contrato** | ¿El dato cumple el esquema? | Tipo, variable conocida, fecha posible. Si no cumple se rechaza: no es una anomalía |
-| **1. Valor** | ¿El valor tiene sentido por sí solo? | Mediana y MAD, códigos especiales, errores de unidad |
+| **1. Valor** | ¿El valor tiene sentido por sí solo? | Mediana y MAD, códigos especiales, errores de unidad. Un valor raro que el contexto explica (el peso al nacer de un prematuro extremo) no se alerta, salvo que salga del rango del diccionario |
 | **2. Contexto** | ¿Tiene sentido para este niño? | Un LightGBM por variable que da el rango esperado, calibrado con predicción conformal |
 | **3. Trayectoria** | ¿Tiene sentido con su historia? | Ventanas de cada etapa, cambio entre visitas frente a pares, reglas como "la talla no baja" |
 | **4. Grupo y tiempo** | ¿Algo empezó a medirse distinto? | Residuos, datos faltantes y redondeo por grupo y trimestre, contra su propio pasado |
@@ -173,7 +173,7 @@ md(f'**Qué vemos.** Entrenar tomó {dec((time.time() - t0) / 60)} minutos. La m
 md("""
 ## 4. Capas 0 y 1: contrato y valor
 
-Desde aquí todo es sobre la parte de **prueba**. La capa 0 rechaza lo que no cumple el esquema; la capa 1 mira cada valor solo. Debajo están los patrones que el modelo no debe aprender como normales: códigos que ocupan buena parte de una variable y redondeo (el porcentaje de valores que terminan en 0, que debería rondar el 10%).
+Desde aquí todo es sobre la parte de **prueba**. La capa 0 rechaza lo que no cumple el esquema; la capa 1 mira cada valor solo, y deja de alertar un valor raro cuando la capa 2 lo ve normal para ese niño y está dentro del rango del diccionario. Debajo están los patrones que el modelo no debe aprender como normales: códigos que ocupan buena parte de una variable y redondeo (el porcentaje de valores que terminan en 0, que debería rondar el 10%).
 """)
 
 code("""
