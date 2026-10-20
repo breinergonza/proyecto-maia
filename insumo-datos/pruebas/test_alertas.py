@@ -152,6 +152,19 @@ def test_metricas_basicas():
     assert (np.diff(ys) >= 0).all() and ys.min() >= 0 and ys.max() <= 1
 
 
+def test_riesgo_calibrado_nunca_es_0_ni_100():
+    rng = np.random.default_rng(9)
+    p = rng.random(3000)
+    y = (rng.random(3000) < p ** 3).astype(int)
+    y[p < 0.3] = 0                 # a whole low tail without a single case
+    y[np.argsort(p)[-3:]] = 1      # and the three highest, all cases
+    xs, ys = AC.isotonica(p, y)
+    assert (np.diff(ys) >= 0).all()
+    assert 0 < ys.min() < 0.01 and 0.5 < ys.max() < 1    # three cases out of three is not certainty
+    bajo = p < 0.3
+    assert abs(np.interp(0.15, xs, ys) - y[bajo].mean()) < 0.01   # large groups keep their own rate
+
+
 def test_conteo_de_una_visita_que_no_ocurrio_no_es_desenlace(clinico):
     """A source may fill the readmission count with 0 for children who never came to that visit."""
     sev, *_, modelo = clinico

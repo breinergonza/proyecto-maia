@@ -98,18 +98,25 @@ def precision_promedio(y: np.ndarray, p: np.ndarray) -> float:
 
 
 def isotonica(p: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Isotonic calibration (pool adjacent violators): knots to read with ``np.interp``."""
+    """Isotonic calibration (pool adjacent violators): knots to read with ``np.interp``.
+
+    Each block of children with the same calibrated level is a binomial count, and its
+    level is the Jeffreys estimate (cases + 1/2) / (children + 1), not the raw share: a block
+    with no case is not a 0% risk, nor three cases out of three a 100% one. Large blocks keep
+    their own share. Adjacent blocks with the same share are one block."""
     o = np.argsort(p)
     p, y = np.asarray(p, dtype=float)[o], np.asarray(y, dtype=float)[o]
     valores, pesos, lo, hi = [], [], [], []
     for pi, yi in zip(p, y):
         valores.append(yi), pesos.append(1.0), lo.append(pi), hi.append(pi)
-        while len(valores) > 1 and valores[-2] > valores[-1]:
+        while len(valores) > 1 and valores[-2] >= valores[-1]:
             w = pesos[-2] + pesos[-1]
             v = (valores[-2] * pesos[-2] + valores[-1] * pesos[-1]) / w
             valores[-2:], pesos[-2:], lo[-2:], hi[-2:] = [v], [w], [lo[-2]], [hi[-1]]
+    w = np.asarray(pesos)
+    nivel = np.maximum.accumulate((np.asarray(valores) * w + 0.5) / (w + 1))
     xs = np.ravel(np.column_stack([lo, hi]))
-    ys = np.repeat(valores, 2)
+    ys = np.repeat(nivel, 2)
     return xs, ys
 
 
