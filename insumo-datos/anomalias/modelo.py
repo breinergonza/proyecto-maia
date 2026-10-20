@@ -533,6 +533,11 @@ def _ref_transicion(g: pd.DataFrame, cfg: Config) -> RefTransicion | None:
     grupos = pd.qcut(g.dias.rank(method='first'), bandas, labels=False) if bandas > 1 else pd.Series(0, index=g.index)
     centros, escalas = [], []
     for _, idx in g.groupby(grupos).groups.items():
+        # a change of exactly 0 is a value copied from the previous datum, not a second measurement:
+        # when copies are common they would shrink the spread of the real changes to almost nothing
+        medido = idx[(g.delta.loc[idx] != 0).to_numpy()]
+        if (g.delta.loc[idx] == 0).mean() >= cfg.ceros and len(medido) >= cfg.min_valores_ref:
+            idx = medido
         _, esc = _escala_robusta(resto.loc[idx])
         if esc > 0:
             centros.append(float(g.dias.loc[idx].median()))

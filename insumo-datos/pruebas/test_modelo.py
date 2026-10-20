@@ -300,6 +300,23 @@ def test_cambio_entre_visitas_se_mide_segun_el_tiempo_transcurrido():
     assert abs(mismo_dia) > 3.5  # 40 g apart on the same day is a copy or typing error
 
 
+def test_cambio_copiado_no_achica_la_escala_del_cambio():
+    rng = np.random.default_rng(8)
+    n = 6000
+    # discharge weight to programme-entry weight, 1 to 3 days apart: for years the entry weight
+    # was copied from the discharge one (change exactly 0); weighed again, they differ by tens of grams
+    dias = rng.integers(1, 4, n).astype(float)
+    copiado = rng.random(n) < 0.45
+    delta = np.where(copiado, 0.0, rng.normal(0, 60, n).round(-1))
+    g = pd.DataFrame({'dias': dias, 'delta': delta})
+    g['velocidad'] = g.delta / g.dias
+    ref = MA._ref_transicion(g, MA.Config())
+    z = (g.delta - ref.velocidad * g.dias) / ref.escala(g.dias.to_numpy())
+    assert (z[~copiado].abs() > 3.5).mean() < 0.01   # a real second weighing is not atypical
+    assert (z[copiado].abs() > 3.5).mean() == 0       # nor is a copy
+    assert abs(400 / ref.escala(np.array([2.0]))[0]) > 3.5  # 400 g in two days still is
+
+
 def test_capa2_no_es_mas_fina_que_el_paso_de_la_variable(modelo):
     for var, m in modelo.capa2.items():
         assert m.escala_min >= modelo.refs1[var].resolucion / 2
