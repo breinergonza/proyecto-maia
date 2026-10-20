@@ -276,6 +276,11 @@ def borrador(meta: pd.DataFrame) -> D.Diccionario:
 # the system started with. From then on the experts own them in the dictionary.
 _COMPARAR = f'{EDAD_GESTACIONAL};ern_peso;v196a'   # gestational age, birth weight, weight at entry
 _CAMBIO_2022 = 'cambio de sistema 2022'
+# before the 2022 system the records carry era markers (fields only that system filled) that a model
+# trained on every year takes as the reason for the risk: these outcomes learn from the new system only
+# (only where their test still has children born since then: the later ones keep every year to stay validated)
+_EPOCA = dict(solo_desde=_CAMBIO_2022, nota='Antes del sistema de 2022 hay campos que solo llenaba ese sistema y el '
+              'modelo los tomaba como explicación del riesgo: solo los nacidos desde entonces.')
 _ANTERIOR = {'40 sem': 'entrada PMC', '3 m EC': '40 sem', '6 m EC': '3 m EC', '9 m EC': '6 m EC', '12 m EC': '9 m EC'}
 _MESES = {'3 m EC': '3 meses', '6 m EC': '6 meses', '9 m EC': '9 meses', '12 m EC': '12 meses'}
 
@@ -301,8 +306,10 @@ def _evento(clave: str, nombre: str, etapa: str, variable: str, codigos: str = '
 def _desenlaces() -> pd.DataFrame:
     uso = D.EN_USO
     filas = [
-        _desenlace('readm_40s', 'readmisión antes de las 40 semanas', uso, 'mayor_que_cero', 'entrada PMC', 'v237'),
-        _desenlace('readm_3m', 'readmisión entre las 40 semanas y los 3 meses', uso, 'mayor_que_cero', '40 sem', 'v276'),
+        _desenlace('readm_40s', 'readmisión antes de las 40 semanas', uso, 'mayor_que_cero', 'entrada PMC', 'v237',
+                   **_EPOCA),
+        _desenlace('readm_3m', 'readmisión entre las 40 semanas y los 3 meses', uso, 'mayor_que_cero', '40 sem', 'v276',
+                   **_EPOCA),
         _desenlace('readm_6m', 'readmisión entre los 3 y los 6 meses', uso, 'mayor_que_cero', '3 m EC', 'v318'),
         _desenlace('readm_9m', 'readmisión entre los 6 y los 9 meses', uso, 'mayor_que_cero', '6 m EC', 'v361'),
         _desenlace('readm_12m', 'readmisión entre los 9 y los 12 meses', uso, 'mayor_que_cero', '9 m EC', 'v403'),
@@ -310,8 +317,9 @@ def _desenlaces() -> pd.DataFrame:
           for c, n, m in (('40s', '40 semanas', 'entrada PMC'), ('3m', '3 meses', '40 sem'), ('6m', '6 meses', '3 m EC'),
                           ('9m', '9 meses', '6 m EC'), ('12m', '12 meses', '9 m EC'))),
         _desenlace('oxigeno_3m', 'oxigenodependencia con diagnóstico a los 3 meses', uso, 'en_codigos', 'entrada PMC',
-                   'v275e', '1;2', '3;9', nota='1 displasia broncopulmonar, 2 hipertensión pulmonar; 3 y 9 sin '
-                   'diagnóstico (el sistema anterior a 2022 usaba el 3, el actual el 9).'),
+                   'v275e', '1;2', '3;9', solo_desde=_CAMBIO_2022,
+                   nota='1 displasia broncopulmonar, 2 hipertensión pulmonar; 3 y 9 sin diagnóstico (el sistema '
+                   'anterior a 2022 usaba el 3, el actual el 9). ' + _EPOCA['nota']),
         _desenlace('oxigeno_12m', 'oxigenodependencia con diagnóstico a los 12 meses', uso, 'en_codigos', '40 sem',
                    'v402e', '1;2', '3;9'),
         _desenlace('desarrollo_6m', 'desarrollo psicomotor bajo a los 6 meses', uso, 'percentil_bajo', '3 m EC', 'v344b',
