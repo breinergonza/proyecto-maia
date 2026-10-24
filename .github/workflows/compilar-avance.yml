@@ -1,0 +1,63 @@
+name: Compilar PDF Avance
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'proyecto-latex/Avance_proyecto.tex'
+      - 'proyecto-latex/figuras/**'
+      - 'proyecto-latex/secciones/**'
+      - 'proyecto-latex/referencias.tex'
+      - 'proyecto-latex/IEEEtran.cls'
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  compilar:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Descargar el repositorio
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+
+      # 2. Instalar LaTeX
+      - name: Instalar LaTeX
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            texlive-latex-base \
+            texlive-latex-recommended \
+            texlive-latex-extra \
+            texlive-fonts-recommended \
+            texlive-lang-spanish \
+            latexmk
+
+      # 3. Compilar el archivo
+      - name: Compilar Avance_proyecto.tex
+        working-directory: proyecto-latex
+        run: |
+          latexmk \
+            -pdf \
+            -interaction=nonstopmode \
+            -halt-on-error \
+            Avance_proyecto.tex
+
+      # 4. Guardar el PDF generado en GitHub
+      - name: Actualizar PDF
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add proyecto-latex/Avance_proyecto.pdf
+
+          if git diff --cached --quiet; then
+            echo "El PDF no tuvo cambios."
+          else
+            git commit -m "Actualizar PDF de Avance_proyecto"
+            git push
+          fi
