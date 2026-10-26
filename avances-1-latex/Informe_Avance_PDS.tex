@@ -1,0 +1,295 @@
+\documentclass[letterpaper,10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[scaled]{helvet}
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage[spanish,es-noshorthands,es-nodecimaldot]{babel}
+\usepackage{icomma}
+\usepackage{textcomp}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage[labelsep=period,justification=centering,font=it]{caption}
+\usepackage[hidelinks]{hyperref}
+\usepackage[top=2.6cm,bottom=2.25cm,left=2.35cm,right=2.35cm,footskip=1.1cm]{geometry}
+
+\graphicspath{{figuras/}}
+
+% Numeración de secciones: "1." y "2.1."
+\titleformat{\section}{\normalfont\large\bfseries}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\normalfont\normalsize\bfseries}{\thesubsection.}{0.5em}{}
+
+% Leyendas: "Fig. N." y "TABLA I."
+\renewcommand{\thetable}{\Roman{table}}
+\captionsetup[figure]{name=Fig.}
+\captionsetup[table]{name=TABLA,font={normalfont,bf},position=top}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+
+% Espaciado de flotantes y títulos
+\setlength{\textfloatsep}{10pt plus 2pt minus 2pt}
+\setlength{\intextsep}{8pt plus 2pt minus 2pt}
+\setlength{\floatsep}{8pt plus 2pt minus 2pt}
+\captionsetup{skip=4pt}
+\renewcommand{\topfraction}{0.85}
+\renewcommand{\bottomfraction}{0.7}
+\renewcommand{\textfraction}{0.15}
+\renewcommand{\floatpagefraction}{0.75}
+\titlespacing*{\section}{0pt}{10pt plus 2pt minus 2pt}{4pt}
+\titlespacing*{\subsection}{0pt}{8pt plus 2pt minus 2pt}{2pt}
+
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\fancyfoot[C]{\footnotesize Universidad de los Andes | Maestría en Inteligencia Artificial \textperiodcentered{} Proyecto PDS}
+
+\begin{document}
+
+\begin{center}
+{\Large\bfseries Sistema de alertas clínicas tempranas con IA interpretable para la predicción de riesgos en niños prematuros y de bajo peso del Programa Madre Canguro\par}
+\vspace{10pt}
+Alex P Chirino Caicedo, Breitner E González, Santiago J Ramos Echeverry, Wilfrido A Gómez Pérez\\
+Universidad de los Andes - Fundación Canguro\\
+Maestría en Inteligencia Artificial, Octubre de 2026
+\end{center}
+
+\section{DESCRIPCIÓN BREVE DE LA PROPUESTA DE SOLUCIÓN}
+
+Se desarrolló una solución de inteligencia artificial (IA) interpretable para apoyar la revisión de registros longitudinales y la estimación de riesgos en niños prematuros o de bajo peso vinculados al Programa Madre Canguro. La propuesta responde a dos dificultades complementarias: la calidad variable de los registros clínicos y la necesidad de anticipar desenlaces antes de la siguiente visita. El sistema no emite diagnósticos ni reemplaza la valoración profesional: organiza datos, identifica observaciones dudosas y produce estimaciones probabilísticas con explicaciones.
+
+La solución consta de dos modelos encadenados. El primero examina la conformidad y plausibilidad de los datos mediante reglas, modelos contextuales y comparaciones longitudinales; el segundo utiliza información disponible hasta un corte de seguimiento para estimar riesgos clínicos por desenlace. El umbral que transforma un riesgo en una notificación pertenece a la aplicación y a la gobernanza clínica, no al entrenamiento del clasificador. El enfoque permite separar errores de captura de señales potencialmente clínicas y mantener trazabilidad de las decisiones.
+
+El alcance se ajustó al comportamiento real de los datos (fuente): en lugar de reentrenamiento mensual y escritura de resultados en la base institucional, se adoptó una ejecución alineada con la carga semestral, manteniendo inferencia a demanda y separación entre datos reales y simulados. Esta decisión reduce dependencias operativas y permite evaluar el sistema con cortes que son reproducibles.
+
+La solución se despliega como servicio con registro de modelos, API de inferencia y tablero web, en un entorno público con datos simulados y uno interno con los datos reales. Se discuten sus aplicaciones para priorizar el seguimiento clínico y sus límites: la perdida de seguimiento y la deriva de la calibración.
+
+\section{RECOLECCIÓN Y PREPARACIÓN DE LOS DATOS}
+
+\subsection{Fuente, extracción y contrato de datos}
+
+SEVARTI (Stages--Episodes--Variables--Topics of Interest) organiza procesos longitudinales mediante etapas de desarrollo, episodios de atención y variables vinculadas a cada momento. En el Programa Madre Canguro permite ubicar los controles y antecedentes en un eje de edad gestacional o corregida, diferenciando las visitas programadas de los episodios con duración propia.
+
+\begin{figure}[!htb]
+\centering
+\includegraphics[width=0.55\textwidth]{fig1_sevarti.png}
+\caption{Modelo conceptual SEVARTI: etapas, episodios y variables. Fuente: esquema compartido del proyecto.}
+\label{fig:sevarti}
+\end{figure}
+
+Se emplearon registros de la capa de consumo de una base PostgreSQL institucional, consultada con permisos de solo lectura. El corte documentado corresponde al 24 de julio de 2026. Los informes técnicos del equipo registran 62.043 pacientes y aproximadamente 13,9 millones de mediciones; estas cifras describen el universo de datos del corte y no el número efectivo de observaciones de cada modelo. La extracción incorpora datos perinatales, controles antropométricos, visitas, eventos clínicos y episodios de atención.
+
+El adaptador SEVARTI representa la información mediante seis entidades: esquema, etapas, sujetos, mediciones, episodios y quiebres históricos. Un diccionario administrado por expertos define variables, unidades, conceptos longitudinales, códigos de ausencia, ventanas de visita y desenlaces. Las versiones de documentación presentan diferencias en el número de variables (339--342), por lo que el conteo definitivo debe acompañarse del identificador del diccionario utilizado en cada experimento.
+
+El corte principal reúne 62.043 niños, 13.884.056 mediciones y 339 variables catalogadas (318 en uso). Las cifras deben asociarse siempre al corte y al criterio de conteo, pues las versiones anteriores de la documentación institucional contenían 15.641 niños y aproximadamente 4,5 millones de mediciones. El 76~\% de los registros carece de ubicación temporal explícita, por lo que el adaptador reconstruye el contexto con la etapa, la edad anotada y las fechas verificables.
+
+La partición experimental se efectuó por niño y por año de nacimiento, con separación de los regímenes anteriores y posteriores al cambio de registro de 2022. Para anomalías se reportaron 40.711 niños en entrenamiento, 7.330 en calibración y 8.955 en prueba; para clasificación clínica, 48.041 en entrenamiento y 8.955 en prueba. Estas cantidades pertenecen a configuraciones experimentales distintas y no deben sumarse como si constituyeran un único particionamiento.
+
+\subsection{Edad corregida, consistencia y tratamiento de faltantes}
+
+La edad corregida en días se obtuvo como $\mathrm{EC} = \text{edad posnatal (días)} - 7 \times (40 - \text{edad gestacional en semanas})$. Se contrastaron fechas de nacimiento y visitas, edades consignadas, orden temporal y ventanas de seguimiento. Para el análisis de crecimiento se conservaron las edades reales de medición, dado que diferencias de semanas pueden afectar la interpretación del peso, la talla y el perímetro cefálico. Los valores dudosos se etiquetan para revisión y, según el protocolo del modelo, se excluyen como valores válidos o se tratan como faltantes; no se sustituyen automáticamente por valores estimados.
+
+La auditoría identificó códigos de relleno no documentados en 14 variables, registros con unidades inconsistentes, fechas imposibles, medidas fuera de la ventana prevista y cambios de codificación alrededor de 2022. Se observó además pérdida de seguimiento: el registro de peso se aproxima al 78~\% en 40 semanas y al 49~\% a los 12 meses de edad corregida. Esta caída exige distinguir entre ausencia de dato, ausencia de visita y pérdida de seguimiento, pues la cohorte de casos completos puede no representar a todos los niños.
+
+\begin{figure}[!htb]
+\centering
+\includegraphics[width=0.62\textwidth]{fig2_cobertura_peso.png}
+\caption{Cobertura de peso en dos controles, según auditoría interna del corte 24/07/2026. Gráfico elaborado para este informe a partir de porcentajes reportados.}
+\label{fig:cobertura}
+\end{figure}
+
+\section{DESCRIPCIÓN DEL PROCESO DE CONSTRUCCIÓN DE LOS MODELOS O SOLUCIÓN}
+
+\subsection{Flujo reproducible y control de versiones}
+
+La ejecución se organiza en preparación SEVARTI, validación del diccionario, detección de anomalías, construcción de variables clínicas, entrenamiento por desenlace, evaluación y cálculo de riesgos. Cada actualización institucional puede iniciar una nueva corrida; el pipeline contempla una modalidad de evaluación silenciosa, en la cual los riesgos se guardan antes de conocer los desenlaces posteriores. Los resultados, modelos y artefactos se versionan para conservar reproducibilidad y permitir comparaciones entre cortes.
+
+La trazabilidad del entrenamiento depende de una máscara de exclusiones versionada: se conservan los datos originales, mientras los códigos especiales, los errores de unidad y los extremos claramente inconsistentes se excluyen como objetivos de entrenamiento y se representan como faltantes en los modelos posteriores. La documentación del corte registra una exclusión del 1,6~\% de aproximadamente 3,53 millones de datos numéricos; ello no equivale a eliminar pacientes completos.
+
+\subsection{Modelo de anomalías: cinco niveles de revisión}
+
+Una anomalía es una observación que incumple el contrato de registro o resulta improbable por su valor, contexto clínico, trayectoria o periodo. No constituye necesariamente un error confirmado ni un diagnóstico: indica que el dato requiere revisión. Un peso plausible aisladamente, por ejemplo, puede ser incompatible con la edad corregida o con mediciones anteriores.
+
+La revisión robusta calcula $z_r = (x - \text{mediana})/(1{,}4826 \times \mathrm{MAD})$, con MAD como mediana de desviaciones absolutas, y señala candidatos cuando $|z_r| > 3{,}5$. La capa contextual estima $Q_{0,25}$, $Q_{0,50}$ y $Q_{0,75}$; el residuo $z_2 = (y - Q_{0,50})/[(Q_{0,75} - Q_{0,25})/1{,}349]$ se contrasta con un umbral conformal obtenido del cuantil $1 - \alpha$ de $|z_2|$ en calibración ($\alpha = 0{,}005$). La tasa empírica de alertas puede diferir de la nominal. Los cinco niveles del proceso se resumen en la Tabla~\ref{tab:niveles}.
+
+\begin{table}[!htb]
+\centering
+\caption{NIVELES DE REVISIÓN DEL MODELO DE DETECCIÓN DE ANOMALÍAS}
+\label{tab:niveles}
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.18\textwidth}>{\raggedright\arraybackslash}p{0.38\textwidth}>{\raggedright\arraybackslash}p{0.36\textwidth}}
+\toprule
+Nivel & Procedimiento & Salida o propósito \\
+\midrule
+0. Contrato & Tipo, unidad, códigos y ubicación temporal & Dato válido, rechazado o no ubicable \\
+1. Valor & Estadísticos robustos; detección de extremos y escala & Posibles valores anómalos o errores de unidad \\
+2. Contexto & LightGBM cuantílico (Q25, Q50, Q75) y residuo calibrado & Incompatibilidad con antecedentes y visita \\
+3. Trayectoria & Diferencias y velocidades entre medidas consecutivas & Saltos inesperados y secuencias incoherentes \\
+4. Grupo-tiempo & Cambios trimestrales, redondeo y faltantes & Posibles cambios en prácticas de registro \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+En la capa contextual se estiman cuantiles condicionales de cada variable a partir de otras características del niño, la visita y el momento de medición, excluyendo el propio valor evaluado. La metodología utiliza un criterio de calibración de residuos y, cuando hay suficiente muestra, un umbral de alerta de $p \leq 0{,}005$. La capa longitudinal contrasta cambios entre visitas con velocidades de referencia y tolerancias por concepto; la capa temporal busca alteraciones sistemáticas en grupos o periodos. La salida prioriza registros para revisión y proporciona motivos, no una etiqueta clínica definitiva.
+
+En la capa contextual se ajustaron tres regresiones cuantílicas por variable numérica (cuantiles 0,25, 0,50 y 0,75). El residuo estandarizado se compara con un umbral estimado sobre la partición de calibración mediante predicción conformal ($\alpha = 0{,}005$). La vigilancia temporal agrega indicadores trimestrales de residuos, faltantes y redondeo, contrastados con los ocho trimestres previos y analizados mediante CUSUM. El entrenamiento documentado generó 132 modelos contextuales en 15,7 minutos de CPU.
+
+\subsection{Clasificación de riesgos y explicabilidad}
+
+Para cada desenlace y corte de seguimiento se preparan firmas con antecedentes basales, historia de visitas, episodios y mediciones conocidas hasta ese instante. Los clasificadores LightGBM estiman probabilidades que se calibran y se comparan con reglas simples. Las explicaciones basadas en TreeSHAP permiten examinar contribuciones de variables a una predicción, sin atribuirles interpretación causal. Las particiones por paciente y la separación cronológica son indispensables para evitar que información de controles futuros contamine la validación.
+
+La documentación registra 14 desenlaces evaluados, incluyendo readmisión, inasistencia a la siguiente visita, oxigenodependencia, desarrollo y resultados de crecimiento. Para cada uno se deben fijar de manera explícita la fecha índice, horizonte de predicción, definición de etiqueta y criterios de elegibilidad. El sistema entrega probabilidad, prioridad relativa y explicación; la interfaz configura la política de visualización de alertas.
+
+Los 14 desenlaces modelados incluyen cinco ventanas de readmisión, cinco de ausencia a la siguiente visita, dos evaluaciones de oxigenodependencia y dos de desarrollo psicomotor bajo. Los cuatro desenlaces adicionales de crecimiento a los 12 meses (peso, talla, peso para la talla y perímetro cefálico bajo el umbral antropométrico) se consideran una extensión diferenciada; no deben contarse como parte de los 14 modelos ya evaluados.
+
+Para disminuir fuga de información, las características se restringen a los registros disponibles hasta cada visita; se descartan variables completadas retrospectivamente y los casos de inasistencia solo se etiquetan una vez cerrada la ventana de seguimiento. Las probabilidades se calibran mediante regresión isotónica con una partición temporal posterior al entrenamiento; la salida incluye riesgo, percentil y contribuciones locales TreeSHAP. La decisión del umbral de notificación corresponde a la aplicación y a los expertos clínicos.
+
+\subsection{Trayectorias antropométricas y firmas incrementales}
+
+Una trayectoria antropométrica es la sucesión ordenada de peso, talla y perímetro cefálico de un niño, con sus edades reales y eventos asociados. Su análisis incluye nivel, dirección, velocidad y cambios de pendiente, preferiblemente mediante puntajes z de una referencia adecuada a sexo y edad corregida. A diferencia de comparar solo dos visitas, permite reconocer desaceleraciones o recuperaciones; no obstante, la ausencia de controles y los intervalos irregulares limitan las comparaciones.
+
+Se estableció una trayectoria de ocho hitos: nacimiento, inicio de posición canguro, salida de posición canguro, 40 semanas de edad gestacional y controles de 3, 6, 9 y 12 meses de edad corregida. Los dos hitos de posición canguro se interpretan como eventos con fecha propia y no como visitas a una edad fija. En cada punto se vinculan peso, talla y perímetro cefálico cuando existen y se calculan indicadores estandarizados conforme a la referencia antropométrica clínicamente aprobada.
+
+Para predecir un desenlace a 12 meses se proyectan firmas sucesivas en 40 semanas, 3, 6 y 9 meses. Cada firma puede incluir estado actual, cambio respecto al control anterior, velocidad por día, trayectoria histórica, variables basales y señales de calidad. La selección de variables combina plausibilidad clínica, disponibilidad antes del corte, completitud, estabilidad temporal y ganancia predictiva frente a una línea base. La interpolación entre mediciones es útil para análisis descriptivos, pero en predicción no puede utilizar una observación posterior al corte. Los cortes de predicción y sus datos admisibles se presentan en la Tabla~\ref{tab:cortes}.
+
+\begin{table}[!htb]
+\centering
+\caption{CORTES DE SEGUIMIENTO E INFORMACIÓN DISPONIBLE PARA LA PREDICCIÓN INCREMENTAL}
+\label{tab:cortes}
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.16\textwidth}>{\raggedright\arraybackslash}p{0.48\textwidth}>{\raggedright\arraybackslash}p{0.28\textwidth}}
+\toprule
+Corte & Información admisible & Desenlace de evaluación \\
+\midrule
+40 semanas & Nacimiento, episodios neonatales y datos hasta 40 semanas & Estado a 12 meses EC \\
+3 meses EC & Firma previa + mediciones y eventos hasta 3 meses & Estado a 12 meses EC \\
+6 meses EC & Firma previa + cambios y eventos hasta 6 meses & Estado a 12 meses EC \\
+9 meses EC & Firma previa + cambios y eventos hasta 9 meses & Estado a 12 meses EC \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La evaluación incremental propuesta distingue cuatro firmas predictivas ---40 semanas, 3, 6 y 9 meses EC--- y un desenlace a 12 meses. En cada firma se calcularán medidas actuales, cambios de puntaje z, velocidades normalizadas por días y antecedentes clínicos previos. Inicio y salida de posición canguro se tratarán como eventos con fechas reales, no como controles de edad fija. Las interpolaciones entre visitas solo se usarán en análisis descriptivos o cuando se pueda garantizar que no emplean observaciones futuras respecto al instante de predicción.
+
+\subsection{Arquitectura técnica y protección de datos}
+
+\begin{figure}[!htb]
+\centering
+\includegraphics[width=0.88\textwidth]{fig3_arquitectura.png}
+\caption{Arquitectura lógica del sistema: SEVARTI, anomalías, riesgos y servicio. La demostración pública emplea datos simulados. Fuente: equipo del proyecto.}
+\label{fig:arquitectura}
+\end{figure}
+
+El procesamiento de datos reales se mantiene en un equipo local con GPU, con acceso a PostgreSQL institucional de solo lectura. El entorno de trabajo integra CLI de entrenamiento, MLflow para seguimiento experimental, MinIO para artefactos, PostgreSQL local, FastAPI para inferencia y React/nginx para visualización. El entorno de demostración en Railway utiliza únicamente datos simulados y un paquete de modelo destinado a ese propósito; no recibe historias clínicas reales. Las salidas individuales permanecen en el entorno autorizado.
+
+La arquitectura contempla contenedores Docker para una ejecución semestral, un registro de experimentos y versiones en MLflow, artefactos en almacenamiento interno, inferencia mediante FastAPI y una interfaz React con funciones de administración, evaluación y visualización. La demostración en Railway utiliza exclusivamente datos simulados; la base real permanece en el entorno interno con acceso de solo lectura. La presentación de ajuste de alcance distingue los componentes ya evaluados de los entregables de despliegue y validación que permanecen en ejecución.
+
+\section{RESULTADOS OBTENIDOS}
+
+La validación interna de los 14 desenlaces detalla el momento de cálculo, niños elegibles, prevalencia, AUC del modelo y de la regla simple, concentración de casos en el decil de mayor riesgo y razón riesgo medio/observado. Trece comparaciones de AUC favorecen al modelo. Para oxigenodependencia a tres meses se obtuvo AUC 0,91 frente a 0,80 de la regla, con 67,7~\% frente a 49,3~\% de los casos en el decil superior. La razón riesgo/observado de 1,58 indica sobreestimación y motiva recalibración.
+
+\begin{table}[!htb]
+\centering
+\caption{Validación retrospectiva por desenlace, corte 24/07/2026. Fuente: resultados internos del proyecto.}
+\label{tab:validacion}
+\footnotesize
+\setlength{\tabcolsep}{2.5pt}
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}llrrrrrrc@{}}
+\toprule
+ & & & & \multicolumn{2}{c}{AUC} & \multicolumn{2}{c}{\parbox[b]{2.2cm}{\centering Casos en el 10~\% superior (\%)}} & Riesgo medio / \\
+\cmidrule(lr){5-6}\cmidrule(lr){7-8}
+Desenlace & Se calcula en & Niños & Casos (\%) & Modelo & Regla & Modelo & Regla & observado \\
+\midrule
+Readmisión antes de 40 semanas & Entrada & 6.323 & 4,90 & 0,71 & 0,67 & 29,7 & 28,1 & 1,64 \\
+Readmisión 40 semanas--3 meses & 40 semanas & 3.886 & 3,68 & 0,67 & 0,58 & 22,4 & 23,1 & 1,39 \\
+Readmisión 3--6 meses & 3 meses & 3.385 & 1,60 & 0,62 & 0,53 & 16,7 & 18,5 & 2,96 \\
+Readmisión 6--9 meses & 6 meses & 2.615 & 1,99 & 0,57 & 0,48 & 15,4 & 11,5 & 1,59 \\
+Readmisión 9--12 meses & 9 meses & 2.295 & 1,57 & 0,65 & 0,50 & 19,4 & 13,9 & 2,01 \\
+\midrule
+No vuelve a 40 semanas & Entrada & 2.222 & 10,80 & 0,67 & 0,57 & 25,0 & 13,8 & 0,98 \\
+No vuelve a 3 meses & 40 semanas & 4.338 & 17,73 & 0,67 & 0,53 & 19,9 & 12,7 & 0,97 \\
+No vuelve a 6 meses & 3 meses & 4.660 & 29,55 & 0,56 & 0,49 & 13,1 & 9,6 & 0,90 \\
+No vuelve a 9 meses & 6 meses & 3.855 & 34,03 & 0,57 & 0,52 & 13,4 & 10,0 & 0,84 \\
+No vuelve a 12 meses & 9 meses & 3.150 & 29,71 & 0,58 & 0,52 & 14,7 & 10,7 & 1,06 \\
+\midrule
+Oxigenodependencia a 3 meses & Entrada & 5.315 & 3,78 & \textbf{0,91} & 0,80 & \textbf{67,7} & 49,3 & 1,58 \\
+Oxigenodependencia a 12 meses & 40 semanas & 2.140 & 0,98 & 0,76 & 0,76 & 57,1 & 33,3 & 0,98 \\
+Desarrollo psicomotor bajo a 6 meses & 3 meses & 3.187 & 4,42 & 0,71 & 0,57 & 35,5 & 19,9 & 0,99 \\
+Desarrollo psicomotor bajo a 12 meses & 6 meses & 2.343 & 4,65 & 0,77 & 0,59 & 39,5 & 23,9 & 0,91 \\
+\bottomrule
+\multicolumn{9}{@{}p{\textwidth}@{}}{\scriptsize Regla: el mismo modelo con solo edad gestacional, peso al nacer y peso a la entrada. Una razón riesgo/observado mayor que 1 indica sobreestimación. \emph{Fuente: elaboración propia.}} \\
+\end{tabular*}
+\end{table}
+
+Los resultados siguientes corresponden a experimentos internos documentados para el corte analizado. No deben confundirse con una evaluación prospectiva definitiva, una validación externa o la aprobación clínica de las alertas. El detector de anomalías mostró 78~\% de detección de desvíos sintéticos de tres desviaciones estándar, frente a 27~\% de una regla de rangos; también se reportó 68~\% de detección de alteraciones de etapa. Estas cifras describen escenarios de prueba específicos y no la sensibilidad ante todos los errores reales.
+
+\begin{figure}[!htb]
+\centering
+\includegraphics[width=0.62\textwidth]{fig4_deteccion.png}
+\caption{Detección en pruebas internas de perturbaciones sintéticas. La comparación con regla simple solo se reportó para desvíos de 3 DE.}
+\label{fig:deteccion}
+\end{figure}
+
+Para oxigenodependencia a tres meses se reportó AUROC de 0,91. En el decil de mayor riesgo, el modelo concentró 67,7~\% de los casos frente a 49,3~\% con la referencia simple. Para desarrollo psicomotor relativamente bajo se documentaron AUROC de 0,71 a seis meses y 0,77 a doce meses. En el conjunto de experimentos reportados, los modelos superaron la referencia simple en 13 de 14 desenlaces; esta síntesis debe acompañarse de la tabla completa por desenlace, cohorte y periodo en la versión definitiva.
+
+\begin{figure}[!htb]
+\centering
+\includegraphics[width=0.62\textwidth]{fig5_oxigenodependencia.png}
+\caption{Concentración de casos de oxigenodependencia en el 10~\% de niños con mayor riesgo; cifras internas reportadas.}
+\label{fig:oxigeno}
+\end{figure}
+
+En calidad de datos se identificaron además 33 fechas imposibles, 985 eventos fechados antes del parto y 5.905 registros de crecimiento con edad distinta a la de la visita. Estos hallazgos apoyan el valor del control de calidad antes del modelamiento, pero requieren confirmación y depuración en origen. El aumento registrado de readmisiones a partir de 2021 sigue bajo revisión para distinguir variación clínica de cambio de codificación.
+
+La evaluación del detector inyectó seis clases de errores en la partición de prueba: códigos, unidades, desviaciones de tres desviaciones estándar, dígitos invertidos, intercambio de etapas y valores procedentes de otro niño. La detección global documentada fue del 75,3~\% con 18,8 alertas por cada 1.000 registros sin perturbación inyectada, frente a 14,7 alertas de la regla vigente. La ganancia fue especialmente marcada en desviaciones de tres DE (78~\% frente a 27~\%) y etapas intercambiadas (68~\% frente a 5~\%); los valores de otro niño fueron más difíciles de identificar (34~\%).
+
+En el componente clínico, se encuentra una AUROC entre 0,56 y 0,91 según desenlace, con mejora frente a la referencia simple en 13 de 14 comparaciones. Estas métricas describen discriminación en prueba retrospectiva; no equivalen a sensibilidad clínica en un umbral específico, ni prueban utilidad prospectiva. La oxigenodependencia a tres meses alcanzó AUROC de 0,91, pero es necesario reportar también prevalencia, AUC-PR, intervalos de confianza y calibración.
+
+\section{ANÁLISIS DE LOS RESULTADOS OBTENIDOS, RETOS Y CÓMO PROSEGUIR}
+
+La lectura conjunta de AUC y calibración es esencial: un clasificador puede ordenar mejor el riesgo y simultáneamente sobreestimar probabilidades. Los desenlaces de inasistencia muestran discriminación moderada (AUC de 0,56 a 0,67); se requiere evaluar por desenlace, con intervalos de confianza, precisión-recall y utilidad operativa, no solo mediante el número agregado de comparaciones favorables.
+
+Posterior a la revisión de los resultados observados en los 14 desenlaces, el equipo sostuvo una sesión con el experto que acompaña el proyecto, quien nos sugirió enfocar el trabajo en dos o tres desenlaces puntuales. Esta recomendación orienta la siguiente fase: en lugar de distribuir el esfuerzo entre todas las ventanas evaluadas, se priorizará un número reducido de desenlaces para profundizar en su definición, calibración, análisis de incertidumbre y la utilidad clínica.
+
+La mejora frente a reglas simples indica que el contexto del niño y su trayectoria contienen información útil que las verificaciones aisladas no capturan. No obstante, la evaluación con perturbaciones artificiales puede sobreestimar la detección de errores naturales. De manera análoga, un AUROC elevado no garantiza probabilidades bien calibradas ni una carga de alertas aceptable. La revisión humana y la evaluación de calibración por subgrupos son necesarias antes de cualquier uso asistencial.
+
+La pérdida de seguimiento es un riesgo metodológico central. Exigir las 18 mediciones de peso, talla y perímetro cefálico en seis visitas generaría una cohorte altamente seleccionada; por ello, se reservará el subconjunto completo para análisis de sensibilidad, mientras que los clasificadores incrementales deben utilizar información disponible hasta cada corte y documentar patrones de ausencia. Se compararán modelos con estado actual frente a modelos con cambios y velocidades, para cuantificar específicamente el aporte de las trayectorias.
+
+Los cambios de captura alrededor de 2022 obligan a controlar quiebres históricos, verificar estabilidad de unidades y validar temporalmente en cohortes posteriores. También quedan por consolidar el diccionario de variables, las referencias de crecimiento según edad y población, la definición de algunos desenlaces y el manejo de mediciones registradas fuera de ventana. La interpolación descriptiva deberá limitarse a intervalos clínicamente admisibles y distinguir valores observados de estimados.
+
+Como continuación se propone en el desarrollo de este proyecto:
+\begin{enumerate}[label=(\roman*),leftmargin=*,itemsep=0pt,topsep=0pt]
+\item congelar el corte y la versión del diccionario para reproducir métricas;
+\item completar auditoría por desenlace, curvas de calibración e intervalos de confianza;
+\item implementar y comparar firmas incrementales en 40 semanas, 3, 6 y 9 meses para predicción a 12 meses;
+\item revisar con expertos una muestra ciega de anomalías y alertas; y
+\item contrastar las predicciones guardadas con un nuevo corte de la Fundación, cuando esté disponible, respetando el tiempo de maduración de cada desenlace.
+\end{enumerate}
+
+La plataforma debe conservar umbrales configurables, registro de versiones y separación entre datos reales y simulados.
+
+La cobertura disminuye a medida que avanza el seguimiento: la documentación experimental registra alrededor de 78~\% de peso disponible a las 40 semanas y 49~\% a los 12 meses entre niños elegibles para cada visita. Por ello, la cohorte con las 18 mediciones completas debe utilizarse como análisis de sensibilidad y caracterización de trayectorias, no como único conjunto de entrenamiento; de lo contrario se favorecería a los pacientes con mejor adherencia al seguimiento.
+
+El quiebre de registro de 2022 constituye una amenaza de deriva: los pesos redondeados a 100 g aumentaron del 0,9~\% al 5,4~\%, y las diferencias de prácticas de medición pueden confundirse con cambios biológicos. El aumento reportado de readmisiones desde 2021 también requiere contrastación con expertos de datos antes de atribuirlo a un cambio clínico real.
+
+Como siguientes acciones se propone congelar la versión del corte y del diccionario; auditar resultados por desenlace y subgrupo; completar curvas de calibración, análisis de incertidumbre y límites antropométricos específicos; y contrastar las predicciones emitidas con el corte del 24 de julio de 2026 frente a una carga posterior, si la Fundación la proporciona. Esa comparación debe respetar la maduración temporal de cada desenlace y no presentarse como validación concluida hasta disponer de los resultados observados.
+
+Finalmente, la incorporación de trayectorias incrementales se evaluará mediante una comparación controlada entre una línea base perinatal, un modelo con estado antropométrico actual y otro con cambios longitudinales acumulados. Solo la diferencia entre estos últimos permitirá cuantificar el aporte predictivo específico de la trayectoria. La explicación individual de los riesgos será sometida a revisión clínica y no se interpretará como evidencia causal.
+
+\renewcommand{\refname}{REFERENCIAS}
+\begin{thebibliography}{9}
+\bibitem{villar2015} J. Villar et al., ``Postnatal growth standards for preterm infants,'' \emph{The Lancet Global Health}, vol. 3, no. 11, pp. e681--e691, 2015, doi: 10.1016/S2214-109X(15)00163-1.
+\bibitem{fenton2013} T. R. Fenton and J. H. Kim, ``A systematic review and meta-analysis to revise the Fenton growth chart for preterm infants,'' \emph{BMC Pediatrics}, vol. 13, art. 59, 2013, doi: 10.1186/1471-2431-13-59.
+\bibitem{collins2024} G. S. Collins et al., ``TRIPOD+AI statement: updated guidance for reporting clinical prediction models that use regression or machine learning methods,'' \emph{BMJ}, vol. 385, e078378, 2024, doi: 10.1136/bmj-2023-078378.
+\bibitem{ke2017} G. Ke et al., ``LightGBM: A highly efficient gradient boosting decision tree,'' in \emph{Advances in Neural Information Processing Systems}, vol. 30, 2017.
+\bibitem{lundberg2017} S. M. Lundberg and S.-I. Lee, ``A unified approach to interpreting model predictions,'' in \emph{Advances in Neural Information Processing Systems}, vol. 30, 2017.
+\bibitem{who2022} World Health Organization, \emph{WHO Recommendations for Care of the Preterm or Low-Birth-Weight Infant}. Geneva, Switzerland: WHO, 2022.
+\end{thebibliography}
+
+\end{document}
