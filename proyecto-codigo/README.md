@@ -14,7 +14,8 @@ Apoyo a la decisión, no diagnóstico.
 
 **Contenido:** [Arquitectura](#arquitectura) · [Local y Railway](#qué-corre-en-local-y-qué-va-en-railway) ·
 [Configuración local](#configuración-local) · [Ejecución local](#ejecución-local) ·
-[Despliegue completo](#despliegue-completo-paso-a-paso) · [Operación](#operación-del-semestre) ·
+[Despliegue completo](#despliegue-completo-paso-a-paso) · [On-premise con GPU](infra/on-premise/README.md) ·
+[Operación](#operación-del-semestre) ·
 [Desarrollo](#desarrollo) · [Problemas frecuentes](#problemas-frecuentes)
 
 ---
@@ -171,6 +172,19 @@ El `Makefile` la toma de la terminal o, si no está, del llavero.
 
 ## Ejecución local
 
+### Solo ver la aplicación (base de datos, API y web)
+
+Para recorrer las pantallas sin MinIO, MLflow, trainer ni `.env`:
+
+```bash
+docker compose -f docker-compose.app.yml up -d --build    # http://localhost:8080
+docker compose -f docker-compose.app.yml down -v          # detiene y borra los datos de prueba
+```
+
+Ingreso: `admin@maia.local` / `clave-local-maia`. La API siembra 1.000 niños simulados (`MAIA_DEMO_SUJETOS`). El
+tablero y los riesgos quedan vacíos hasta que se publique un paquete de modelos (ver [Probar con datos
+simulados](#probar-con-datos-simulados), con la pila completa). Otro puerto: `WEB_PUERTO=8081`.
+
 ### Levantar todo
 
 ```bash
@@ -259,6 +273,9 @@ El orden importa: Railway recibe modelos que se entrenan en el equipo local, as�
 | A9 | `make corrida` (base real) | Corrida terminada; Excel en `maia-salidas`; tablero con los niños reales |
 | A10 | Activar desenlaces en **Notificaciones** y **Enviar prueba** | El correo llega (Mailpit o el buzón real) |
 | A11 | Programar la corrida (ver [Operación](#operación-del-semestre)) | `crontab -l` muestra la línea |
+
+> **Alternativa: todo on-premise en un servidor con GPU.** Si el servidor propio tiene GPU NVIDIA, las fases A a D
+> se reemplazan por un solo recurso Docker Compose: ver [`infra/on-premise/README.md`](infra/on-premise/README.md).
 
 ### Fase B · Railway (una sola vez)
 
@@ -375,8 +392,11 @@ proyecto-codigo/
 │   ├── local/                 docker-compose del equipo local, inicialización de Postgres y MinIO
 │   ├── docker/                Dockerfile de trainer (CUDA), api, web (nginx) y mlflow
 │   ├── railway/               guía detallada de la demostración
+│   ├── on-premise/            guía del despliegue completo on-premise (docker-compose.on-premise.yml)
 │   └── openapi.json           contrato de la API (de él salen los tipos del frontend)
 ├── docs/decisiones.md         versiones, desvíos del plan y lo que falta verificar
+├── docker-compose.app.yml     solo base de datos, API y web, para ver la aplicación
+├── docker-compose.on-premise.yml  despliegue completo en un servidor con GPU
 ├── Makefile                   todas las tareas ("make" muestra la ayuda)
 └── uv.lock                    versiones exactas de Python
 ```

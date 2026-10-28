@@ -1,24 +1,25 @@
 @import 'tailwindcss';
 
 /* Tokens del Observatorio. El coral se reserva para lo que pide atención (riesgo alto, dato por revisar);
-   el ocre, para el crecimiento por debajo de -2 DE. Todo lo demás vive en la gama del verde azulado. */
+   el ocre, para el crecimiento por debajo de -2 DE. Todo lo demás vive en la gama del verde azulado, sobre
+   superficies claras y casi sin bordes: la información manda, el marco se retira. */
 @theme {
   --font-sans: 'Atkinson Hyperlegible Next', 'Atkinson Hyperlegible', ui-sans-serif, system-ui, sans-serif;
 
   --color-teal: #1f4e52;
-  --color-teal-hondo: #163b3e;
+  --color-teal-hondo: #12312f;
   --color-teal-medio: #2e6b70;
-  --color-teal-tinte: #e2eceb;
+  --color-teal-tinte: #e8f1f0;
   --color-coral: #d9694c;
   --color-coral-hondo: #b5502f;
-  --color-coral-tinte: #f8e5df;
+  --color-coral-tinte: #fbeae5;
   --color-ocre: #b8862b;
-  --color-ocre-tinte: #f5ead3;
-  --color-tinta: #172a2c;
-  --color-salvia: #56736d;
-  --color-fondo: #f3f6f5;
+  --color-ocre-tinte: #f7eed9;
+  --color-tinta: #14262a;
+  --color-salvia: #5b716d;
+  --color-fondo: #f6f8f8;
   --color-papel: #ffffff;
-  --color-linea: #d2dcda;
+  --color-linea: #e3e9e8;
 
   /* series de los gráficos (validadas: banda de luminosidad, croma, daltonismo y contraste sobre blanco) */
   --color-serie-1: #008f99;
@@ -26,8 +27,31 @@
   --color-serie-3: #7f5cb5;
   --color-referencia: #8a9b98;
 
-  --radius-control: 6px;
-  --radius-panel: 10px;
+  --radius-control: 10px;
+  --radius-panel: 16px;
+
+  --shadow-suave: 0 1px 2px rgb(20 38 42 / 0.04), 0 1px 3px rgb(20 38 42 / 0.06);
+  --shadow-elevada: 0 10px 30px -12px rgb(20 38 42 / 0.25);
+
+  --animate-aparecer: aparecer 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-subir: subir 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-cinta: cinta 38s linear infinite;
+  --animate-flotar: flotar 9s ease-in-out infinite;
+  --animate-trazar: trazar 2.4s cubic-bezier(0.65, 0, 0.35, 1) 0.3s both;
+  --animate-latir: latir 2.4s ease-out infinite;
+
+  @keyframes aparecer { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @keyframes subir { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+  @keyframes cinta { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  @keyframes flotar {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(3%, -4%) scale(1.08); }
+  }
+  @keyframes trazar { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+  @keyframes latir {
+    0% { transform: scale(1); opacity: 0.55; }
+    80%, 100% { transform: scale(2.6); opacity: 0; }
+  }
 }
 
 @layer base {
@@ -39,12 +63,20 @@
     line-height: 1.5;
     font-feature-settings: 'tnum' 1;
     -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    text-size-adjust: 100%;
   }
-  h1 { font-size: 1.75rem; line-height: 1.2; font-weight: 700; letter-spacing: -0.01em; }
-  h2 { font-size: 1.25rem; line-height: 1.3; font-weight: 600; }
+  body { min-height: 100dvh; overflow-x: hidden; }
+  h1 { font-size: 1.5rem; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em; }
+  h2 { font-size: 1.125rem; line-height: 1.3; font-weight: 600; letter-spacing: -0.01em; }
   h3 { font-size: 1rem; line-height: 1.4; font-weight: 600; }
+  @media (min-width: 640px) { h1 { font-size: 1.75rem; } }
   :focus-visible { outline: 3px solid var(--color-coral); outline-offset: 2px; }
+  ::selection { background: var(--color-teal-tinte); }
   @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important; animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }

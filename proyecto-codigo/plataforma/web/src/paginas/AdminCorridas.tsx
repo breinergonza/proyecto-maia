@@ -37,7 +37,7 @@ export default function AdminCorridas() {
         Una corrida pasa los datos del corte vigente por los dos modelos del paquete activo y deja los resultados en el
         tablero. La corrida semestral con los datos de la Fundación se hace en el equipo local (maia corrida).
       </Encabezado>
-      <Panel titulo="Ejecutar una corrida" className="mb-6">
+      <Panel titulo="Ejecutar una corrida" className="mb-4">
         {activo.data === null ? <Aviso>No hay un paquete activo. Actívelo en Modelos antes de ejecutar.</Aviso> : (
           <div className="flex flex-wrap items-center gap-4">
             <label className="flex items-center gap-2">

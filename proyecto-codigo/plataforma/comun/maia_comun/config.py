@@ -29,7 +29,7 @@ class Configuracion(BaseSettings):
                                       case_sensitive=False)
 
     # --- comunes
-    maia_entorno: Literal['local', 'demo', 'prueba'] = 'local'
+    maia_entorno: Literal['local', 'demo', 'prueba', 'produccion'] = 'local'
     database_url: str = 'postgresql+psycopg://maia:cambiar@localhost:5432/maia'
     maia_raiz: Path | None = None
     maia_paquete_clave: str = INSEGURO

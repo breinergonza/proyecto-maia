@@ -1260,6 +1260,8 @@ export interface operations {
                 pagina?: number;
                 tamano?: number;
                 corrida_id?: number | null;
+                orden?: ("sujeto" | "eg_semanas" | "desenlace_max" | "percentil_max" | "n_alertas" | "crecimiento") | null;
+                dir?: "asc" | "desc";
             };
             header?: never;
             path?: never;

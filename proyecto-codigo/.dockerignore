@@ -1,0 +1,22 @@
+# Lo que nunca entra a una imagen: secretos, datos, modelos ni dependencias locales.
+.git
+.env
+.env.*
+.venv/
+**/node_modules/
+**/dist/
+**/__pycache__/
+**/.pytest_cache/
+.ruff_cache/
+respaldos/
+datos/
+mlruns/
+**/*.parquet
+**/*.pkl
+**/*.tar.gz
+nucleo/salidas/
+nucleo/interno/
+nucleo/cortes/
+nucleo/paquetes/
+nucleo/privado/
+nucleo/entradas/retroalimentacion/

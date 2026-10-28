@@ -33,10 +33,10 @@ export default function Nino() {
 
   return (
     <>
-      <Link to="/ninos" className="mb-4 inline-flex items-center gap-1 text-sm text-teal hover:underline">
+      <Link to="/ninos" className="mb-2 inline-flex items-center gap-1 text-sm text-teal hover:underline">
         <ArrowLeft size={16} aria-hidden /> Todos los niños
       </Link>
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1>Niño {n.sujeto}</h1>
           <p className="mt-1 text-salvia">
@@ -47,10 +47,12 @@ export default function Nino() {
         </div>
       </div>
 
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+      <div className="space-y-4">
       {riesgos.length > 0 && (
-        <section aria-label="Riesgo calculado" className="mb-6 grid gap-4 md:grid-cols-2">
+        <section aria-label="Riesgo calculado" className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
           {riesgos.map((r) => (
-            <article key={r.id} className={cn('rounded-panel border bg-papel p-5',
+            <article key={r.id} className={cn('rounded-panel border bg-papel p-4 shadow-suave',
               r.percentil >= 90 ? 'border-coral/50 shadow-[inset_4px_0_0_var(--color-coral)]' : 'border-linea')}>
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -74,6 +76,9 @@ export default function Nino() {
         </section>
       )}
 
+      <Crecimiento datos={n} />
+      </div>
+
       <Panel titulo="Visitas">
         {n.visitas.length === 0 ? <Vacio titulo="Este niño no tiene visitas registradas" /> : (
           <>
@@ -82,8 +87,7 @@ export default function Nino() {
           </>
         )}
       </Panel>
-
-      <Crecimiento datos={n} />
+      </div>
     </>
   )
 }
@@ -145,7 +149,7 @@ function DetalleVisita({ visita }: { visita: Visita }) {
   const alertas = new Map(visita.alertas_dato.map((a) => [a.variable, a]))
   const z = Object.entries(visita.z).filter(([, v]) => v != null)
   return (
-    <div className="mt-5 grid gap-6 border-t border-linea pt-5 lg:grid-cols-[1.5fr_1fr]">
+    <div className="mt-4 grid gap-5 border-t border-linea pt-4 lg:grid-cols-[1.5fr_1fr] xl:grid-cols-1 2xl:grid-cols-[1.5fr_1fr]">
       <div>
         <h3>{visita.nombre}: lo que se midió</h3>
         <p className="mb-3 text-sm text-salvia">{fecha(visita.fecha)}{visita.edad_corregida != null && ` · ${edad(visita.edad_corregida)} de edad corregida`}</p>
@@ -226,11 +230,9 @@ function Crecimiento({ datos }: { datos: LineaTemporal }) {
 
   if (!filas.length) return null
   return (
-    <Panel titulo="Crecimiento frente a la OMS" className="mt-6">
-      <p className="mb-3 text-sm text-salvia">
-        Puntaje z por edad corregida. La franja marca la zona por debajo de −2 desviaciones estándar.
-      </p>
-      <div className="h-80">
+    <Panel titulo="Crecimiento frente a la OMS"
+      accion={<span className="text-xs text-salvia">puntaje z por edad corregida · franja: bajo −2 DE</span>}>
+      <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={filas} margin={{ left: 0, right: 16, top: 8 }}>
             <CartesianGrid stroke="#e4ebea" vertical={false} />

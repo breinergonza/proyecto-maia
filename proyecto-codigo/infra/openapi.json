@@ -828,6 +828,44 @@
        ],
        "title": "Corrida Id"
       }
+     },
+     {
+      "name": "orden",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "enum": [
+          "sujeto",
+          "eg_semanas",
+          "desenlace_max",
+          "percentil_max",
+          "n_alertas",
+          "crecimiento"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Orden"
+      }
+     },
+     {
+      "name": "dir",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "enum": [
+        "asc",
+        "desc"
+       ],
+       "type": "string",
+       "default": "desc",
+       "title": "Dir"
+      }
      }
     ],
     "responses": {

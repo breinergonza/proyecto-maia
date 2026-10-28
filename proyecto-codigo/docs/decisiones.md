@@ -75,13 +75,18 @@ El código se escribió y probó en un entorno sin Docker, sin GPU y sin acceso 
   `uv sync --frozen --no-dev --package maia-api`, misma orden de arranque) y la API respondió; la configuración de
   nginx se probó con nginx 1.24 local y el frontend compilado, incluido el proxy, la cookie de sesión y la política de
   seguridad de contenido. La primera `make arrancar` es la verdadera prueba de los Dockerfile.
-* **Etiquetas de imágenes sin confirmar:** `minio/minio:RELEASE.2025-09-07T16-13-09Z`,
-  `minio/mc:RELEASE.2025-08-13T08-35-41Z` y `axllent/mailpit:v1.27`. Si alguna no existe, use la más reciente de su
-  serie y anótelo aquí.
+* **Etiquetas de imágenes:** `minio/minio` y `minio/mc` ya no existen en Docker Hub (comprobado el 2026-10-27: MinIO
+  dejó de publicar imágenes ahí). On-premise se eligen con `MINIO_IMAGEN` y `MC_IMAGEN`; el compose local sigue con
+  las etiquetas originales hasta que el equipo apruebe una fuente. `axllent/mailpit:v1.27` sin confirmar.
 * **La GPU.** El parche de CUDA está probado en su camino de CPU (y con una GPU simulada que falla). Ejecute
   `make verificar-gpu` en el equipo: debe decir `cuda` y medir la diferencia de tiempo.
 * **La CLI de Railway.** Los comandos de `infra/railway/README.md` siguen la documentación de octubre de 2026; si la
   CLI cambió, `railway --help` manda.
+
+* **On-premise (2026-10-27).** Se construyeron por primera vez las imágenes de postgres, mlflow, api y web con
+  `docker-compose.on-premise.yml` y se levantaron postgres + api + web en `MAIA_ENTORNO=produccion`: salud, initdb de
+  MLflow, admin sembrado, ingreso y proxy de nginx correctos. La api no arrancaba con un checkout de permisos 600
+  (ahora `chmod -R a+rX /app`). Sin probar: la imagen del trainer (CUDA) y MinIO.
 
 ## Datos de demostración
 

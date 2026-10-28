@@ -1,0 +1,148 @@
+# Despliegue completo on-premise, en un servidor propio con GPU NVIDIA (guía: infra/on-premise/README.md).
+# En el orquestador: Build Pack "Docker Compose", Base Directory "/proyecto-codigo",
+# Docker Compose Location "/docker-compose.on-premise.yml".
+#
+# Solo la web queda publicada (dominio con HTTPS del proxy del servidor). MLflow y la consola de MinIO escuchan en 127.0.0.1 del
+# servidor: se abren con un túnel SSH. Postgres, MinIO (API) y la API solo existen en la red interna del compose.
+#
+# Las variables SERVICE_* las genera el orquestador en el primer despliegue y quedan visibles en "Environment Variables".
+
+x-maia: &maia
+  DATABASE_URL: postgresql+psycopg://maia:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/maia
+  MAIA_ENTORNO: ${MAIA_ENTORNO:-produccion}
+  MAIA_RAIZ: /datos
+  MAIA_PAQUETE_CLAVE: ${SERVICE_BASE64_64_PAQUETE}
+  MAIA_ADMIN_EMAIL: ${MAIA_ADMIN_EMAIL:?defina MAIA_ADMIN_EMAIL}
+  MAIA_ADMIN_CLAVE: ${SERVICE_PASSWORD_ADMIN}
+  MAIA_URL_PUBLICA: ${SERVICE_URL_WEB}
+  SMTP_HOST: ${SMTP_HOST:-localhost}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USUARIO: ${SMTP_USUARIO:-}
+  SMTP_CLAVE: ${SMTP_CLAVE:-}
+  SMTP_REMITENTE: ${SMTP_REMITENTE:-alertas@maia.local}
+  SMTP_TLS: ${SMTP_TLS:-true}
+
+x-minio-servicio: &minio-servicio
+  MINIO_URL: http://minio:9000
+  MINIO_ACCESS_KEY: maia-servicio
+  MINIO_SECRET_KEY: ${SERVICE_PASSWORD_MINIOSERVICIO}
+
+services:
+  postgres:
+    build: {context: ., dockerfile: infra/docker/postgres.Dockerfile}
+    environment:
+      POSTGRES_USER: maia
+      POSTGRES_DB: maia
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+      MLFLOW_DB_PASSWORD: ${SERVICE_PASSWORD_MLFLOWDB}    # lo usa initdb la primera vez (volumen vacío)
+    volumes:
+      - pg_datos:/var/lib/postgresql/data
+      - respaldos:/respaldos                             # destino de pg_dump (tarea programada on-premise)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U maia -d maia"]
+      interval: 5s
+      retries: 20
+    restart: unless-stopped
+
+  minio:
+    image: ${MINIO_IMAGEN:-minio/minio:RELEASE.2025-09-07T16-13-09Z}
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: maia
+      MINIO_ROOT_PASSWORD: ${SERVICE_PASSWORD_MINIOROOT}
+    volumes: [minio_datos:/data]
+    ports: ["127.0.0.1:${MINIO_CONSOLA_PUERTO:-9001}:9001"]   # consola, solo por túnel SSH
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      retries: 20
+    restart: unless-stopped
+
+  minio-init:
+    build:
+      context: .
+      dockerfile: infra/docker/minio-init.Dockerfile
+      args: {MC_IMAGEN: "${MC_IMAGEN:-minio/mc:RELEASE.2025-08-13T08-35-41Z}"}
+    environment:
+      <<: *minio-servicio
+      MINIO_ROOT_USER: maia
+      MINIO_ROOT_PASSWORD: ${SERVICE_PASSWORD_MINIOROOT}
+      MLFLOW_MINIO_ACCESS_KEY: maia-mlflow
+      MLFLOW_MINIO_SECRET_KEY: ${SERVICE_PASSWORD_MINIOMLFLOW}
+    depends_on:
+      minio: {condition: service_healthy}
+    exclude_from_hc: true          # corre una vez y termina
+    restart: "no"
+
+  mlflow:
+    build: {context: ., dockerfile: infra/docker/mlflow.Dockerfile}
+    environment:
+      MLFLOW_DB_PASSWORD: ${SERVICE_PASSWORD_MLFLOWDB}
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: maia-mlflow
+      AWS_SECRET_ACCESS_KEY: ${SERVICE_PASSWORD_MINIOMLFLOW}
+    depends_on:
+      postgres: {condition: service_healthy}
+      minio-init: {condition: service_completed_successfully}
+    ports: ["127.0.0.1:${MLFLOW_PUERTO:-5000}:5000"]          # solo por túnel SSH (MLflow no tiene ingreso)
+    restart: unless-stopped
+
+  trainer:
+    build: {context: ., dockerfile: infra/docker/trainer.Dockerfile}
+    # Queda encendido sin hacer nada: las corridas se lanzan desde las tareas programadas o la terminal del orquestador
+    # ("maia corrida ..."). Al arrancar copia el diccionario de los expertos (versionado en git) al volumen.
+    entrypoint: ["/bin/sh", "-c", "mkdir -p /datos/entradas && cp -f /app/nucleo/entradas/diccionario.xlsx /datos/entradas/ && exec sleep infinity"]
+    environment:
+      <<: [*maia, *minio-servicio]
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MAIA_LGBM_DEVICE: ${MAIA_LGBM_DEVICE:-cuda}
+      KMC_PW: ${KMC_PW:-}                              # solo si este servidor corre la base real
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    volumes: [datos_maia:/datos]
+    deploy:
+      resources:
+        reservations:
+          devices: [{driver: nvidia, count: all, capabilities: [gpu]}]
+    depends_on:
+      postgres: {condition: service_healthy}
+      minio-init: {condition: service_completed_successfully}
+      mlflow: {condition: service_started}
+    exclude_from_hc: true
+    restart: unless-stopped
+
+  api:
+    build: {context: ., dockerfile: infra/docker/api.Dockerfile}
+    environment:
+      <<: *maia
+      MAIA_JWT_SECRETO: ${SERVICE_BASE64_64_JWT}
+      MAIA_SOLO_SIMULADO: ${MAIA_SOLO_SIMULADO:-false}
+      MAIA_DEMO_SUJETOS: ${MAIA_DEMO_SUJETOS:-3000}
+      MAIA_DIR_PAQUETES: /datos/paquetes
+      MAIA_HOST: 0.0.0.0
+      PORT: "8000"
+    volumes: [paquetes_api:/datos/paquetes]   # volumen con nombre: hereda el dueño (maia) de la imagen
+    depends_on:
+      postgres: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/salud')"]
+      interval: 10s
+      retries: 30
+    restart: unless-stopped
+
+  web:
+    build: {context: ., dockerfile: infra/docker/web.Dockerfile}
+    environment:
+      SERVICE_URL_WEB_8080:                 # el orquestador asigna el dominio y lo enruta al puerto 8080
+      API_INTERNA: http://api:8000
+      PORT: "8080"
+      MAIA_ENTORNO: ${MAIA_ENTORNO:-produccion}
+    depends_on:
+      api: {condition: service_healthy}
+    restart: unless-stopped
+
+volumes:
+  pg_datos:
+  minio_datos:
+  datos_maia:
+  paquetes_api:
+  respaldos:

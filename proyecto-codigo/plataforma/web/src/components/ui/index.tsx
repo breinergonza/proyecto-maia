@@ -5,10 +5,10 @@ import { cn } from '../../lib/cn'
 
 type Variante = 'primario' | 'secundario' | 'fantasma' | 'atencion'
 const variantes: Record<Variante, string> = {
-  primario: 'bg-teal text-white hover:bg-teal-medio disabled:bg-teal/50',
-  secundario: 'border border-linea bg-papel text-tinta hover:border-teal hover:text-teal disabled:opacity-50',
+  primario: 'bg-teal text-white shadow-suave hover:bg-teal-medio hover:shadow-elevada disabled:bg-teal/50 disabled:shadow-none',
+  secundario: 'border border-linea bg-papel text-tinta shadow-suave hover:border-teal/40 hover:text-teal disabled:opacity-50',
   fantasma: 'text-teal hover:bg-teal-tinte disabled:opacity-50',
-  atencion: 'bg-coral-hondo text-white hover:bg-coral disabled:opacity-50',
+  atencion: 'bg-coral-hondo text-white shadow-suave hover:bg-coral disabled:opacity-50',
 }
 
 export const Boton = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement> & { variante?: Variante; chico?: boolean }>(
@@ -18,8 +18,8 @@ export const Boton = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButt
         ref={ref}
         type={type}
         className={cn(
-          'inline-flex items-center justify-center gap-2 rounded-control font-semibold transition-colors disabled:cursor-not-allowed',
-          chico ? 'h-8 px-3 text-sm' : 'h-10 px-4',
+          'inline-flex select-none items-center justify-center gap-2 rounded-control font-semibold transition-all duration-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:active:scale-100',
+          chico ? 'h-9 px-3 text-sm sm:h-8' : 'h-11 px-5 sm:h-10',
           variantes[variante],
           className,
         )}
@@ -30,16 +30,16 @@ export const Boton = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButt
 )
 
 const control =
-  'w-full rounded-control border border-linea bg-papel px-3 text-tinta placeholder:text-salvia/70 focus:border-teal focus:outline-none focus-visible:outline-none focus:ring-2 focus:ring-teal/25 aria-[invalid=true]:border-coral-hondo'
+  'w-full rounded-control border border-linea bg-papel px-3.5 text-base text-tinta shadow-suave transition-[border-color,box-shadow] duration-200 placeholder:text-salvia/60 hover:border-teal/30 focus:border-teal focus:outline-none focus-visible:outline-none focus:ring-4 focus:ring-teal/10 aria-[invalid=true]:border-coral-hondo aria-[invalid=true]:focus:ring-coral/15'
 
 export const Entrada = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Entrada(
   { className, ...p }, ref) {
-  return <input ref={ref} className={cn(control, 'h-10', className)} {...p} />
+  return <input ref={ref} className={cn(control, 'h-11 sm:h-10', className)} {...p} />
 })
 
 export const Selector = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(function Selector(
   { className, ...p }, ref) {
-  return <select ref={ref} className={cn(control, 'h-10 pr-8', className)} {...p} />
+  return <select ref={ref} className={cn(control, 'h-11 pr-8 sm:h-10', className)} {...p} />
 })
 
 export const Texto = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function Texto(
@@ -51,8 +51,8 @@ export function Campo({ etiqueta, error, ayuda, children, id }: {
   etiqueta: string; error?: string; ayuda?: string; children: ReactNode; id: string
 }) {
   return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-sm font-semibold">{etiqueta}</label>
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className="text-sm font-semibold text-tinta/90">{etiqueta}</label>
       {children}
       {error ? <p className="text-sm text-coral-hondo" role="alert">{error}</p>
         : ayuda ? <p className="text-sm text-salvia">{ayuda}</p> : null}
@@ -60,18 +60,20 @@ export function Campo({ etiqueta, error, ayuda, children, id }: {
   )
 }
 
-export function Panel({ titulo, accion, children, className }: {
-  titulo?: ReactNode; accion?: ReactNode; children: ReactNode; className?: string
+/** Panel con título opcional. `llenar`: ocupa el alto que le da su contenedor y desplaza su contenido por dentro. */
+export function Panel({ titulo, accion, children, className, llenar }: {
+  titulo?: ReactNode; accion?: ReactNode; children: ReactNode; className?: string; llenar?: boolean
 }) {
   return (
-    <section className={cn('rounded-panel border border-linea bg-papel', className)}>
+    <section className={cn('animate-aparecer rounded-panel border border-linea/80 bg-papel shadow-suave',
+      llenar && 'flex min-h-0 flex-col', className)}>
       {(titulo || accion) && (
-        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-linea px-5 py-3">
+        <header className={cn('flex flex-wrap items-center justify-between gap-2 px-4 pt-4', llenar ? 'shrink-0 sm:px-5' : 'sm:px-6 sm:pt-5')}>
           {typeof titulo === 'string' ? <h2 className="text-base">{titulo}</h2> : titulo}
           {accion}
         </header>
       )}
-      <div className="p-5">{children}</div>
+      <div className={llenar ? 'min-h-0 flex-1 overflow-auto p-4 sm:px-5' : 'p-4 sm:p-6'}>{children}</div>
     </section>
   )
 }
@@ -91,10 +93,12 @@ export function Insignia({ tono = 'neutro', children, className }: { tono?: Tono
   )
 }
 
-export function Tabla({ children, className }: { children: ReactNode; className?: string }) {
+/** Tabla con el estilo de la aplicación. `densa`: filas más bajas, para paneles que deben caber en la ventana. */
+export function Tabla({ children, className, densa }: { children: ReactNode; className?: string; densa?: boolean }) {
   return (
-    <div className={cn('overflow-x-auto', className)}>
-      <table className="w-full border-collapse text-sm [&_td]:border-b [&_td]:border-linea [&_td]:px-3 [&_td]:py-2 [&_th]:border-b-2 [&_th]:border-linea [&_th]:px-3 [&_th]:py-2 [&_th:not(.text-right)]:text-left [&_th]:font-semibold [&_th]:text-salvia [&_tbody_tr:hover]:bg-fondo">
+    <div className={cn('-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0', className)}>
+      <table className={cn(densa ? '[&_td]:px-2.5 [&_td]:py-1.5 [&_td]:leading-snug [&_th]:px-2.5' : '[&_td]:px-3 [&_td]:py-3 [&_th]:px-3',
+        'w-full border-collapse text-sm [&_td]:border-b [&_td]:border-linea/70 [&_th]:border-b [&_th]:border-linea [&_th]:pb-2.5 [&_th]:pt-1 [&_th:not(.text-right)]:text-left [&_th]:text-xs [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-salvia [&_th]:whitespace-nowrap [&_tbody_tr]:transition-colors [&_tbody_tr:hover]:bg-teal-tinte/40 [&_tbody_tr:last-child_td]:border-b-0')}>
         {children}
       </table>
     </div>
@@ -105,20 +109,25 @@ export function Tabla({ children, className }: { children: ReactNode; className?
 export function Cifra({ valor, texto, tono }: { valor: ReactNode; texto: string; tono?: 'coral' }) {
   return (
     <div>
-      <div className={cn('text-2xl font-bold leading-tight', tono === 'coral' ? 'text-coral-hondo' : 'text-teal')}>{valor}</div>
-      <div className="text-sm text-salvia">{texto}</div>
+      <div className={cn('text-2xl font-bold leading-tight tracking-tight sm:text-3xl', tono === 'coral' ? 'text-coral-hondo' : 'text-teal')}>{valor}</div>
+      <div className="mt-1 text-sm leading-snug text-salvia">{texto}</div>
     </div>
   )
 }
 
 export function Cargando({ texto = 'Cargando…' }: { texto?: string }) {
-  return <p className="py-6 text-salvia" role="status">{texto}</p>
+  return (
+    <p className="flex items-center gap-3 py-6 text-salvia" role="status">
+      <span className="size-4 animate-spin rounded-full border-2 border-teal/20 border-t-teal" aria-hidden />
+      {texto}
+    </p>
+  )
 }
 
 export function Aviso({ children, tono = 'coral' }: { children: ReactNode; tono?: 'coral' | 'teal' }) {
   return (
     <div role={tono === 'coral' ? 'alert' : 'status'}
-      className={cn('rounded-control border px-4 py-3 text-sm',
+      className={cn('animate-aparecer rounded-control border px-4 py-3 text-sm',
         tono === 'coral' ? 'border-coral/40 bg-coral-tinte text-coral-hondo' : 'border-teal/25 bg-teal-tinte text-teal')}>
       {children}
     </div>
@@ -127,9 +136,12 @@ export function Aviso({ children, tono = 'coral' }: { children: ReactNode; tono?
 
 export function Vacio({ titulo, children }: { titulo: string; children?: ReactNode }) {
   return (
-    <div className="rounded-panel border border-dashed border-linea px-6 py-10 text-center">
+    <div className="animate-aparecer rounded-panel border border-dashed border-linea bg-papel/60 px-6 py-12 text-center">
+      <div className="mx-auto mb-4 grid size-12 place-items-center rounded-full bg-teal-tinte" aria-hidden>
+        <span className="size-2.5 rounded-full bg-teal/60" />
+      </div>
       <p className="font-semibold">{titulo}</p>
-      {children && <div className="mt-1 text-sm text-salvia">{children}</div>}
+      {children && <div className="mx-auto mt-1 max-w-[46ch] text-sm text-salvia">{children}</div>}
     </div>
   )
 }
@@ -140,7 +152,7 @@ export function Paginador({ pagina, tamano, total, cambiar }: {
   const paginas = Math.max(1, Math.ceil(total / tamano))
   if (paginas <= 1) return null
   return (
-    <nav className="mt-4 flex items-center justify-between gap-2 text-sm" aria-label="Páginas">
+    <nav className="mt-4 flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between" aria-label="Páginas">
       <span className="text-salvia">Página {pagina} de {paginas} · {total} en total</span>
       <div className="flex gap-2">
         <Boton chico variante="secundario" disabled={pagina <= 1} onClick={() => cambiar(pagina - 1)}>Anterior</Boton>
@@ -152,10 +164,10 @@ export function Paginador({ pagina, tamano, total, cambiar }: {
 
 export function Encabezado({ titulo, children, accion }: { titulo: string; children?: ReactNode; accion?: ReactNode }) {
   return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-      <div className="max-w-[70ch]">
+    <div className="mb-4 flex animate-aparecer flex-wrap items-end justify-between gap-3 lg:mb-5">
+      <div className="max-w-[90ch]">
         <h1>{titulo}</h1>
-        {children && <p className="mt-1 text-salvia">{children}</p>}
+        {children && <p className="mt-1 text-sm text-salvia">{children}</p>}
       </div>
       {accion}
     </div>

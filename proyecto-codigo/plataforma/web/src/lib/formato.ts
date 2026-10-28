@@ -3,6 +3,7 @@ import type { Respuesta, Rol } from '../api/tipos'
 const nf = new Intl.NumberFormat('es-CO')
 const nf1 = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 1, minimumFractionDigits: 1 })
 const nf2 = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 })
+const nf3 = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 3 })
 
 export const num = (v: number | null | undefined) => (v == null ? '—' : nf.format(v))
 export const dec = (v: number | null | undefined) => (v == null ? '—' : nf1.format(v))
@@ -11,6 +12,13 @@ export const pct = (v: number | null | undefined) => (v == null ? '—' : `${nf1
 /** Riesgo (0 a 1) como porcentaje. */
 export const riesgo = (v: number | null | undefined) => (v == null ? '—' : `${nf1.format(100 * v)} %`)
 export const posicion = (v: number | null | undefined) => (v == null ? '—' : nf.format(Math.round(v)))
+/** Valor medido tal como llega de la base (texto): si es un número, sin ruido de coma flotante y con hasta 3
+ * decimales, para que un dato mal registrado (p. ej. un peso en kilos donde van gramos) se siga viendo como es. */
+export const medida = (v: string | null | undefined) => {
+  if (v == null || v === '') return '—'
+  const n = Number(v)
+  return Number.isFinite(n) && /^-?\d+(\.\d+)?$/.test(v.trim()) ? nf3.format(n) : v
+}
 
 export function fecha(v: string | null | undefined): string {
   if (!v) return '—'

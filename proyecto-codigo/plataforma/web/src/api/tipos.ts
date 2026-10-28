@@ -24,7 +24,7 @@ export interface Pagina<T> {
 export interface Salud {
   db: boolean
   paquete: string | null
-  entorno: 'local' | 'demo' | 'prueba'
+  entorno: 'local' | 'demo' | 'prueba' | 'produccion'
 }
 
 export interface RiesgoDesenlace {

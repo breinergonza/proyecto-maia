@@ -1,0 +1,58 @@
+# Solo la aplicación (base de datos, API y web) para verla funcionar en el equipo, con niños simulados.
+# Sin MinIO, MLflow ni trainer, y sin .env: las claves de abajo son de prueba y solo sirven en este equipo.
+#
+#   docker compose -f docker-compose.app.yml up -d --build      luego http://localhost:8080
+#   docker compose -f docker-compose.app.yml down -v            detiene y borra los datos de prueba
+#
+# Ingreso: admin@maia.local / clave-local-maia. Para ver riesgos hace falta un paquete de modelos
+# (make demo-entrenar / demo-exportar / demo-publicar con la pila completa de infra/local).
+name: maia-app
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: maia
+      POSTGRES_DB: maia
+      POSTGRES_PASSWORD: maia-local
+    volumes: [pg_app:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U maia -d maia"]
+      interval: 5s
+      retries: 20
+
+  api:
+    build: {context: ., dockerfile: infra/docker/api.Dockerfile}
+    environment:
+      DATABASE_URL: postgresql+psycopg://maia:maia-local@postgres:5432/maia
+      MAIA_ENTORNO: demo                       # siembra la cohorte simulada al arrancar
+      MAIA_SOLO_SIMULADO: "true"
+      MAIA_DEMO_SUJETOS: ${MAIA_DEMO_SUJETOS:-1000}
+      MAIA_JWT_SECRETO: secreto-jwt-solo-para-ver-local
+      MAIA_PAQUETE_CLAVE: ${MAIA_PAQUETE_CLAVE:-clave-paquete-solo-local}
+      MAIA_ADMIN_EMAIL: admin@maia.local
+      MAIA_ADMIN_CLAVE: clave-local-maia
+      MAIA_URL_PUBLICA: http://localhost:${WEB_PUERTO:-8080}
+      MAIA_HOST: 0.0.0.0
+      PORT: "8000"
+    volumes: [paquetes_app:/datos/paquetes]
+    depends_on:
+      postgres: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/salud')"]
+      interval: 10s
+      retries: 30
+
+  web:
+    build: {context: ., dockerfile: infra/docker/web.Dockerfile}
+    environment:
+      API_INTERNA: http://api:8000
+      PORT: "8080"
+      MAIA_ENTORNO: demo
+    ports: ["127.0.0.1:${WEB_PUERTO:-8080}:8080"]
+    depends_on:
+      api: {condition: service_healthy}
+
+volumes:
+  pg_app:
+  paquetes_app:

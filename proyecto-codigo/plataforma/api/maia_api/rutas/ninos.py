@@ -3,6 +3,7 @@ de la OMS, alertas de dato y riesgos). Los códigos son los seudonimizados de la
 from __future__ import annotations
 
 from collections import defaultdict
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import text
@@ -14,11 +15,23 @@ from maia_comun.modelos_db import Usuario
 
 ruta = APIRouter(prefix='/ninos', tags=['niños'])
 
+# Columnas por las que se puede ordenar la lista (lista cerrada: el nombre nunca llega al SQL sin pasar por aquí).
+ORDENES = {
+    'sujeto': 's.sujeto',
+    'eg_semanas': 's.eg_semanas',
+    'desenlace_max': 'r.desenlace_max',
+    'percentil_max': 'r.percentil_max',
+    'n_alertas': 'coalesce(a.n_alertas, 0)',
+    'crecimiento': 'coalesce(g.n_bajo, 0) + coalesce(g.n_caida, 0)',
+}
+
 
 @ruta.get('')
 def listar(buscar: str | None = None, desenlace: str | None = None,
            percentil_min: float | None = Query(None, ge=0, le=100), pagina: int = Query(1, ge=1),
            tamano: int = Query(25, ge=1, le=200), corrida_id: int | None = None,
+           orden: Literal['sujeto', 'eg_semanas', 'desenlace_max', 'percentil_max', 'n_alertas', 'crecimiento'] | None = None,
+           dir: Literal['asc', 'desc'] = 'desc',
            s: Session = Depends(sesion), _: Usuario = Depends(CUALQUIERA)) -> dict:
     c = corrida_de(s, corrida_id)
     if c.corte_id is None:
@@ -50,12 +63,13 @@ def listar(buscar: str | None = None, desenlace: str | None = None,
         WHERE {' AND '.join(filtros)}"""
     p = {'c': c.id, 'corte': c.corte_id, 'd': desenlace, 'b': f'%{buscar}%' if buscar else None, 'p': percentil_min}
     total = s.execute(text(f'SELECT count(*) {base}'), p).scalar_one()
+    orden_sql = f'{ORDENES[orden]} {dir.upper()} NULLS LAST, ' if orden else ''
     filas = s.execute(text(f"""
         SELECT s.sujeto, s.eg_semanas, s.grupo, r.percentil_max, r.riesgo_max, r.desenlace_max, r.clave_max,
                coalesce(r.n_riesgos, 0) AS n_riesgos, coalesce(a.n_alertas, 0) AS n_alertas,
                coalesce(g.n_bajo, 0) AS n_bajo_2de, coalesce(g.n_caida, 0) AS n_caida_1de
         {base}
-        ORDER BY r.percentil_max DESC NULLS LAST, a.n_alertas DESC NULLS LAST, s.sujeto
+        ORDER BY {orden_sql}r.percentil_max DESC NULLS LAST, a.n_alertas DESC NULLS LAST, s.sujeto
         LIMIT :lim OFFSET :off"""), {**p, 'lim': tamano, 'off': (pagina - 1) * tamano})
     return {'total': total, 'pagina': pagina, 'tamano': tamano, 'items': [dict(f._mapping) for f in filas]}
 
