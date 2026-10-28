@@ -17,7 +17,7 @@ describe('ingreso y permisos', () => {
   it('valida el formulario antes de llamar a la API', async () => {
     const llamadas = simularApi(sinSesion)
     montar('/ingresar')
-    await userEvent.click(await screen.findByRole('button', { name: 'Ingresar' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Ingresar al sistema' }))
     expect(await screen.findByText('Escriba su correo.')).toBeInTheDocument()
     expect(llamadas.some((l) => l.url === '/api/auth/login')).toBe(false)
   })
@@ -34,13 +34,13 @@ describe('ingreso y permisos', () => {
       if (url === '/api/tablero/resumen') return { estado: 404, cuerpo: { detail: 'Todavía no hay resultados' } }
     })
     montar('/ingresar')
-    await userEvent.type(await screen.findByLabelText('Correo'), 'consulta@maia.prueba')
+    await userEvent.type(await screen.findByLabelText('Correo electrónico'), 'consulta@maia.prueba')
     await userEvent.type(screen.getByLabelText('Contraseña'), 'mala')
-    await userEvent.click(screen.getByRole('button', { name: 'Ingresar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Ingresar al sistema' }))
     expect(await screen.findByText('Correo o contraseña incorrectos.')).toBeInTheDocument()
     await userEvent.clear(screen.getByLabelText('Contraseña'))
     await userEvent.type(screen.getByLabelText('Contraseña'), 'buena-clave')
-    await userEvent.click(screen.getByRole('button', { name: 'Ingresar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Ingresar al sistema' }))
     expect(await screen.findByText('Todavía no hay resultados')).toBeInTheDocument()
   })
 
