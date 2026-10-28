@@ -174,16 +174,21 @@ El `Makefile` la toma de la terminal o, si no está, del llavero.
 
 ### Solo ver la aplicación (base de datos, API y web)
 
-Para recorrer las pantallas sin MinIO, MLflow, trainer ni `.env`:
+Para recorrer las pantallas sin MinIO, MLflow ni trainer. Las claves salen del mismo `.env` de la pila completa
+(`make env` y cambiar todo lo que dice `cambiar`); el compose no trae ninguna escrita y no arranca si falta una:
 
 ```bash
+make env                                                  # una vez: crea .env desde .env.example
 docker compose -f docker-compose.app.yml up -d --build    # http://localhost:8080
 docker compose -f docker-compose.app.yml down -v          # detiene y borra los datos de prueba
 ```
 
-Ingreso: `admin@maia.local` / `clave-local-maia`. La API siembra 1.000 niños simulados (`MAIA_DEMO_SUJETOS`). El
-tablero y los riesgos quedan vacíos hasta que se publique un paquete de modelos (ver [Probar con datos
-simulados](#probar-con-datos-simulados), con la pila completa). Otro puerto: `WEB_PUERTO=8081`.
+Del `.env` usa `POSTGRES_PASSWORD` (solo letras y números: va dentro de la URL de la base), `MAIA_JWT_SECRETO`,
+`MAIA_PAQUETE_CLAVE`, `MAIA_ADMIN_EMAIL` y `MAIA_ADMIN_CLAVE` (12 caracteres o más; con ellas se ingresa). La API
+siembra 1.000 niños simulados (`MAIA_DEMO_SUJETOS`). El tablero y los riesgos quedan vacíos hasta que se publique un
+paquete firmado con la misma `MAIA_PAQUETE_CLAVE` (ver [Probar con datos simulados](#probar-con-datos-simulados), con
+la pila completa). Otro puerto: `WEB_PUERTO=8081`. La cuenta de administración se crea solo con la base vacía: si
+cambia `MAIA_ADMIN_CLAVE` después, cámbiela también en **Administración → Usuarios** (o empiece de cero con `down -v`).
 
 ### Levantar todo
 
