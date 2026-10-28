@@ -28,7 +28,7 @@ KMC_PW ?= $(shell (command -v secret-tool >/dev/null && secret-tool lookup maia 
 export KMC_PW
 
 .PHONY: ayuda env verificar-gpu arrancar detener estado registros migrar demo-entrenar demo-exportar demo-publicar \
-        corrida corrida-si-hay-corte-nuevo corrida-silencio pruebas pruebas-web verificar-todo tipos-web respaldo \
+        corrida corrida-si-hay-corte-nuevo corrida-silencio programador pruebas pruebas-web verificar-todo tipos-web respaldo \
         sincronizar-nucleo parches-nucleo railway-api railway-web
 
 ayuda:  ## esta ayuda
@@ -47,7 +47,7 @@ arrancar:  ## levanta postgres, minio, mlflow, mailpit, api y web (http://localh
 	@echo "Web http://localhost:8080 · MLflow http://localhost:5000 · MinIO http://localhost:9001 · Correo http://localhost:8025"
 
 detener:  ## detiene todo (los datos quedan en los volúmenes)
-	$(COMPOSE) --profile entrenamiento down
+	$(COMPOSE) --profile entrenamiento --profile programador down
 
 estado:  ## servicios y su salud
 	$(COMPOSE) ps
@@ -72,18 +72,31 @@ demo-publicar:  ## sube y activa el último paquete simulado en la web local (VE
 	$(TRAINER) publicar --url $(WEB_LOCAL) --fuente simulado $(if $(VERSION),--version $(VERSION),)
 
 # ------------------------------------------------------------------ corridas con la base de la Fundación
+# Parámetros de extracción opcionales (docs/extraccion.md); solo se pasan los definidos, p. ej.:
+#   make corrida FECHA_CORTE=2026-06-30 ANIO_DESDE=2015
+FILTROS_KMC := $(if $(FECHA_CORTE),--fecha-corte $(FECHA_CORTE)) $(if $(ANIO_DESDE),--anio-desde $(ANIO_DESDE)) \
+               $(if $(ANIO_HASTA),--anio-hasta $(ANIO_HASTA)) $(if $(DESDE_VISITA),--desde-visita $(DESDE_VISITA)) \
+               $(if $(HASTA_VISITA),--hasta-visita $(HASTA_VISITA))
 
 corrida:  ## corrida semestral completa con la base real (pide KMC_PW)
 	@test -n "$$KMC_PW" || (echo "Defina KMC_PW en la terminal (export KMC_PW=...) o en el llavero" && exit 1)
-	$(TRAINER) corrida --fuente kmc
+	$(TRAINER) corrida --fuente kmc $(FILTROS_KMC)
 
 corrida-si-hay-corte-nuevo:  ## igual, pero solo si la base cambió desde el último corte (para cron)
 	@test -n "$$KMC_PW" || (echo "Defina KMC_PW en la terminal o en el llavero" && exit 1)
-	$(TRAINER) corrida --fuente kmc --solo-si-nuevo
+	$(TRAINER) corrida --fuente kmc --solo-si-nuevo $(FILTROS_KMC)
+
+programador:  ## enciende el servicio que ejecuta lo programado en Administración (SIN_GPU=1: en esta terminal)
+ifeq ($(SIN_GPU),1)
+	$(TRAINER) programador
+else
+	$(COMPOSE) --profile programador up -d --build programador
+	@echo "Programador encendido. Registros: $(COMPOSE) logs -f programador"
+endif
 
 corrida-silencio:  ## corrida en silencio: guarda los riesgos sin mostrarlos ni enviar correos
 	@test -n "$$KMC_PW" || (echo "Defina KMC_PW en la terminal o en el llavero" && exit 1)
-	$(TRAINER) corrida --fuente kmc --silencio
+	$(TRAINER) corrida --fuente kmc --silencio $(FILTROS_KMC)
 
 # ------------------------------------------------------------------ calidad
 

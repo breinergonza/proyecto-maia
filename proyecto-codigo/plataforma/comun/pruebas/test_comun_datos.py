@@ -20,10 +20,12 @@ def test_url_de_railway_se_normaliza():
     assert Configuracion(database_url='postgres://a@b/c').database_url.startswith('postgresql+psycopg://')
 
 
-def test_fuera_de_local_no_se_arranca_con_secretos_de_ejemplo():
+def test_fuera_de_local_no_se_arranca_con_secretos_de_ejemplo(monkeypatch):
+    for n in ('MAIA_JWT_SECRETO', 'MAIA_PAQUETE_CLAVE', 'MAIA_ADMIN_CLAVE'):   # sin el .env ni el entorno del equipo
+        monkeypatch.delenv(n, raising=False)
     Configuracion(maia_entorno='local').exigir_secretos()
     with pytest.raises(RuntimeError, match='MAIA_JWT_SECRETO'):
-        Configuracion(maia_entorno='demo').exigir_secretos()
+        Configuracion(_env_file=None, maia_entorno='demo').exigir_secretos()
     Configuracion(maia_entorno='demo', maia_jwt_secreto='x' * 40, maia_paquete_clave='y' * 40,
                   maia_admin_clave='z' * 16).exigir_secretos()
 

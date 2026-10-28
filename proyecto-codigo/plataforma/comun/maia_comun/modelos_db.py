@@ -63,6 +63,8 @@ class Corte(Base):
     filas: Mapped[dict] = mapped_column(JSONB)
     vigente: Mapped[bool] = mapped_column(Boolean, server_default=text('false'))
     creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    parametros: Mapped[dict | None] = mapped_column(JSONB)      # parámetros de la extracción (0002)
+    consulta_sha: Mapped[str | None] = mapped_column(Text)      # sha256 de las consultas SQL ejecutadas
 
 
 def _fk_corte() -> ForeignKey:
@@ -189,6 +191,73 @@ class Auditoria(Base):
     recurso: Mapped[str | None] = mapped_column(Text)
     detalle: Mapped[dict | None] = mapped_column(JSONB)
     creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ---- administración de las ejecuciones (0003): conexión a la base de la entidad, horarios, cola e hiperparámetros
+
+class ConexionOrigen(Base):
+    __tablename__ = 'conexion_origen'
+    __table_args__ = (CheckConstraint("fuente IN ('kmc')", name='fuente'), {'schema': 'app'})
+    fuente: Mapped[str] = mapped_column(Text, primary_key=True)
+    host: Mapped[str] = mapped_column(Text)
+    puerto: Mapped[int] = mapped_column(Integer, server_default=text('5432'))
+    base: Mapped[str] = mapped_column(Text)
+    usuario: Mapped[str] = mapped_column(Text)
+    esquema: Mapped[str] = mapped_column(Text, server_default=text("'consumo'"))
+    sslmode: Mapped[str] = mapped_column(Text, server_default=text("'require'"))
+    timeout: Mapped[int] = mapped_column(Integer, server_default=text('20'))
+    clave_cifrada: Mapped[str | None] = mapped_column(Text)   # Fernet con MAIA_CIFRADO_CLAVE; nunca sale de la API
+    actualizado_por: Mapped[uuid.UUID | None] = mapped_column(ForeignKey('app.usuarios.id', ondelete='SET NULL'))
+    actualizado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Programacion(Base):
+    __tablename__ = 'programaciones'
+    __table_args__ = (CheckConstraint("fuente IN ('kmc','simulado')", name='fuente'), {'schema': 'app'})
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    nombre: Mapped[str] = mapped_column(Text)
+    fuente: Mapped[str] = mapped_column(Text, server_default=text("'kmc'"))
+    cron: Mapped[str] = mapped_column(Text)                   # minuto hora día mes día-semana (maia_comun.calendario)
+    zona: Mapped[str] = mapped_column(Text, server_default=text("'America/Bogota'"))
+    activo: Mapped[bool] = mapped_column(Boolean, server_default=text('true'))
+    silencio: Mapped[bool] = mapped_column(Boolean, server_default=text('false'))
+    solo_si_nuevo: Mapped[bool] = mapped_column(Boolean, server_default=text('true'))
+    parametros: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'"))   # filtros de extracción
+    proxima: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ultima: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    creado_por: Mapped[uuid.UUID | None] = mapped_column(ForeignKey('app.usuarios.id', ondelete='SET NULL'))
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Ejecucion(Base):
+    __tablename__ = 'ejecuciones'
+    __table_args__ = (CheckConstraint("tipo IN ('corrida','aprobacion','entrenamiento')", name='tipo'),
+                      CheckConstraint("origen IN ('programada','manual')", name='origen'),
+                      CheckConstraint("estado IN ('pendiente','en_curso','ok','error')", name='estado'),
+                      Index(None, 'estado', 'id'), {'schema': 'app'})
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tipo: Mapped[str] = mapped_column(Text)
+    origen: Mapped[str] = mapped_column(Text)
+    estado: Mapped[str] = mapped_column(Text, server_default=text("'pendiente'"))
+    programacion_id: Mapped[int | None] = mapped_column(ForeignKey('app.programaciones.id', ondelete='SET NULL'))
+    fuente: Mapped[str] = mapped_column(Text)
+    parametros: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'"))
+    resultado: Mapped[dict | None] = mapped_column(JSONB)      # corrida, versiones registradas, paquete
+    registro: Mapped[str | None] = mapped_column(Text)         # últimas líneas de la salida (sin datos por niño)
+    mensaje: Mapped[str | None] = mapped_column(Text)
+    solicitada_por: Mapped[uuid.UUID | None] = mapped_column(ForeignKey('app.usuarios.id', ondelete='SET NULL'))
+    creada_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    iniciada: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    terminada: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Hiperparametro(Base):
+    __tablename__ = 'hiperparametros'
+    __table_args__ = (CheckConstraint("modelo IN ('anomalias','clinico')", name='modelo'), {'schema': 'app'})
+    modelo: Mapped[str] = mapped_column(Text, primary_key=True)
+    valores: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'"))
+    actualizado_por: Mapped[uuid.UUID | None] = mapped_column(ForeignKey('app.usuarios.id', ondelete='SET NULL'))
+    actualizado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 # ============================================================ esquema resultados

@@ -64,19 +64,28 @@ y sirve la aplicación. El archivo es [`docker-compose.on-premise.yml`](../../do
    |---|---|
    | `MAIA_ADMIN_EMAIL` | Correo de la cuenta de administración (obligatoria) |
    | `MINIO_IMAGEN`, `MC_IMAGEN` | Ver «decisiones», punto 2 |
-   | `KMC_PW` | Clave de `kmc_estudiante`. Márquela como secreta. Solo en operación real |
+   | `KMC_PW` | Opcional: mejor guardarla cifrada en **Administración › Configuración** (la web la cifra con `SERVICE_BASE64_64_CIFRADO`, que el orquestador genera como `MAIA_CIFRADO_CLAVE`) |
+   | `MLFLOW_URL_PUBLICA` | Enlace a MLflow desde **Administración › Entrenamientos** (por defecto `http://localhost:5000`, el túnel SSH) |
+   | `MAIA_ZONA_HORARIA` | Zona de los horarios programados en la web (por defecto `America/Bogota`) |
    | `MAIA_ENTORNO`, `MAIA_SOLO_SIMULADO` | Ver la tabla de modos (por defecto `produccion` / `false`) |
    | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USUARIO`, `SMTP_CLAVE`, `SMTP_REMITENTE`, `SMTP_TLS` | Servidor de correo de la Fundación. Sin ellos, la app funciona, pero los correos quedan con error |
    | `MLFLOW_PUERTO`, `MINIO_CONSOLA_PUERTO` | Solo si 5000 o 9001 ya están ocupados en el servidor |
 
-   La clave del administrador es `SERVICE_PASSWORD_ADMIN` (cópiela del panel). `KMC_PW` queda guardada en la base del
-   orquestador y en el `.env` que este escribe en el servidor: proteja el acceso SSH y el panel.
+   La clave del administrador es `SERVICE_PASSWORD_ADMIN` (cópiela del panel). Si define `KMC_PW` aquí, queda guardada
+   en la base del orquestador y en el `.env` que este escribe en el servidor: proteja el acceso SSH y el panel.
+   `SERVICE_BASE64_64_CIFRADO` no debe cambiar después de guardar la clave en la web (si cambia, hay que escribirla de
+   nuevo).
 5. **Deploy.** El primer build tarda (compila LightGBM con CUDA). Al terminar, `https://<dominio>/api/salud` debe
    responder `{"db": true, ..., "entorno": "produccion"}`.
 
 ## Operar on-premise
 
-Los comandos de la CLI corren dentro del contenedor `trainer`: desde **Terminal** en el panel (servicio `trainer`), o
+El contenedor `trainer` es el **programador** (`maia programador`): ejecuta las corridas que se programan o piden en
+**Administración › Programación** y las aprobaciones de modelos de **Administración › Entrenamientos**. La primera
+vez: ingrese como administración, guarde la conexión en **Configuración** y cree la programación (por ejemplo, cada
+semestre). Sus registros: `docker logs -f $(docker ps -qf name=trainer)`.
+
+Los comandos de la CLI también corren a mano dentro del contenedor `trainer`: desde **Terminal** en el panel (servicio `trainer`), o
 por SSH con `docker exec -it $(docker ps -qf name=trainer) maia ...`.
 
 | Tarea | Comando |
@@ -95,11 +104,10 @@ En el recurso, **Scheduled Tasks → Add**:
 
 | Nombre | Servicio | Comando | Frecuencia |
 |---|---|---|---|
-| Corrida semanal | `trainer` | `maia corrida --fuente kmc --solo-si-nuevo` | `0 6 * * 1` |
 | Respaldo de Postgres | `postgres` | `sh -c 'pg_dump -U maia -Fc maia > /respaldos/maia_$(date +%F).dump && pg_dump -U maia -Fc mlflow > /respaldos/mlflow_$(date +%F).dump && find /respaldos -name "*.dump" -mtime +60 -delete'` | `0 3 * * *` |
 
-La hora de la tarea es la zona horaria configurada en el panel (**Settings → Timezone**); el trainer usa
-`America/Bogota` para sus fechas. Copie periódicamente el volumen `respaldos` (y el de MinIO) fuera del servidor.
+Las corridas ya no van aquí: se programan en la web. La hora de la tarea de respaldo es la zona horaria configurada en
+el panel (**Settings → Timezone**). Copie periódicamente el volumen `respaldos` (y el de MinIO) fuera del servidor.
 
 ### MLflow y la consola de MinIO
 

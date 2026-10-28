@@ -54,6 +54,11 @@ def _texto(v: object) -> str | None:
     return (v.strip() or None) if isinstance(v, str) else None
 
 
+def _numero(v: object) -> float | None:
+    """A number of the sheet, or None for an empty cell (or a column an older dictionary lacks)."""
+    return None if v is None or pd.isna(v) else float(v)
+
+
 def _curva(dic: D.Diccionario) -> tuple[str, tuple[tuple[str, int], ...], tuple[str, ...]]:
     """The sex variable, its codes for the WHO tables (1 boys, 2 girls) and the visits the curve
     applies to. Without them no growth can be read, so a problem here stops the run."""
@@ -82,7 +87,9 @@ def _medida(fila: object, dic: D.Diccionario) -> CR.Medida | str:
         return f'ninguna variable de la hoja "Variables" tiene "{faltan[0]}" en "Qué mide"'
     return CR.Medida(fila.concepto, fila.indicador, factor=factor, restringido=fila.indicador in CR.RESTRINGIDOS,
                      por_talla=por_talla, z_bajo=CR.Z_BAJO if pd.isna(fila.z_bajo) else float(fila.z_bajo),
-                     caida=CR.CAIDA if pd.isna(fila.caida) else float(fila.caida))
+                     caida=CR.CAIDA if pd.isna(fila.caida) else float(fila.caida),
+                     z_improbable_min=_numero(getattr(fila, 'z_improbable_min', None)),
+                     z_improbable_max=_numero(getattr(fila, 'z_improbable_max', None)))
 
 
 def _codigos(texto: object) -> tuple[float, ...] | None:

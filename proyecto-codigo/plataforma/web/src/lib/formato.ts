@@ -64,3 +64,9 @@ export const frase = (v: string | null | undefined) => (v ? v.charAt(0).toUpperC
 export const TIPOS_CORRIDA: Record<string, string> = {
   demo: 'Desde la plataforma', completa: 'Semestral (equipo local)', revision: 'Solo revisión de datos', riesgos: 'Solo riesgos',
 }
+export const ESTADOS_EJECUCION: Record<string, string> = {
+  pendiente: 'En cola', en_curso: 'En curso', ok: 'Terminada', error: 'Con error',
+}
+export const TIPOS_EJECUCION: Record<string, string> = { corrida: 'Corrida', aprobacion: 'Aprobación de modelos' }
+export const FUENTES: Record<string, string> = { kmc: 'Base de la Fundación', simulado: 'Datos simulados' }
+export const MODELOS: Record<string, string> = { anomalias: 'Anomalías (revisión de datos)', clinico: 'Alertas clínicas' }

@@ -1,7 +1,8 @@
 // Marco de la aplicación: navegación lateral en escritorio, barra superior con cajón deslizable en el teléfono,
 // aviso de demostración y contenido (que aparece con una transición corta al cambiar de página).
 import {
-  Baby, Bell, Calculator, ClipboardCheck, HeartPulse, LayoutDashboard, LogOut, Menu, Package, Play, Users, X,
+  Baby, Bell, BrainCircuit, CalendarClock, Calculator, ClipboardCheck, HeartPulse, LayoutDashboard, LogOut, Menu, Package,
+  Play, Settings, Users, X,
   type LucideIcon,
 } from 'lucide-react'
 import { Suspense, useEffect, useState, type ReactNode } from 'react'
@@ -11,7 +12,8 @@ import { puede, useSesion } from '../auth/sesion'
 import { cn } from '../lib/cn'
 import { esDemo } from '../lib/config'
 import { ROLES } from '../lib/formato'
-import { Cargando } from './ui'
+import { enMarcha, useEntrenamientos } from './EntrenarAhora'
+import { Cargando, Insignia } from './ui'
 
 type Enlace = { a: string; texto: string; icono: LucideIcon; roles?: Rol[] }
 
@@ -31,6 +33,9 @@ const SECCIONES: { titulo: string; enlaces: Enlace[] }[] = [
   {
     titulo: 'Administración',
     enlaces: [
+      { a: '/admin/configuracion', texto: 'Configuración', icono: Settings, roles: ['admin'] },
+      { a: '/admin/programacion', texto: 'Programación', icono: CalendarClock, roles: ['admin'] },
+      { a: '/admin/entrenamientos', texto: 'Entrenamientos', icono: BrainCircuit, roles: ['admin'] },
       { a: '/admin/modelos', texto: 'Modelos', icono: Package, roles: ['admin'] },
       { a: '/admin/corridas', texto: 'Corridas', icono: Play, roles: ['admin'] },
       { a: '/admin/usuarios', texto: 'Usuarios', icono: Users, roles: ['admin'] },
@@ -41,6 +46,7 @@ const SECCIONES: { titulo: string; enlaces: Enlace[] }[] = [
 
 function Navegacion({ alElegir }: { alElegir?: () => void }) {
   const { usuario } = useSesion()
+  const entrenando = enMarcha(useEntrenamientos(puede(usuario, ['admin'])).data?.[0])
   return (
     <nav aria-label="Secciones" className="flex flex-col gap-6">
       {SECCIONES.map((s) => {
@@ -65,6 +71,7 @@ function Navegacion({ alElegir }: { alElegir?: () => void }) {
                         <e.icono size={18} strokeWidth={isActive ? 2.25 : 1.75} aria-hidden
                           className={cn('shrink-0 transition-colors', isActive ? 'text-teal' : 'text-salvia group-hover:text-tinta')} />
                         {e.texto}
+                        {e.a === '/admin/entrenamientos' && entrenando && <Insignia tono="ocre" className="ml-auto">Entrenando…</Insignia>}
                       </>
                     )}
                   </NavLink>

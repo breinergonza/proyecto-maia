@@ -494,14 +494,406 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/administracion/resumen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Resumen */
+        get: operations["resumen_api_administracion_resumen_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/administracion/conexion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Conexion */
+        get: operations["conexion_api_administracion_conexion_get"];
+        /** Guardar Conexion */
+        put: operations["guardar_conexion_api_administracion_conexion_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/administracion/conexion/probar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Probar Conexion
+         * @description Prueba los datos del formulario (o los guardados) sin guardarlos. Sin clave en el formulario, usa la guardada.
+         */
+        post: operations["probar_conexion_api_administracion_conexion_probar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/administracion/hiperparametros": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Hiperparametros */
+        get: operations["hiperparametros_api_administracion_hiperparametros_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/administracion/hiperparametros/{modelo}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Guardar Hiperparametros */
+        put: operations["guardar_hiperparametros_api_administracion_hiperparametros__modelo__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/administracion/calendario": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Calendario
+         * @description Cómo se lee una expresión cron y sus próximas cinco fechas (para revisarla antes de guardarla).
+         */
+        get: operations["calendario_api_administracion_calendario_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/administracion/programaciones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Programaciones */
+        get: operations["programaciones_api_administracion_programaciones_get"];
+        put?: never;
+        /** Crear Programacion */
+        post: operations["crear_programacion_api_administracion_programaciones_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/administracion/programaciones/{pid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Cambiar Programacion */
+        put: operations["cambiar_programacion_api_administracion_programaciones__pid__put"];
+        post?: never;
+        /** Borrar Programacion */
+        delete: operations["borrar_programacion_api_administracion_programaciones__pid__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/administracion/programaciones/{pid}/ejecutar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ejecutar Programacion
+         * @description La ejecuta ya, con sus mismos parámetros, sin mover su próxima hora.
+         */
+        post: operations["ejecutar_programacion_api_administracion_programaciones__pid__ejecutar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/administracion/ejecuciones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ejecuciones */
+        get: operations["ejecuciones_api_administracion_ejecuciones_get"];
+        put?: never;
+        /**
+         * Nueva Ejecucion
+         * @description Una corrida ahora (extraer, entrenar, registrar en MLflow, revisar y calcular riesgos).
+         */
+        post: operations["nueva_ejecucion_api_administracion_ejecuciones_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/administracion/ejecuciones/{eid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ejecucion */
+        get: operations["ejecucion_api_administracion_ejecuciones__eid__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/entrenamientos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar */
+        get: operations["listar_api_entrenamientos_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/entrenamientos/aprobar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Aprobar
+         * @description Promueve las dos versiones a ``produccion``, arma el paquete y lo activa en la solución.
+         */
+        post: operations["aprobar_api_entrenamientos_aprobar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/entrenamientos/entrenar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Entrenar
+         * @description Entrena ya: el programador trae los datos de la fuente y entrena cada modelo con estos hiperparámetros. El
+         *     resultado queda en MLflow como ``candidato``; el avance se ve en ``GET /entrenamientos/ejecuciones``.
+         */
+        post: operations["entrenar_api_entrenamientos_entrenar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/entrenamientos/ejecuciones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ejecuciones
+         * @description Los últimos entrenamientos pedidos desde la web, con su paso actual (para la capa de presentación).
+         */
+        get: operations["ejecuciones_api_entrenamientos_ejecuciones_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AprobacionEntrada */
+        AprobacionEntrada: {
+            /**
+             * Fuente
+             * @default kmc
+             * @enum {string}
+             */
+            fuente: "kmc" | "simulado";
+            /** Anomalias */
+            anomalias: string;
+            /** Clinico */
+            clinico: string;
+        };
         /** Body_subir_api_modelos_paquetes_post */
         Body_subir_api_modelos_paquetes_post: {
             /** Archivo */
             archivo: string;
+        };
+        /** Calendario */
+        Calendario: {
+            /** Cron */
+            cron: string;
+            /** Zona */
+            zona: string;
+            /** Descripcion */
+            descripcion: string;
+            /** Proximas */
+            proximas: string[];
+        };
+        /** CampoHiperparametro */
+        CampoHiperparametro: {
+            /** Nombre */
+            nombre: string;
+            /** Etiqueta */
+            etiqueta: string;
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "int" | "float";
+            /** Minimo */
+            minimo: number;
+            /** Maximo */
+            maximo: number;
+            /** Ayuda */
+            ayuda: string;
+            /** Defecto */
+            defecto: number | null;
+            /** Valor */
+            valor: number | null;
+        };
+        /** ConexionEntrada */
+        ConexionEntrada: {
+            /** Host */
+            host: string;
+            /**
+             * Puerto
+             * @default 5432
+             */
+            puerto: number;
+            /** Base */
+            base: string;
+            /** Usuario */
+            usuario: string;
+            /**
+             * Esquema
+             * @default consumo
+             */
+            esquema: string;
+            /**
+             * Sslmode
+             * @default require
+             * @enum {string}
+             */
+            sslmode: "disable" | "allow" | "prefer" | "require" | "verify-ca" | "verify-full";
+            /**
+             * Timeout
+             * @default 20
+             */
+            timeout: number;
+            /** Clave */
+            clave?: string | null;
+            /**
+             * Borrar Clave
+             * @default false
+             */
+            borrar_clave: boolean;
+        };
+        /** ConexionSalida */
+        ConexionSalida: {
+            /** Host */
+            host: string;
+            /** Puerto */
+            puerto: number;
+            /** Base */
+            base: string;
+            /** Usuario */
+            usuario: string;
+            /** Esquema */
+            esquema: string;
+            /** Sslmode */
+            sslmode: string;
+            /** Timeout */
+            timeout: number;
+            /** Guardada */
+            guardada: boolean;
+            /**
+             * Origen Clave
+             * @enum {string}
+             */
+            origen_clave: "guardada" | "entorno" | "ninguna";
+            /** Cifrado Disponible */
+            cifrado_disponible: boolean;
+            /** Actualizado En */
+            actualizado_en?: string | null;
         };
         /** ConfigNotificacionEntrada */
         ConfigNotificacionEntrada: {
@@ -569,6 +961,153 @@ export interface components {
             /** Mensaje */
             mensaje?: string | null;
         };
+        /** EjecucionNueva */
+        EjecucionNueva: {
+            /**
+             * Fuente
+             * @default kmc
+             * @enum {string}
+             */
+            fuente: "kmc" | "simulado";
+            /**
+             * Silencio
+             * @default false
+             */
+            silencio: boolean;
+            /**
+             * Solo Si Nuevo
+             * @default false
+             */
+            solo_si_nuevo: boolean;
+            parametros?: components["schemas"]["ParametrosProgramacion"];
+        };
+        /** EjecucionSalida */
+        EjecucionSalida: {
+            /** Id */
+            id: number;
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "corrida" | "aprobacion" | "entrenamiento";
+            /**
+             * Origen
+             * @enum {string}
+             */
+            origen: "programada" | "manual";
+            /**
+             * Estado
+             * @enum {string}
+             */
+            estado: "pendiente" | "en_curso" | "ok" | "error";
+            /** Programacion Id */
+            programacion_id?: number | null;
+            /** Fuente */
+            fuente: string;
+            /** Parametros */
+            parametros?: {
+                [key: string]: unknown;
+            };
+            /** Resultado */
+            resultado?: {
+                [key: string]: unknown;
+            } | null;
+            /** Registro */
+            registro?: string | null;
+            /** Mensaje */
+            mensaje?: string | null;
+            /** Creada En */
+            creada_en?: string | null;
+            /** Iniciada */
+            iniciada?: string | null;
+            /** Terminada */
+            terminada?: string | null;
+        };
+        /** Entrenamiento */
+        Entrenamiento: {
+            /** Run Id */
+            run_id: string;
+            /** Experimento Id */
+            experimento_id: string;
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "anomalias" | "clinico";
+            /** Nombre */
+            nombre?: string | null;
+            /** Estado */
+            estado?: string | null;
+            /** Inicio */
+            inicio?: string | null;
+            /** Fin */
+            fin?: string | null;
+            /** Fuente */
+            fuente?: string | null;
+            /** Corte */
+            corte?: string | null;
+            /** Hiperparametros */
+            hiperparametros?: {
+                [key: string]: string;
+            };
+            /** Extraccion */
+            extraccion?: {
+                [key: string]: string;
+            };
+            /** Metricas */
+            metricas?: {
+                [key: string]: number;
+            };
+            /** Etiquetas */
+            etiquetas?: {
+                [key: string]: string;
+            };
+            modelo?: components["schemas"]["ModeloRegistrado"] | null;
+            /** Enlace */
+            enlace?: string | null;
+        };
+        /** Entrenamientos */
+        Entrenamientos: {
+            /** Mlflow Url */
+            mlflow_url: string | null;
+            /** Anomalias */
+            anomalias: components["schemas"]["Entrenamiento"][];
+            /** Clinico */
+            clinico: components["schemas"]["Entrenamiento"][];
+        };
+        /**
+         * EntrenarAhora
+         * @description Entrenar ya desde la web: datos de la fuente y los hiperparámetros escritos en el formulario.
+         */
+        EntrenarAhora: {
+            /**
+             * Fuente
+             * @default kmc
+             * @enum {string}
+             */
+            fuente: "kmc" | "simulado";
+            /** Modelos */
+            modelos?: ("anomalias" | "clinico")[];
+            /**
+             * Extraer
+             * @default true
+             */
+            extraer: boolean;
+            /** Hiperparametros */
+            hiperparametros?: {
+                [key: string]: {
+                    [key: string]: number | null;
+                };
+            };
+            filtros?: components["schemas"]["ParametrosProgramacion"];
+            /** Sujetos */
+            sujetos?: number | null;
+            /**
+             * Guardar
+             * @default false
+             */
+            guardar: boolean;
+        };
         /** EpisodioEntrada */
         EpisodioEntrada: {
             /** Sujeto */
@@ -584,6 +1123,25 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HiperparametrosEntrada */
+        HiperparametrosEntrada: {
+            /** Valores */
+            valores: {
+                [key: string]: number | null;
+            };
+        };
+        /** HiperparametrosSalida */
+        HiperparametrosSalida: {
+            /**
+             * Modelo
+             * @enum {string}
+             */
+            modelo: "anomalias" | "clinico";
+            /** Campos */
+            campos: components["schemas"]["CampoHiperparametro"][];
+            /** Actualizado En */
+            actualizado_en?: string | null;
         };
         /** Login */
         Login: {
@@ -604,6 +1162,15 @@ export interface components {
             fecha?: string | null;
             /** Edad Dias */
             edad_dias?: number | null;
+        };
+        /** ModeloRegistrado */
+        ModeloRegistrado: {
+            /** Registro */
+            registro: string;
+            /** Version */
+            version: string;
+            /** Alias */
+            alias?: string[];
         };
         /** PaqueteSalida */
         PaqueteSalida: {
@@ -634,6 +1201,15 @@ export interface components {
                 [key: string]: number;
             };
         };
+        /** ParametrosProgramacion */
+        ParametrosProgramacion: {
+            /** Anio Desde */
+            anio_desde?: number | null;
+            /** Anio Hasta */
+            anio_hasta?: number | null;
+            /** Ventana Meses */
+            ventana_meses?: number | null;
+        };
         /** PeticionInferencia */
         PeticionInferencia: {
             /** Corte */
@@ -645,6 +1221,81 @@ export interface components {
             /** Episodios */
             episodios?: components["schemas"]["EpisodioEntrada"][];
         };
+        /** ProgramacionEntrada */
+        ProgramacionEntrada: {
+            /** Nombre */
+            nombre: string;
+            /**
+             * Fuente
+             * @default kmc
+             * @enum {string}
+             */
+            fuente: "kmc" | "simulado";
+            /** Cron */
+            cron: string;
+            /** Zona */
+            zona?: string | null;
+            /**
+             * Activo
+             * @default true
+             */
+            activo: boolean;
+            /**
+             * Silencio
+             * @default false
+             */
+            silencio: boolean;
+            /**
+             * Solo Si Nuevo
+             * @default true
+             */
+            solo_si_nuevo: boolean;
+            parametros?: components["schemas"]["ParametrosProgramacion"];
+        };
+        /** ProgramacionSalida */
+        ProgramacionSalida: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+            /** Fuente */
+            fuente: string;
+            /** Cron */
+            cron: string;
+            /** Zona */
+            zona: string;
+            /** Descripcion */
+            descripcion: string;
+            /** Activo */
+            activo: boolean;
+            /** Silencio */
+            silencio: boolean;
+            /** Solo Si Nuevo */
+            solo_si_nuevo: boolean;
+            /** Parametros */
+            parametros: {
+                [key: string]: unknown;
+            };
+            /** Proxima */
+            proxima?: string | null;
+            /** Ultima */
+            ultima?: string | null;
+            /** Creado En */
+            creado_en?: string | null;
+        };
+        /** PruebaConexionSalida */
+        PruebaConexionSalida: {
+            /** Ok */
+            ok: boolean;
+            /** Mensaje */
+            mensaje: string;
+            /** Version Servidor */
+            version_servidor?: string | null;
+            /** Esquema */
+            esquema?: string | null;
+            /** Tablas */
+            tablas?: string[];
+        };
         /** PruebaCorreo */
         PruebaCorreo: {
             /** Destinatario */
@@ -655,6 +1306,30 @@ export interface components {
             /** Acceso */
             acceso: string;
             usuario: components["schemas"]["UsuarioSalida"];
+        };
+        /** ResumenAdministracion */
+        ResumenAdministracion: {
+            /** Entorno */
+            entorno: string;
+            /** Solo Simulado */
+            solo_simulado: boolean;
+            /** Zona Horaria */
+            zona_horaria: string;
+            /** Mlflow Url */
+            mlflow_url: string | null;
+            /** Cifrado Disponible */
+            cifrado_disponible: boolean;
+            /** Conexion Guardada */
+            conexion_guardada: boolean;
+            /** Clave Disponible */
+            clave_disponible: boolean;
+            /** Programaciones Activas */
+            programaciones_activas: number;
+            /** Hiperparametros Ajustados */
+            hiperparametros_ajustados: boolean;
+            /** Paquete Activo */
+            paquete_activo: string | null;
+            ultima_ejecucion?: components["schemas"]["EjecucionSalida"] | null;
         };
         /** RevisionDatoEntrada */
         RevisionDatoEntrada: {
@@ -1665,6 +2340,571 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resumen_api_administracion_resumen_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumenAdministracion"];
+                };
+            };
+        };
+    };
+    conexion_api_administracion_conexion_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConexionSalida"];
+                };
+            };
+        };
+    };
+    guardar_conexion_api_administracion_conexion_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConexionEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConexionSalida"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    probar_conexion_api_administracion_conexion_probar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ConexionEntrada"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PruebaConexionSalida"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hiperparametros_api_administracion_hiperparametros_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HiperparametrosSalida"][];
+                };
+            };
+        };
+    };
+    guardar_hiperparametros_api_administracion_hiperparametros__modelo__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                modelo: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HiperparametrosEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HiperparametrosSalida"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    calendario_api_administracion_calendario_get: {
+        parameters: {
+            query: {
+                cron: string;
+                zona?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Calendario"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    programaciones_api_administracion_programaciones_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramacionSalida"][];
+                };
+            };
+        };
+    };
+    crear_programacion_api_administracion_programaciones_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgramacionEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramacionSalida"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cambiar_programacion_api_administracion_programaciones__pid__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pid: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgramacionEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramacionSalida"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    borrar_programacion_api_administracion_programaciones__pid__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ejecutar_programacion_api_administracion_programaciones__pid__ejecutar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EjecucionSalida"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ejecuciones_api_administracion_ejecuciones_get: {
+        parameters: {
+            query?: {
+                limite?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EjecucionSalida"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    nueva_ejecucion_api_administracion_ejecuciones_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EjecucionNueva"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EjecucionSalida"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ejecucion_api_administracion_ejecuciones__eid__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EjecucionSalida"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listar_api_entrenamientos_get: {
+        parameters: {
+            query?: {
+                fuente?: ("kmc" | "simulado") | null;
+                limite?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Entrenamientos"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    aprobar_api_entrenamientos_aprobar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AprobacionEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EjecucionSalida"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    entrenar_api_entrenamientos_entrenar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EntrenarAhora"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EjecucionSalida"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ejecuciones_api_entrenamientos_ejecuciones_get: {
+        parameters: {
+            query?: {
+                limite?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EjecucionSalida"][];
+                };
             };
             /** @description Validation Error */
             422: {

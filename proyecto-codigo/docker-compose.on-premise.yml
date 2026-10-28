@@ -15,6 +15,8 @@ x-maia: &maia
   MAIA_ADMIN_EMAIL: ${MAIA_ADMIN_EMAIL:?defina MAIA_ADMIN_EMAIL}
   MAIA_ADMIN_CLAVE: ${SERVICE_PASSWORD_ADMIN}
   MAIA_URL_PUBLICA: ${SERVICE_URL_WEB}
+  MAIA_CIFRADO_CLAVE: ${SERVICE_BASE64_64_CIFRADO}    # cifra la clave de la base de la entidad guardada desde la web
+  MAIA_ZONA_HORARIA: ${MAIA_ZONA_HORARIA:-America/Bogota}
   SMTP_HOST: ${SMTP_HOST:-localhost}
   SMTP_PORT: ${SMTP_PORT:-587}
   SMTP_USUARIO: ${SMTP_USUARIO:-}
@@ -89,14 +91,15 @@ services:
 
   trainer:
     build: {context: ., dockerfile: infra/docker/trainer.Dockerfile}
-    # Queda encendido sin hacer nada: las corridas se lanzan desde las tareas programadas o la terminal del orquestador
-    # ("maia corrida ..."). Al arrancar copia el diccionario de los expertos (versionado en git) al volumen.
-    entrypoint: ["/bin/sh", "-c", "mkdir -p /datos/entradas && cp -f /app/nucleo/entradas/diccionario.xlsx /datos/entradas/ && exec sleep infinity"]
+    # Es el programador: ejecuta las corridas programadas o pedidas en Administración y las aprobaciones de modelos
+    # (maia programador). También se puede entrar a la terminal y correr "maia corrida ..." a mano. Al arrancar copia
+    # el diccionario de los expertos (versionado en git) al volumen.
+    entrypoint: ["/bin/sh", "-c", "mkdir -p /datos/entradas && cp -f /app/nucleo/entradas/diccionario.xlsx /datos/entradas/ && exec maia programador"]
     environment:
       <<: [*maia, *minio-servicio]
       MLFLOW_TRACKING_URI: http://mlflow:5000
       MAIA_LGBM_DEVICE: ${MAIA_LGBM_DEVICE:-cuda}
-      KMC_PW: ${KMC_PW:-}                              # solo si este servidor corre la base real
+      KMC_PW: ${KMC_PW:-}                              # opcional: mejor guardarla cifrada desde Administración
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
     volumes: [datos_maia:/datos]
     deploy:
@@ -113,7 +116,9 @@ services:
   api:
     build: {context: ., dockerfile: infra/docker/api.Dockerfile}
     environment:
-      <<: *maia
+      <<: [*maia, *minio-servicio]                     # MinIO: importa los paquetes que aprueba administración
+      MLFLOW_TRACKING_URI: http://mlflow:5000          # lee los entrenamientos para Administración › Entrenamientos
+      MLFLOW_URL_PUBLICA: ${MLFLOW_URL_PUBLICA:-http://localhost:5000}   # enlace del navegador (túnel SSH)
       MAIA_JWT_SECRETO: ${SERVICE_BASE64_64_JWT}
       MAIA_SOLO_SIMULADO: ${MAIA_SOLO_SIMULADO:-false}
       MAIA_DEMO_SUJETOS: ${MAIA_DEMO_SUJETOS:-3000}

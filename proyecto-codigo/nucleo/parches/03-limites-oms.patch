@@ -1,0 +1,306 @@
+--- a/clinico/crecimiento.py
++++ b/clinico/crecimiento.py
+@@ -25,6 +25,15 @@
+ UNIDADES = {'g': ('peso', 0.001), 'kg': ('peso', 1.0), 'cm': ('longitud', 1.0), 'mm': ('longitud', 0.1)}
+ RESTRINGIDOS = frozenset({'peso', 'peso_para_talla'})
+ Z_BAJO, CAIDA = -2.0, 1.0   # defaults: WHO's "low" is under -2 SD
++# WHO's flags for biologically implausible z-scores, per indicator (a z strictly beyond them is a datum to
++# check, not a finding): length/height-for-age < -6 or > +6, weight-for-age < -6 or > +5, weight-for-length
++# and head circumference-for-age < -5 or > +5 (BMI-for-age, not used here, is also -5 / +5). Source: WHO Anthro
++# Software and its macros (igrowup; R package ``anthro``, ``anthro_zscores``: flen, fwei, fwfl, fhc) and
++# WHO/UNICEF, Recommendations for data collection, analysis and reporting on anthropometric indicators in
++# children under 5 years old (2019), section on flagging implausible z-scores.
++Z_IMPROBABLE = 6.0  # the widest flag: a concept that is no WHO indicator is implausible beyond +-6 SD
++Z_IMPROBABLES = {'talla': (-6.0, 6.0), 'peso': (-6.0, 5.0), 'peso_para_talla': (-5.0, 5.0),
++                 'perimetro_cefalico': (-5.0, 5.0)}
+ 
+ 
+ @dataclass(frozen=True)
+@@ -36,13 +45,23 @@
+     por_talla: str | None = None  # weight-for-length: concept of the length measured at the same visit
+     z_bajo: float = Z_BAJO   # growth alert and outcome: under this z
+     caida: float = CAIDA     # growth alert: this many SD lower than the previous visit
++    z_improbable_min: float | None = None   # implausible under this z; None is WHO's flag for the indicator
++    z_improbable_max: float | None = None   # implausible over this z; None is WHO's flag for the indicator
+ 
+     @property
+     def nombre(self) -> str:
+         """What its z-scores are called: the concept for an indicator by age, else the indicator."""
+         return self.indicador if self.por_talla else self.concepto
+ 
++    @property
++    def improbable(self) -> tuple[float, float]:
++        """The z-scores outside which a datum is implausible: the experts' limits, else WHO's flags.
++        Read with ``getattr`` so a measure pickled before these fields existed still answers."""
++        lo, hi = Z_IMPROBABLES.get(self.indicador, (-Z_IMPROBABLE, Z_IMPROBABLE))
++        minimo, maximo = getattr(self, 'z_improbable_min', None), getattr(self, 'z_improbable_max', None)
++        return (lo if minimo is None else float(minimo), hi if maximo is None else float(maximo))
+ 
++
+ def leer_referencia(ruta: Path = REFERENCIA_OMS, peso_talla: Path = REFERENCIA_PESO_TALLA) -> pd.DataFrame:
+     """Both WHO tables in one, on a common axis ``eje``: age in days, or length in cm for
+     weight-for-length."""
+@@ -117,20 +136,31 @@
+     return out[~out.duplicated(['sujeto', 'etapa', 'concepto'], keep='last')].sort_index()
+ 
+ 
+-Z_IMPROBABLE = 6.0  # WHO's cleaning rule: beyond +-6 SD a growth value is biologically implausible
++def limites_improbable(concepto: str, medidas: tuple[Medida, ...] = (),
++                       z_improbable: float = Z_IMPROBABLE) -> tuple[float, float]:
++    """The implausible limits of a concept's z-scores: those of the measure that names it, else WHO's
++    flags when the concept is an indicator's name, else +-``z_improbable``."""
++    for m in medidas:
++        if m.nombre == concepto:
++            return m.improbable
++    return Z_IMPROBABLES.get(concepto, (-z_improbable, z_improbable))
+ 
+ 
+ def alertas_crecimiento(z: pd.DataFrame, medidas: tuple[Medida, ...] = (),
+                         z_improbable: float = Z_IMPROBABLE) -> pd.DataFrame:
+     """Per growth datum: below its measure's ``z_bajo`` SD, or ``caida`` SD lower than the subject's
+     previous datum of the same concept (WHO's -2 and 1 for a concept no measure names). A value beyond
+-    ``z_improbable`` SD, or one whose age is outside its visit's window (``en_ventana`` False), is not a
+-    clinical alert but a datum to check (``revisar``); it is left out of the next visit's drop too."""
++    its measure's implausible limits (WHO's flags per indicator, ``limites_improbable``), or one whose age
++    is outside its visit's window (``en_ventana`` False), is not a clinical alert but a datum to check
++    (``revisar``); it is left out of the next visit's drop too."""
+     z = z.sort_values(['sujeto', 'concepto', 'ec_dias'])
+     umbral = {m.nombre: (m.z_bajo, m.caida) for m in medidas}
+     bajo_de = z.concepto.map(lambda c: umbral.get(c, (Z_BAJO, CAIDA))[0]).astype(float)
+     caida_de = z.concepto.map(lambda c: umbral.get(c, (Z_BAJO, CAIDA))[1]).astype(float)
+-    improbable = z.z.abs() > z_improbable
++    limites = {c: limites_improbable(c, medidas, z_improbable) for c in z.concepto.unique()}
++    lo_de = z.concepto.map(lambda c: limites[c][0]).astype(float)
++    hi_de = z.concepto.map(lambda c: limites[c][1]).astype(float)
++    improbable = (z.z < lo_de) | (z.z > hi_de)
+     otra_edad = ~z.en_ventana.astype(bool) if 'en_ventana' in z else pd.Series(False, index=z.index)
+     revisar = improbable | otra_edad
+     creible = z.z.where(~revisar)
+@@ -138,10 +168,11 @@
+     out = z.assign(z_previo=previo, improbable=improbable, revisar=revisar,
+                    bajo=creible < bajo_de, cae=(previo - creible) > caida_de)
+     out['motivo'] = [
+-        f'más de {z_improbable:g} DE: revisar el dato' if i else
++        (f'menos de {lo:g} DE: revisar el dato' if v < lo else f'más de {hi:+g} DE: revisar el dato') if i else
+         'la edad no corresponde a la visita: revisar el dato' if o else
+         f'por debajo de {b:g} DE y cayó más de {c:g} DE' if es_bajo and cae else
+         f'por debajo de {b:g} DE' if es_bajo else
+         f'cayó más de {c:g} DE desde la visita anterior' if cae else ''
+-        for i, o, es_bajo, cae, b, c in zip(out.improbable, otra_edad, out.bajo, out.cae, bajo_de, caida_de)]
++        for v, lo, hi, i, o, es_bajo, cae, b, c in zip(out.z, lo_de, hi_de, out.improbable, otra_edad, out.bajo,
++                                                        out.cae, bajo_de, caida_de)]
+     return out
+--- a/clinico/configuracion.py
++++ b/clinico/configuracion.py
+@@ -54,6 +54,11 @@
+     return (v.strip() or None) if isinstance(v, str) else None
+ 
+ 
++def _numero(v: object) -> float | None:
++    """A number of the sheet, or None for an empty cell (or a column an older dictionary lacks)."""
++    return None if v is None or pd.isna(v) else float(v)
++
++
+ def _curva(dic: D.Diccionario) -> tuple[str, tuple[tuple[str, int], ...], tuple[str, ...]]:
+     """The sex variable, its codes for the WHO tables (1 boys, 2 girls) and the visits the curve
+     applies to. Without them no growth can be read, so a problem here stops the run."""
+@@ -82,7 +87,9 @@
+         return f'ninguna variable de la hoja "Variables" tiene "{faltan[0]}" en "Qué mide"'
+     return CR.Medida(fila.concepto, fila.indicador, factor=factor, restringido=fila.indicador in CR.RESTRINGIDOS,
+                      por_talla=por_talla, z_bajo=CR.Z_BAJO if pd.isna(fila.z_bajo) else float(fila.z_bajo),
+-                     caida=CR.CAIDA if pd.isna(fila.caida) else float(fila.caida))
++                     caida=CR.CAIDA if pd.isna(fila.caida) else float(fila.caida),
++                     z_improbable_min=_numero(getattr(fila, 'z_improbable_min', None)),
++                     z_improbable_max=_numero(getattr(fila, 'z_improbable_max', None)))
+ 
+ 
+ def _codigos(texto: object) -> tuple[float, ...] | None:
+--- a/clinico/modelo.py
++++ b/clinico/modelo.py
+@@ -324,7 +324,8 @@
+             return self._no_vuelve(p, des, sujetos)
+         if des.regla == 'z_bajo':   # known for children measured at that visit; an implausible z, or an age
+                                     # that is not the visit's, is a data error
+-            z = p.z[(p.z.concepto == des.concepto) & (p.z.etapa == des.etapa) & (p.z.z.abs() <= CR.Z_IMPROBABLE)
++            minimo, maximo = CR.limites_improbable(des.concepto, self.cfg.medidas)
++            z = p.z[(p.z.concepto == des.concepto) & (p.z.etapa == des.etapa) & p.z.z.between(minimo, maximo)
+                     & p.z.en_ventana]
+             z = z.groupby('sujeto').z.first()
+             limite = next((m.z_bajo for m in self.cfg.medidas if m.nombre == des.concepto), CR.Z_BAJO)
+--- a/sevarti/diccionario.py
++++ b/sevarti/diccionario.py
+@@ -41,12 +41,13 @@
+     quiebres=('quiebre', 'fecha'),
+     desenlaces=('clave', 'nombre', 'estado', 'regla', 'momento', 'variable', 'codigos', 'negativos', 'percentil',
+                 'medida', 'etapa', 'solo_desde', 'comparar', 'nota'),
+-    crecimiento=('indicador', 'concepto', 'unidad', 'por_talla', 'z_bajo', 'caida', 'estado'),
++    crecimiento=('indicador', 'concepto', 'unidad', 'por_talla', 'z_bajo', 'caida', 'z_improbable_min',
++                 'z_improbable_max', 'estado'),
+     curva=('sexo', 'codigo_nino', 'codigo_nina', 'etapas'),
+ )
+ _FLOTANTES = {'variables': ('tolerancia', 'rango_min', 'rango_max'),
+               'visitas': ('edad_min', 'edad_max', 'edad_fija'),
+-              'desenlaces': ('percentil',), 'crecimiento': ('z_bajo', 'caida')}
++              'desenlaces': ('percentil',), 'crecimiento': ('z_bajo', 'caida', 'z_improbable_min', 'z_improbable_max')}
+ _TEXTOS_VACIOS = ('codigos_especiales', 'categorias')   # "no codes" is the empty text, as in the SEVARTI schema
+ 
+ # What the Excel shows for each internal value of the closed columns.
+@@ -78,7 +79,9 @@
+                  'Curva OMS': ('sexo', 'codigo_nino', 'codigo_nina', 'etapas')}
+ _NUMEROS = {'Variables': ('tolerancia', 'rango_min', 'rango_max'),
+             'Visitas': ('orden', 'edad_min', 'edad_max', 'edad_fija'),
+-            'Desenlaces': ('percentil',), 'Crecimiento': ('z_bajo', 'caida')}
++            'Desenlaces': ('percentil',), 'Crecimiento': ('z_bajo', 'caida', 'z_improbable_min', 'z_improbable_max')}
++# columns added after the first dictionaries: a file without them reads them as empty (the default)
++_OPCIONALES = {'Crecimiento': ('z_improbable_min', 'z_improbable_max')}
+ _FECHAS = {'Quiebres': ('fecha',)}
+ 
+ # ---------------------------------------------------------------- the workbook
+@@ -223,6 +226,12 @@
+                        'para el desenlace "Crecimiento bajo". Vacío es -2, el corte de la OMS.', 12),
+             LB.Columna('caida', 'Caída que alerta', 'Cuántas desviaciones estándar tiene que bajar desde la visita '
+                        'anterior para alertar. Vacío es 1.', 12),
++            LB.Columna('z_improbable_min', 'Dato improbable si z menor que', 'Puntaje z bajo el cual la medida no '
++                       'es un hallazgo sino un dato para revisar. Vacío es el límite de la OMS: -6 en peso y talla, -5 '
++                       'en perímetro cefálico y peso para la talla.', 12),
++            LB.Columna('z_improbable_max', 'Dato improbable si z mayor que', 'Puntaje z sobre el cual la medida no '
++                       'es un hallazgo sino un dato para revisar. Vacío es el límite de la OMS: +6 en talla, +5 en '
++                       'peso, perímetro cefálico y peso para la talla.', 12),
+             _t('estado', 'Estado', 'En uso: el modelo la usa. En prueba: solo en "python -m clinico experimento". No '
+                'usar: no se calcula.', 12, opciones=_opciones(_ESTADO_CLINICO)),
+         ), filas_extra=5),
+@@ -380,6 +389,9 @@
+     hoja = LIBRO.hoja(nombre)
+     t = LB.leer(LIBRO, ruta, nombre)
+     titulos = {c.clave: c.titulo for c in hoja.columnas}
++    for c in _OPCIONALES.get(nombre, ()):
++        if c not in t:
++            t[c] = np.nan
+     faltan = [titulos[c] for c in titulos if c not in t]
+     if faltan:
+         raise ValueError(f'La hoja "{nombre}" de {ruta.name} no tiene las columnas {faltan}: puede que hayan '
+--- a/pruebas/test_limites_oms.py
++++ b/pruebas/test_limites_oms.py
+@@ -0,0 +1,122 @@
++"""WHO's limits for a biologically implausible growth z-score, per indicator: a datum beyond them is
++sent to be checked, not to the clinician. Length/height-for-age -6 / +6, weight-for-age -6 / +5,
++weight-for-length and head circumference-for-age -5 / +5 (WHO Anthro, igrowup)."""
++from pathlib import Path
++
++import pandas as pd
++import pytest
++from openpyxl import load_workbook
++
++from clinico import configuracion as CF
++from clinico import crecimiento as CR
++from sevarti import diccionario as D
++from sevarti import kmc as K
++
++
++def _alertas(concepto: str, valores: list[float], medidas: tuple[CR.Medida, ...] = ()) -> pd.DataFrame:
++    """One child, one datum per visit of the concept, with the given z-scores."""
++    n = len(valores)
++    z = pd.DataFrame({'sujeto': 'a', 'concepto': concepto, 'ec_dias': [90.0 * i for i in range(n)],
++                      'z': valores, 'etapa': [f'v{i}' for i in range(n)]})
++    return CR.alertas_crecimiento(z, medidas).set_index('ec_dias')
++
++
++def test_los_limites_son_los_de_la_oms():
++    assert CR.Z_IMPROBABLES == {'talla': (-6.0, 6.0), 'peso': (-6.0, 5.0), 'peso_para_talla': (-5.0, 5.0),
++                                'perimetro_cefalico': (-5.0, 5.0)}
++    assert set(CR.Z_IMPROBABLES) == set(CR.INDICADORES)
++
++
++def test_mas_cinco_y_medio_es_improbable_en_peso_y_no_en_talla():
++    peso, talla = _alertas('peso', [5.5]).iloc[0], _alertas('talla', [5.5]).iloc[0]
++    assert peso.improbable and 'revisar el dato' in peso.motivo and '+5' in peso.motivo
++    assert not talla.improbable and talla.motivo == ''
++
++
++def test_menos_cinco_y_medio_es_improbable_en_perimetro_y_no_en_peso():
++    pc, peso = _alertas('perimetro_cefalico', [-5.5]).iloc[0], _alertas('peso', [-5.5]).iloc[0]
++    assert pc.improbable and not pc.bajo and 'menos de -5 DE' in pc.motivo
++    assert not peso.improbable and peso.bajo                 # a credible, very low weight: a clinical alert
++
++
++@pytest.mark.parametrize('concepto, minimo, maximo', [
++    ('talla', -6.0, 6.0), ('peso', -6.0, 5.0), ('peso_para_talla', -5.0, 5.0), ('perimetro_cefalico', -5.0, 5.0)])
++def test_el_limite_exacto_no_es_improbable_y_lo_que_pasa_si(concepto, minimo, maximo):
++    a = _alertas(concepto, [minimo, maximo, minimo - 0.01, maximo + 0.01])
++    assert a.improbable.tolist() == [False, False, True, True]
++
++
++def test_la_medida_toma_los_limites_de_su_indicador_aunque_el_concepto_se_llame_distinto():
++    medida = CR.Medida('peso_g', 'peso', factor=0.001, restringido=True)
++    assert medida.improbable == (-6.0, 5.0)
++    assert _alertas('peso_g', [5.5], (medida,)).iloc[0].improbable
++    assert not _alertas('peso_g', [5.5]).iloc[0].improbable      # no measure, no indicator: +-6
++    pt = CR.Medida('peso', 'peso_para_talla', por_talla='talla')
++    assert CR.limites_improbable('peso_para_talla', (pt,)) == (-5.0, 5.0)
++
++
++def test_los_expertos_pueden_cambiar_los_limites():
++    medida = CR.Medida('talla', 'talla', z_improbable_min=-4.0, z_improbable_max=None)
++    assert medida.improbable == (-4.0, 6.0)
++    assert _alertas('talla', [-4.5], (medida,)).iloc[0].improbable
++
++
++def test_una_medida_guardada_antes_de_los_limites_usa_los_de_la_oms():
++    medida = CR.Medida('peso', 'peso')
++    for campo in ('z_improbable_min', 'z_improbable_max'):    # what unpickling an older model leaves
++        object.__delattr__(medida, campo)
++    assert medida.improbable == (-6.0, 5.0)
++
++
++def test_el_desenlace_de_crecimiento_ignora_el_dato_improbable_con_el_limite_de_su_indicador():
++    medidas = (CR.Medida('peso', 'peso'), CR.Medida('talla', 'talla'))
++    assert CR.limites_improbable('peso', medidas) == (-6.0, 5.0)
++    assert CR.limites_improbable('talla', medidas) == (-6.0, 6.0)
++    assert CR.limites_improbable('otro', medidas) == (-CR.Z_IMPROBABLE, CR.Z_IMPROBABLE)
++
++
++# ---------------------------------------------------------------- the dictionary
++
++def _dic(crecimiento: list[dict]) -> D.Diccionario:
++    variables = pd.DataFrame([dict(variable='peso_v', estado=D.LISTA, tipo='numeric', concepto='peso'),
++                              dict(variable='talla_v', estado=D.LISTA, tipo='numeric', concepto='talla'),
++                              dict(variable='sexo', estado=D.LISTA, tipo='categorical', categorias='1=niño;2=niña')])
++    visitas = pd.DataFrame([dict(etapa='a', orden=0, base='corregida')])
++    curva = pd.DataFrame([dict(sexo='sexo', codigo_nino='1', codigo_nina='2', etapas='a')])
++    return D.Diccionario(variables, visitas, crecimiento=pd.DataFrame(crecimiento), curva=curva)
++
++
++def test_un_diccionario_sin_las_columnas_usa_los_limites_de_la_oms():
++    cfg = CF.leer(_dic([dict(indicador='peso', concepto='peso', unidad='g', estado=D.EN_USO),
++                        dict(indicador='talla', concepto='talla', unidad='cm', estado=D.EN_USO)]))
++    assert {m.nombre: m.improbable for m in cfg.medidas} == {'peso': (-6.0, 5.0), 'talla': (-6.0, 6.0)}
++
++
++def test_los_limites_del_diccionario_llegan_a_la_medida():
++    cfg = CF.leer(_dic([dict(indicador='peso', concepto='peso', unidad='g', z_improbable_min=-5.0,
++                             estado=D.EN_USO)]))
++    assert cfg.medidas[0].improbable == (-5.0, 5.0)
++
++
++def _sin_columnas_de_limites(ruta: Path) -> None:
++    """A dictionary written before the two columns existed."""
++    wb = load_workbook(ruta)
++    ws = wb['Crecimiento']
++    for celda in reversed(ws[1]):
++        if celda.value and str(celda.value).startswith('Dato improbable'):
++            ws.delete_cols(celda.column)
++    wb.save(ruta)
++
++
++def test_un_libro_anterior_a_las_columnas_se_lee_igual(meta, tmp_path):
++    ruta = tmp_path / 'diccionario.xlsx'
++    borrador = K.borrador(meta)
++    D.escribir(borrador, ruta)
++    assert {'Dato improbable si z menor que', 'Dato improbable si z mayor que'} <= {
++        c.value for c in load_workbook(ruta)['Crecimiento'][1]}
++    _sin_columnas_de_limites(ruta)
++    dic = D.leer(ruta)
++    assert dic.crecimiento[['z_improbable_min', 'z_improbable_max']].isna().all().all()
++    assert len(dic.crecimiento) == len(borrador.crecimiento)
++    medidas = CF.leer(dic, prueba=True).medidas
++    assert medidas and all(m.improbable == CR.Z_IMPROBABLES[m.indicador] for m in medidas)

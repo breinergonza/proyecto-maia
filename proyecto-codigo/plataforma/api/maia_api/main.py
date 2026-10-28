@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import threading
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -11,8 +12,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from maia_api import trabajos as T
 from maia_api.rutas import (
+    administracion,
     auth,
     corridas,
+    entrenamientos,
     inferencia,
     modelos,
     ninos,
@@ -34,7 +37,11 @@ async def ciclo(app: FastAPI):
     with db.fabrica()() as s:
         T.cerrar_interrumpidas(s)
     print('Arranque:', sembrar(cfg), flush=True)
+    parar = threading.Event()
+    if not cfg.maia_solo_simulado:   # los paquetes que aprueba administración (los arma el programador)
+        T.vigilar_aprobados(cfg, parar)
     yield
+    parar.set()
 
 
 def crear_app() -> FastAPI:
@@ -46,7 +53,8 @@ def crear_app() -> FastAPI:
         # en local el frontend de Vite corre en otro puerto; en Railway, nginx sirve todo bajo el mismo origen
         app.add_middleware(CORSMiddleware, allow_origins=cfg.maia_cors_origenes, allow_credentials=True,
                            allow_methods=['*'], allow_headers=['*'])
-    for r in (salud, auth, usuarios, modelos, corridas, tablero, ninos, revision, inferencia, notificaciones):
+    for r in (salud, auth, usuarios, modelos, corridas, tablero, ninos, revision, inferencia, notificaciones,
+              administracion, entrenamientos):
         app.include_router(r.ruta, prefix='/api')
     return app
 

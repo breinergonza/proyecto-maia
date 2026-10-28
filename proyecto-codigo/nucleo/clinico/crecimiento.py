@@ -25,6 +25,15 @@ MAGNITUD = {'peso': 'peso', 'peso_para_talla': 'peso', 'talla': 'longitud', 'per
 UNIDADES = {'g': ('peso', 0.001), 'kg': ('peso', 1.0), 'cm': ('longitud', 1.0), 'mm': ('longitud', 0.1)}
 RESTRINGIDOS = frozenset({'peso', 'peso_para_talla'})
 Z_BAJO, CAIDA = -2.0, 1.0   # defaults: WHO's "low" is under -2 SD
+# WHO's flags for biologically implausible z-scores, per indicator (a z strictly beyond them is a datum to
+# check, not a finding): length/height-for-age < -6 or > +6, weight-for-age < -6 or > +5, weight-for-length
+# and head circumference-for-age < -5 or > +5 (BMI-for-age, not used here, is also -5 / +5). Source: WHO Anthro
+# Software and its macros (igrowup; R package ``anthro``, ``anthro_zscores``: flen, fwei, fwfl, fhc) and
+# WHO/UNICEF, Recommendations for data collection, analysis and reporting on anthropometric indicators in
+# children under 5 years old (2019), section on flagging implausible z-scores.
+Z_IMPROBABLE = 6.0  # the widest flag: a concept that is no WHO indicator is implausible beyond +-6 SD
+Z_IMPROBABLES = {'talla': (-6.0, 6.0), 'peso': (-6.0, 5.0), 'peso_para_talla': (-5.0, 5.0),
+                 'perimetro_cefalico': (-5.0, 5.0)}
 
 
 @dataclass(frozen=True)
@@ -36,11 +45,21 @@ class Medida:
     por_talla: str | None = None  # weight-for-length: concept of the length measured at the same visit
     z_bajo: float = Z_BAJO   # growth alert and outcome: under this z
     caida: float = CAIDA     # growth alert: this many SD lower than the previous visit
+    z_improbable_min: float | None = None   # implausible under this z; None is WHO's flag for the indicator
+    z_improbable_max: float | None = None   # implausible over this z; None is WHO's flag for the indicator
 
     @property
     def nombre(self) -> str:
         """What its z-scores are called: the concept for an indicator by age, else the indicator."""
         return self.indicador if self.por_talla else self.concepto
+
+    @property
+    def improbable(self) -> tuple[float, float]:
+        """The z-scores outside which a datum is implausible: the experts' limits, else WHO's flags.
+        Read with ``getattr`` so a measure pickled before these fields existed still answers."""
+        lo, hi = Z_IMPROBABLES.get(self.indicador, (-Z_IMPROBABLE, Z_IMPROBABLE))
+        minimo, maximo = getattr(self, 'z_improbable_min', None), getattr(self, 'z_improbable_max', None)
+        return (lo if minimo is None else float(minimo), hi if maximo is None else float(maximo))
 
 
 def leer_referencia(ruta: Path = REFERENCIA_OMS, peso_talla: Path = REFERENCIA_PESO_TALLA) -> pd.DataFrame:
@@ -105,27 +124,38 @@ def puntajes_z(datos: pd.DataFrame, x: pd.Series, sexo: pd.Series, medidas: tupl
     return out.dropna(subset=['z'])
 
 
-Z_IMPROBABLE = 6.0  # WHO's cleaning rule: beyond +-6 SD a growth value is biologically implausible
+def limites_improbable(concepto: str, medidas: tuple[Medida, ...] = (),
+                       z_improbable: float = Z_IMPROBABLE) -> tuple[float, float]:
+    """The implausible limits of a concept's z-scores: those of the measure that names it, else WHO's
+    flags when the concept is an indicator's name, else +-``z_improbable``."""
+    for m in medidas:
+        if m.nombre == concepto:
+            return m.improbable
+    return Z_IMPROBABLES.get(concepto, (-z_improbable, z_improbable))
 
 
 def alertas_crecimiento(z: pd.DataFrame, medidas: tuple[Medida, ...] = (),
                         z_improbable: float = Z_IMPROBABLE) -> pd.DataFrame:
     """Per growth datum: below its measure's ``z_bajo`` SD, or ``caida`` SD lower than the subject's
     previous datum of the same concept (WHO's -2 and 1 for a concept no measure names). A value beyond
-    ``z_improbable`` SD is not a clinical alert but a datum to check (``improbable``); it is left out of
-    the next visit's drop too."""
+    its measure's implausible limits (WHO's flags per indicator, ``limites_improbable``) is not a clinical
+    alert but a datum to check (``improbable``); it is left out of the next visit's drop too."""
     z = z.sort_values(['sujeto', 'concepto', 'ec_dias'])
     umbral = {m.nombre: (m.z_bajo, m.caida) for m in medidas}
     bajo_de = z.concepto.map(lambda c: umbral.get(c, (Z_BAJO, CAIDA))[0]).astype(float)
     caida_de = z.concepto.map(lambda c: umbral.get(c, (Z_BAJO, CAIDA))[1]).astype(float)
-    improbable = z.z.abs() > z_improbable
+    limites = {c: limites_improbable(c, medidas, z_improbable) for c in z.concepto.unique()}
+    lo_de = z.concepto.map(lambda c: limites[c][0]).astype(float)
+    hi_de = z.concepto.map(lambda c: limites[c][1]).astype(float)
+    improbable = (z.z < lo_de) | (z.z > hi_de)
     creible = z.z.where(~improbable)
     previo = creible.groupby([z.sujeto, z.concepto]).shift()
     out = z.assign(z_previo=previo, improbable=improbable, bajo=creible < bajo_de, cae=(previo - creible) > caida_de)
     out['motivo'] = [
-        f'más de {z_improbable:g} DE: revisar el dato' if i else
+        (f'menos de {lo:g} DE: revisar el dato' if v < lo else f'más de {hi:+g} DE: revisar el dato') if i else
         f'por debajo de {b:g} DE y cayó más de {c:g} DE' if es_bajo and cae else
         f'por debajo de {b:g} DE' if es_bajo else
         f'cayó más de {c:g} DE desde la visita anterior' if cae else ''
-        for i, es_bajo, cae, b, c in zip(out.improbable, out.bajo, out.cae, bajo_de, caida_de)]
+        for v, lo, hi, i, es_bajo, cae, b, c in zip(out.z, lo_de, hi_de, out.improbable, out.bajo, out.cae,
+                                                     bajo_de, caida_de)]
     return out

@@ -11,6 +11,8 @@ dependencies = [
     "pydantic>=2.11",
     "pydantic-settings>=2.10",
     "boto3>=1.40",
+    "cryptography>=46",
+    "httpx>=0.28",
 ]
 
 [build-system]

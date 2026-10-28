@@ -22,7 +22,7 @@ import psycopg
 
 from anomalias.motor import DatasetSpec, Family, Stage, parse_dates
 from sevarti import diccionario as D
-from sevarti.contrato import Sevarti
+from sevarti.contrato import Sevarti, edad_corregida
 
 USER = 'kmc_estudiante.rfmxvnfbmbdpkjmhenrz'
 HOST = 'aws-1-us-east-1.pooler.supabase.com'
@@ -213,6 +213,72 @@ EPISODIOS = (('hospitalización URN', ('hd_diasurn',)),
              ('hospitalización total', ('hd_totaldiashospital', 'v196')))
 QUIEBRES = pd.DataFrame({'quiebre': ['cambio de sistema 2022'], 'fecha': [pd.Timestamp('2022-01-01')]})
 
+# ---------------------------------------------------------------- open decisions (a) and (b)
+# Both are off unless switched on, so the export stays as described above. ``to_sevarti`` takes them
+# as arguments; left as None, it reads these environment variables ('1', 'true', 'si'... switch on).
+#
+# a. Each corrected-age visit window is the real range of the base: p1 to p99 of the corrected age in
+#    days of the subjects seen at that visit, recomputed on every run. A visit with fewer than
+#    VENTANA_MIN_SUJETOS subjects keeps the dictionary window. ``etapas.ventana_fuente`` says which
+#    window each visit got.
+# b. The site is the group and the delivery date the birth date, when the base brings them and the
+#    Fundación has not restricted them (consumo.variable_restringida). Otherwise, as above. The patient
+#    key (iden_codigo) is never read, whatever is declared.
+ENV_VENTANAS_REALES = 'MAIA_VENTANAS_REALES'
+ENV_USAR_SEDE_FECHA = 'MAIA_USAR_SEDE_FECHA'
+VENTANA_PERCENTILES = (1.0, 99.0)
+VENTANA_MIN_SUJETOS = 200
+SIN_SEDE = 'sin sede'
+NUNCA = frozenset({'iden_codigo'})
+_SI = {'1', 'true', 'si', 'sí', 'yes', 'on'}
+
+
+def opcion(valor: bool | None, variable: str) -> bool:
+    """An explicit argument wins; None reads the environment variable (off when unset)."""
+    if valor is not None:
+        return bool(valor)
+    return os.environ.get(variable, '').strip().lower() in _SI
+
+
+def ventanas_de_la_base(etapas: pd.DataFrame, edades: dict[str, pd.Series], eg_semanas: pd.Series,
+                        min_sujetos: int | None = None) -> pd.DataFrame:
+    """Decision (a): ``etapas`` with each corrected-age visit window replaced by p1 to p99 of the
+    corrected age of the subjects seen at it. Visits with too few subjects, or with no age, keep the
+    dictionary window; ``ventana_fuente`` records which one each visit got."""
+    minimo = VENTANA_MIN_SUJETOS if min_sujetos is None else min_sujetos
+    lo_p, hi_p = (p / 100 for p in VENTANA_PERCENTILES)
+    out = etapas.copy()
+    out['edad_min'] = out.edad_min.astype(float)
+    out['edad_max'] = out.edad_max.astype(float)
+    out['ventana_fuente'] = 'diccionario'
+    for i, r in out.iterrows():
+        if r.base != 'corregida' or r.etapa not in edades:
+            continue
+        ec = edad_corregida(edades[r.etapa], eg_semanas).dropna()
+        if len(ec) < minimo:
+            out.at[i, 'ventana_fuente'] = f'diccionario (solo {len(ec)} sujetos)'
+            continue
+        lo, hi = ec.quantile([lo_p, hi_p])
+        out.at[i, 'edad_min'], out.at[i, 'edad_max'] = float(np.floor(lo)), float(np.ceil(hi))
+        out.at[i, 'ventana_fuente'] = f'base p{VENTANA_PERCENTILES[0]:g}-p{VENTANA_PERCENTILES[1]:g} (n={len(ec)})'
+    return out
+
+
+def sede_y_fecha(wide: pd.DataFrame, restringidas: set[str] | frozenset[str] = frozenset()
+                 ) -> tuple[pd.Series | None, pd.Series | None]:
+    """Decision (b): the site and the delivery date of each subject, each None when the base does not
+    bring it (or it is empty) or it is restricted."""
+    fuera = set(restringidas) | NUNCA
+    sede = fecha = None
+    if GROUP in wide and GROUP not in fuera and wide[GROUP].notna().any():
+        texto = wide[GROUP].astype('string').str.strip()
+        sede = texto.where(texto.notna() & texto.ne(''), SIN_SEDE).astype(object)
+    if ANCHOR in wide and ANCHOR not in fuera:
+        fecha = parse_dates(wide[ANCHOR]).date.astype('datetime64[ns]')
+        if fecha.isna().all():
+            fecha = None
+    return sede, fecha
+
 
 def _etapa_kmc(variable: str) -> str | None:
     if variable in ('v195', 'v196'):
@@ -398,9 +464,14 @@ def _edades_por_etapa(wide: pd.DataFrame, fechas: dict[str, pd.Series], columnas
     return edades
 
 
-def to_sevarti(dic: D.Diccionario, wide: pd.DataFrame) -> Sevarti:
+def to_sevarti(dic: D.Diccionario, wide: pd.DataFrame, *, ventanas_reales: bool | None = None,
+               usar_sede_fecha: bool | None = None, restringidas: set[str] | None = None) -> Sevarti:
     """The KMC wide table as SEVARTI tables, defined by the dictionary: only its "Lista" variables
-    travel. Restricted fields are never read (see above)."""
+    travel. Restricted fields are never read (see above).
+
+    ``ventanas_reales`` and ``usar_sede_fecha`` switch on the open decisions (a) and (b); None reads
+    ``MAIA_VENTANAS_REALES`` and ``MAIA_USAR_SEDE_FECHA``. ``restringidas`` are the fields declared
+    restricted, which (b) never uses even if ``wide`` still carries them."""
     esquema = D.esquema(dic)
     etapas = D.etapas(dic)
     visitas = dic.visitas.set_index('etapa')
@@ -408,10 +479,24 @@ def to_sevarti(dic: D.Diccionario, wide: pd.DataFrame) -> Sevarti:
     sujetos = pd.DataFrame({'sujeto': wide.paciente_id, 'grupo': GRUPO_UNICO,
                             'fecha_nacimiento': pd.NaT, 'anio_nacimiento': pd.to_numeric(wide[ANIO], errors='coerce') if ANIO in wide else np.nan,
                             'eg_semanas': ga.where(ga.between(22, 44))})
+    if opcion(usar_sede_fecha, ENV_USAR_SEDE_FECHA):
+        sede, nacimiento = sede_y_fecha(wide, restringidas or frozenset())
+        if sede is not None:
+            sujetos['grupo'] = sede
+        if nacimiento is not None:
+            sujetos['fecha_nacimiento'] = nacimiento
+            sujetos['anio_nacimiento'] = sujetos.anio_nacimiento.fillna(nacimiento.dt.year)
+        print(f'Sede como grupo: {"sí" if sede is not None else "no"}; fecha de parto como nacimiento: '
+              f'{"sí" if nacimiento is not None else "no"} ({ENV_USAR_SEDE_FECHA})', flush=True)
     fechas = {e: _primera_fecha(wide, cols) for e in etapas.etapa if (cols := D.partes(visitas.at[e, 'fecha_variables']))}
     edades = _edades_por_etapa(wide, fechas, {e: visitas.at[e, 'edad_variable'] for e in etapas.etapa
                                               if pd.notna(visitas.at[e, 'edad_variable'])},
                                etapas.set_index('etapa').orden)
+    if opcion(ventanas_reales, ENV_VENTANAS_REALES):
+        etapas = ventanas_de_la_base(etapas, edades, sujetos.eg_semanas)
+        usadas = etapas[etapas.base == 'corregida']
+        print('Ventanas de visita (' + ENV_VENTANAS_REALES + '): ' + '; '.join(
+            f'{r.etapa} {r.edad_min:g} a {r.edad_max:g} [{r.ventana_fuente}]' for r in usadas.itertuples()), flush=True)
     edad_fija = visitas.edad_fija.dropna().to_dict()
     edad_propia = D.en_uso(dic).set_index('variable').edad_variable.dropna().to_dict()
     nada = pd.Series(np.nan, index=wide.index)
@@ -473,7 +558,7 @@ def cargar_sevarti(ruta_diccionario: Path) -> Sevarti:
         meta, fuera = _fuente(conn)
         wide = load_wide(conn)
     wide = wide.drop(columns=[c for c in wide if c in fuera])
-    return to_sevarti(D.sincronizar(ruta_diccionario, borrador(meta)), wide)
+    return to_sevarti(D.sincronizar(ruta_diccionario, borrador(meta)), wide, restringidas=fuera)
 
 
 def actualizar_diccionario(ruta_diccionario: Path) -> None:

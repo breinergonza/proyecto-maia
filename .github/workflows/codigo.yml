@@ -1,0 +1,108 @@
+# Integración continua del código (proyecto-codigo/): lint y pruebas de Python, pruebas y build del frontend.
+# Equivale a "make verificar-todo", con un Postgres de servicio en lugar del compose local.
+name: Código
+
+on:
+  push:
+    paths:
+      - 'proyecto-codigo/**'
+      - '.github/workflows/codigo.yml'
+  pull_request:
+    paths:
+      - 'proyecto-codigo/**'
+      - '.github/workflows/codigo.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codigo-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python (ruff + pytest)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: proyecto-codigo
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: maia
+          POSTGRES_PASSWORD: maia-ci
+          POSTGRES_DB: maia
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U maia -d maia"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      # conftest.py: servidor existente; cada sesión crea y borra su propia base a partir de "postgres".
+      MAIA_TEST_DATABASE_URL: postgresql://maia:maia-ci@127.0.0.1:5432/postgres
+      MAIA_LGBM_DEVICE: cpu
+      UV_PYTHON: '3.13'
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+
+      - name: Instalar uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: '0.11.7'
+          enable-cache: true
+          cache-dependency-glob: proyecto-codigo/uv.lock
+
+      - name: OpenMP para LightGBM
+        # libgomp1 viene en la imagen de ubuntu de GitHub (con gcc); se instala solo si faltara.
+        run: |
+          if ldconfig -p | grep -q 'libgomp\.so\.1'; then
+            echo "libgomp ya está instalada"
+          else
+            sudo apt-get update && sudo apt-get install -y --no-install-recommends libgomp1
+          fi
+
+      - name: Instalar dependencias
+        run: uv sync --frozen --all-packages
+
+      - name: Ruff
+        run: uv run --frozen ruff check .
+
+      - name: Pytest
+        run: uv run --frozen pytest -q
+
+  web:
+    name: Frontend (vitest + build)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: proyecto-codigo/plataforma/web
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+
+      - name: Instalar Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: proyecto-codigo/plataforma/web/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci --no-audit --no-fund
+
+      - name: Pruebas
+        run: npm run pruebas
+
+      - name: Compilar
+        run: npm run build

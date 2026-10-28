@@ -315,7 +315,8 @@ class ModeloClinico:
         if des.regla == 'no_vuelve':
             return self._no_vuelve(p, des, sujetos)
         if des.regla == 'z_bajo':   # known for children measured at that visit; an implausible z is a data error
-            z = p.z[(p.z.concepto == des.concepto) & (p.z.etapa == des.etapa) & (p.z.z.abs() <= CR.Z_IMPROBABLE)]
+            minimo, maximo = CR.limites_improbable(des.concepto, self.cfg.medidas)
+            z = p.z[(p.z.concepto == des.concepto) & (p.z.etapa == des.etapa) & p.z.z.between(minimo, maximo)]
             z = z.groupby('sujeto').z.first()
             limite = next((m.z_bajo for m in self.cfg.medidas if m.nombre == des.concepto), CR.Z_BAJO)
             return (z < limite).astype(float).reindex(sujetos)

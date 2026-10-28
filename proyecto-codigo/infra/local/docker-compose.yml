@@ -25,7 +25,7 @@ services:
     restart: unless-stopped
 
   minio:
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    image: ${MINIO_IMAGEN:-minio/minio:RELEASE.2025-09-07T16-13-09Z}   # MinIO dejó de publicar en Docker Hub
     command: server /data --console-address :9001
     <<: *env
     volumes: [minio_datos:/data]
@@ -37,7 +37,7 @@ services:
     restart: unless-stopped
 
   minio-init:
-    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    image: ${MC_IMAGEN:-minio/mc:RELEASE.2025-08-13T08-35-41Z}
     depends_on:
       minio: {condition: service_healthy}
     entrypoint: ["/bin/sh", "/init.sh"]
@@ -81,6 +81,29 @@ services:
       postgres: {condition: service_healthy}
       minio-init: {condition: service_completed_successfully}
       mlflow: {condition: service_started}
+
+  programador:
+    # Ejecuta lo que se programa o pide en Administración (corridas, aprobaciones de modelos). Misma imagen y GPU
+    # que el trainer: make programador (sin GPU: make programador SIN_GPU=1, en el equipo).
+    build: {context: ../.., dockerfile: infra/docker/trainer.Dockerfile}
+    profiles: [programador]
+    command: ["programador"]                 # la imagen ya tiene ENTRYPOINT maia
+    <<: *env
+    environment:
+      MAIA_RAIZ: /datos
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    volumes:
+      - datos_maia:/datos
+      - ../../nucleo/entradas:/datos/entradas
+    deploy:
+      resources:
+        reservations:
+          devices: [{driver: nvidia, count: all, capabilities: [gpu]}]
+    depends_on:
+      postgres: {condition: service_healthy}
+      minio-init: {condition: service_completed_successfully}
+      mlflow: {condition: service_started}
+    restart: unless-stopped
 
   api:
     build: {context: ../.., dockerfile: infra/docker/api.Dockerfile}

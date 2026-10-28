@@ -58,6 +58,20 @@ def params_de(cfg) -> dict[str, str]:
     return salida
 
 
+def params_extraccion(parametros: dict | None, consulta_sha: str | None) -> dict[str, str]:
+    """Los parámetros de extracción del corte como params de MLflow (``extraccion.*``): solo filtros, nunca datos."""
+    salida = {f'extraccion.{k}': str(v) for k, v in (parametros or {}).items() if v is not None}
+    if consulta_sha:
+        salida['extraccion.consulta_sha'] = consulta_sha
+    return salida
+
+
+def _etiquetas_ejecucion() -> dict[str, str]:
+    """Si el programador lanzó el entrenamiento: qué ejecución (y qué programación) de ``app.ejecuciones``."""
+    return {k: v for k, v in (('ejecucion', os.environ.get('MAIA_EJECUCION_ID')),
+                               ('programacion', os.environ.get('MAIA_PROGRAMACION_ID'))) if v}
+
+
 def _codigo() -> list[str]:
     import anomalias
     import archivos
@@ -70,17 +84,22 @@ def _codigo() -> list[str]:
 
 
 def registrar(tipo: str, fuente: str, carpeta_modelo: Path, cfg, metricas: dict[str, float], etiquetas: dict[str, str],
-              nombre_registro: str, artefactos: dict[str, Path] | None = None) -> ModelVersion:
-    """Un run con params, tags, métricas y artefactos; el modelo pyfunc registrado con alias ``candidato``."""
+              nombre_registro: str, artefactos: dict[str, Path] | None = None,
+              extraccion: dict[str, str] | None = None) -> ModelVersion:
+    """Un run con params, tags, métricas y artefactos; el modelo pyfunc registrado con alias ``candidato``.
+    ``extraccion`` (de ``params_extraccion``) dice con qué parámetros se extrajo el corte."""
     from maia_entrenamiento.envolturas import EnvolturaAnomalias, EnvolturaClinico
 
     experimento(tipo)
     ficha = json.loads((carpeta_modelo / 'ficha.json').read_text(encoding='utf-8'))
     with mlflow.start_run(run_name=f'{tipo} {fuente} {ficha.get("corte_datos")} {ficha["version"]}') as run:
-        mlflow.log_params(params_de(cfg))
+        mlflow.log_params({**params_de(cfg), **(extraccion or {})})
         mlflow.set_tags({'fuente': fuente, 'corte': str(ficha.get('corte_datos')), 'version_modelo': ficha['version'],
                          'version_codigo': str(ficha.get('version_codigo')), 'n_sujetos': str(ficha.get('sujetos')),
-                         'git_sha': _git_sha(), 'host': socket.gethostname(), **etiquetas})
+                         'git_sha': _git_sha(), 'host': socket.gethostname(), **_etiquetas_ejecucion(),
+                         **({'consulta_sha': extraccion['extraccion.consulta_sha']}
+                            if extraccion and 'extraccion.consulta_sha' in extraccion else {}),
+                         **etiquetas})
         if metricas:
             mlflow.log_metrics(metricas)
         mlflow.log_dict(ficha, 'ficha.json')
