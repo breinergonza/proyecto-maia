@@ -30,7 +30,7 @@ class Configuracion(BaseSettings):
 
     # --- comunes
     maia_entorno: Literal['local', 'demo', 'prueba', 'produccion'] = 'local'
-    database_url: str = 'postgresql+psycopg://maia:cambiar@localhost:5432/maia'
+    database_url: str = 'postgresql+psycopg://maia@localhost:5432/maia'   # la clave va en DATABASE_URL (.env)
     maia_raiz: Path | None = None
     maia_paquete_clave: str = INSEGURO
     maia_cifrado_clave: str | None = None          # llave de las claves guardadas desde la web (32+ caracteres)
@@ -38,10 +38,10 @@ class Configuracion(BaseSettings):
 
     # --- solo local
     kmc_pw: str | None = None                       # nunca en .env: de la terminal o del llavero
-    kmc_host: str = 'aws-1-us-east-1.pooler.supabase.com'
+    kmc_host: str = ''                              # lo entrega el Observatorio: en .env o en Administración
     kmc_port: int = 5432
     kmc_db: str = 'postgres'
-    kmc_usuario: str = 'kmc_estudiante.rfmxvnfbmbdpkjmhenrz'
+    kmc_usuario: str = ''                           # igual que kmc_host; nunca en el código
     kmc_esquema: str = 'consumo'
     kmc_sslmode: Literal['disable', 'allow', 'prefer', 'require', 'verify-ca', 'verify-full'] = 'require'
     kmc_timeout: int = 20                           # segundos para conectar

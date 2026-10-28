@@ -16,16 +16,16 @@ llama sin modificarlo.
 
 Lo más simple es configurar la conexión en **Administración › Configuración** (la clave se guarda cifrada con
 `MAIA_CIFRADO_CLAVE`). Para las ejecuciones que lanza el programador, eso reemplaza a las variables de abajo. Sin
-conexión guardada, o al correr `maia` a mano, las variables se leen del entorno o de `.env` (`maia_comun.config`). Los
-valores por defecto son los del Observatorio, así que en la operación normal solo hace falta `KMC_PW`.
+conexión guardada, o al correr `maia` a mano, las variables se leen del entorno o de `.env` (`maia_comun.config`).
+El servidor y el usuario no tienen valor por defecto: los entrega el Observatorio y no se escriben en el código.
 
 | Variable | Por defecto | Para qué |
 |---|---|---|
 | `KMC_PW` | (ninguno) | Clave del usuario de solo lectura. **Nunca en `.env`**: se exporta en la terminal o se guarda en el llavero (ver `Makefile`). |
-| `KMC_HOST` | `aws-1-us-east-1.pooler.supabase.com` | Servidor de la base. |
+| `KMC_HOST` | (ninguno) | Servidor de la base. Puede ir en `.env`. |
 | `KMC_PORT` | `5432` | |
 | `KMC_DB` | `postgres` | |
-| `KMC_USUARIO` | `kmc_estudiante.<proyecto>` | El usuario que entregó el Observatorio. |
+| `KMC_USUARIO` | (ninguno) | El usuario de solo lectura que entregó el Observatorio. Puede ir en `.env`. |
 | `KMC_ESQUEMA` | `consumo` | Esquema con `diccionario`, `categoria`, `perfil_paciente` y `variable_restringida`. |
 | `KMC_SSLMODE` | `require` | `disable` solo para un Postgres de prueba local. |
 | `KMC_TIMEOUT` | `20` | Segundos de espera para conectar. |
@@ -163,6 +163,7 @@ sev, meta = datos.extraer_kmc(ParametrosExtraccion(fecha_corte=date(2026, 6, 30)
 Usan el mismo Postgres que el resto de pruebas (`MAIA_TEST_DATABASE_URL` o testcontainers) y se saltan si no hay uno:
 
 ```bash
-docker run -d --rm --name maia-pg-pruebas -p 127.0.0.1:55432:5432 -e POSTGRES_PASSWORD=prueba postgres:16
-MAIA_TEST_DATABASE_URL=postgresql://postgres:prueba@127.0.0.1:55432/postgres uv run pytest plataforma -q
+PG_PRUEBA=$(openssl rand -hex 16)
+docker run -d --rm --name maia-pg-pruebas -p 127.0.0.1:55432:5432 -e POSTGRES_PASSWORD="$PG_PRUEBA" postgres:16
+MAIA_TEST_DATABASE_URL="postgresql://postgres:$PG_PRUEBA@127.0.0.1:55432/postgres" uv run pytest plataforma -q
 ```

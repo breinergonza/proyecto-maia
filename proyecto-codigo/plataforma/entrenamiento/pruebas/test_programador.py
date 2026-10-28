@@ -90,6 +90,17 @@ def test_sin_clave_la_corrida_real_falla_con_un_mensaje_claro(motor, monkeypatch
     assert e.estado == 'error' and 'No hay clave' in e.mensaje and lanzador.llamadas == []
 
 
+def test_sin_servidor_ni_usuario_la_corrida_real_falla_con_un_mensaje_claro(motor):
+    with Session(motor) as s:
+        EJ.encolar(s, 'corrida', 'kmc', 'manual')
+        s.commit()
+    lanzador = Lanzador({})
+    cfg = Configuracion(_env_file=None, maia_cifrado_clave='p' * 40, kmc_pw='clave', kmc_host='', kmc_usuario='')
+    Programador(motor=motor, lanzar=lanzador, cfg=cfg).ciclo()
+    e = _ultima(motor)
+    assert e.estado == 'error' and 'KMC_HOST y KMC_USUARIO' in e.mensaje and lanzador.llamadas == []
+
+
 def test_corrida_que_falla_y_base_sin_cambios(motor):
     with Session(motor) as s:
         EJ.encolar(s, 'corrida', 'simulado', 'manual', {'silencio': True})

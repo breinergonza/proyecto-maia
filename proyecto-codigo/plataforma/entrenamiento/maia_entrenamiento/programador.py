@@ -137,6 +137,9 @@ class Programador:
             if not clave:
                 raise FalloEjecucion('No hay clave de la base de la entidad: guárdela en Administración › '
                                      'Configuración o defina KMC_PW en el servidor.')
+            if not (datos.host and datos.usuario):
+                raise FalloEjecucion('Falta el servidor o el usuario de la base de la entidad: guárdelos en '
+                                     'Administración › Configuración o defina KMC_HOST y KMC_USUARIO.')
             env.update(CO.entorno(datos, clave))
         return env
 

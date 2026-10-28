@@ -7,8 +7,8 @@
 -from sevarti.contrato import Sevarti
 +from sevarti.contrato import Sevarti, edad_corregida
  
- USER = 'kmc_estudiante.rfmxvnfbmbdpkjmhenrz'
- HOST = 'aws-1-us-east-1.pooler.supabase.com'
+ # Server, user and password come from the environment (the Observatory shares them privately).
+ CONEXION = ('KMC_HOST', 'KMC_USUARIO', 'KMC_PW')
 @@ -213,7 +213,73 @@
               ('hospitalización total', ('hd_totaldiashospital', 'v196')))
  QUIEBRES = pd.DataFrame({'quiebre': ['cambio de sistema 2022'], 'fecha': [pd.Timestamp('2022-01-01')]})

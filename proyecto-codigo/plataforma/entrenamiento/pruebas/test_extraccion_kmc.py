@@ -89,9 +89,11 @@ def test_los_nombres_van_como_identificadores():
     assert '"a""b"' in KP.texto(KP.consulta_perfil('consumo', ['a"b'], P(), None)[1])
 
 
-def test_conectar_exige_la_clave():
+def test_conectar_exige_servidor_usuario_y_clave():
+    with pytest.raises(RuntimeError, match='KMC_HOST y KMC_USUARIO'):
+        KP.conectar(Configuracion(_env_file=None, kmc_host='', kmc_usuario='', kmc_pw='x'))
     with pytest.raises(RuntimeError, match='KMC_PW'):
-        KP.conectar(Configuracion(kmc_pw=None))
+        KP.conectar(Configuracion(_env_file=None, kmc_host='db.entidad', kmc_usuario='lector', kmc_pw=None))
 
 
 # ====================================================================== un consumo de prueba
