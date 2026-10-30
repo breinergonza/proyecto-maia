@@ -15,6 +15,7 @@ const AdminModelos = lazy(() => import('./paginas/AdminModelos'))
 const AdminNotificaciones = lazy(() => import('./paginas/AdminNotificaciones'))
 const AdminProgramacion = lazy(() => import('./paginas/AdminProgramacion'))
 const AdminUsuarios = lazy(() => import('./paginas/AdminUsuarios'))
+const Diccionario = lazy(() => import('./paginas/Diccionario'))
 const Inferencia = lazy(() => import('./paginas/Inferencia'))
 const Nino = lazy(() => import('./paginas/Nino'))
 const Ninos = lazy(() => import('./paginas/Ninos'))
@@ -47,6 +48,7 @@ export function Rutas() {
         <Route path="revision/datos" element={<Requiere roles={['admin', 'experto']}><RevisionDatos /></Requiere>} />
         <Route path="revision/riesgos" element={<Requiere roles={['admin', 'experto']}><RevisionRiesgos /></Requiere>} />
         <Route path="inferencia" element={<Requiere roles={['admin', 'experto']}><Inferencia /></Requiere>} />
+        <Route path="diccionario" element={<Requiere roles={['admin', 'experto']}><Diccionario /></Requiere>} />
         <Route path="admin/configuracion" element={<Requiere roles={['admin']}><AdminConfiguracion /></Requiere>} />
         <Route path="admin/programacion" element={<Requiere roles={['admin']}><AdminProgramacion /></Requiere>} />
         <Route path="admin/entrenamientos" element={<Requiere roles={['admin']}><AdminEntrenamientos /></Requiere>} />

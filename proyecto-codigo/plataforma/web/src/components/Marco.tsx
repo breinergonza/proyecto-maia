@@ -1,7 +1,7 @@
 // Marco de la aplicación: navegación lateral en escritorio, barra superior con cajón deslizable en el teléfono,
 // aviso de demostración y contenido (que aparece con una transición corta al cambiar de página).
 import {
-  Baby, Bell, BrainCircuit, CalendarClock, Calculator, ClipboardCheck, HeartPulse, LayoutDashboard, LogOut, Menu, Package,
+  Baby, Bell, BookOpen, BrainCircuit, CalendarClock, Calculator, ClipboardCheck, HeartPulse, LayoutDashboard, LogOut, Menu, Package,
   Play, Settings, Users, X,
   type LucideIcon,
 } from 'lucide-react'
@@ -11,6 +11,7 @@ import type { Rol } from '../api/tipos'
 import { puede, useSesion } from '../auth/sesion'
 import { cn } from '../lib/cn'
 import { esDemo } from '../lib/config'
+import { usePorClasificar } from '../lib/diccionario'
 import { ROLES } from '../lib/formato'
 import { enMarcha, useEntrenamientos } from './EntrenarAhora'
 import { Cargando, Insignia } from './ui'
@@ -27,7 +28,8 @@ const SECCIONES: { titulo: string; enlaces: Enlace[] }[] = [
     enlaces: [
       { a: '/revision/datos', texto: 'Datos por revisar', icono: ClipboardCheck, roles: ['admin', 'experto'] },
       { a: '/revision/riesgos', texto: 'Revisión de riesgos', icono: HeartPulse, roles: ['admin', 'experto'] },
-      { a: '/inferencia', texto: 'Calcular un niño', icono: Calculator, roles: ['admin', 'experto'] },
+      { a: '/inferencia', texto: 'Calcular el riesgo de un niño', icono: Calculator, roles: ['admin', 'experto'] },
+      { a: '/diccionario', texto: 'Diccionario', icono: BookOpen, roles: ['admin', 'experto'] },
     ],
   },
   {
@@ -47,6 +49,7 @@ const SECCIONES: { titulo: string; enlaces: Enlace[] }[] = [
 function Navegacion({ alElegir }: { alElegir?: () => void }) {
   const { usuario } = useSesion()
   const entrenando = enMarcha(useEntrenamientos(puede(usuario, ['admin'])).data?.[0])
+  const porClasificar = usePorClasificar(puede(usuario, ['admin', 'experto'])).data?.total ?? 0
   return (
     <nav aria-label="Secciones" className="flex flex-col gap-6">
       {SECCIONES.map((s) => {
@@ -72,6 +75,11 @@ function Navegacion({ alElegir }: { alElegir?: () => void }) {
                           className={cn('shrink-0 transition-colors', isActive ? 'text-teal' : 'text-salvia group-hover:text-tinta')} />
                         {e.texto}
                         {e.a === '/admin/entrenamientos' && entrenando && <Insignia tono="ocre" className="ml-auto">Entrenando…</Insignia>}
+                        {e.a === '/diccionario' && porClasificar > 0 && (
+                          <Insignia tono="ocre" className="ml-auto">
+                            {porClasificar}<span className="sr-only"> variables por clasificar</span>
+                          </Insignia>
+                        )}
                       </>
                     )}
                   </NavLink>
@@ -154,10 +162,10 @@ export function Marco({ children }: { children?: ReactNode }) {
   }, [abierto])
 
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-[264px_1fr]">
+    <div className="min-h-dvh lg:grid lg:grid-cols-[264px_minmax(0,1fr)]">
       <aside className="hidden border-r border-linea bg-papel px-4 py-6 lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col lg:gap-8">
         <div className="px-2"><Marca /></div>
-        <div className="-mx-1 flex-1 overflow-y-auto px-1"><Navegacion /></div>
+        <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1"><Navegacion /></div>
         <Usuario />
       </aside>
 
@@ -182,7 +190,7 @@ export function Marco({ children }: { children?: ReactNode }) {
               <X size={22} aria-hidden />
             </button>
           </div>
-          <div className="-mx-1 flex-1 overflow-y-auto px-1"><Navegacion alElegir={() => setAbierto(false)} /></div>
+          <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1"><Navegacion alElegir={() => setAbierto(false)} /></div>
           <Usuario />
         </div>
       </div>

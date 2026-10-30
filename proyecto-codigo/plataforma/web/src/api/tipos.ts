@@ -73,6 +73,10 @@ export interface ResumenTablero {
   alertas_por_capa: Record<string, number>
   alarmas_grupo: number | null
   ninos_con_riesgo: number | null
+  /** niños distintos con al menos un riesgo alto (no la suma por desenlace) */
+  ninos_riesgo_alto: number
+  riesgos_altos: number
+  percentil_alto: number
   riesgos_por_desenlace: RiesgoDesenlace[]
   crecimiento_por_etapa: CrecimientoEtapa[]
 }
@@ -87,14 +91,6 @@ export interface AlarmaGrupo {
   referencia: number | null
   estadistico: number | null
   que_paso: string
-}
-
-export interface Desempeno {
-  desenlaces: ({ clave: string; desenlace: string } & Record<string, number | string>)[]
-  errores_detectados: ({ tipo: string } & Record<string, number | string>)[]
-  falsas_por_1000: Record<string, number>
-  modelo_clinico: string | null
-  modelo_anomalias: string | null
 }
 
 export interface NinoFila {
@@ -220,6 +216,41 @@ export interface ResumenRevision {
   corrida_id: number
   datos_por_capa: { capa: string; respuestas: number; si: number; no: number; no_se: number; precision_pct: number }[]
   riesgos_por_grupo: { grupo: string; respuestas: number; si: number; no: number; preocupa_pct: number }[]
+}
+
+/** GET /inferencia/formulario: los campos del formulario de cálculo, armados con el esquema del paquete activo. */
+export interface CampoFormulario {
+  variable: string
+  etiqueta: string
+  tipo: 'numero' | 'lista' | 'si_no' | 'fecha' | 'texto'
+  unidad: string | null
+  tema: string | null
+  opciones: { valor: string; etiqueta: string }[]
+  minimo: number | null
+  maximo: number | null
+  crecimiento: boolean
+  /** 0 a 1: cuánto pesa en los modelos de riesgo frente a la variable que más pesa */
+  peso: number
+  principal: boolean
+}
+
+export interface VisitaFormulario {
+  etapa: string
+  nombre: string
+  orden: number
+  base: string | null
+  edad_min: number | null
+  edad_max: number | null
+  /** los desenlaces que se calculan con lo medido hasta esta visita */
+  desenlaces: string[]
+  campos: CampoFormulario[]
+}
+
+export interface FormularioCalculo {
+  paquete: string
+  fuente: string
+  generales: CampoFormulario[]
+  visitas: VisitaFormulario[]
 }
 
 export interface ResultadoInferencia {

@@ -245,8 +245,14 @@ def test_corrida_y_tablero(cliente, admin, corrida, smtp):
     r = cliente.get('/api/tablero/resumen', headers=admin).json()
     assert r['corrida']['id'] == corrida['id'] and r['ninos'] == 600
     assert r['crecimiento_por_etapa']
-    d = cliente.get('/api/tablero/desempeno', headers=admin).json()
-    assert d['desenlaces'] and 'auc' in d['desenlaces'][0]
+    # riesgo alto: niños distintos, igual que la lista que se abre al hacer clic
+    altos = cliente.get('/api/ninos', headers=admin, params={'percentil_min': r['percentil_alto'], 'tamano': 1}).json()
+    assert r['ninos_riesgo_alto'] == altos['total'] <= r['riesgos_altos']
+    assert r['riesgos_altos'] == sum(d['altos'] for d in r['riesgos_por_desenlace'])
+    # la validación técnica (y la regla simple) no sale por la API
+    assert cliente.get('/api/tablero/desempeno', headers=admin).status_code == 404
+    activo = cliente.get('/api/modelos/activo', headers=admin).json()
+    assert activo['metricas'] and not any('regla' in k for k in activo['metricas'])
     assert isinstance(cliente.get('/api/tablero/alarmas-grupo', headers=admin).json(), list)
     if corrida['resumen'].get('notificaciones', {}).get('correos'):
         assert len(buzon.mensajes) >= 2   # el de prueba y al menos uno de riesgo alto
@@ -315,3 +321,29 @@ def test_inferencia(cliente, admin, corrida):
     assert cliente.post('/api/inferencia', headers=admin, json=malo).status_code == 422
     visor = _login(cliente, 'visor@maia.prueba', 'clave-larga-123')
     assert cliente.post('/api/inferencia', headers=visor, json=peticion).status_code == 403
+
+
+def test_formulario_de_calculo(cliente, admin, corrida):
+    r = cliente.get('/api/inferencia/formulario', headers=admin)
+    assert r.status_code == 200, r.text
+    f = r.json()
+    ordenes = [v['orden'] for v in f['visitas']]
+    assert ordenes == sorted(ordenes) and len(ordenes) >= 3
+    campos = [c for v in f['visitas'] for c in v['campos']] + f['generales']
+    assert all(c['tipo'] in ('numero', 'lista', 'si_no', 'fecha', 'texto') for c in campos)
+    assert any(c['principal'] and not c['crecimiento'] for c in campos), 'las variables que más pesan van primero'
+    assert all(c['principal'] for c in campos if c['crecimiento']), 'las medidas de crecimiento siempre se ven'
+    assert any(c['opciones'] for c in campos if c['tipo'] == 'lista')
+    assert sum(len(v['desenlaces']) for v in f['visitas']) >= 1
+    for v in f['visitas']:   # en cada visita, primero los principales y luego por peso
+        principales = [c['principal'] for c in v['campos']]
+        assert principales == sorted(principales, reverse=True)
+    # la web arma la petición con estos campos: el niño de ejemplo, solo con variables del formulario, calcula
+    conocidas = {c['variable'] for c in campos}
+    peticion = cliente.get('/api/inferencia/ejemplo', headers=admin).json()
+    peticion.pop('nota')
+    peticion['mediciones'] = [m for m in peticion['mediciones'] if m['variable'] in conocidas]
+    out = cliente.post('/api/inferencia', headers=admin, json=peticion).json()
+    assert out['variables_ignoradas'] == [] and out['crecimiento']
+    visor = _login(cliente, 'visor@maia.prueba', 'clave-larga-123')
+    assert cliente.get('/api/inferencia/formulario', headers=visor).status_code == 403

@@ -41,15 +41,17 @@ def enviar(destinatarios: list[str], asunto: str, texto: str, html: str | None =
 
 
 def _cuerpo(nombre: str, filas: list[Riesgo], url: str, minimo: float) -> tuple[str, str]:
-    lineas = [f'Niños con posición {minimo:g} o más en "{nombre}":', '']
-    lineas += [f'- {r.sujeto}: posición {r.percentil:.0f} · {url}/ninos/{r.sujeto}' for r in filas]
+    # en palabras del equipo clínico: la posición (percentil) se dice como «más riesgo que N de cada 100 niños»
+    titulo = f'Niños con más riesgo que {minimo:g} de cada 100 niños del programa en "{nombre}":'
+    lineas = [titulo, '']
+    lineas += [f'- {r.sujeto}: más riesgo que {r.percentil:.0f} de cada 100 niños · {url}/ninos/{r.sujeto}' for r in filas]
     lineas += ['', 'Apoyo a la decisión, no diagnóstico. El riesgo ordena a los niños; la decisión es del equipo clínico.']
     filas_html = ''.join(
         f'<tr><td><a href="{escape(url)}/ninos/{escape(r.sujeto)}">{escape(r.sujeto)}</a></td>'
-        f'<td style="text-align:right">{r.percentil:.0f}</td></tr>' for r in filas)
-    html = (f'<p>Niños con posición {minimo:g} o más en <b>{escape(nombre)}</b>:</p>'
+        f'<td style="text-align:right">{r.percentil:.0f} de cada 100</td></tr>' for r in filas)
+    html = (f'<p>Niños con más riesgo que {minimo:g} de cada 100 niños del programa en <b>{escape(nombre)}</b>:</p>'
             f'<table cellpadding="4" style="border-collapse:collapse"><tr><th align="left">Niño</th>'
-            f'<th align="right">Posición (0 a 100)</th></tr>{filas_html}</table>'
+            f'<th align="right">Tiene más riesgo que</th></tr>{filas_html}</table>'
             '<p style="color:#555">Apoyo a la decisión, no diagnóstico. El riesgo ordena a los niños; '
             'la decisión es del equipo clínico.</p>')
     return '\n'.join(lineas), html

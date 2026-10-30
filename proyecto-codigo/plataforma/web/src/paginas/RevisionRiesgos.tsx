@@ -9,6 +9,7 @@ import { useSesion, puede } from '../auth/sesion'
 import { Aviso, Boton, Cargando, Encabezado, Panel, Tabla, Texto, Vacio } from '../components/ui'
 import { cn } from '../lib/cn'
 import { fecha, num, pct, RESPUESTAS } from '../lib/formato'
+import { alerta, ayudaAlerta } from '../lib/lenguaje'
 
 export default function RevisionRiesgos() {
   const { usuario } = useSesion()
@@ -31,12 +32,12 @@ export default function RevisionRiesgos() {
         Una muestra de niños, en orden fijo. No se muestra el riesgo calculado, a propósito: responda con su criterio
         clínico si el niño le preocupa para el desenlace indicado.
       </Encabezado>
-      <div className={cn('grid gap-4 lg:min-h-0 lg:flex-1', admin && 'xl:grid-cols-[1fr_22rem]')}>
+      <div className={cn('grid gap-4 lg:min-h-0 lg:flex-1', admin && 'xl:grid-cols-[minmax(0,1fr)_22rem]')}>
         <div className="lg:min-h-0 lg:overflow-y-auto lg:pr-1">
           {q.isPending ? <Cargando /> : q.error ? <Aviso>{q.error.message}</Aviso> : total === 0 ? (
-            <Vacio titulo="No hay niños con riesgo calculado en la última corrida" />
+            <Vacio titulo="No hay niños con riesgo calculado con los datos más recientes" />
           ) : (
-            <ol className="grid content-start gap-3 2xl:grid-cols-2">{q.data.items.map((r, i) => <Caso key={r.id} caso={r} numero={i + 1} />)}</ol>
+            <ol className="grid grid-cols-1 content-start gap-3 2xl:grid-cols-2">{q.data.items.map((r, i) => <Caso key={r.id} caso={r} numero={i + 1} />)}</ol>
           )}
         </div>
         {admin && <Resultados />}
@@ -59,7 +60,7 @@ function Caso({ caso, numero }: { caso: RiesgoRevision; numero: number }) {
       <div className="min-w-0">
         <p className="text-xs text-salvia">Caso {numero} · niño {caso.sujeto} · {caso.momento_nombre} ({fecha(caso.fecha_visita)})</p>
         <h2 className="mt-1 text-base">{caso.desenlace}</h2>
-        <ul className="mt-1.5 grid gap-x-5 gap-y-0.5 text-sm sm:grid-cols-2 2xl:grid-cols-3">{caso.resumen.map((l) => <li key={l}>{l}</li>)}</ul>
+        <ul className="mt-1.5 grid grid-cols-1 gap-x-5 gap-y-0.5 text-sm sm:grid-cols-2 2xl:grid-cols-3">{caso.resumen.map((l) => <li key={l}>{l}</li>)}</ul>
       </div>
       <fieldset className="mt-auto border-t border-linea/70 pt-3">
         <legend className="float-left pt-1.5 text-sm font-semibold">¿Le preocupa este niño?</legend>
@@ -91,11 +92,11 @@ function Resultados() {
       ) : (
         <div className="space-y-5">
           <div>
-            <h3 className="mb-1 text-sm">Datos raros que eran errores, por capa</h3>
+            <h3 className="mb-1 text-sm">Datos raros que eran errores, por tipo de alerta</h3>
             <Tabla>
-              <thead><tr><th>Capa</th><th className="text-right">Resp.</th><th className="text-right">Error</th></tr></thead>
+              <thead><tr><th>Alerta</th><th className="text-right">Resp.</th><th className="text-right">Error</th></tr></thead>
               <tbody>{q.data!.datos_por_capa.map((c) => (
-                <tr key={c.capa}><td>{c.capa}</td><td className="text-right">{num(c.respuestas)}</td><td className="text-right">{pct(c.precision_pct)}</td></tr>
+                <tr key={c.capa}><td title={ayudaAlerta(c.capa)}>{alerta(c.capa)}</td><td className="text-right">{num(c.respuestas)}</td><td className="text-right">{pct(c.precision_pct)}</td></tr>
               ))}</tbody>
             </Tabla>
           </div>
@@ -104,7 +105,7 @@ function Resultados() {
             <Tabla>
               <thead><tr><th>Grupo</th><th className="text-right">Resp.</th><th className="text-right">Preocupan</th></tr></thead>
               <tbody>{q.data!.riesgos_por_grupo.map((g) => (
-                <tr key={g.grupo}><td>{g.grupo === 'riesgo alto' ? 'Riesgo alto (≥ 90)' : 'Resto'}</td><td className="text-right">{num(g.respuestas)}</td><td className="text-right">{pct(g.preocupa_pct)}</td></tr>
+                <tr key={g.grupo}><td>{g.grupo === 'riesgo alto' ? 'Riesgo alto' : 'Resto'}</td><td className="text-right">{num(g.respuestas)}</td><td className="text-right">{pct(g.preocupa_pct)}</td></tr>
               ))}</tbody>
             </Tabla>
             <p className="mt-2 text-xs text-salvia">Si el modelo ordena bien, el riesgo alto debería preocupar más que el resto.</p>

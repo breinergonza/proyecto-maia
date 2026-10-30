@@ -2,24 +2,33 @@
 
 La petición trae sujetos, mediciones y episodios; el esquema, las etapas y los quiebres salen del corte con que se
 entrenaron los modelos (``sevarti_base`` del paquete). No hay capa 4 (necesita la historia de todo el programa).
+
+``GET /inferencia/formulario`` describe, con ese mismo esquema, el formulario de la web: los datos generales del niño y
+cada visita en orden, con sus campos (los que más pesan en el riesgo, primero) y los desenlaces que se calculan con lo
+medido hasta esa visita. La web arma con él la misma petición que antes se pegaba como JSON.
 """
 from __future__ import annotations
 
 import json
 import math
+from collections import defaultdict
 from datetime import date, datetime
 
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from anomalias import modelo as MA
 from maia_api import estado as E
 from maia_api.dependencias import EXPERTO, auditar, sesion
 from maia_api.esquemas import PeticionInferencia
 from maia_comun import puntuacion as PU
 from maia_comun.modelos_db import Usuario
+from sevarti import contrato as SV
 
 ruta = APIRouter(prefix='/inferencia', tags=['inferencia'])
+TIPOS_CAMPO = {'numeric': 'numero', 'categorical': 'lista', 'boolean': 'si_no', 'date': 'fecha', 'text': 'texto'}
+PRINCIPALES_POR_VISITA = 6   # además de las medidas de crecimiento
 
 
 def _limpio(v):
@@ -44,6 +53,36 @@ def _activo():
     if modelos is None or carpeta is None:
         raise HTTPException(status.HTTP_409_CONFLICT, 'No hay un paquete de modelos activo.')
     return modelos, manifest, carpeta
+
+
+def _opciones(texto: object) -> list[dict]:
+    """``'1=displasia;9=sin diagnóstico'`` → ``[{'valor': '1', 'etiqueta': 'displasia'}, ...]``."""
+    if not isinstance(texto, str) or not texto.strip():
+        return []
+    salida = []
+    for parte in texto.split(';'):
+        codigo, _, etiqueta = parte.partition('=')
+        if codigo.strip():
+            salida.append({'valor': codigo.strip(), 'etiqueta': (etiqueta or codigo).strip()})
+    return salida
+
+
+def _pesos(modelos, esquema: pd.DataFrame) -> dict[str, float]:
+    """Cuánto pesa cada variable en el riesgo: la ganancia de LightGBM de cada modelo de desenlace, normalizada por
+    modelo y sumada. Las columnas ``z_<medida>_<visita>`` cuentan para las medidas de esa visita."""
+    por_columna = {MA._nombre(v): v for v in esquema.variable}
+    medidas: dict[str, list[str]] = defaultdict(list)
+    for v, c, e in zip(esquema.variable, esquema.concepto, esquema.etapa):
+        if isinstance(c, str) and isinstance(e, str):
+            medidas[MA._nombre(f'z_{c}_{e}')].append(v)
+    pesos: dict[str, float] = defaultdict(float)
+    for m in modelos.clinico.modelos.values():
+        ganancia = m.modelo.feature_importance(importance_type='gain')
+        total = float(ganancia.sum()) or 1.0
+        for col, g in zip(m.modelo.feature_name(), ganancia):
+            for v in [por_columna[col]] if col in por_columna else medidas.get(col, []):
+                pesos[v] += float(g) / total
+    return pesos
 
 
 @ruta.post('')
@@ -87,6 +126,48 @@ def inferir(p: PeticionInferencia, s: Session = Depends(sesion), u: Usuario = De
     s.commit()
     return {'paquete': manifest['version'], 'fuente': manifest['fuente'], 'variables_ignoradas': ignoradas,
             'alertas_dato': alertas, 'riesgos': riesgos, 'crecimiento': _registros(salida['crecimiento'])}
+
+
+@ruta.get('/formulario')
+def formulario(_: Usuario = Depends(EXPERTO)) -> dict:
+    """Los campos del formulario de cálculo, por visita, a partir del esquema del paquete activo."""
+    modelos, manifest, carpeta = _activo()
+    base = carpeta / 'sevarti_base'
+    esquema = pd.read_parquet(base / 'esquema.parquet')
+    etapas = pd.read_parquet(base / 'etapas.parquet').sort_values('orden')
+    pesos = _pesos(modelos, esquema)
+    maximo = max(pesos.values(), default=0.0) or 1.0
+
+    def campo(f) -> dict:
+        opciones = _opciones(getattr(f, 'categorias', None))
+        tipo = TIPOS_CAMPO.get(str(f.tipo), 'texto')
+        if tipo == 'lista' and not opciones:
+            tipo = 'texto'   # categoría sin etiquetas en el diccionario: se escribe el código
+        return {'variable': f.variable, 'etiqueta': _limpio(f.etiqueta) or f.variable, 'tipo': tipo,
+                'unidad': _limpio(f.unidad), 'tema': _limpio(f.tema), 'opciones': opciones,
+                'minimo': _limpio(f.rango_min), 'maximo': _limpio(f.rango_max),
+                'crecimiento': isinstance(f.concepto, str), 'peso': round(pesos.get(f.variable, 0.0) / maximo, 3)}
+
+    def ordenar(campos: list[dict]) -> list[dict]:
+        mas_pesan = {c['variable'] for c in sorted(campos, key=lambda c: -c['peso'])[:PRINCIPALES_POR_VISITA] if c['peso'] > 0}
+        for c in campos:
+            c['principal'] = c['crecimiento'] or c['variable'] in mas_pesan
+        return sorted(campos, key=lambda c: (not c['principal'], -c['peso'], c['etiqueta']))
+
+    por_etapa: dict[str, list[dict]] = defaultdict(list)
+    generales: list[dict] = []
+    for f in esquema.itertuples():
+        (por_etapa[f.etapa] if isinstance(f.etapa, str) else generales).append(campo(f))
+    desenlaces: dict[str, list[str]] = defaultdict(list)
+    for m in modelos.clinico.modelos.values():
+        desenlaces[m.desenlace.momento].append(m.desenlace.nombre)
+    nombres = SV.nombres_etapa(etapas)
+    visitas = [{'etapa': e.etapa, 'nombre': nombres.get(e.etapa, e.etapa), 'orden': int(e.orden), 'base': _limpio(e.base),
+                'edad_min': _limpio(e.edad_min), 'edad_max': _limpio(e.edad_max),
+                'desenlaces': sorted(desenlaces.get(e.etapa, [])), 'campos': ordenar(por_etapa.get(e.etapa, []))}
+               for e in etapas.itertuples() if por_etapa.get(e.etapa) or desenlaces.get(e.etapa)]
+    return {'paquete': manifest['version'], 'fuente': manifest['fuente'], 'generales': ordenar(generales),
+            'visitas': visitas}
 
 
 @ruta.get('/ejemplo')

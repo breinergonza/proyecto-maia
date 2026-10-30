@@ -2,7 +2,8 @@
 
 * el administrador de ``MAIA_ADMIN_EMAIL`` / ``MAIA_ADMIN_CLAVE`` si no hay usuarios;
 * en la demostración (``MAIA_ENTORNO=demo``), una cohorte simulada de ``MAIA_DEMO_SUJETOS`` niños si no hay corte;
-* la configuración de notificaciones (inactiva) de cada desenlace del paquete activo.
+* la configuración de notificaciones (inactiva) de cada desenlace del paquete activo;
+* el diccionario de variables del núcleo como versión vigente, si todavía no hay ninguna.
 
     python -m maia_api.semillas
 """
@@ -14,6 +15,7 @@ from sqlalchemy.orm import Session
 from maia_api import estado as E
 from maia_api import seguridad as SG
 from maia_comun import db
+from maia_comun import diccionarios as DIC
 from maia_comun import sevarti_db as SDB
 from maia_comun.config import Configuracion, obtener
 from maia_comun.modelos_db import ConfigNotificacion, Usuario
@@ -58,6 +60,8 @@ def sembrar(cfg: Configuracion | None = None) -> dict:
         hecho = {'admin': admin_inicial(s, cfg), 'corte_demo': datos_demo(s, cfg)}
         hecho['paquete'] = E.cargar_activo(s, cfg)
         hecho['notificaciones'] = config_notificaciones_de(s)
+        hecho['diccionario'] = DIC.sembrar(s)
+        s.commit()
     return hecho
 
 

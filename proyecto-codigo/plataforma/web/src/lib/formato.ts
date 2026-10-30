@@ -10,7 +10,9 @@ export const dec = (v: number | null | undefined) => (v == null ? '—' : nf1.fo
 export const dec2 = (v: number | null | undefined) => (v == null ? '—' : nf2.format(v))
 export const pct = (v: number | null | undefined) => (v == null ? '—' : `${nf1.format(v)} %`)
 /** Riesgo (0 a 1) como porcentaje. */
-export const riesgo = (v: number | null | undefined) => (v == null ? '—' : `${nf1.format(100 * v)} %`)
+/** Probabilidad en porcentaje; una mayor que cero que se redondearía a 0,0 % se dice «menos de 0,1 %» (no es cero). */
+export const riesgo = (v: number | null | undefined) =>
+  v == null ? '—' : v > 0 && 100 * v < 0.05 ? 'menos de 0,1 %' : `${nf1.format(100 * v)} %`
 export const posicion = (v: number | null | undefined) => (v == null ? '—' : nf.format(Math.round(v)))
 /** Valor medido tal como llega de la base (texto): si es un número, sin ruido de coma flotante y con hasta 3
  * decimales, para que un dato mal registrado (p. ej. un peso en kilos donde van gramos) se siga viendo como es. */
@@ -42,6 +44,9 @@ export function edad(dias: number | null | undefined): string {
   if (meses < 24) return `${nf1.format(meses)} m`
   return `${nf1.format(meses / 12)} a`
 }
+
+/** «Riesgo alto»: entre el 10 % de mayor riesgo de su desenlace (igual que PERCENTIL_ALTO en maia_comun.modelos_db). */
+export const RIESGO_ALTO = 90
 
 export const ROLES: Record<Rol, string> = { admin: 'Administración', experto: 'Experto clínico', visualizador: 'Consulta' }
 export const RESPUESTAS: Record<Respuesta, string> = { si: 'Sí', no: 'No', no_se: 'No sé' }

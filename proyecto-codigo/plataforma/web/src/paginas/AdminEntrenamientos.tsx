@@ -168,7 +168,7 @@ function Pares({ titulo, datos, formato }: { titulo: string; datos?: Record<stri
 
 function Detalle({ e }: { e: Entrenamiento }) {
   return (
-    <div className="grid gap-4 py-2 md:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 py-2 md:grid-cols-3">
       <Pares titulo="Hiperparámetros" datos={e.hiperparametros} />
       <Pares titulo="Métricas de validación" datos={e.metricas} formato={(v) => dec2(v)} />
       <div className="flex flex-col gap-4">

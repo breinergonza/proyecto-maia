@@ -2,6 +2,9 @@
 
 * Anomalías: detectados_pct__{tipo}__{capa}, falsas_por_1000__{capa}, alpha_{a}__{columna}...
 * Clínico: auc__{clave}, auc_regla__{clave}, top10__{clave}, pr_auc__{clave}, calibracion__{clave}...
+
+La comparación con la «regla simple» (``*_regla*``) es una validación interna: va a MLflow y no sale de ahí (ni a
+``resultados.metricas_modelo`` ni al paquete ni a la API).
 """
 from __future__ import annotations
 
@@ -79,6 +82,11 @@ def desde_ficha_clinica(ficha: dict) -> pd.DataFrame | None:
     return pd.DataFrame.from_dict(v, orient='index') if v else None
 
 
+def interna(nombre: str) -> bool:
+    """Métrica solo para MLflow: la comparación con la regla simple."""
+    return 'regla' in nombre.partition('__')[0]
+
+
 def filas_metricas(ficha_anomalias: dict | None, ficha_clinica: dict | None,
                    nombre_a_clave: dict[str, str]) -> list[dict]:
     """Filas para resultados.metricas_modelo: (modelo, version, clave, metrica, valor)."""
@@ -90,6 +98,8 @@ def filas_metricas(ficha_anomalias: dict | None, ficha_clinica: dict | None,
                               metrica=metrica, valor=v))
     if ficha_clinica:
         for nombre, v in metricas_clinicas(desde_ficha_clinica(ficha_clinica), None, nombre_a_clave).items():
+            if interna(nombre):
+                continue
             metrica, _, clave = nombre.partition('__')
             filas.append(dict(modelo='clinico', version=ficha_clinica['version'], clave=clave or '-',
                               metrica=metrica, valor=v))

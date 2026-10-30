@@ -16,6 +16,8 @@ describe('formatos', () => {
   })
   it('riesgo como porcentaje y posición entera', () => {
     expect(riesgo(0.857)).toBe('85,7 %')
+    expect(riesgo(0.0003)).toBe('menos de 0,1 %')
+    expect(riesgo(0)).toBe('0,0 %')
     expect(posicion(98.6)).toBe('99')
   })
   it('primera letra en mayúscula', () => expect(frase('valor atípico')).toBe('Valor atípico'))

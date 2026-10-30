@@ -70,6 +70,7 @@ y sirve la aplicación. El archivo es [`docker-compose.on-premise.yml`](../../do
    | `MAIA_ENTORNO`, `MAIA_SOLO_SIMULADO` | Ver la tabla de modos (por defecto `produccion` / `false`) |
    | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USUARIO`, `SMTP_CLAVE`, `SMTP_REMITENTE`, `SMTP_TLS` | Servidor de correo de la Fundación. Sin ellos, la app funciona, pero los correos quedan con error |
    | `MLFLOW_PUERTO`, `MINIO_CONSOLA_PUERTO` | Solo si 5000 o 9001 ya están ocupados en el servidor |
+   | `MLFLOW_USUARIO` | Usuario administrador de MLflow (por defecto `admin`); su clave es `SERVICE_PASSWORD_MLFLOWADMIN` |
 
    La clave del administrador es `SERVICE_PASSWORD_ADMIN` (cópiela del panel). Si define `KMC_PW` aquí, queda guardada
    en la base del orquestador y en el `.env` que este escribe en el servidor: proteja el acceso SSH y el panel.
@@ -111,7 +112,9 @@ el panel (**Settings → Timezone**). Copie periódicamente el volumen `respaldo
 
 ### MLflow y la consola de MinIO
 
-No tienen ingreso propio, por eso solo escuchan en el servidor. Desde su equipo:
+Solo escuchan en el servidor. MLflow además pide usuario y clave (autenticación nativa, `--app-name basic-auth`):
+`MLFLOW_USUARIO` (por defecto `admin`) y `SERVICE_PASSWORD_MLFLOWADMIN`. El trainer y la API entran con esas mismas
+credenciales. Desde su equipo:
 
 ```bash
 ssh -N -L 5000:127.0.0.1:5000 -L 9001:127.0.0.1:9001 usuario@servidor
@@ -138,4 +141,6 @@ Luego abra http://localhost:5000 (MLflow) y http://localhost:9001 (MinIO, usuari
 | «Defina valores propios (12 caracteres o más)» | Faltan variables `SERVICE_*` | Vuelva a cargar el compose para que el orquestador las genere |
 | 502 en `/api` | La API no está sana | Logs del servicio `api` en el panel |
 | MLflow no arranca: «password authentication failed» | El volumen de Postgres se creó antes que `SERVICE_PASSWORD_MLFLOWDB` | `ALTER ROLE mlflow PASSWORD '...'` en la terminal de `postgres` |
+| MLflow no arranca: «defina MLFLOW_TRACKING_PASSWORD» / «MLFLOW_FLASK_SERVER_SECRET_KEY» | Faltan `SERVICE_PASSWORD_MLFLOWADMIN` o `SERVICE_BASE64_64_MLFLOWFLASK` | Vuelva a cargar el compose para que el orquestador las genere |
+| Entrenamientos: «MLflow rechazó las credenciales» | La clave del admin cambió en el panel después del primer arranque (MLflow solo la usa al crear el usuario) | Cámbiela en MLflow (`POST /api/2.0/mlflow/users/update-password` con la clave anterior) o deje la variable como estaba |
 | «No hay un paquete de modelos activo» | No se publicó ninguno | `maia publicar --url http://api:8000 --fuente ...` |

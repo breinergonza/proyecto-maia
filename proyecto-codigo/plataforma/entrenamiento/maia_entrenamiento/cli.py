@@ -451,7 +451,7 @@ def exportar(fuente: Fuente = FUENTE,
         dic = next((run_c / 'diccionario').glob('*.xlsx'), None) if (run_c / 'diccionario').exists() else None
         metricas = {f'{f["metrica"]}__{f["clave"]}': round(f['valor'], 4)
                     for f in filas_metricas(None, modelos.ficha_clinica, modelos.nombre_a_clave)
-                    if f['metrica'] in ('auc', 'auc_regla', 'top10', 'pr_auc')}
+                    if f['metrica'] in ('auc', 'top10', 'pr_auc')}
         ruta = PQ.armar(tmp / PQ.NOMBRE, ca, cc, base, fuente.value, obtener().maia_paquete_clave,
                         {'anomalias': {'registro': mva.name, 'version': str(mva.version), 'run_id': mva.run_id},
                          'clinico': {'registro': mvc.name, 'version': str(mvc.version), 'run_id': mvc.run_id}},

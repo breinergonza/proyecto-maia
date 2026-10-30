@@ -19,9 +19,9 @@ export default function AdminNotificaciones() {
       {configs.isPending ? <Cargando /> : configs.error ? <Aviso>{configs.error.message}</Aviso> : configs.data.length === 0 ? (
         <Vacio titulo="No hay desenlaces para configurar">Se crean al activar un paquete de modelos.</Vacio>
       ) : (
-        <div className="grid gap-4 xl:grid-cols-2">{configs.data.map((c) => <Config key={c.desenlace} c={c} />)}</div>
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">{configs.data.map((c) => <Config key={c.desenlace} c={c} />)}</div>
       )}
-      <div className="mt-4 grid items-start gap-4 xl:grid-cols-[22rem_1fr]">
+      <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[22rem_minmax(0,1fr)]">
         <Prueba />
         <Historial />
       </div>
@@ -53,7 +53,7 @@ function Config({ c }: { c: ConfigNotificacionSalida }) {
           Enviar avisos
         </label>
       }>
-      <form className="grid items-start gap-3 sm:grid-cols-[9rem_1fr]" onSubmit={(e) => { e.preventDefault(); guardar.mutate() }}>
+      <form className="grid grid-cols-1 items-start gap-3 sm:grid-cols-[9rem_minmax(0,1fr)]" onSubmit={(e) => { e.preventDefault(); guardar.mutate() }}>
         <Campo id={`${id}-min`} etiqueta="Posición mínima" error={errorMinimo} ayuda="95: el 5 % con más riesgo.">
           <Entrada id={`${id}-min`} type="number" min={0} max={100} step={1} value={minimo}
             aria-invalid={!!errorMinimo} onChange={(e) => setMinimo(e.target.value)} />

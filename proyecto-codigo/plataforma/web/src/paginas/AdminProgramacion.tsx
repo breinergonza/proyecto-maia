@@ -40,7 +40,7 @@ export default function AdminProgramacion() {
         hiperparámetros de Configuración), los registra en MLflow como candidatos, revisa los datos y calcula los riesgos.
         Los modelos nuevos se usan en la solución cuando se aprueban en <Link className="text-teal underline" to="/admin/entrenamientos">Entrenamientos</Link>.
       </Encabezado>
-      <div className="grid items-start gap-4 xl:grid-cols-[1fr_26rem]">
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_26rem]">
         <div className="flex min-w-0 flex-col gap-4">
           <ListaProgramaciones editar={setEditando} />
           <ListaEjecuciones />
@@ -231,7 +231,7 @@ function FilaEjecucion({ e }: { e: Ejecucion }) {
       )}
       {e.registro && (
         <details className="mt-1">
-          <summary className="cursor-pointer text-sm text-teal">Ver salida</summary>
+          <summary className="cursor-pointer text-sm text-teal">Ver detalle técnico</summary>
           <pre className="mt-1 max-h-72 overflow-auto rounded-control bg-tinta/95 p-3 text-xs leading-relaxed text-white">{e.registro}</pre>
         </details>
       )}

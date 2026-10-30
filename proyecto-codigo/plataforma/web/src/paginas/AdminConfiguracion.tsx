@@ -21,7 +21,7 @@ export default function AdminConfiguracion() {
         usarlos. Los horarios y la cola están en Programación; lo entrenado, en Entrenamientos.
       </Encabezado>
       {resumen.isPending ? <Cargando /> : resumen.error ? <Aviso>{resumen.error.message}</Aviso> : <Pasos r={resumen.data} />}
-      <div className="mt-4 grid items-start gap-4 xl:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
         <FormConexion soloSimulado={!!resumen.data?.solo_simulado} />
         <div className="flex flex-col gap-4">
           <FormHiperparametros />
@@ -48,7 +48,7 @@ function Pasos({ r }: { r: ResumenAdministracion }) {
   return (
     <Panel titulo="Estado de la configuración">
       {r.solo_simulado && <div className="mb-3"><Aviso tono="teal">Este servicio solo trabaja con datos simulados: la base real se configura en el servidor on-premise.</Aviso></div>}
-      <ol className="grid gap-4 md:grid-cols-2">
+      <ol className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Paso hecho={r.cifrado_disponible} titulo="1. Llave de cifrado en el servidor">
           {r.cifrado_disponible ? 'MAIA_CIFRADO_CLAVE está definida: la clave de la base se guarda cifrada.'
             : 'Defina MAIA_CIFRADO_CLAVE (32 caracteres o más) en el entorno del servidor para guardar la clave desde aquí.'}
@@ -109,16 +109,16 @@ function FormConexion({ soloSimulado }: { soloSimulado: boolean }) {
             Postgres de la Fundación, en solo lectura. Las consultas usan valores enlazados y nunca piden las columnas
             restringidas. {actual.data.guardada ? `Guardada el ${fechaHora(actual.data.actualizado_en)}.` : 'Hoy se usan los valores del entorno del servidor (KMC_*).'}
           </p>
-          <div className="grid gap-3 sm:grid-cols-[1fr_7rem]">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_7rem]">
             <Campo id="c-host" etiqueta="Servidor"><Entrada id="c-host" required value={d.host} onChange={cambio('host')} /></Campo>
             <Campo id="c-puerto" etiqueta="Puerto"><Entrada id="c-puerto" type="number" min={1} max={65535} value={d.puerto} onChange={cambio('puerto')} /></Campo>
           </div>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Campo id="c-base" etiqueta="Base"><Entrada id="c-base" required value={d.base} onChange={cambio('base')} /></Campo>
             <Campo id="c-usuario" etiqueta="Usuario"><Entrada id="c-usuario" required autoComplete="off" value={d.usuario} onChange={cambio('usuario')} /></Campo>
             <Campo id="c-esquema" etiqueta="Esquema"><Entrada id="c-esquema" required value={d.esquema} onChange={cambio('esquema')} /></Campo>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Campo id="c-ssl" etiqueta="SSL"><Selector id="c-ssl" value={d.sslmode} onChange={cambio('sslmode')}>{SSL.map((s) => <option key={s}>{s}</option>)}</Selector></Campo>
             <Campo id="c-timeout" etiqueta="Espera al conectar (s)"><Entrada id="c-timeout" type="number" min={1} max={120} value={d.timeout} onChange={cambio('timeout')} /></Campo>
           </div>
@@ -179,7 +179,7 @@ function PanelModelo({ h }: { h: Hiperparametros }) {
           Vacío = el valor del núcleo (en gris). Aplican al próximo entrenamiento y MLflow registra los valores usados.
           {h.actualizado_en && <> Último cambio: {fechaHora(h.actualizado_en)}.</>}
         </p>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {h.campos.map((c) => (
             <Campo key={c.nombre} id={`hp-${h.modelo}-${c.nombre}`} etiqueta={c.etiqueta} ayuda={`${c.ayuda} (${c.minimo}–${c.maximo})`}>
               <Entrada id={`hp-${h.modelo}-${c.nombre}`} type="number" inputMode="decimal" min={c.minimo} max={c.maximo}

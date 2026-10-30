@@ -75,6 +75,17 @@ export function conParams(ruta: string, params?: Opciones['params']): string {
   return s ? `${ruta}?${s}` : ruta
 }
 
+/** Un archivo (p. ej. un .xlsx) con la sesión actual: el token va en la cabecera, no en la dirección. */
+export async function pedirArchivo(ruta: string, reintento = true): Promise<Blob> {
+  const r = await fetch(`/api${ruta}`, {
+    headers: acceso ? { Authorization: `Bearer ${acceso}` } : {},
+    credentials: 'same-origin',
+  })
+  if (r.status === 401 && reintento && (await refrescar())) return pedirArchivo(ruta, false)
+  if (!r.ok) throw new ErrorApi(r.status, mensajeDe(await r.json().catch(() => null), r.status))
+  return r.blob()
+}
+
 export async function pedir<T>(ruta: string, op: Opciones = {}, reintento = true): Promise<T> {
   const cabeceras: Record<string, string> = {}
   if (acceso) cabeceras.Authorization = `Bearer ${acceso}`

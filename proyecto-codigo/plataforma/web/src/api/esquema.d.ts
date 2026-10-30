@@ -245,27 +245,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/tablero/desempeno": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Desempeno
-         * @description Validación de los modelos de la corrida: por desenlace (AUC del modelo y de la regla simple, casos en el 10 %
-         *     de mayor riesgo, PR-AUC) y por tipo de error inyectado (porcentaje detectado).
-         */
-        get: operations["desempeno_api_tablero_desempeno_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/ninos": {
         parameters: {
             query?: never;
@@ -400,6 +379,26 @@ export interface paths {
         put?: never;
         /** Inferir */
         post: operations["inferir_api_inferencia_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inferencia/formulario": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Formulario
+         * @description Los campos del formulario de cálculo, por visita, a partir del esquema del paquete activo.
+         */
+        get: operations["formulario_api_inferencia_formulario_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -775,6 +774,158 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/diccionario/versiones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Versiones */
+        get: operations["versiones_api_diccionario_versiones_get"];
+        put?: never;
+        /**
+         * Subir
+         * @description Guarda el archivo como versión nueva, vigente (o como borrador, si se pide; un campo ausente es «no»).
+         */
+        post: operations["subir_api_diccionario_versiones_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/diccionario/vigente/archivo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Descargar Vigente */
+        get: operations["descargar_vigente_api_diccionario_vigente_archivo_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/diccionario/versiones/{vid}/archivo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Descargar */
+        get: operations["descargar_api_diccionario_versiones__vid__archivo_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/diccionario/comparar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Comparar
+         * @description Valida el archivo y dice qué cambia frente a la vigente, sin guardar nada.
+         */
+        post: operations["comparar_api_diccionario_comparar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/diccionario/versiones/{vid}/diferencias": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Diferencias */
+        get: operations["diferencias_api_diccionario_versiones__vid__diferencias_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/diccionario/versiones/{vid}/activar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Activar
+         * @description Deja vigente esa versión; también sirve para volver a una anterior.
+         */
+        post: operations["activar_api_diccionario_versiones__vid__activar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/diccionario/por-clasificar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Por Clasificar
+         * @description Las variables «Por clasificar» de la vigente y, si una actualización trajo variables nuevas, su borrador.
+         */
+        get: operations["por_clasificar_api_diccionario_por_clasificar_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/diccionario/clasificar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Clasificar
+         * @description Marca rápido una variable como Lista o No usar: queda una versión nueva, vigente.
+         */
+        post: operations["clasificar_api_diccionario_clasificar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -792,10 +943,33 @@ export interface components {
             /** Clinico */
             clinico: string;
         };
+        /** Body_comparar_api_diccionario_comparar_post */
+        Body_comparar_api_diccionario_comparar_post: {
+            /** Archivo */
+            archivo: string;
+        };
+        /** Body_subir_api_diccionario_versiones_post */
+        Body_subir_api_diccionario_versiones_post: {
+            /** Archivo */
+            archivo: string;
+            /** Nota */
+            nota?: string | null;
+            /**
+             * Borrador
+             * @default false
+             */
+            borrador: boolean;
+        };
         /** Body_subir_api_modelos_paquetes_post */
         Body_subir_api_modelos_paquetes_post: {
             /** Archivo */
             archivo: string;
+        };
+        /** BorradorDiccionario */
+        BorradorDiccionario: {
+            version: components["schemas"]["VersionDiccionarioSalida"];
+            /** Nuevas */
+            nuevas: components["schemas"]["VariableDiccionario"][];
         };
         /** Calendario */
         Calendario: {
@@ -807,6 +981,38 @@ export interface components {
             descripcion: string;
             /** Proximas */
             proximas: string[];
+        };
+        /** CambioDesenlace */
+        CambioDesenlace: {
+            /** Clave */
+            clave: string;
+            /** Nombre */
+            nombre?: string | null;
+            /** Antes */
+            antes?: string | null;
+            /** Despues */
+            despues?: string | null;
+        };
+        /** CambioEstado */
+        CambioEstado: {
+            /** Variable */
+            variable: string;
+            /** Etiqueta */
+            etiqueta?: string | null;
+            /** Estado */
+            estado?: string | null;
+            /** Tema */
+            tema?: string | null;
+            /** Etapa */
+            etapa?: string | null;
+            /** Visita */
+            visita?: string | null;
+            /** Nota */
+            nota?: string | null;
+            /** Antes */
+            antes?: string | null;
+            /** Despues */
+            despues?: string | null;
         };
         /** CampoHiperparametro */
         CampoHiperparametro: {
@@ -829,6 +1035,16 @@ export interface components {
             defecto: number | null;
             /** Valor */
             valor: number | null;
+        };
+        /** Clasificacion */
+        Clasificacion: {
+            /** Variable */
+            variable: string;
+            /**
+             * Estado
+             * @enum {string}
+             */
+            estado: "Lista" | "No usar";
         };
         /** ConexionEntrada */
         ConexionEntrada: {
@@ -960,6 +1176,23 @@ export interface components {
             terminada?: string | null;
             /** Mensaje */
             mensaje?: string | null;
+        };
+        /** DiferenciasDiccionario */
+        DiferenciasDiccionario: {
+            /** Nuevas */
+            nuevas: components["schemas"]["VariableDiccionario"][];
+            /** Quitadas */
+            quitadas: components["schemas"]["VariableDiccionario"][];
+            /** Estados */
+            estados: components["schemas"]["CambioEstado"][];
+            /** Desenlaces Activados */
+            desenlaces_activados: components["schemas"]["CambioDesenlace"][];
+            /** Desenlaces Apagados */
+            desenlaces_apagados: components["schemas"]["CambioDesenlace"][];
+            /** Sin Cambios */
+            sin_cambios: boolean;
+            /** Vigente */
+            vigente?: number | null;
         };
         /** EjecucionNueva */
         EjecucionNueva: {
@@ -1221,6 +1454,15 @@ export interface components {
             /** Episodios */
             episodios?: components["schemas"]["EpisodioEntrada"][];
         };
+        /** PorClasificar */
+        PorClasificar: {
+            vigente?: components["schemas"]["VersionDiccionarioSalida"] | null;
+            /** Variables */
+            variables: components["schemas"]["VariableDiccionario"][];
+            borrador?: components["schemas"]["BorradorDiccionario"] | null;
+            /** Total */
+            total: number;
+        };
         /** ProgramacionEntrada */
         ProgramacionEntrada: {
             /** Nombre */
@@ -1427,6 +1669,53 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VariableDiccionario */
+        VariableDiccionario: {
+            /** Variable */
+            variable: string;
+            /** Etiqueta */
+            etiqueta?: string | null;
+            /** Estado */
+            estado?: string | null;
+            /** Tema */
+            tema?: string | null;
+            /** Etapa */
+            etapa?: string | null;
+            /** Visita */
+            visita?: string | null;
+            /** Nota */
+            nota?: string | null;
+        };
+        /** VersionDiccionarioSalida */
+        VersionDiccionarioSalida: {
+            /** Id */
+            id: number;
+            /** Version */
+            version: number;
+            /**
+             * Estado
+             * @enum {string}
+             */
+            estado: "vigente" | "borrador" | "archivado";
+            /**
+             * Origen
+             * @enum {string}
+             */
+            origen: "subido" | "corrida" | "semilla";
+            /** Nota */
+            nota?: string | null;
+            /** Sha256 */
+            sha256: string;
+            /** Tamano */
+            tamano: number;
+            /** Creado Por */
+            creado_por?: string | null;
+            /**
+             * Creado En
+             * Format: date-time
+             */
+            creado_en: string;
         };
     };
     responses: never;
@@ -1893,39 +2182,6 @@ export interface operations {
             };
         };
     };
-    desempeno_api_tablero_desempeno_get: {
-        parameters: {
-            query?: {
-                corrida_id?: number | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     listar_api_ninos_get: {
         parameters: {
             query?: {
@@ -2202,6 +2458,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    formulario_api_inferencia_formulario_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };
@@ -2904,6 +3182,258 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EjecucionSalida"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    versiones_api_diccionario_versiones_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionDiccionarioSalida"][];
+                };
+            };
+        };
+    };
+    subir_api_diccionario_versiones_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_subir_api_diccionario_versiones_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionDiccionarioSalida"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    descargar_vigente_api_diccionario_vigente_archivo_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": unknown;
+                };
+            };
+        };
+    };
+    descargar_api_diccionario_versiones__vid__archivo_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    comparar_api_diccionario_comparar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_comparar_api_diccionario_comparar_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiferenciasDiccionario"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    diferencias_api_diccionario_versiones__vid__diferencias_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiferenciasDiccionario"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activar_api_diccionario_versiones__vid__activar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionDiccionarioSalida"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    por_clasificar_api_diccionario_por_clasificar_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PorClasificar"];
+                };
+            };
+        };
+    };
+    clasificar_api_diccionario_clasificar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Clasificacion"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionDiccionarioSalida"];
                 };
             };
             /** @description Validation Error */

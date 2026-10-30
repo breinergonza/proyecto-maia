@@ -1,0 +1,96 @@
+// Calcular el riesgo de un niño: el formulario por visita arma la petición de siempre, avisa en español lo que falta y
+// muestra el resultado con el glosario clínico. El JSON queda solo para administración.
+import { screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { Usuario } from '../api/tipos'
+import { montar, simularApi, usuario } from './util'
+
+afterEach(() => vi.unstubAllGlobals())
+
+const campo = (variable: string, etiqueta: string, extra = {}) => ({
+  variable, etiqueta, tipo: 'numero', unidad: null, tema: null, opciones: [], minimo: null, maximo: null,
+  crecimiento: false, peso: 0, principal: true, ...extra,
+})
+const formulario = {
+  paquete: 'p1', fuente: 'simulado',
+  generales: [campo('ingreso_hogar', 'Ingreso del hogar', { principal: false, unidad: 'COP' })],
+  visitas: [
+    { etapa: 'nacimiento', nombre: 'Nacimiento', orden: 1, base: 'cronologica', edad_min: 0, edad_max: 3, desenlaces: [],
+      campos: [campo('peso_nacer', 'Peso al nacer', { unidad: 'g', crecimiento: true })] },
+    { etapa: '3 m EC', nombre: '3 meses (edad corregida)', orden: 4, base: 'corregida', edad_min: 45, edad_max: 135,
+      desenlaces: ['desarrollo psicomotor bajo a los 6 meses'],
+      campos: [campo('peso_3m', 'Peso a 3 m EC', { unidad: 'g', crecimiento: true }),
+        campo('oxigeno_3m', 'Oxígeno a los 3 meses', { tipo: 'lista', opciones: [{ valor: '1', etiqueta: 'displasia broncopulmonar' }, { valor: '9', etiqueta: 'sin diagnóstico' }] })] },
+  ],
+}
+const resultado = {
+  paquete: 'p1', fuente: 'simulado', variables_ignoradas: [],
+  riesgos: [{ sujeto: 'calculo', clave: 'des6', desenlace: 'desarrollo psicomotor bajo a los 6 meses', momento: '3 m EC', riesgo: 0.31,
+    percentil: 96, motivos: ['Peso al nacer (peso_nacer) = 900'], fecha_visita: '2026-05-10' }],
+  alertas_dato: [{ sujeto: 'calculo', variable: 'peso_3m', etiqueta: 'Peso a 3 m EC', etapa: '3 m EC', valor: '9999', esperado: 5000,
+    rango_bajo: 4000, rango_alto: 6500, capas: ['1'], motivo: 'posible error de unidad', prioridad: 1 }],
+  crecimiento: [{ sujeto: 'calculo', etapa: '3 m EC', indicador: 'peso', fecha: '2026-05-10', edad_corregida: 60, valor: 9999, z: -2.6,
+    bajo_2de: true, caida_1de: true, improbable: false }],
+}
+
+function api(rol: Usuario['rol'], enviados: unknown[] = []) {
+  simularApi((url, init) => {
+    if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario(rol) } }
+    if (url === '/api/modelos/activo') return { cuerpo: { version: 'p1', fuente: 'simulado', activo: true, metricas: {}, modelos: {} } }
+    if (url === '/api/inferencia/formulario') return { cuerpo: formulario }
+    if (url === '/api/inferencia') {
+      enviados.push(JSON.parse(String(init?.body)))
+      return { cuerpo: resultado }
+    }
+    return { cuerpo: {} }
+  })
+  return enviados
+}
+
+describe('calcular el riesgo de un niño', () => {
+  it('arma la petición desde el formulario y muestra el resultado en palabras clínicas', async () => {
+    const enviados = api('experto')
+    montar('/inferencia')
+    await userEvent.type(await screen.findByLabelText('Fecha de nacimiento'), '2026-01-10')
+    await userEvent.type(screen.getByLabelText('Semanas de gestación al nacer'), '30,5')
+    await userEvent.click(screen.getByRole('button', { name: /3 meses \(edad corregida\)/ }))
+    expect(screen.getByText(/Aquí se calcula: desarrollo psicomotor bajo/)).toBeInTheDocument()
+    await userEvent.type(screen.getByLabelText('Peso a 3 m EC (g)'), '9999')
+    await userEvent.selectOptions(screen.getByLabelText('Oxígeno a los 3 meses'), '9')
+
+    // sin la fecha de la visita no se calcula, y se dice por qué
+    await userEvent.click(screen.getByRole('button', { name: 'Calcular el riesgo' }))
+    expect(await screen.findByText('Escriba la fecha de la visita «3 meses (edad corregida)».')).toBeInTheDocument()
+    expect(enviados).toEqual([])
+
+    await userEvent.type(screen.getByLabelText('Fecha de la visita'), '2026-05-10')
+    await userEvent.click(screen.getByRole('button', { name: 'Calcular el riesgo' }))
+    await waitFor(() => expect(enviados).toHaveLength(1))
+    expect(enviados[0]).toEqual({
+      sujetos: [{ sujeto: 'calculo', fecha_nacimiento: '2026-01-10', eg_semanas: 30.5 }],
+      mediciones: [
+        { sujeto: 'calculo', variable: 'peso_3m', valor: 9999, fecha: '2026-05-10', edad_dias: 120 },
+        { sujeto: 'calculo', variable: 'oxigeno_3m', valor: 9, fecha: '2026-05-10', edad_dias: 120 },
+      ],
+    })
+
+    const riesgo = (await screen.findByText('desarrollo psicomotor bajo a los 6 meses', { selector: 'p' })).closest('li')!
+    expect(within(riesgo).getByText('Riesgo muy alto')).toBeInTheDocument()
+    expect(within(riesgo).getByText('9 de 10')).toBeInTheDocument()
+    expect(within(riesgo).getByText('Peso al nacer: 900')).toBeInTheDocument()
+    expect(screen.getByText('Parece anotado en otra unidad (por ejemplo, kilos en lugar de gramos).')).toBeInTheDocument()
+    expect(screen.getByText('Bajo para la edad')).toBeInTheDocument()
+    expect(screen.getByText('Cayó desde el último control')).toBeInTheDocument()
+    expect(document.querySelector('main')?.textContent).not.toMatch(/posici[oó]n|puntaje z|capa \d|[−-]2 DE|\(peso_nacer\)/i)
+    expect(screen.queryByRole('button', { name: 'Modo avanzado (JSON)' })).not.toBeInTheDocument()
+  })
+
+  it('los datos generales van plegados y la administración tiene el modo avanzado', async () => {
+    api('admin')
+    montar('/inferencia')
+    expect(await screen.findByText('Más datos del niño y la familia (1)')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Modo avanzado (JSON)' }))
+    expect(screen.getByLabelText('Petición en JSON')).toBeInTheDocument()
+  })
+})

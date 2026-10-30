@@ -670,63 +670,6 @@
     }
    }
   },
-  "/api/tablero/desempeno": {
-   "get": {
-    "tags": [
-     "tablero"
-    ],
-    "summary": "Desempeno",
-    "description": "Validación de los modelos de la corrida: por desenlace (AUC del modelo y de la regla simple, casos en el 10 %\nde mayor riesgo, PR-AUC) y por tipo de error inyectado (porcentaje detectado).",
-    "operationId": "desempeno_api_tablero_desempeno_get",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "corrida_id",
-      "in": "query",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "integer"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Corrida Id"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "type": "object",
-         "additionalProperties": true,
-         "title": "Response Desempeno Api Tablero Desempeno Get"
-        }
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   }
-  },
   "/api/ninos": {
    "get": {
     "tags": [
@@ -1330,6 +1273,35 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/inferencia/formulario": {
+   "get": {
+    "tags": [
+     "inferencia"
+    ],
+    "summary": "Formulario",
+    "description": "Los campos del formulario de cálculo, por visita, a partir del esquema del paquete activo.",
+    "operationId": "formulario_api_inferencia_formulario_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Formulario Api Inferencia Formulario Get"
         }
        }
       }
@@ -2448,6 +2420,362 @@
      }
     }
    }
+  },
+  "/api/diccionario/versiones": {
+   "get": {
+    "tags": [
+     "diccionario"
+    ],
+    "summary": "Versiones",
+    "operationId": "versiones_api_diccionario_versiones_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/VersionDiccionarioSalida"
+         },
+         "type": "array",
+         "title": "Response Versiones Api Diccionario Versiones Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   },
+   "post": {
+    "tags": [
+     "diccionario"
+    ],
+    "summary": "Subir",
+    "description": "Guarda el archivo como versión nueva, vigente (o como borrador, si se pide; un campo ausente es «no»).",
+    "operationId": "subir_api_diccionario_versiones_post",
+    "requestBody": {
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_subir_api_diccionario_versiones_post"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/VersionDiccionarioSalida"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/diccionario/vigente/archivo": {
+   "get": {
+    "tags": [
+     "diccionario"
+    ],
+    "summary": "Descargar Vigente",
+    "operationId": "descargar_vigente_api_diccionario_vigente_archivo_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/diccionario/versiones/{vid}/archivo": {
+   "get": {
+    "tags": [
+     "diccionario"
+    ],
+    "summary": "Descargar",
+    "operationId": "descargar_api_diccionario_versiones__vid__archivo_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "vid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Vid"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/diccionario/comparar": {
+   "post": {
+    "tags": [
+     "diccionario"
+    ],
+    "summary": "Comparar",
+    "description": "Valida el archivo y dice qué cambia frente a la vigente, sin guardar nada.",
+    "operationId": "comparar_api_diccionario_comparar_post",
+    "requestBody": {
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_comparar_api_diccionario_comparar_post"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DiferenciasDiccionario"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/diccionario/versiones/{vid}/diferencias": {
+   "get": {
+    "tags": [
+     "diccionario"
+    ],
+    "summary": "Diferencias",
+    "operationId": "diferencias_api_diccionario_versiones__vid__diferencias_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "vid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Vid"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DiferenciasDiccionario"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/diccionario/versiones/{vid}/activar": {
+   "post": {
+    "tags": [
+     "diccionario"
+    ],
+    "summary": "Activar",
+    "description": "Deja vigente esa versión; también sirve para volver a una anterior.",
+    "operationId": "activar_api_diccionario_versiones__vid__activar_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "vid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Vid"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/VersionDiccionarioSalida"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/diccionario/por-clasificar": {
+   "get": {
+    "tags": [
+     "diccionario"
+    ],
+    "summary": "Por Clasificar",
+    "description": "Las variables «Por clasificar» de la vigente y, si una actualización trajo variables nuevas, su borrador.",
+    "operationId": "por_clasificar_api_diccionario_por_clasificar_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PorClasificar"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/diccionario/clasificar": {
+   "post": {
+    "tags": [
+     "diccionario"
+    ],
+    "summary": "Clasificar",
+    "description": "Marca rápido una variable como Lista o No usar: queda una versión nueva, vigente.",
+    "operationId": "clasificar_api_diccionario_clasificar_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/Clasificacion"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/VersionDiccionarioSalida"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
   }
  },
  "components": {
@@ -2481,6 +2809,51 @@
     ],
     "title": "AprobacionEntrada"
    },
+   "Body_comparar_api_diccionario_comparar_post": {
+    "properties": {
+     "archivo": {
+      "type": "string",
+      "contentMediaType": "application/octet-stream",
+      "title": "Archivo"
+     }
+    },
+    "type": "object",
+    "required": [
+     "archivo"
+    ],
+    "title": "Body_comparar_api_diccionario_comparar_post"
+   },
+   "Body_subir_api_diccionario_versiones_post": {
+    "properties": {
+     "archivo": {
+      "type": "string",
+      "contentMediaType": "application/octet-stream",
+      "title": "Archivo"
+     },
+     "nota": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 500
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Nota"
+     },
+     "borrador": {
+      "type": "boolean",
+      "title": "Borrador",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "archivo"
+    ],
+    "title": "Body_subir_api_diccionario_versiones_post"
+   },
    "Body_subir_api_modelos_paquetes_post": {
     "properties": {
      "archivo": {
@@ -2494,6 +2867,26 @@
      "archivo"
     ],
     "title": "Body_subir_api_modelos_paquetes_post"
+   },
+   "BorradorDiccionario": {
+    "properties": {
+     "version": {
+      "$ref": "#/components/schemas/VersionDiccionarioSalida"
+     },
+     "nuevas": {
+      "items": {
+       "$ref": "#/components/schemas/VariableDiccionario"
+      },
+      "type": "array",
+      "title": "Nuevas"
+     }
+    },
+    "type": "object",
+    "required": [
+     "version",
+     "nuevas"
+    ],
+    "title": "BorradorDiccionario"
    },
    "Calendario": {
     "properties": {
@@ -2526,6 +2919,153 @@
      "proximas"
     ],
     "title": "Calendario"
+   },
+   "CambioDesenlace": {
+    "properties": {
+     "clave": {
+      "type": "string",
+      "title": "Clave"
+     },
+     "nombre": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Nombre"
+     },
+     "antes": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Antes"
+     },
+     "despues": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Despues"
+     }
+    },
+    "type": "object",
+    "required": [
+     "clave"
+    ],
+    "title": "CambioDesenlace"
+   },
+   "CambioEstado": {
+    "properties": {
+     "variable": {
+      "type": "string",
+      "title": "Variable"
+     },
+     "etiqueta": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Etiqueta"
+     },
+     "estado": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Estado"
+     },
+     "tema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tema"
+     },
+     "etapa": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Etapa"
+     },
+     "visita": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Visita"
+     },
+     "nota": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Nota"
+     },
+     "antes": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Antes"
+     },
+     "despues": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Despues"
+     }
+    },
+    "type": "object",
+    "required": [
+     "variable"
+    ],
+    "title": "CambioEstado"
    },
    "CampoHiperparametro": {
     "properties": {
@@ -2598,6 +3138,30 @@
      "valor"
     ],
     "title": "CampoHiperparametro"
+   },
+   "Clasificacion": {
+    "properties": {
+     "variable": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Variable"
+     },
+     "estado": {
+      "type": "string",
+      "enum": [
+       "Lista",
+       "No usar"
+      ],
+      "title": "Estado"
+     }
+    },
+    "type": "object",
+    "required": [
+     "variable",
+     "estado"
+    ],
+    "title": "Clasificacion"
    },
    "ConexionEntrada": {
     "properties": {
@@ -2957,6 +3521,70 @@
      "silencio"
     ],
     "title": "CorridaSalida"
+   },
+   "DiferenciasDiccionario": {
+    "properties": {
+     "nuevas": {
+      "items": {
+       "$ref": "#/components/schemas/VariableDiccionario"
+      },
+      "type": "array",
+      "title": "Nuevas"
+     },
+     "quitadas": {
+      "items": {
+       "$ref": "#/components/schemas/VariableDiccionario"
+      },
+      "type": "array",
+      "title": "Quitadas"
+     },
+     "estados": {
+      "items": {
+       "$ref": "#/components/schemas/CambioEstado"
+      },
+      "type": "array",
+      "title": "Estados"
+     },
+     "desenlaces_activados": {
+      "items": {
+       "$ref": "#/components/schemas/CambioDesenlace"
+      },
+      "type": "array",
+      "title": "Desenlaces Activados"
+     },
+     "desenlaces_apagados": {
+      "items": {
+       "$ref": "#/components/schemas/CambioDesenlace"
+      },
+      "type": "array",
+      "title": "Desenlaces Apagados"
+     },
+     "sin_cambios": {
+      "type": "boolean",
+      "title": "Sin Cambios"
+     },
+     "vigente": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Vigente"
+     }
+    },
+    "type": "object",
+    "required": [
+     "nuevas",
+     "quitadas",
+     "estados",
+     "desenlaces_activados",
+     "desenlaces_apagados",
+     "sin_cambios"
+    ],
+    "title": "DiferenciasDiccionario"
    },
    "EjecucionNueva": {
     "properties": {
@@ -3764,6 +4392,47 @@
     ],
     "title": "PeticionInferencia"
    },
+   "PorClasificar": {
+    "properties": {
+     "vigente": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/VersionDiccionarioSalida"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "variables": {
+      "items": {
+       "$ref": "#/components/schemas/VariableDiccionario"
+      },
+      "type": "array",
+      "title": "Variables"
+     },
+     "borrador": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/BorradorDiccionario"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "total": {
+      "type": "integer",
+      "title": "Total"
+     }
+    },
+    "type": "object",
+    "required": [
+     "variables",
+     "total"
+    ],
+    "title": "PorClasificar"
+   },
    "ProgramacionEntrada": {
     "properties": {
      "nombre": {
@@ -4399,6 +5068,161 @@
      "type"
     ],
     "title": "ValidationError"
+   },
+   "VariableDiccionario": {
+    "properties": {
+     "variable": {
+      "type": "string",
+      "title": "Variable"
+     },
+     "etiqueta": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Etiqueta"
+     },
+     "estado": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Estado"
+     },
+     "tema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tema"
+     },
+     "etapa": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Etapa"
+     },
+     "visita": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Visita"
+     },
+     "nota": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Nota"
+     }
+    },
+    "type": "object",
+    "required": [
+     "variable"
+    ],
+    "title": "VariableDiccionario"
+   },
+   "VersionDiccionarioSalida": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "version": {
+      "type": "integer",
+      "title": "Version"
+     },
+     "estado": {
+      "type": "string",
+      "enum": [
+       "vigente",
+       "borrador",
+       "archivado"
+      ],
+      "title": "Estado"
+     },
+     "origen": {
+      "type": "string",
+      "enum": [
+       "subido",
+       "corrida",
+       "semilla"
+      ],
+      "title": "Origen"
+     },
+     "nota": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Nota"
+     },
+     "sha256": {
+      "type": "string",
+      "title": "Sha256"
+     },
+     "tamano": {
+      "type": "integer",
+      "title": "Tamano"
+     },
+     "creado_por": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Creado Por"
+     },
+     "creado_en": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Creado En"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "version",
+     "estado",
+     "origen",
+     "sha256",
+     "tamano",
+     "creado_en"
+    ],
+    "title": "VersionDiccionarioSalida"
    }
   },
   "securitySchemes": {

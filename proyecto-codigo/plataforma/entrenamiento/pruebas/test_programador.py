@@ -101,13 +101,26 @@ def test_sin_servidor_ni_usuario_la_corrida_real_falla_con_un_mensaje_claro(moto
     assert e.estado == 'error' and 'KMC_HOST y KMC_USUARIO' in e.mensaje and lanzador.llamadas == []
 
 
+def test_un_fallo_conocido_sale_explicado(motor):
+    with Session(motor) as s:
+        EJ.encolar(s, 'corrida', 'simulado', 'manual')
+        s.commit()
+    salida = ('Traceback (most recent call last):\nbotocore.exceptions.ClientError: An error occurred (AccessDenied) '
+              'when calling the CreateBucket operation: Access Denied.')
+    Programador(motor=motor, lanzar=Lanzador({'corrida': (1, salida)}), cfg=CFG).ciclo()
+    e = _ultima(motor)
+    assert e.estado == 'error' and e.mensaje.startswith('MinIO no le dio permiso') and 'CreateBucket' in e.registro
+
+
 def test_corrida_que_falla_y_base_sin_cambios(motor):
     with Session(motor) as s:
         EJ.encolar(s, 'corrida', 'simulado', 'manual', {'silencio': True})
         s.commit()
     Programador(motor=motor, lanzar=Lanzador({'corrida': (1, 'Traceback...\nRuntimeError: sin corte')}), cfg=CFG).ciclo()
     e = _ultima(motor)
-    assert e.estado == 'error' and 'código 1' in e.mensaje and 'sin corte' in e.mensaje and 'Traceback' in e.registro
+    # en la web, el paso que falló en palabras claras; el texto de Python queda en el registro («Ver detalle técnico»)
+    assert e.estado == 'error' and '«maia corrida»' in e.mensaje and 'Traceback' not in e.mensaje
+    assert 'Detalle técnico' in e.registro and 'código 1' in e.registro and 'sin corte' in e.registro
     with Session(motor) as s:
         EJ.encolar(s, 'corrida', 'simulado', 'manual')
         s.commit()
@@ -180,5 +193,5 @@ def test_entrenar_ahora_que_falla_deja_el_paso_donde_fallo(motor):
     Programador(motor=motor, lanzar=lanzador, cfg=CFG).ciclo()
     e = _ultima(motor)
     assert e.estado == 'error' and e.resultado == {'paso': 'entrenando_anomalias', 'hechos': []}
-    assert 'no hay cortes' in e.mensaje and len(lanzador.llamadas) == 1
+    assert 'Todavía no hay datos guardados' in e.mensaje and 'no hay cortes' in e.registro and len(lanzador.llamadas) == 1
     assert '--hiperparametros' not in lanzador.llamadas[0][0]

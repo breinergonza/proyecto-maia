@@ -16,11 +16,10 @@ from sqlalchemy.orm import Session
 from maia_api.consultas import corrida_de, esquema, etapas, nombre_etapa
 from maia_api.dependencias import EXPERTO, auditar, sesion
 from maia_api.esquemas import RevisionDatoEntrada, RevisionRiesgoEntrada
-from maia_comun.modelos_db import AlertaDato, RevisionDato, RevisionRiesgo, Riesgo, Usuario
+from maia_comun.modelos_db import PERCENTIL_ALTO, AlertaDato, RevisionDato, RevisionRiesgo, Riesgo, Usuario
 
 ruta = APIRouter(prefix='/revision', tags=['revisión'])
 MUESTRA_POR_GRUPO = 20
-PERCENTIL_ALTO = 90
 
 
 @ruta.get('/datos')

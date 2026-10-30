@@ -24,6 +24,11 @@ x-maia: &maia
   SMTP_REMITENTE: ${SMTP_REMITENTE:-alertas@maia.local}
   SMTP_TLS: ${SMTP_TLS:-true}
 
+x-mlflow-cliente: &mlflow-cliente                 # MLflow con autenticación nativa: trainer y API entran como el admin
+  MLFLOW_TRACKING_URI: http://mlflow:5000
+  MLFLOW_TRACKING_USERNAME: ${MLFLOW_USUARIO:-admin}
+  MLFLOW_TRACKING_PASSWORD: ${SERVICE_PASSWORD_MLFLOWADMIN}
+
 x-minio-servicio: &minio-servicio
   MINIO_URL: http://minio:9000
   MINIO_ACCESS_KEY: maia-servicio
@@ -83,6 +88,8 @@ services:
       MLFLOW_S3_ENDPOINT_URL: http://minio:9000
       AWS_ACCESS_KEY_ID: maia-mlflow
       AWS_SECRET_ACCESS_KEY: ${SERVICE_PASSWORD_MINIOMLFLOW}
+      <<: *mlflow-cliente                                # usuario y clave del admin que se crea en el primer arranque
+      MLFLOW_FLASK_SERVER_SECRET_KEY: ${SERVICE_BASE64_64_MLFLOWFLASK}
     depends_on:
       postgres: {condition: service_healthy}
       minio-init: {condition: service_completed_successfully}
@@ -92,12 +99,12 @@ services:
   trainer:
     build: {context: ., dockerfile: infra/docker/trainer.Dockerfile}
     # Es el programador: ejecuta las corridas programadas o pedidas en Administración y las aprobaciones de modelos
-    # (maia programador). También se puede entrar a la terminal y correr "maia corrida ..." a mano. Al arrancar copia
-    # el diccionario de los expertos (versionado en git) al volumen.
-    entrypoint: ["/bin/sh", "-c", "mkdir -p /datos/entradas && cp -f /app/nucleo/entradas/diccionario.xlsx /datos/entradas/ && exec maia programador"]
+    # (maia programador). También se puede entrar a la terminal y correr "maia corrida ..." a mano. El diccionario de
+    # los expertos vive con versiones en Postgres (página Diccionario): antes de cada corrida se baja la versión vigente
+    # al volumen; la del núcleo solo se siembra si la base no tiene ninguna (ya no se pisa en cada reinicio).
+    entrypoint: ["/bin/sh", "-c", "mkdir -p /datos/entradas && exec maia programador"]
     environment:
-      <<: [*maia, *minio-servicio]
-      MLFLOW_TRACKING_URI: http://mlflow:5000
+      <<: [*maia, *minio-servicio, *mlflow-cliente]
       MAIA_LGBM_DEVICE: ${MAIA_LGBM_DEVICE:-cuda}
       KMC_PW: ${KMC_PW:-}                              # opcional: mejor guardarla cifrada desde Administración
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
@@ -116,8 +123,7 @@ services:
   api:
     build: {context: ., dockerfile: infra/docker/api.Dockerfile}
     environment:
-      <<: [*maia, *minio-servicio]                     # MinIO: importa los paquetes que aprueba administración
-      MLFLOW_TRACKING_URI: http://mlflow:5000          # lee los entrenamientos para Administración › Entrenamientos
+      <<: [*maia, *minio-servicio, *mlflow-cliente]    # MinIO: paquetes que aprueba administración; MLflow: Entrenamientos
       MLFLOW_URL_PUBLICA: ${MLFLOW_URL_PUBLICA:-http://localhost:5000}   # enlace del navegador (túnel SSH)
       MAIA_JWT_SECRETO: ${SERVICE_BASE64_64_JWT}
       MAIA_SOLO_SIMULADO: ${MAIA_SOLO_SIMULADO:-false}

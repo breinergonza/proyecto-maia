@@ -10,7 +10,8 @@ import type { AlertaDato, LineaTemporal, Visita } from '../api/tipos'
 import { Aviso, Cargando, Insignia, Panel, Tabla, Vacio } from '../components/ui'
 import { cn } from '../lib/cn'
 import { HEX_SERIES } from '../lib/consultas'
-import { CAPAS, dec, dec2, edad, fecha, frase, indicador, posicion, riesgo } from '../lib/formato'
+import { dec, dec2, edad, fecha, indicador, riesgo, RIESGO_ALTO } from '../lib/formato'
+import { alerta, AYUDA_OMS, ayudaAlerta, ayudaPosicion, ayudaZ, cuantosMenos, datosAl, frenteOms, motivo, nivelAlto, peso } from '../lib/lenguaje'
 
 export default function Nino() {
   const { sujeto = '' } = useParams()
@@ -42,33 +43,36 @@ export default function Nino() {
           <p className="mt-1 text-salvia">
             {n.eg_semanas != null && <>Nació a las {dec(n.eg_semanas)} semanas de gestación</>}
             {n.anio_nacimiento && <>, en {n.anio_nacimiento}</>}
-            {n.grupo && <>. Grupo {n.grupo}</>}. Datos hasta el corte del {fecha(n.corte)}.
+            {n.grupo && <>. Grupo {n.grupo}</>}. {datosAl(n.corte)}.
           </p>
         </div>
       </div>
 
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
       <div className="space-y-4">
       {riesgos.length > 0 && (
-        <section aria-label="Riesgo calculado" className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
+        <section aria-label="Riesgo calculado" className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-1">
           {riesgos.map((r) => (
             <article key={r.id} className={cn('rounded-panel border bg-papel p-4 shadow-suave',
-              r.percentil >= 90 ? 'border-coral/50 shadow-[inset_4px_0_0_var(--color-coral)]' : 'border-linea')}>
+              r.percentil >= RIESGO_ALTO ? 'border-coral/50 shadow-[inset_4px_0_0_var(--color-coral)]' : 'border-linea')}>
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h2 className="text-base">{r.desenlace}</h2>
                   <p className="text-sm text-salvia">Calculado con lo medido hasta {r.visita}</p>
                 </div>
-                <div className="text-right">
-                  <p className={cn('text-2xl font-bold leading-none', r.percentil >= 90 ? 'text-coral-hondo' : 'text-teal')}>{posicion(r.percentil)}</p>
-                  <p className="text-xs text-salvia">posición de 0 a 100</p>
+                <div className="shrink-0 text-right" title={ayudaPosicion(r.percentil)}>
+                  {nivelAlto(r.percentil) && <Insignia tono="coral" className="mb-1">{nivelAlto(r.percentil)}</Insignia>}
+                  <p className={cn('text-2xl font-bold leading-none', r.percentil >= RIESGO_ALTO ? 'text-coral-hondo' : 'text-teal')}>
+                    {cuantosMenos(r.percentil)} de 10
+                  </p>
+                  <p className="text-xs text-salvia">niños tienen menos riesgo</p>
                 </div>
               </div>
               <p className="mt-3 text-sm">Riesgo estimado: <strong>{riesgo(r.riesgo)}</strong></p>
               {r.motivos.length > 0 && (
                 <>
                   <p className="mt-3 text-sm font-semibold">Lo que más pesó</p>
-                  <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm">{r.motivos.map((m) => <li key={m}>{m}</li>)}</ul>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm">{r.motivos.map((m) => <li key={m} title={m}>{peso(m)}</li>)}</ul>
                 </>
               )}
             </article>
@@ -108,7 +112,7 @@ function Recorrido({ visitas, elegida, elegir }: { visitas: Visita[]; elegida: s
     <div ref={caja} className="relative -mx-5 overflow-x-auto px-5 pb-2">
       <ol className="relative flex min-w-max gap-0" aria-label="Visitas en orden">
         {visitas.map((v, i) => {
-          const atencion = v.alertas_dato.length > 0 || v.riesgos.some((r) => r.percentil >= 90)
+          const atencion = v.alertas_dato.length > 0 || v.riesgos.some((r) => r.percentil >= RIESGO_ALTO)
           const activa = v.etapa === elegida
           return (
             <li key={v.etapa} className="relative w-36 shrink-0">
@@ -129,7 +133,7 @@ function Recorrido({ visitas, elegida, elegir }: { visitas: Visita[]; elegida: s
                 <span className="text-xs text-salvia">{v.edad_corregida != null ? `${edad(v.edad_corregida)} corregidos` : fecha(v.fecha)}</span>
                 <span className="mt-1 flex min-h-5 flex-wrap justify-center gap-1">
                   {v.alertas_dato.length > 0 && <Insignia tono="coral">{v.alertas_dato.length} por revisar</Insignia>}
-                  {v.riesgos.length > 0 && <Insignia tono={v.riesgos.some((r) => r.percentil >= 90) ? 'coral' : 'teal'}>riesgo</Insignia>}
+                  {v.riesgos.length > 0 && <Insignia tono={v.riesgos.some((r) => r.percentil >= RIESGO_ALTO) ? 'coral' : 'teal'}>riesgo</Insignia>}
                 </span>
               </button>
             </li>
@@ -149,7 +153,7 @@ function DetalleVisita({ visita }: { visita: Visita }) {
   const alertas = new Map(visita.alertas_dato.map((a) => [a.variable, a]))
   const z = Object.entries(visita.z).filter(([, v]) => v != null)
   return (
-    <div className="mt-4 grid gap-5 border-t border-linea pt-4 lg:grid-cols-[1.5fr_1fr] xl:grid-cols-1 2xl:grid-cols-[1.5fr_1fr]">
+    <div className="mt-4 grid grid-cols-1 gap-5 border-t border-linea pt-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] xl:grid-cols-1 2xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
       <div>
         <h3>{visita.nombre}: lo que se midió</h3>
         <p className="mb-3 text-sm text-salvia">{fecha(visita.fecha)}{visita.edad_corregida != null && ` · ${edad(visita.edad_corregida)} de edad corregida`}</p>
@@ -168,7 +172,7 @@ function DetalleVisita({ visita }: { visita: Visita }) {
                     <td className="text-sm">
                       {a ? (
                         <span>
-                          {frase(a.motivo) || 'Fuera de lo esperado'}
+                          {motivo(a.motivo) || 'Fuera de lo esperado'}
                           {rango(a) && <span className="text-salvia"> · esperado {rango(a)}</span>}
                         </span>
                       ) : ''}
@@ -183,12 +187,14 @@ function DetalleVisita({ visita }: { visita: Visita }) {
       <div className="space-y-5">
         {z.length > 0 && (
           <div>
-            <h3 className="mb-2">Puntaje z (OMS)</h3>
+            <h3 className="mb-2" title={AYUDA_OMS}>Frente a la OMS</h3>
             <ul className="divide-y divide-linea">
               {z.map(([k, v]) => (
-                <li key={k} className="flex justify-between py-1.5">
+                <li key={k} className="flex justify-between gap-3 py-1.5">
                   <span>{indicador(k)}</span>
-                  <span className={cn('font-semibold', (v as number) < -2 && 'text-[#7a5717]')}>{dec2(v)}</span>
+                  <span title={ayudaZ(v as number)} className={cn('text-right font-semibold', (v as number) < -2 && 'text-[#7a5717]')}>
+                    {frenteOms(v as number)}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -201,7 +207,7 @@ function DetalleVisita({ visita }: { visita: Visita }) {
               {visita.alertas_dato.map((a) => (
                 <li key={a.id}>
                   <span className="font-semibold">{a.etiqueta ?? a.variable}</span>{' '}
-                  {a.capas.map((c) => <Insignia key={c} className="mr-1">{CAPAS[c] ?? c}</Insignia>)}
+                  {a.capas.map((c) => <span key={c} title={ayudaAlerta(c)}><Insignia className="mr-1">{alerta(c)}</Insignia></span>)}
                 </li>
               ))}
             </ul>
@@ -231,7 +237,7 @@ function Crecimiento({ datos }: { datos: LineaTemporal }) {
   if (!filas.length) return null
   return (
     <Panel titulo="Crecimiento frente a la OMS"
-      accion={<span className="text-xs text-salvia">puntaje z por edad corregida · franja: bajo −2 DE</span>}>
+      accion={<span className="text-xs text-salvia" title={AYUDA_OMS}>0 = lo esperado para la edad corregida · franja: bajo para la edad</span>}>
       <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={filas} margin={{ left: 0, right: 16, top: 8 }}>
@@ -243,7 +249,7 @@ function Crecimiento({ datos }: { datos: LineaTemporal }) {
               stroke="#56736d" fontSize={12} />
             <YAxis domain={[(m: number) => Math.min(-3, Math.floor(m)), (m: number) => Math.max(2, Math.ceil(m))]}
               allowDataOverflow stroke="#56736d" fontSize={12} width={36} />
-            <Tooltip labelFormatter={(v) => `${edad(Number(v))} de edad corregida`} formatter={(v, nombre) => [dec2(Number(v)), nombre]} />
+            <Tooltip labelFormatter={(v) => `${edad(Number(v))} de edad corregida`} formatter={(v, nombre) => [`${frenteOms(Number(v))} (z ${dec2(Number(v))})`, nombre]} />
             <Legend verticalAlign="top" height={28} />
             {indicadores.map((k, i) => (
               <Line key={k} dataKey={k} name={indicador(k)} stroke={HEX_SERIES[i % HEX_SERIES.length]} strokeWidth={2}

@@ -51,6 +51,7 @@ services:
       MLFLOW_S3_ENDPOINT_URL: http://minio:9000
       AWS_ACCESS_KEY_ID: ${MLFLOW_MINIO_ACCESS_KEY:-maia-mlflow}
       AWS_SECRET_ACCESS_KEY: ${MLFLOW_MINIO_SECRET_KEY:?defina MLFLOW_MINIO_SECRET_KEY en .env}
+      # autenticación nativa: MLFLOW_TRACKING_USERNAME / MLFLOW_TRACKING_PASSWORD y MLFLOW_FLASK_SERVER_SECRET_KEY salen de .env
     depends_on:
       postgres: {condition: service_healthy}
       minio-init: {condition: service_completed_successfully}

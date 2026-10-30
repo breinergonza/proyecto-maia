@@ -148,6 +148,8 @@ Edite `.env` y cambie todo lo que dice `cambiar`:
 |---|---|
 | `POSTGRES_PASSWORD` y la clave dentro de `DATABASE_URL` | La misma clave nueva en los dos lugares |
 | `MLFLOW_DB_PASSWORD` | Clave de la base de MLflow (la crea `infra/local/initdb`) |
+| `MLFLOW_TRACKING_USERNAME`, `MLFLOW_TRACKING_PASSWORD` | Administrador de MLflow (autenticación nativa): se crea en el primer arranque y con él entran el trainer, el programador, la API y usted en http://localhost:5000 |
+| `MLFLOW_FLASK_SERVER_SECRET_KEY` | Firma las sesiones de la interfaz de MLflow (`openssl rand -hex 32`) |
 | `MINIO_ROOT_PASSWORD`, `MINIO_SECRET_KEY`, `MLFLOW_MINIO_SECRET_KEY` | Claves de 8 caracteres o más |
 | `MAIA_PAQUETE_CLAVE` | Secreto largo (`openssl rand -base64 32`). **Será la misma en Railway**: con ella se firman y verifican los paquetes |
 | `MAIA_JWT_SECRETO` | Secreto largo (`openssl rand -base64 48`) |
@@ -209,7 +211,7 @@ crea la cuenta de administración al arrancar.
 |---|---|
 | http://localhost:8080 | La aplicación (ingrese con `MAIA_ADMIN_EMAIL` / `MAIA_ADMIN_CLAVE`) |
 | http://localhost:8080/api/docs | Documentación de la API |
-| http://localhost:5000 | MLflow |
+| http://localhost:5000 | MLflow (usuario y clave: `MLFLOW_TRACKING_USERNAME` / `MLFLOW_TRACKING_PASSWORD`) |
 | http://localhost:9001 | Consola de MinIO (`MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`) |
 | http://localhost:8025 | Mailpit: los correos que envía la aplicación |
 

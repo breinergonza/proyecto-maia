@@ -8,7 +8,8 @@ import { pedir } from '../api/cliente'
 import type { NinoFila, Pagina, ResumenTablero } from '../api/tipos'
 import { Aviso, Boton, Cargando, Encabezado, Entrada, Insignia, Paginador, Selector, Vacio } from '../components/ui'
 import { cn } from '../lib/cn'
-import { dec, num, posicion } from '../lib/formato'
+import { dec, num } from '../lib/formato'
+import { ayudaPosicion, AYUDA_OMS, BAJO_EDAD, CAYO, esAlto, nivelCorto } from '../lib/lenguaje'
 
 const TAMANOS = [5, 10, 25, 50]
 const TAMANO = 5
@@ -37,9 +38,10 @@ const COLUMNAS: Columna[] = [
     celda: (n) => <>{n.desenlace_max ?? <span className="text-salvia">Sin riesgo calculado</span>}{n.n_riesgos > 1 && <span className="text-salvia"> y {n.n_riesgos - 1} más</span>}</>,
   },
   {
-    id: 'percentil_max', titulo: 'Posición', derecha: true, primero: 'desc',
-    celda: (n) => (n.percentil_max == null ? '—' : n.percentil_max >= 90
-      ? <Insignia tono="coral">{posicion(n.percentil_max)}</Insignia> : posicion(n.percentil_max)),
+    id: 'percentil_max', titulo: 'Nivel de riesgo', derecha: true, primero: 'desc',
+    celda: (n) => (n.percentil_max == null ? '—' : esAlto(n.percentil_max)
+      ? <span title={ayudaPosicion(n.percentil_max)}><Insignia tono="coral">{nivelCorto(n.percentil_max)}</Insignia></span>
+      : <span title={ayudaPosicion(n.percentil_max)} className="whitespace-nowrap">{nivelCorto(n.percentil_max)}</span>),
   },
   {
     id: 'n_alertas', titulo: 'Datos por revisar', derecha: true, primero: 'desc',
@@ -49,8 +51,8 @@ const COLUMNAS: Columna[] = [
     id: 'crecimiento', titulo: 'Crecimiento', primero: 'desc',
     celda: (n) => (
       <span className="flex flex-wrap gap-1">
-        {n.n_bajo_2de > 0 && <Insignia tono="ocre">Bajo −2 DE ×{n.n_bajo_2de}</Insignia>}
-        {n.n_caida_1de > 0 && <Insignia>Caída ×{n.n_caida_1de}</Insignia>}
+        {n.n_bajo_2de > 0 && <span title={AYUDA_OMS}><Insignia tono="ocre">{BAJO_EDAD} ×{n.n_bajo_2de}</Insignia></span>}
+        {n.n_caida_1de > 0 && <span title={`${CAYO}. ${AYUDA_OMS}`}><Insignia>Cayó ×{n.n_caida_1de}</Insignia></span>}
         {!n.n_bajo_2de && !n.n_caida_1de && <span className="text-salvia">—</span>}
       </span>
     ),
@@ -130,11 +132,11 @@ export default function Ninos() {
   return (
     <div className="flex flex-col lg:h-full">
       <Encabezado titulo="Niños">
-        Por defecto, ordenados por su riesgo más alto en este corte. Los códigos están seudonimizados: para saber quién es
+        Por defecto, ordenados por su riesgo más alto con los datos más recientes. Los códigos están seudonimizados: para saber quién es
         un niño hay que consultar la base de la Fundación.
       </Encabezado>
 
-      <div className="mb-4 grid shrink-0 gap-3 sm:grid-cols-2 xl:grid-cols-[1fr_16rem_14rem_auto]">
+      <div className="mb-4 grid grid-cols-1 shrink-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_16rem_14rem_auto]">
         <label className="sr-only" htmlFor="buscar">Buscar por código</label>
         <Entrada id="buscar" placeholder="Buscar por código" value={texto} onChange={(e) => setTexto(e.target.value)} />
         <label className="sr-only" htmlFor="desenlace">Desenlace</label>
@@ -142,11 +144,11 @@ export default function Ninos() {
           <option value="">Todos los desenlaces</option>
           {desenlaces.data?.riesgos_por_desenlace.map((d) => <option key={d.clave} value={d.clave}>{d.desenlace}</option>)}
         </Selector>
-        <label className="sr-only" htmlFor="percentil">Posición mínima</label>
+        <label className="sr-only" htmlFor="percentil">Nivel de riesgo</label>
         <Selector id="percentil" value={percentil} onChange={(e) => cambiar({ percentil_min: e.target.value })}>
           <option value="">Cualquier riesgo</option>
-          <option value="90">Riesgo alto (posición 90 o más)</option>
-          <option value="95">Posición 95 o más</option>
+          <option value="90">Riesgo alto (el 10 % con más riesgo)</option>
+          <option value="95">Riesgo muy alto (el 5 % con más riesgo)</option>
           <option value="0">Con algún riesgo calculado</option>
         </Selector>
         <MenuColumnas columnas={columnas} reordenar={reordenar} />

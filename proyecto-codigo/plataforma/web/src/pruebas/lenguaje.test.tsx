@@ -1,0 +1,127 @@
+// Las pantallas del equipo clínico hablan como el equipo clínico: el glosario (lib/lenguaje) y una guardia que falla si
+// en el texto visible de esas pantallas vuelve a aparecer un término técnico. El término técnico puede seguir en title.
+import { screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { alerta, cuantosMenos, frenteOms, motivo, nivelAlto, nivelCorto, peso } from '../lib/lenguaje'
+import { montar, simularApi, usuario } from './util'
+
+afterEach(() => vi.unstubAllGlobals())
+
+const PROHIBIDO = /posici[oó]n|percentil|puntaje z|\bcorte\b|\bcorrida\b|capa \d|[−-]2 DE|\bAUC\b/i
+
+describe('glosario clínico', () => {
+  it('dice la posición como comparación con los demás niños', () => {
+    expect(cuantosMenos(87)).toBe(8)
+    expect(nivelCorto(87)).toBe('Más que 8 de 10')
+    expect(nivelCorto(91)).toBe('Alto')
+    expect(nivelCorto(97)).toBe('Muy alto')
+    expect(nivelAlto(50)).toBeNull()
+    expect(nivelAlto(90)).toBe('Riesgo alto')
+  })
+
+  it('dice el puntaje z, las capas y los motivos del motor en palabras clínicas', () => {
+    expect(frenteOms(-2.4)).toBe('Bajo para la edad')
+    expect(frenteOms(0.3)).toBe('En el rango esperado')
+    expect(frenteOms(2.5)).toBe('Alto para la edad')
+    expect(alerta('2')).toBe('No cuadra con el resto de sus datos')
+    expect(motivo('valor atípico; fuera de la ventana de la etapa'))
+      .toBe('Valor muy distinto al de los demás niños; la fecha no corresponde a esta visita')
+    expect(motivo('algo que el glosario no conoce')).toBe('Algo que el glosario no conoce')
+  })
+
+  it('dice lo que más pesó en un riesgo sin códigos internos', () => {
+    expect(peso('Días en UCI (dias_uci) = 20')).toBe('Días en UCI: 20')
+    expect(peso('Perímetro cefálico a 40 sem (pc_40) = 35,4')).toBe('Perímetro cefálico a 40 sem: 35,4')
+    expect(peso('quiebre_cambio_de_sistema_2022 = 1')).toBe('Nació después del cambio de sistema 2022')
+    expect(peso('quiebre_cambio_de_sistema_2022 = 0')).toBe('Nació antes del cambio de sistema 2022')
+    expect(peso('z_peso_40_sem = -2,4')).toBe('Peso para la edad a 40 sem: bajo para la edad')
+    expect(peso('Sexo = Femenino')).toBe('Sexo: Femenino')
+  })
+})
+
+const corrida = { id: 3, estado: 'ok', tipo: 'demo', fuente: 'simulado', terminada: '2026-07-01T10:00:00Z', creada_en: '2026-07-01T09:00:00Z' }
+const resumen = {
+  corrida, corte: '2026-06-30', fuente: 'simulado', paquete: 'p1', ninos: 800, datos: 16000, datos_revisar: 200,
+  ninos_revisar: 90, datos_revisados: 10, alertas_por_1000: 12.5, alertas_por_capa: { '1': 50, '2': 90, '3': 60 },
+  alarmas_grupo: 1, ninos_con_riesgo: 300, ninos_riesgo_alto: 40, riesgos_altos: 55, percentil_alto: 90,
+  riesgos_por_desenlace: [{ clave: 'readm', desenlace: 'readmisión a los 3 meses', momento: 's40', momento_nombre: '40 semanas', ninos: 300, altos: 30, riesgo_medio: 0.12 }],
+  crecimiento_por_etapa: [{ etapa: 'm3', etapa_nombre: '3 meses (edad corregida)', indicador: 'peso', datos: 500, pct_bajo: 12, pct_caida: 4, z_mediano: -0.8 }],
+}
+const alertaDato = { id: 1, variable: 'peso_3m', etiqueta: 'Peso a los 3 meses', etapa: 'm3', valor: '9999', esperado: 5000,
+  rango_bajo: 4000, rango_alto: 6500, capas: ['1', '3'], motivo: 'valor atípico; fuera de la ventana de la etapa', prioridad: 1 }
+const linea = {
+  sujeto: 's1', grupo: null, eg_semanas: 31, anio_nacimiento: 2025, corte: '2026-06-30', corrida_id: 3, nombre_etapa: { m3: '3 meses' },
+  contexto: [], crecimiento: { peso: [{ etapa: 'm3', indicador: 'peso', fecha: '2026-03-01', edad_corregida: 90, valor: 4100, z: -2.4, bajo_2de: true, caida_1de: true, improbable: false }] },
+  visitas: [{
+    etapa: 'm3', nombre: '3 meses', orden: 3, fecha: '2026-03-01', edad_corregida: 90,
+    mediciones: [{ variable: 'peso_3m', etiqueta: 'Peso a los 3 meses', valor: '9999', unidad: 'g', fecha: '2026-03-01', tema: 'crecimiento' }],
+    z: { peso: -2.4, talla: 0.2 }, alertas_dato: [alertaDato],
+    riesgos: [{ id: 9, clave: 'readm', desenlace: 'readmisión a los 6 meses', momento: 'm3', riesgo: 0.41, percentil: 93, motivos: ['Peso al nacer (peso_nacer) = 769', 'quiebre_cambio_de_sistema_2022 = 1'], fecha_visita: '2026-03-01' }],
+  }],
+}
+const fila = { sujeto: 's1', eg_semanas: 31, grupo: null, percentil_max: 93, riesgo_max: 0.41, desenlace_max: 'readmisión a los 6 meses',
+  clave_max: 'readm', n_riesgos: 2, n_alertas: 1, n_bajo_2de: 2, n_caida_1de: 1 }
+const datoRevision = { ...alertaDato, sujeto: 's1', unidad: 'g', etapa_nombre: '3 meses', fecha: '2026-03-01', fuerza: 9, es_error: null, comentario: null }
+
+function api() {
+  simularApi((url) => {
+    if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('experto') } }
+    if (url === '/api/tablero/resumen') return { cuerpo: resumen }
+    if (url === '/api/tablero/alarmas-grupo') return { cuerpo: [{ grupo: null, periodo: '2026Q1', variable: 'peso_3m', etiqueta: 'Peso a los 3 meses', senal: 'cusum', valor: 1, referencia: 0, estadistico: 9, que_paso: 'subió de golpe en todo el programa' }] }
+    if (url.startsWith('/api/ninos?')) return { cuerpo: { total: 1, pagina: 1, tamano: 25, items: [fila] } }
+    if (url === '/api/ninos/s1/linea-temporal') return { cuerpo: linea }
+    if (url.startsWith('/api/revision/datos?')) return { cuerpo: { total: 1, pagina: 1, tamano: 10, items: [datoRevision] } }
+    if (url === '/api/revision/riesgos') return { cuerpo: { corrida_id: 3, items: [] } }
+    if (url === '/api/revision/resumen') return { cuerpo: { datos_por_capa: [{ capa: '2', respuestas: 4, si: 3, no: 1, no_se: 0, precision_pct: 75 }], riesgos_por_grupo: [] } }
+    return { cuerpo: {} }
+  })
+}
+
+const visible = () => document.body.textContent ?? ''
+
+describe('pantallas del equipo clínico sin términos técnicos', () => {
+  it('tablero', async () => {
+    api()
+    montar('/')
+    expect(await screen.findByText('niños con algún riesgo alto')).toBeInTheDocument()
+    expect(await screen.findByText('subió de golpe en todo el programa')).toBeInTheDocument()
+    expect(screen.getByText('No cuadra con el resto de sus datos')).toBeInTheDocument()
+    expect(visible()).toMatch(/Datos al 30 de jun/)
+    expect(visible()).not.toMatch(PROHIBIDO)
+  })
+
+  it('lista de niños', async () => {
+    api()
+    montar('/ninos')
+    expect(await screen.findByText('Alto')).toBeInTheDocument()
+    expect(screen.getByText('Bajo para la edad ×2')).toBeInTheDocument()
+    expect(visible()).not.toMatch(PROHIBIDO)
+  })
+
+  it('ficha del niño', async () => {
+    api()
+    montar('/ninos/s1')
+    expect(await screen.findByText('9 de 10')).toBeInTheDocument()
+    expect(screen.getAllByText('Riesgo alto').length).toBeGreaterThan(0)
+    expect(screen.getByText('Bajo para la edad')).toBeInTheDocument()
+    expect(screen.getByText(/Valor muy distinto al de los demás niños; la fecha no corresponde a esta visita/)).toBeInTheDocument()
+    expect(screen.getByText('Peso al nacer: 769')).toBeInTheDocument()
+    expect(screen.getByText('Nació después del cambio de sistema 2022')).toBeInTheDocument()
+    expect(visible()).not.toMatch(PROHIBIDO)
+    expect(visible()).not.toMatch(/\([a-z]+_[a-z0-9_]+\)|quiebre_/)
+  })
+
+  it('revisión de datos', async () => {
+    api()
+    montar('/revision/datos')
+    expect(await screen.findByText(/Para este niño se esperaba entre/)).toBeInTheDocument()
+    expect(visible()).not.toMatch(PROHIBIDO)
+  })
+
+  it('revisión de riesgos', async () => {
+    api()
+    montar('/revision/riesgos')
+    expect(await screen.findByText('No hay niños con riesgo calculado con los datos más recientes')).toBeInTheDocument()
+    expect(visible()).not.toMatch(PROHIBIDO)
+  })
+})

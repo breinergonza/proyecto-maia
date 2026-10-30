@@ -27,7 +27,7 @@ def _enlace(cfg: Configuracion, e: dict) -> str | None:
 @ruta.get('', response_model=Entrenamientos)
 def listar(fuente: Fuente | None = Query(None), limite: int = Query(30, ge=1, le=200),
            cfg: Configuracion = Depends(configuracion), _: Usuario = Depends(ADMIN)) -> Entrenamientos:
-    lector = ML.Lector(cfg.mlflow_tracking_uri)
+    lector = ML.Lector(cfg.mlflow_tracking_uri, cfg.mlflow_tracking_username, cfg.mlflow_tracking_password)
     try:
         datos = {t: lector.entrenamientos(t, fuente, limite) for t in ML.EXPERIMENTOS}
     except ML.MlflowNoDisponible as e:

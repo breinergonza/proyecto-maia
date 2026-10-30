@@ -89,11 +89,11 @@ export function EntrenarAhora({ fuente }: { fuente: Fuente }) {
               <span className="text-salvia">(si no, usa el último corte)</span>
             </label>
           </div>
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {hp.data.filter((h) => modelos[h.modelo]).map((h) => (
               <fieldset key={h.modelo} className="rounded-control border border-linea p-3">
                 <legend className="px-1 text-sm font-semibold">Hiperparámetros · {MODELOS[h.modelo]}</legend>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {h.campos.map((c) => (
                     <Campo key={c.nombre} id={`ea-${h.modelo}-${c.nombre}`} etiqueta={c.etiqueta} ayuda={`${c.minimo}–${c.maximo} · núcleo: ${c.defecto}`}>
                       <Entrada id={`ea-${h.modelo}-${c.nombre}`} type="number" inputMode="decimal" min={c.minimo} max={c.maximo}
@@ -161,7 +161,7 @@ export function EstadoEntrenamiento({ e }: { e: Ejecucion }) {
       )}
       {e.registro && (
         <details className="mt-1">
-          <summary className="cursor-pointer text-sm text-teal">Ver salida</summary>
+          <summary className="cursor-pointer text-sm text-teal">Ver detalle técnico</summary>
           <pre className="mt-1 max-h-60 overflow-auto rounded-control bg-tinta/95 p-3 text-xs leading-relaxed text-white">{e.registro}</pre>
         </details>
       )}

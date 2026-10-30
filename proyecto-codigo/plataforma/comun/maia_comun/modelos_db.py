@@ -22,6 +22,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     MetaData,
     PrimaryKeyConstraint,
     Text,
@@ -260,6 +261,26 @@ class Hiperparametro(Base):
     actualizado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+# ---- diccionario de variables con versiones (0005): el Excel de los expertos, guardado aquí y no en MinIO
+
+class VersionDiccionario(Base):
+    __tablename__ = 'diccionarios'
+    __table_args__ = (CheckConstraint("estado IN ('vigente','borrador','archivado')", name='estado'),
+                      CheckConstraint("origen IN ('subido','corrida','semilla')", name='origen'),
+                      Index('ix_diccionarios_un_vigente', 'estado', unique=True,
+                            postgresql_where=text("estado = 'vigente'")),
+                      {'schema': 'app'})
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    version: Mapped[int] = mapped_column(Integer, unique=True)
+    archivo: Mapped[bytes] = mapped_column(LargeBinary)          # el .xlsx tal cual (pesa poco)
+    sha256: Mapped[str] = mapped_column(Text)
+    estado: Mapped[str] = mapped_column(Text, server_default=text("'borrador'"))
+    origen: Mapped[str] = mapped_column(Text)
+    nota: Mapped[str | None] = mapped_column(Text)
+    creado_por: Mapped[uuid.UUID | None] = mapped_column(ForeignKey('app.usuarios.id', ondelete='SET NULL'))
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 # ============================================================ esquema resultados
 
 class Corrida(Base):
@@ -325,6 +346,10 @@ class AlarmaGrupo(Base):
     referencia: Mapped[float | None] = mapped_column(Float)
     estadistico: Mapped[float | None] = mapped_column(Float)
     que_paso: Mapped[str | None] = mapped_column(Text)
+
+
+# «Riesgo alto»: estar en el 10 % de mayor riesgo de su desenlace (percentil dentro de la corrida), no un umbral clínico.
+PERCENTIL_ALTO = 90
 
 
 class Riesgo(Base):

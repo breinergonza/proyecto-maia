@@ -125,6 +125,80 @@ Todas las versiones de Python están fijadas en `uv.lock` y las de JavaScript en
    avance y un aviso en el menú. No carga el corte en Postgres ni calcula riesgos (para eso está la corrida): solo
    deja el modelo en MLflow como `candidato`. Un solo entrenamiento en cola o en curso a la vez.
 
+15. **Ajustes para el uso clínico, primera parte (2026-10-30; fase 8 de la lista de chequeo).**
+   * **Regla simple:** la comparación con la regla que usa solo las variables que hoy mira el equipo clínico fue una
+     prueba interna. Sigue en MLflow (`metricas.interna`), pero ya no va a `resultados.metricas_modelo`, al paquete ni
+     a la API; `/modelos` la filtra también en los paquetes armados antes. Se quitó `GET /tablero/desempeno` (lo pedía
+     cualquier perfil y mandaba todas las métricas de validación) y el panel del Tablero.
+   * **Riesgo alto:** `/tablero/resumen` cuenta niños distintos (`ninos_riesgo_alto`) además del total por desenlace
+     (`riesgos_altos`), igual que la lista de niños. El umbral es uno solo: `PERCENTIL_ALTO` en `modelos_db` (90: el
+     10 % de mayor riesgo de cada desenlace, una posición relativa y no un umbral clínico) y `RIESGO_ALTO` en la web.
+   * **Pantalla de ingreso:** el gráfico de ejemplo ya no habla de «predicción de crecimiento» ni de «riesgo
+     moderado», que la plataforma no tiene: muestra el rango OMS, los controles y la caída que sí avisa.
+   * **Errores:** `maia_api/errores.py` traduce los errores de validación de Pydantic al español con el nombre visible
+     del campo (`detail` es una frase; `errores`, la lista por campo) y responde los 500 sin la traza. El programador
+     guarda un mensaje claro para los fallos conocidos (`programador.explicar`) y deja el texto original al final del
+     registro, bajo «Detalle técnico».
+   * **Interfaz:** las grillas declaran una columna que se puede encoger (`grid-cols-1` y `minmax(0, …fr)`), que es lo
+     que hacía salir de la pantalla al Tablero en el celular y cortaba la última columna de Usuarios. Usuarios queda en
+     tres columnas con las acciones fijas a la derecha; las alarmas de grupo tienen su propio panel.
+
+16. **Lenguaje clínico (2026-10-30; fase 8, punto 5).** Las pantallas del equipo clínico (Tablero, Niños, Niño, Datos
+   por revisar y Revisión de riesgos) y los correos de alerta usan palabras de consulta; el término técnico queda en
+   `title` y en Administración. Todo sale de `web/src/lib/lenguaje.ts`, el único lugar que hay que tocar cuando los
+   médicos de la Fundación revisen las palabras (pendiente: validarlas con ellos).
+   * Posición (percentil) → «N de 10 niños tienen menos riesgo»; ≥ 90 «Riesgo alto», ≥ 95 «Riesgo muy alto». En el
+     correo, «más riesgo que 97 de cada 100 niños del programa».
+   * Puntaje z → «Bajo para la edad» (< −2), «En el rango esperado», «Alto para la edad» (> +2); caída de más de
+     1 DE → «Cayó desde el último control».
+   * Capas → tipos de alerta («Valor fuera de lo esperado», «No cuadra con el resto de sus datos», «Cambio raro entre
+     controles», «Cambio en todo un grupo»), y los siete motivos que escribe el motor, en frases clínicas.
+   * «Lo que más pesó» sin códigos internos: se quita el `(codigo)` de la etiqueta, `quiebre_X = 1` es «Nació después
+     del X» y `z_<medida>_<visita>` se dice frente a la OMS.
+   * Corte → «Datos al {fecha}»; corrida → «actualización». El paquete y la corrida solo los ve administración.
+   * «Calcular el riesgo de un niño» usa el mismo glosario desde el punto 17.
+   * Guardia: `pruebas/lenguaje.test.tsx` pinta esas pantallas como experto y falla si en el texto visible vuelve a
+     aparecer «posición», «percentil», «puntaje z», «corte», «corrida», «Capa N», «−2 DE», «AUC» o un código interno.
+
+17. **Calcular el riesgo de un niño con un formulario (2026-10-30; fase 8, punto 6).** Antes era pegar un JSON.
+   `GET /api/inferencia/formulario` (experto y administración) arma el formulario con el esquema del paquete activo
+   (`sevarti_base/esquema.parquet` y `etapas.parquet`): datos generales (variables sin visita) y cada visita en orden,
+   con su ventana de edad, los desenlaces que se calculan con lo medido hasta ella (`momento` de cada modelo) y sus
+   campos (etiqueta; tipo número, lista con las categorías del diccionario, sí/no, fecha o texto; unidad y rango
+   habitual, solo informativo). Son **principales** las medidas de crecimiento y las 6 variables de cada visita que más
+   pesan: la ganancia de LightGBM de cada modelo de desenlace, normalizada por modelo y sumada (las columnas
+   `z_<medida>_<visita>` cuentan para las medidas de esa visita). El resto queda plegado. La web arma la misma petición
+   de siempre (`POST /api/inferencia` no cambió): `edad_dias` sale de la fecha de nacimiento y la de cada visita; las
+   visitas del nacimiento usan la fecha de nacimiento. Las validaciones (fechas, semanas de gestación 20 a 45, números)
+   se dicen en español; el rango no bloquea, porque un valor fuera de lo habitual es justo lo que el modelo de
+   anomalías debe ver. Los episodios no tienen campos: el JSON queda como «Modo avanzado», solo para administración.
+   Los resultados usan el glosario clínico del punto 16.
+   El niño de ejemplo se carga hasta la última visita en que se calcula un riesgo (el riesgo sale de la última visita
+   con datos), y la página lleva el resultado a la vista al terminar.
+
+18. **El diccionario de variables vive con versiones en la plataforma (2026-10-30; fase 8, punto 2).** El Excel sigue
+   siendo el formato de trabajo de los expertos (listas desplegables y validaciones), pero ya no vive en el volumen del
+   trainer: se guarda en Postgres (`app.diccionarios`, migración 0005) con número de versión, sha256, estado
+   (`vigente`, `borrador`, `archivado`), origen (`subido`, `corrida`, `semilla`), nota y autor. Va en Postgres y no en
+   MinIO porque pesa unos 50 KB y la API en Railway no tiene MinIO; un índice único parcial garantiza una sola vigente.
+   Toda validación pasa por `sevarti.diccionario.leer`, así que el núcleo sigue siendo la única fuente de reglas; los
+   errores se dicen en español con hoja y fila.
+   * API `/api/diccionario` (experto y administración): versiones, descargar, comparar antes de subir, subir (409 si es
+     igual a la vigente), diferencias, activar o volver a una anterior, variables por clasificar y clasificar rápido
+     (Lista o No usar), que crea una versión nueva. Subir, activar y clasificar quedan en la auditoría.
+   * Programador: antes de cada corrida o entrenamiento baja la vigente a `MAIA_RAIZ/entradas/diccionario.xlsx` (solo si
+     cambió); si la corrida agrega variables nuevas de la base, guarda un borrador y anota `resultado.variables_nuevas`.
+     Activar ese borrador suma sus variables nuevas a la vigente, sin deshacer lo que los expertos clasificaron
+     mientras tanto. Nada de esto hace fallar la ejecución.
+   * Semilla: si la base no tiene ninguna versión, la API o el programador siembran la del núcleo
+     (`nucleo/entradas`, ahora también en la imagen de la API). Se quitó el `cp -f` del trainer, que en cada reinicio
+     pisaba el archivo y perdía las variables nuevas y los cambios de los expertos.
+   * Web: página **Diccionario** (Revisión clínica), insignia en el menú y aviso en el Tablero con las variables por
+     clasificar. El menú lateral ahora se desplaza (`min-h-0`): con el enlace nuevo ya no cabía en ventanas de menos de
+     ~900 px de alto y escondía Usuarios y Notificaciones detrás de la tarjeta del usuario.
+   * En el compose local el trainer monta `nucleo/entradas` como `/datos/entradas`: bajar la vigente escribe en el
+     archivo del repositorio cuando difiere de la que está en la base. On-premise no pasa: es un volumen.
+
 ## Pendiente fuera de este código
 
 * **Primera extracción real con `kmc_postgres`.** Supone que `perfil_paciente` trae `anio_parto`, que `diccionario`
@@ -168,9 +242,9 @@ riesgo, suba `MAIA_DEMO_SUJETOS`.
 | Conjunto | Cantidad | Cómo |
 |---|---|---|
 | Núcleo | 191 (1 omitida) | `uv run pytest nucleo/pruebas` |
-| Común | 8 | Postgres real (`MAIA_TEST_DATABASE_URL`) y MinIO simulado (moto) |
+| Común | 9 + 1 + 6 | Postgres real (`MAIA_TEST_DATABASE_URL`) y MinIO simulado (moto); buckets de otro usuario de MinIO; texto del correo de alerta; versiones del diccionario |
 | Extracción KMC | 26 | 18 unitarias y 8 contra un esquema `consumo` de prueba en Postgres real |
-| Administración de ejecuciones | 19 + 7 + 9 | cron, cifrado, hiperparámetros, cola y conexión (comun); programador con lanzador falso; API con MLflow simulado |
+| Administración de ejecuciones | 19 + 9 + 3 + 10 | cron, cifrado, hiperparámetros, cola y conexión (comun); programador con lanzador falso, incluidos los mensajes de los fallos conocidos y el diccionario; API con MLflow simulado |
 | CLI de entrenamiento | flujo completo | simular → entrenar → registrar → promover → exportar → corrida → silencio |
-| API | 10 | paquete firmado real, Postgres real, SMTP de prueba |
-| Frontend | 18 | Vitest + Testing Library (5 de las páginas de administración, incluido entrenar ahora) |
+| API | 11 + 3 + 6 | paquete firmado real, Postgres real, SMTP de prueba; riesgo alto por niño y sin métricas de la regla simple; errores de validación en español y 500 sin traza; diccionario |
+| Frontend | 33 | Vitest + Testing Library (5 de las páginas de administración, incluido entrenar ahora; 8 del glosario clínico y la guardia de términos técnicos; 2 del formulario de cálculo; 5 del diccionario) |

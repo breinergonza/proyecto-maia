@@ -36,18 +36,18 @@ export default function AdminUsuarios() {
         Administración crea usuarios y cambia todo; un experto clínico responde las revisiones y calcula niños; consulta solo
         ve el tablero y la lista de niños.
       </Encabezado>
-      <div className="grid items-start gap-4 xl:grid-cols-[1fr_22rem]">
+      <div className="grid grid-cols-1 items-start gap-4 2xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="min-w-0">
           {lista.isPending ? <Cargando /> : lista.error ? <Aviso>{lista.error.message}</Aviso> : (
             <div className="rounded-panel border border-linea bg-papel p-2">
               <Tabla>
-                <thead><tr><th>Nombre</th><th>Perfil</th><th>Último ingreso</th><th>Estado</th><th></th></tr></thead>
+                <thead><tr><th>Usuario</th><th>Perfil</th><th className="sticky right-0 bg-papel"><span className="sr-only">Acciones</span></th></tr></thead>
                 <tbody>{lista.data.map((u) => <Fila key={u.id} u={u} />)}</tbody>
               </Tabla>
             </div>
           )}
         </div>
-        <Panel titulo="Nuevo usuario" className="max-w-xl xl:max-w-none">
+        <Panel titulo="Nuevo usuario" className="max-w-xl 2xl:max-w-none">
           <form className="space-y-3" noValidate onSubmit={f.handleSubmit((d) => crear.mutate(d))}>
             <Campo id="n-nombre" etiqueta="Nombre" error={e.nombre?.message}><Entrada id="n-nombre" aria-invalid={!!e.nombre} {...f.register('nombre')} /></Campo>
             <Campo id="n-email" etiqueta="Correo" error={e.email?.message}><Entrada id="n-email" type="email" aria-invalid={!!e.email} {...f.register('email')} /></Campo>
@@ -80,28 +80,34 @@ function Fila({ u }: { u: Usuario }) {
   return (
     <>
       <tr>
-        <td><p className="font-semibold">{u.nombre}</p><p className="text-salvia">{u.email}</p></td>
+        <td className="min-w-48">
+          <p className="flex flex-wrap items-center gap-2 font-semibold">
+            {u.nombre}{u.activo ? <Insignia tono="teal">Activo</Insignia> : <Insignia>Inactivo</Insignia>}
+          </p>
+          <p className="break-all text-salvia">{u.email}</p>
+          <p className="text-xs text-salvia">Último ingreso: {u.ultimo_ingreso ? fechaHora(u.ultimo_ingreso) : 'nunca'}</p>
+        </td>
         <td>
           <label className="sr-only" htmlFor={`rol-${u.id}`}>Perfil de {u.nombre}</label>
-          <Selector id={`rol-${u.id}`} className="h-8 w-44 text-sm" value={u.rol} disabled={soyYo || cambiar.isPending}
+          <Selector id={`rol-${u.id}`} className="h-8 w-40 text-sm" value={u.rol} disabled={soyYo || cambiar.isPending}
             onChange={(e) => cambiar.mutate({ rol: e.target.value as Rol })}>
             {Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </Selector>
         </td>
-        <td className="whitespace-nowrap">{fechaHora(u.ultimo_ingreso)}</td>
-        <td>{u.activo ? <Insignia tono="teal">Activo</Insignia> : <Insignia>Inactivo</Insignia>}</td>
-        <td className="space-x-1 whitespace-nowrap text-right">
-          <Boton chico variante="fantasma" onClick={() => setClave(clave === null ? '' : null)}>Contraseña</Boton>
-          {!soyYo && (
-            <Boton chico variante="fantasma" disabled={cambiar.isPending} onClick={() => cambiar.mutate({ activo: !u.activo })}>
-              {u.activo ? 'Desactivar' : 'Activar'}
-            </Boton>
-          )}
+        <td className="sticky right-0 bg-papel text-right">
+          <div className="flex flex-col items-end gap-1 sm:flex-row sm:justify-end">
+            <Boton chico variante="fantasma" onClick={() => setClave(clave === null ? '' : null)}>Contraseña</Boton>
+            {!soyYo && (
+              <Boton chico variante="fantasma" disabled={cambiar.isPending} onClick={() => cambiar.mutate({ activo: !u.activo })}>
+                {u.activo ? 'Desactivar' : 'Activar'}
+              </Boton>
+            )}
+          </div>
         </td>
       </tr>
       {(clave !== null || cambiar.error) && (
         <tr>
-          <td colSpan={5}>
+          <td colSpan={3}>
             {clave !== null && (
               <form className="flex flex-wrap items-center gap-2" onSubmit={(e) => { e.preventDefault(); cambiar.mutate({ clave }) }}>
                 <label htmlFor={`clave-${u.id}`} className="text-sm">Nueva contraseña para {u.nombre}</label>

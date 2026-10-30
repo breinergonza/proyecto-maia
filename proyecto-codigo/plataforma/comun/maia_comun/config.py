@@ -47,6 +47,8 @@ class Configuracion(BaseSettings):
     kmc_timeout: int = 20                           # segundos para conectar
     maia_lgbm_device: str = 'cpu'
     mlflow_tracking_uri: str = 'http://localhost:5000'
+    mlflow_tracking_username: str | None = None    # autenticación nativa de MLflow (las mismas variables del cliente mlflow)
+    mlflow_tracking_password: str | None = None
     mlflow_url_publica: str | None = None          # enlace a la interfaz de MLflow que muestra la web (p. ej. túnel SSH)
     minio_url: str = 'http://localhost:9000'
     minio_access_key: str = 'maia-servicio'
@@ -77,7 +79,8 @@ class Configuracion(BaseSettings):
     def _url(cls, v: str) -> str:
         return normalizar_url_db(v)
 
-    @field_validator('smtp_usuario', 'smtp_clave', 'kmc_pw', 'maia_cifrado_clave', 'mlflow_url_publica', mode='before')
+    @field_validator('smtp_usuario', 'smtp_clave', 'kmc_pw', 'maia_cifrado_clave', 'mlflow_url_publica',
+                     'mlflow_tracking_username', 'mlflow_tracking_password', mode='before')
     @classmethod
     def _vacio(cls, v):
         return v or None
