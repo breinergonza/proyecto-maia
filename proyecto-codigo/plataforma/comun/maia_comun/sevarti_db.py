@@ -1,7 +1,8 @@
 """Las seis tablas SEVARTI entre memoria, MinIO (cortes inmutables) y Postgres (el corte vigente).
 
 * ``subir_corte`` guarda un ``Sevarti`` como Parquet (formato de ``sevarti.contrato.guardar``) en
-  ``s3://maia-sevarti/cortes/{fuente}/{AAAA-MM-DD}/`` con el hash del conjunto.
+  ``s3://maia-sevarti/cortes/{fuente}/{AAAA-MM-DD}/`` con el hash del conjunto y, si viene de una extracción,
+  ``extraccion.json`` (parámetros y sha de las consultas; entra en el hash).
 * ``bajar_corte`` trae un corte de MinIO a una carpeta local y ``sevarti.contrato.leer`` lo abre.
 * ``guardar_en_db`` carga un corte en el esquema ``sevarti`` con ``COPY`` (el corte real tiene ~14 millones de
   mediciones) y lo deja vigente; el vigente anterior de la misma fuente se borra de Postgres (sigue en MinIO).
@@ -29,6 +30,7 @@ from sevarti.contrato import Sevarti
 
 FUENTES = ('kmc', 'simulado')
 BLOQUE_COPY = 250_000
+EXTRACCION = 'extraccion.json'
 
 
 @dataclass(frozen=True)
@@ -38,6 +40,8 @@ class InfoCorte:
     ruta_minio: str
     sha256: str
     filas: dict[str, int]
+    parametros: dict | None = None      # de extraccion.json, si el corte salió de una extracción
+    consulta_sha: str | None = None
 
 
 def fecha_corte(sev: Sevarti) -> str:
@@ -68,15 +72,28 @@ def prefijo_corte(fuente: str, fecha: str) -> str:
     return f'cortes/{fuente}/{fecha}'
 
 
-def subir_corte(sev: Sevarti, fuente: str, almacen: Almacen) -> InfoCorte:
+def subir_corte(sev: Sevarti, fuente: str, almacen: Almacen, parametros: dict | None = None,
+                consulta_sha: str | None = None, detalle: dict | None = None) -> InfoCorte:
+    """``parametros``, ``consulta_sha`` y ``detalle`` (p. ej. origen y sha de cada consulta, sin datos por niño ni
+    claves) van a ``extraccion.json``; deben ser deterministas, porque entran en el hash del corte."""
     _validar_fuente(fuente)
     fecha = fecha_corte(sev)
     with tempfile.TemporaryDirectory() as tmp:
         carpeta = SV.guardar(sev, Path(tmp) / 'corte')
+        if parametros is not None or consulta_sha is not None:
+            extraccion = {'parametros': parametros, 'consulta_sha': consulta_sha, **(detalle or {})}
+            (carpeta / EXTRACCION).write_text(json.dumps(extraccion, ensure_ascii=False, sort_keys=True, indent=1),
+                                              encoding='utf-8')
         sha = hash_carpeta(carpeta)
         (carpeta / 'sha256.txt').write_text(sha, encoding='utf-8')
         uri = almacen.subir_carpeta(carpeta, BUCKET_SEVARTI, prefijo_corte(fuente, fecha))
-    return InfoCorte(fuente, fecha, uri, sha, _filas(sev))
+    return InfoCorte(fuente, fecha, uri, sha, _filas(sev), parametros, consulta_sha)
+
+
+def leer_extraccion(carpeta: Path) -> dict:
+    """El ``extraccion.json`` de un corte bajado (vacío si el corte no salió de una extracción parametrizada)."""
+    ruta = carpeta / EXTRACCION
+    return json.loads(ruta.read_text(encoding='utf-8')) if ruta.exists() else {}
 
 
 def cortes_en_minio(almacen: Almacen, fuente: str) -> list[str]:
@@ -100,7 +117,9 @@ def bajar_corte(almacen: Almacen, fuente: str, destino: Path, fecha: str | None 
     if sha != sha_guardado:
         raise RuntimeError(f'El corte {fuente}/{fecha} no coincide con su hash: no se usa.')
     filas = _filas(SV.leer(carpeta))
-    return carpeta, InfoCorte(fuente, fecha, f's3://{BUCKET_SEVARTI}/{prefijo_corte(fuente, fecha)}/', sha, filas)
+    ext = leer_extraccion(carpeta)
+    return carpeta, InfoCorte(fuente, fecha, f's3://{BUCKET_SEVARTI}/{prefijo_corte(fuente, fecha)}/', sha, filas,
+                              ext.get('parametros'), ext.get('consulta_sha'))
 
 
 # ================================================================== Postgres
@@ -135,8 +154,9 @@ def _json_seguro(v):
 
 
 def guardar_en_db(motor: Engine, sev: Sevarti, fuente: str, ruta_minio: str | None = None,
-                  sha256: str | None = None) -> int:
-    """Carga el corte y lo deja vigente para su fuente. Devuelve el id del corte."""
+                  sha256: str | None = None, parametros: dict | None = None, consulta_sha: str | None = None) -> int:
+    """Carga el corte y lo deja vigente para su fuente. Devuelve el id del corte. ``parametros`` y ``consulta_sha``
+    dicen cómo se extrajo (``sevarti.cortes``)."""
     _validar_fuente(fuente)
     fecha = fecha_corte(sev)
     with Session(motor) as s, s.begin():
@@ -145,7 +165,7 @@ def guardar_en_db(motor: Engine, sev: Sevarti, fuente: str, ruta_minio: str | No
             s.delete(c)
         s.flush()
         corte = Corte(fuente=fuente, fecha_corte=date.fromisoformat(fecha), ruta_minio=ruta_minio, sha256=sha256,
-                      filas=_filas(sev), vigente=False)
+                      filas=_filas(sev), vigente=False, parametros=parametros, consulta_sha=consulta_sha)
         s.add(corte)
         s.flush()
         cid = corte.id

@@ -267,6 +267,14 @@ def test_ninos_y_linea_temporal(cliente, admin, corrida):
     if r['items'][0]['percentil_max'] is not None:
         filtrado = cliente.get('/api/ninos', headers=admin, params={'percentil_min': 90}).json()
         assert all(i['percentil_max'] >= 90 for i in filtrado['items'])
+    # orden por columna, en los dos sentidos, sobre todos los niños (no solo la página)
+    asc = cliente.get('/api/ninos', headers=admin, params={'orden': 'eg_semanas', 'dir': 'asc', 'tamano': 50}).json()
+    eg = [i['eg_semanas'] for i in asc['items'] if i['eg_semanas'] is not None]
+    assert eg == sorted(eg)
+    desc = cliente.get('/api/ninos', headers=admin, params={'orden': 'sujeto', 'dir': 'desc', 'tamano': 50}).json()
+    codigos = [i['sujeto'] for i in desc['items']]
+    assert codigos == sorted(codigos, reverse=True)
+    assert cliente.get('/api/ninos', headers=admin, params={'orden': 'columna_inexistente'}).status_code == 422
 
 
 def test_revision(cliente, admin, corrida):

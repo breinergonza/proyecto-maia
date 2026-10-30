@@ -39,6 +39,24 @@ def listar(s: Session = Depends(sesion), _: Usuario = Depends(ADMIN)) -> list[Pa
     return [_salida(p) for p in s.scalars(select(Paquete).order_by(Paquete.subido_en.desc()))]
 
 
+def registrar_paquete(s: Session, cfg: Configuracion, origen: Path, usuario_id=None) -> Paquete:
+    """Verifica un paquete (firma, hashes, versiones), lo copia a ``MAIA_DIR_PAQUETES`` y lo registra sin activarlo.
+    Lo usan la subida desde la web y la importación de un paquete aprobado (``trabajos.importar_aprobados``)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        contenido = PQ.verificar(origen, cfg.maia_paquete_clave, Path(tmp) / 'contenido',
+                                 solo_simulado=cfg.maia_solo_simulado)
+        version = contenido.manifest['version']
+        if s.get(Paquete, version):
+            raise FileExistsError(f'El paquete {version} ya está subido.')
+        destino = E.carpeta_paquete(cfg, version)
+        destino.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(origen, destino / PQ.NOMBRE)
+    p = Paquete(version=version, fuente=contenido.manifest['fuente'], manifest=contenido.manifest,
+                ruta=str(destino / PQ.NOMBRE), activo=False, subido_por=usuario_id)
+    s.add(p)
+    return p
+
+
 @ruta.post('/paquetes', response_model=PaqueteSalida)
 def subir(archivo: UploadFile = File(...), s: Session = Depends(sesion), cfg: Configuracion = Depends(configuracion),
           admin: Usuario = Depends(ADMIN)) -> PaqueteSalida:
@@ -52,20 +70,12 @@ def subir(archivo: UploadFile = File(...), s: Session = Depends(sesion), cfg: Co
                     raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, 'El paquete pasa de 1 GB.')
                 f.write(bloque)
         try:
-            contenido = PQ.verificar(ruta_tmp, cfg.maia_paquete_clave, Path(tmp) / 'contenido',
-                                     solo_simulado=cfg.maia_solo_simulado)
+            p = registrar_paquete(s, cfg, ruta_tmp, admin.id)
         except PQ.PaqueteInvalido as e:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from e
-        version = contenido.manifest['version']
-        if s.get(Paquete, version):
-            raise HTTPException(status.HTTP_409_CONFLICT, f'El paquete {version} ya está subido.')
-        destino = E.carpeta_paquete(cfg, version)
-        destino.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(ruta_tmp, destino / PQ.NOMBRE)
-    p = Paquete(version=version, fuente=contenido.manifest['fuente'], manifest=contenido.manifest,
-                ruta=str(destino / PQ.NOMBRE), activo=False, subido_por=admin.id)
-    s.add(p)
-    auditar(s, admin, 'subir_paquete', version, {'fuente': p.fuente})
+        except FileExistsError as e:
+            raise HTTPException(status.HTTP_409_CONFLICT, str(e)) from e
+    auditar(s, admin, 'subir_paquete', p.version, {'fuente': p.fuente})
     s.commit()
     s.refresh(p)
     return _salida(p)

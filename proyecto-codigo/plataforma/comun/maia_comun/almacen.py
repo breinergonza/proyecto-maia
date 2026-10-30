@@ -41,12 +41,22 @@ class Almacen:
 
     # ------------------------------------------------------------- buckets
     def asegurar_buckets(self, buckets: tuple[str, ...] = BUCKETS) -> None:
-        """Crea los buckets que falten (minio-init los crea en compose; esto es para pruebas y arranques limpios)."""
-        existentes = {b['Name'] for b in self.cliente.list_buckets().get('Buckets', [])}
+        """Crea los buckets que falten (minio-init los crea en compose; esto es para pruebas y arranques limpios).
+
+        Se pregunta bucket por bucket: el usuario de servicio no ve ``maia-mlflow`` (es del usuario de MLflow), así que
+        ``list_buckets`` no dice si existe. Un 403 es un bucket que existe y es de otro servicio: se deja como está."""
         for b in buckets:
-            if b not in existentes:
-                self.cliente.create_bucket(Bucket=b)
-                self.cliente.put_bucket_versioning(Bucket=b, VersioningConfiguration={'Status': 'Enabled'})
+            try:
+                self.cliente.head_bucket(Bucket=b)
+                continue
+            except ClientError as e:
+                codigo = e.response.get('Error', {}).get('Code')
+                if codigo in ('403', 'AccessDenied', 'Forbidden'):
+                    continue
+                if codigo not in ('404', 'NoSuchBucket', 'NotFound'):
+                    raise
+            self.cliente.create_bucket(Bucket=b)
+            self.cliente.put_bucket_versioning(Bucket=b, VersioningConfiguration={'Status': 'Enabled'})
 
     # ------------------------------------------------------------- objetos
     def subir_archivo(self, ruta: Path, bucket: str, clave: str) -> str:

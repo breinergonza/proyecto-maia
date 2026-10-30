@@ -14,7 +14,9 @@ Apoyo a la decisión, no diagnóstico.
 
 **Contenido:** [Arquitectura](#arquitectura) · [Local y Railway](#qué-corre-en-local-y-qué-va-en-railway) ·
 [Configuración local](#configuración-local) · [Ejecución local](#ejecución-local) ·
-[Despliegue completo](#despliegue-completo-paso-a-paso) · [Operación](#operación-del-semestre) ·
+[Despliegue completo](#despliegue-completo-paso-a-paso) · [On-premise con GPU](infra/on-premise/README.md) ·
+[Operación](#operación-del-semestre) · [Manual de uso](docs/manual_usuario.md) ·
+[Extracción parametrizada](docs/extraccion.md) ·
 [Desarrollo](#desarrollo) · [Problemas frecuentes](#problemas-frecuentes)
 
 ---
@@ -118,7 +120,8 @@ Reglas que no se rompen:
 * Ningún dato de un niño real sale del equipo local: ni a git, ni a Railway, ni a MLflow (que solo guarda agregados).
 * `railway up` no sube datos, modelos, `.env` ni respaldos (`.railwayignore`).
 * `MAIA_SOLO_SIMULADO=true` en Railway hace que la API rechace paquetes de la base real.
-* `KMC_PW` nunca va en un archivo, una imagen ni en Railway.
+* `KMC_PW` nunca va en un archivo, una imagen ni en Railway. Desde la web se guarda **cifrada** en la base (con
+  `MAIA_CIFRADO_CLAVE`, que solo vive en el entorno del servidor) y nunca se vuelve a mostrar.
 
 ---
 
@@ -157,7 +160,9 @@ no los cambie.
 
 ### 2. La clave de la base de la Fundación
 
-`KMC_PW` no va en `.env`. Elija una forma:
+`KMC_PW` no va en `.env`. Lo recomendado es escribirla en **Administración › Configuración** (queda cifrada; necesita
+`MAIA_CIFRADO_CLAVE` en `.env`) y programar ahí las corridas: `make programador` enciende el servicio que las ejecuta.
+Para correr `make corrida` a mano, elija una forma:
 
 ```bash
 export KMC_PW='...'                                        # solo para esta terminal
@@ -170,6 +175,24 @@ El `Makefile` la toma de la terminal o, si no está, del llavero.
 ---
 
 ## Ejecución local
+
+### Solo ver la aplicación (base de datos, API y web)
+
+Para recorrer las pantallas sin MinIO, MLflow ni trainer. Las claves salen del mismo `.env` de la pila completa
+(`make env` y cambiar todo lo que dice `cambiar`); el compose no trae ninguna escrita y no arranca si falta una:
+
+```bash
+make env                                                  # una vez: crea .env desde .env.example
+docker compose -f docker-compose.app.yml up -d --build    # http://localhost:8080
+docker compose -f docker-compose.app.yml down -v          # detiene y borra los datos de prueba
+```
+
+Del `.env` usa `POSTGRES_PASSWORD` (solo letras y números: va dentro de la URL de la base), `MAIA_JWT_SECRETO`,
+`MAIA_PAQUETE_CLAVE`, `MAIA_ADMIN_EMAIL` y `MAIA_ADMIN_CLAVE` (12 caracteres o más; con ellas se ingresa). La API
+siembra 1.000 niños simulados (`MAIA_DEMO_SUJETOS`). El tablero y los riesgos quedan vacíos hasta que se publique un
+paquete firmado con la misma `MAIA_PAQUETE_CLAVE` (ver [Probar con datos simulados](#probar-con-datos-simulados), con
+la pila completa). Otro puerto: `WEB_PUERTO=8081`. La cuenta de administración se crea solo con la base vacía: si
+cambia `MAIA_ADMIN_CLAVE` después, cámbiela también en **Administración → Usuarios** (o empiece de cero con `down -v`).
 
 ### Levantar todo
 
@@ -259,6 +282,9 @@ El orden importa: Railway recibe modelos que se entrenan en el equipo local, as�
 | A9 | `make corrida` (base real) | Corrida terminada; Excel en `maia-salidas`; tablero con los niños reales |
 | A10 | Activar desenlaces en **Notificaciones** y **Enviar prueba** | El correo llega (Mailpit o el buzón real) |
 | A11 | Programar la corrida (ver [Operación](#operación-del-semestre)) | `crontab -l` muestra la línea |
+
+> **Alternativa: todo on-premise en un servidor con GPU.** Si el servidor propio tiene GPU NVIDIA, las fases A a D
+> se reemplazan por un solo recurso Docker Compose: ver [`infra/on-premise/README.md`](infra/on-premise/README.md).
 
 ### Fase B · Railway (una sola vez)
 
@@ -375,8 +401,13 @@ proyecto-codigo/
 │   ├── local/                 docker-compose del equipo local, inicialización de Postgres y MinIO
 │   ├── docker/                Dockerfile de trainer (CUDA), api, web (nginx) y mlflow
 │   ├── railway/               guía detallada de la demostración
+│   ├── on-premise/            guía del despliegue completo on-premise (docker-compose.on-premise.yml)
 │   └── openapi.json           contrato de la API (de él salen los tipos del frontend)
 ├── docs/decisiones.md         versiones, desvíos del plan y lo que falta verificar
+├── docs/manual_usuario.md     manual de uso por perfil (administración, experto clínico, consulta)
+├── docs/extraccion.md         extracción parametrizada desde la base PostgreSQL de la Fundación
+├── docker-compose.app.yml     solo base de datos, API y web, para ver la aplicación
+├── docker-compose.on-premise.yml  despliegue completo en un servidor con GPU
 ├── Makefile                   todas las tareas ("make" muestra la ayuda)
 └── uv.lock                    versiones exactas de Python
 ```

@@ -41,12 +41,13 @@ COLUMNAS = dict(
     quiebres=('quiebre', 'fecha'),
     desenlaces=('clave', 'nombre', 'estado', 'regla', 'momento', 'variable', 'codigos', 'negativos', 'percentil',
                 'medida', 'etapa', 'solo_desde', 'comparar', 'nota'),
-    crecimiento=('indicador', 'concepto', 'unidad', 'por_talla', 'z_bajo', 'caida', 'estado'),
+    crecimiento=('indicador', 'concepto', 'unidad', 'por_talla', 'z_bajo', 'caida', 'z_improbable_min',
+                 'z_improbable_max', 'estado'),
     curva=('sexo', 'codigo_nino', 'codigo_nina', 'etapas'),
 )
 _FLOTANTES = {'variables': ('tolerancia', 'rango_min', 'rango_max'),
               'visitas': ('edad_min', 'edad_max', 'edad_fija'),
-              'desenlaces': ('percentil',), 'crecimiento': ('z_bajo', 'caida')}
+              'desenlaces': ('percentil',), 'crecimiento': ('z_bajo', 'caida', 'z_improbable_min', 'z_improbable_max')}
 _TEXTOS_VACIOS = ('codigos_especiales', 'categorias')   # "no codes" is the empty text, as in the SEVARTI schema
 
 # What the Excel shows for each internal value of the closed columns.
@@ -78,7 +79,9 @@ _OBLIGATORIAS = {'Variables': ('variable', 'estado', 'tipo'), 'Visitas': ('etapa
                  'Curva OMS': ('sexo', 'codigo_nino', 'codigo_nina', 'etapas')}
 _NUMEROS = {'Variables': ('tolerancia', 'rango_min', 'rango_max'),
             'Visitas': ('orden', 'edad_min', 'edad_max', 'edad_fija'),
-            'Desenlaces': ('percentil',), 'Crecimiento': ('z_bajo', 'caida')}
+            'Desenlaces': ('percentil',), 'Crecimiento': ('z_bajo', 'caida', 'z_improbable_min', 'z_improbable_max')}
+# columns added after the first dictionaries: a file without them reads them as empty (the default)
+_OPCIONALES = {'Crecimiento': ('z_improbable_min', 'z_improbable_max')}
 _FECHAS = {'Quiebres': ('fecha',)}
 
 # ---------------------------------------------------------------- the workbook
@@ -223,6 +226,12 @@ LIBRO = LB.Libro(
                        'para el desenlace "Crecimiento bajo". Vacío es -2, el corte de la OMS.', 12),
             LB.Columna('caida', 'Caída que alerta', 'Cuántas desviaciones estándar tiene que bajar desde la visita '
                        'anterior para alertar. Vacío es 1.', 12),
+            LB.Columna('z_improbable_min', 'Dato improbable si z menor que', 'Puntaje z bajo el cual la medida no '
+                       'es un hallazgo sino un dato para revisar. Vacío es el límite de la OMS: -6 en peso y talla, -5 '
+                       'en perímetro cefálico y peso para la talla.', 12),
+            LB.Columna('z_improbable_max', 'Dato improbable si z mayor que', 'Puntaje z sobre el cual la medida no '
+                       'es un hallazgo sino un dato para revisar. Vacío es el límite de la OMS: +6 en talla, +5 en '
+                       'peso, perímetro cefálico y peso para la talla.', 12),
             _t('estado', 'Estado', 'En uso: el modelo la usa. En prueba: solo en "python -m clinico experimento". No '
                'usar: no se calcula.', 12, opciones=_opciones(_ESTADO_CLINICO)),
         ), filas_extra=5),
@@ -380,6 +389,9 @@ def _leer_hoja(ruta: Path, nombre: str, errores: _Errores) -> pd.DataFrame:
     hoja = LIBRO.hoja(nombre)
     t = LB.leer(LIBRO, ruta, nombre)
     titulos = {c.clave: c.titulo for c in hoja.columnas}
+    for c in _OPCIONALES.get(nombre, ()):
+        if c not in t:
+            t[c] = np.nan
     faltan = [titulos[c] for c in titulos if c not in t]
     if faltan:
         raise ValueError(f'La hoja "{nombre}" de {ruta.name} no tiene las columnas {faltan}: puede que hayan '

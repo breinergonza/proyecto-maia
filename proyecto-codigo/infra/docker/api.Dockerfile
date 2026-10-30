@@ -30,7 +30,9 @@ COPY plataforma/comun plataforma/comun
 COPY plataforma/api plataforma/api
 RUN uv sync --frozen --no-dev --package maia-api
 
-RUN useradd --create-home --uid 10001 maia && mkdir -p /datos/paquetes && chown -R maia:maia /datos
+# chmod: el código lo lee un usuario sin root aunque el checkout tenga permisos 600
+RUN chmod -R a+rX /app \
+    && useradd --create-home --uid 10001 maia && mkdir -p /datos/paquetes && chown -R maia:maia /datos
 USER maia
 ENV PATH="/app/.venv/bin:$PATH"
 VOLUME ["/datos"]

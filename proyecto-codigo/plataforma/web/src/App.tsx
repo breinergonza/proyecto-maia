@@ -8,9 +8,12 @@ import { Marco } from './components/Marco'
 import Ingresar from './paginas/Ingresar'
 
 // Cada página se descarga cuando se abre: la primera carga queda liviana.
+const AdminConfiguracion = lazy(() => import('./paginas/AdminConfiguracion'))
 const AdminCorridas = lazy(() => import('./paginas/AdminCorridas'))
+const AdminEntrenamientos = lazy(() => import('./paginas/AdminEntrenamientos'))
 const AdminModelos = lazy(() => import('./paginas/AdminModelos'))
 const AdminNotificaciones = lazy(() => import('./paginas/AdminNotificaciones'))
+const AdminProgramacion = lazy(() => import('./paginas/AdminProgramacion'))
 const AdminUsuarios = lazy(() => import('./paginas/AdminUsuarios'))
 const Inferencia = lazy(() => import('./paginas/Inferencia'))
 const Nino = lazy(() => import('./paginas/Nino'))
@@ -44,6 +47,9 @@ export function Rutas() {
         <Route path="revision/datos" element={<Requiere roles={['admin', 'experto']}><RevisionDatos /></Requiere>} />
         <Route path="revision/riesgos" element={<Requiere roles={['admin', 'experto']}><RevisionRiesgos /></Requiere>} />
         <Route path="inferencia" element={<Requiere roles={['admin', 'experto']}><Inferencia /></Requiere>} />
+        <Route path="admin/configuracion" element={<Requiere roles={['admin']}><AdminConfiguracion /></Requiere>} />
+        <Route path="admin/programacion" element={<Requiere roles={['admin']}><AdminProgramacion /></Requiere>} />
+        <Route path="admin/entrenamientos" element={<Requiere roles={['admin']}><AdminEntrenamientos /></Requiere>} />
         <Route path="admin/modelos" element={<Requiere roles={['admin']}><AdminModelos /></Requiere>} />
         <Route path="admin/corridas" element={<Requiere roles={['admin']}><AdminCorridas /></Requiere>} />
         <Route path="admin/usuarios" element={<Requiere roles={['admin']}><AdminUsuarios /></Requiere>} />

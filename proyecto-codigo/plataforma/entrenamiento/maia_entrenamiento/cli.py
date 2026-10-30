@@ -1,19 +1,29 @@
 """CLI ``maia``: todo lo que corre en el equipo local con GPU (sección 4.7 del plan).
 
     maia verificar-gpu                       ¿LightGBM entrena en CUDA? (y cuánto gana frente a CPU)
-    maia extraer --fuente kmc                base de la Fundación -> MinIO (necesita KMC_PW)
+    maia extraer --fuente kmc [filtros]      base de la Fundación -> MinIO (necesita KMC_PW)
     maia simular --sujetos 5000              datos simulados -> MinIO
     maia cargar-corte --fuente F             último corte de MinIO -> Postgres (vigente)
     maia entrenar anomalias|clinico          valida, entrena y registra en MLflow (alias candidato)
     maia experimento-desenlaces              valida los desenlaces "En prueba" sin tocar el modelo en uso
     maia promover anomalias|clinico -v N     mueve el alias produccion a la versión N
     maia modelos                             modelos registrados y sus alias
-    maia corrida [--silencio]                la corrida semestral completa
+    maia corrida [--silencio] [filtros]      la corrida semestral completa
     maia silencio-retrospectivo --corte F    riesgos calculados en una fecha pasada frente a lo que pasó
     maia exportar                            arma y firma el paquete de modelos para la API
     maia publicar --url URL --version V      sube un paquete a la API (Railway)
+    maia programador                         ejecuta lo programado o pedido desde Administración (servicio)
 
 Todas aceptan ``--fuente kmc|simulado`` (por defecto ``simulado``).
+
+``extraer`` y ``corrida`` aceptan parámetros de extracción (consultas parametrizadas, ver docs/extraccion.md):
+
+    --fecha-corte AAAA-MM-DD     nada fechado después entra; es la fecha del corte
+    --anio-desde / --anio-hasta  año de nacimiento (anio_parto)
+    --desde-visita AAAA-MM-DD    solo niños con alguna visita desde esa fecha (conservan su historia)
+    --hasta-visita AAAA-MM-DD    ninguna visita posterior entra
+
+(En ``corrida``, ``--desde`` sigue siendo el inicio del periodo de revisión, no un filtro de extracción.)
 """
 from __future__ import annotations
 
@@ -45,6 +55,11 @@ class Tipo(StrEnum):
 
 
 FUENTE = typer.Option(Fuente.simulado, '--fuente', '-f', help='kmc (base real) o simulado')
+FECHA_CORTE = typer.Option(None, '--fecha-corte', help='AAAA-MM-DD: nada fechado después entra; fecha del corte')
+ANIO_DESDE = typer.Option(None, '--anio-desde', help='año de nacimiento mínimo')
+ANIO_HASTA = typer.Option(None, '--anio-hasta', help='año de nacimiento máximo')
+DESDE_VISITA = typer.Option(None, '--desde-visita', help='AAAA-MM-DD: solo niños con alguna visita desde esa fecha')
+HASTA_VISITA = typer.Option(None, '--hasta-visita', help='AAAA-MM-DD: ninguna visita posterior entra')
 
 
 def _decir(texto: str) -> None:
@@ -66,6 +81,22 @@ def _almacen():
 def _motor():
     from maia_comun.db import motor
     return motor()
+
+
+def _parametros(fecha_corte: str | None, anio_desde: int | None, anio_hasta: int | None, desde_visita: str | None,
+                hasta_visita: str | None):
+    from maia_entrenamiento.fuentes.kmc_postgres import ParametrosExtraccion
+    try:
+        return ParametrosExtraccion.desde_textos(fecha_corte, anio_desde, anio_hasta, desde_visita, hasta_visita)
+    except ValueError as e:
+        raise typer.BadParameter(str(e)) from None
+
+
+def _subir_extraccion(sev, meta: dict, almacen):
+    """Sube el corte extraído con su extraccion.json (parámetros, sha de las consultas, origen sin clave)."""
+    from maia_comun import sevarti_db as SDB
+    detalle = {k: meta[k] for k in ('origen', 'consultas', 'columnas_excluidas', 'filas')}
+    return SDB.subir_corte(sev, 'kmc', almacen, meta['parametros'], meta['consulta_sha'], detalle)
 
 
 @app.callback()
@@ -92,17 +123,25 @@ def verificar_gpu(medir: bool = typer.Option(True, help='medir CPU frente a GPU'
 
 @app.command()
 def extraer(fuente: Fuente = typer.Option(Fuente.kmc, '--fuente', '-f'),
-            cargar: bool = typer.Option(False, help='también cargarlo en Postgres')) -> None:
-    """Lee la base de la Fundación (solo lectura, KMC_PW), la pasa a SEVARTI y la guarda en MinIO."""
+            cargar: bool = typer.Option(False, help='también cargarlo en Postgres'),
+            fecha_corte: str | None = FECHA_CORTE, anio_desde: int | None = ANIO_DESDE,
+            anio_hasta: int | None = ANIO_HASTA, desde_visita: str | None = DESDE_VISITA,
+            hasta_visita: str | None = HASTA_VISITA) -> None:
+    """Lee la base de la Fundación (solo lectura, KMC_PW, consultas parametrizadas), la pasa a SEVARTI y la guarda
+    en MinIO con los parámetros de la extracción."""
     if fuente != Fuente.kmc:
         raise typer.BadParameter('extraer es para la base real; para datos simulados use: maia simular')
     from maia_comun import sevarti_db as SDB
     from maia_entrenamiento import datos as D
-    sev = D.extraer_kmc()
-    info = SDB.subir_corte(sev, 'kmc', _almacen())
-    _decir(f'Corte {info.fecha} guardado en {info.ruta_minio} ({info.filas["mediciones"]:,} datos, sha {info.sha256[:12]})')
+    params = _parametros(fecha_corte, anio_desde, anio_hasta, desde_visita, hasta_visita)
+    if not params.vacio:
+        _decir(f'Parámetros de extracción: {json.dumps(params.como_dict())}')
+    sev, meta = D.extraer_kmc(params)
+    info = _subir_extraccion(sev, meta, _almacen())
+    _decir(f'Corte {info.fecha} guardado en {info.ruta_minio} ({info.filas["mediciones"]:,} datos, sha {info.sha256[:12]}, '
+           f'consultas {meta["consulta_sha"][:12]})')
     if cargar:
-        cid = SDB.guardar_en_db(_motor(), sev, 'kmc', info.ruta_minio, info.sha256)
+        cid = SDB.guardar_en_db(_motor(), sev, 'kmc', info.ruta_minio, info.sha256, info.parametros, info.consulta_sha)
         _decir(f'Cargado en Postgres como corte {cid} (vigente).')
 
 
@@ -127,7 +166,8 @@ def cargar_corte(fuente: Fuente = FUENTE, fecha: str | None = typer.Option(None,
     from maia_comun import sevarti_db as SDB
     from maia_entrenamiento import datos as D
     sev, info, _ = D.corte_local(_almacen(), fuente.value, fecha)
-    cid = SDB.guardar_en_db(_motor(), sev, fuente.value, info.ruta_minio, info.sha256)
+    cid = SDB.guardar_en_db(_motor(), sev, fuente.value, info.ruta_minio, info.sha256, info.parametros,
+                            info.consulta_sha)
     _decir(f'Corte {fuente.value}/{info.fecha} cargado en Postgres (id {cid}, vigente): '
            f'{info.filas["sujetos"]:,} niños, {info.filas["mediciones"]:,} datos.')
 
@@ -139,22 +179,46 @@ def entrenar(tipo: Tipo, fuente: Fuente = FUENTE,
              config: Path | None = typer.Option(None, help='JSON con parámetros que cambian, p. ej. {"alpha": 0.002}'),
              sin_validacion: bool = typer.Option(False, '--sin-validacion', help='solo entrenar (sin métricas)'),
              fecha: str | None = typer.Option(None, help='corte AAAA-MM-DD; por defecto el último'),
-             sin_registro: bool = typer.Option(False, '--sin-registro', help='no registrar en MLflow')) -> None:
+             sin_registro: bool = typer.Option(False, '--sin-registro', help='no registrar en MLflow'),
+             hiperparametros: str | None = typer.Option(
+                 None, help='JSON con los hiperparámetros de este entrenamiento (los de la web); mandan sobre los '
+                            'guardados en Administración')) -> None:
     """Valida, entrena con todos los datos, guarda en MAIA_RAIZ/interno y registra en MLflow con alias candidato."""
+    from maia_comun import hiperparametros as HP
     from maia_entrenamiento import datos as D
     from maia_entrenamiento import entrenar as E
     from maia_entrenamiento import registro as R
     sev, info, _ = D.corte_local(_almacen(), fuente.value, fecha)
     if not sin_registro:
         R.configurar()
+    extraccion = R.params_extraccion(info.parametros, info.consulta_sha)
+    pedidos = None
+    if hiperparametros:
+        try:
+            pedidos = HP.validar(tipo.value, json.loads(hiperparametros))
+        except (ValueError, TypeError) as e:
+            raise typer.BadParameter(f'--hiperparametros: {e}') from None
+    _decir(f'Corte {info.fecha} ({info.filas["sujetos"]:,} niños).')
     if tipo == Tipo.anomalias:
-        r = E.entrenar_anomalias(sev, fuente.value, E.config_anomalias(str(config) if config else None),
-                                 validar=not sin_validacion, registrar=not sin_registro)
+        if config:   # el archivo manda sobre los ajustes de administración
+            cfg, ajustes = E.config_anomalias(str(config)), json.loads(config.read_text(encoding='utf-8'))
+        elif pedidos is not None:
+            cfg, ajustes = HP.aplicar(E.config_anomalias(None), pedidos), pedidos
+        else:
+            cfg, ajustes = HP.leer_y_aplicar(E.config_anomalias(None), 'anomalias')
+        r = E.entrenar_anomalias(sev, fuente.value, cfg, validar=not sin_validacion, registrar=not sin_registro,
+                                 extraccion=extraccion, ajustes=ajustes)
     else:
         if config:
             raise typer.BadParameter('La configuración clínica sale del diccionario de variables, no de --config.')
-        r = E.entrenar_clinico(sev, fuente.value, D.config_clinica(fuente.value), validar=not sin_validacion,
-                               registrar=not sin_registro)
+        if pedidos is not None:
+            cfg, ajustes = HP.aplicar(D.config_clinica(fuente.value), pedidos), pedidos
+        else:
+            cfg, ajustes = HP.leer_y_aplicar(D.config_clinica(fuente.value), 'clinico')
+        r = E.entrenar_clinico(sev, fuente.value, cfg, validar=not sin_validacion, registrar=not sin_registro,
+                               extraccion=extraccion, ajustes=ajustes)
+    if ajustes:
+        _decir(f'Hiperparámetros ajustados: {json.dumps(ajustes)}')
     _decir(f'\nModelo {tipo.value} {r.version_modelo} ({r.minutos:.1f} min) en {r.carpeta}')
     _decir(f'Dispositivo por objetivo: {json.dumps(r.dispositivos)}')
     if r.version_registro:
@@ -234,7 +298,11 @@ def corrida(fuente: Fuente = typer.Option(Fuente.kmc, '--fuente', '-f'),
             sin_extraer: bool = typer.Option(False, '--sin-extraer', help='usar el último corte de MinIO'),
             sin_entrenar: bool = typer.Option(False, '--sin-entrenar', help='usar modelos ya registrados'),
             alias: str = typer.Option('candidato', help='alias de los modelos a usar con --sin-entrenar'),
-            desde: str | None = typer.Option(None, help='AAAA-MM-DD; por defecto desde el corte anterior')) -> None:
+            desde: str | None = typer.Option(None, help='AAAA-MM-DD: inicio del periodo de revisión; por defecto desde '
+                                                        'el corte anterior (no filtra la extracción)'),
+            fecha_corte: str | None = FECHA_CORTE, anio_desde: int | None = ANIO_DESDE,
+            anio_hasta: int | None = ANIO_HASTA, desde_visita: str | None = DESDE_VISITA,
+            hasta_visita: str | None = HASTA_VISITA) -> None:
     """La corrida semestral: extraer, cargar, entrenar ambos modelos, revisar, comparar el silencio y calcular riesgos.
     Los resultados quedan en Postgres, los Excel para la Fundación en MAIA_RAIZ/salidas y en MinIO (maia-salidas)."""
     from anomalias import operacion as OP
@@ -250,22 +318,29 @@ def corrida(fuente: Fuente = typer.Option(Fuente.kmc, '--fuente', '-f'),
     from maia_entrenamiento import entrenar as E
     from maia_entrenamiento import registro as R
 
+    params = _parametros(fecha_corte, anio_desde, anio_hasta, desde_visita, hasta_visita)
+    if not params.vacio and (fuente != Fuente.kmc or sin_extraer):
+        raise typer.BadParameter('Los parámetros de extracción solo aplican a --fuente kmc sin --sin-extraer.')
     almacen, motor = _almacen(), _motor()
     f = fuente.value
     t0 = datetime.now(UTC)
+    fecha_extraida = None
     if f == 'kmc' and not sin_extraer:
         _decir('=== 1. Extraer la base de la Fundación ===')
-        nuevo = D.extraer_kmc()
+        if not params.vacio:
+            _decir(f'Parámetros de extracción: {json.dumps(params.como_dict())}')
+        nuevo, meta = D.extraer_kmc(params)
         fechas = SDB.cortes_en_minio(almacen, 'kmc')
         if solo_si_nuevo and fechas and SDB.fecha_corte(nuevo) <= fechas[-1]:
             _decir(f'La base no cambió (corte {SDB.fecha_corte(nuevo)}, último guardado {fechas[-1]}). Nada que hacer.')
             return
-        SDB.subir_corte(nuevo, 'kmc', almacen)
+        fecha_extraida = _subir_extraccion(nuevo, meta, almacen).fecha
     elif solo_si_nuevo:
         _decir('--solo-si-nuevo solo aplica a la base real con extracción.')
     _decir('=== 2. Cargar el corte en Postgres ===')
-    sev, info, _ = D.corte_local(almacen, f)
-    corte_id = SDB.guardar_en_db(motor, sev, f, info.ruta_minio, info.sha256)
+    sev, info, _ = D.corte_local(almacen, f, fecha_extraida)   # el recién extraído (con --fecha-corte puede no ser el último)
+    corte_id = SDB.guardar_en_db(motor, sev, f, info.ruta_minio, info.sha256, info.parametros, info.consulta_sha)
+    extraccion = R.params_extraccion(info.parametros, info.consulta_sha)
     _decir(f'Corte {info.fecha} (id {corte_id}).')
     R.configurar()
     with tempfile.TemporaryDirectory() as tmp:
@@ -273,10 +348,17 @@ def corrida(fuente: Fuente = typer.Option(Fuente.kmc, '--fuente', '-f'),
             _decir(f'=== 3. Modelos registrados con alias {alias} ===')
             modelos, _, _ = _modelos_de_registro(f, alias, alias, Path(tmp))
         else:
+            from maia_comun import hiperparametros as HP
+            cfg_a, ajustes_a = HP.leer_y_aplicar(E.config_anomalias(None), 'anomalias', motor)
+            cfg_c, ajustes_c = HP.leer_y_aplicar(D.config_clinica(f), 'clinico', motor)
+            if ajustes_a or ajustes_c:
+                _decir(f'Hiperparámetros ajustados: anomalías {json.dumps(ajustes_a)} · clínico {json.dumps(ajustes_c)}')
             _decir('=== 3. Entrenar el modelo de anomalías ===')
-            ra = E.entrenar_anomalias(sev, f, E.config_anomalias(None))
+            ra = E.entrenar_anomalias(sev, f, cfg_a, extraccion=extraccion, ajustes=ajustes_a)
             _decir('=== 4. Entrenar las alertas clínicas ===')
-            rc = E.entrenar_clinico(sev, f, D.config_clinica(f))
+            rc = E.entrenar_clinico(sev, f, cfg_c, extraccion=extraccion, ajustes=ajustes_c)
+            _decir(f'Registrado en MLflow: {ra.registro} v{ra.version_registro} · {rc.registro} v{rc.version_registro} '
+                   '(alias candidato)')
             anom, fa = OP.cargar(ra.carpeta)
             clin, fc = AC.cargar(rc.carpeta)
             modelos = Modelos(anom, fa, clin, fc, origen=f'registro a{ra.version_registro}/c{rc.version_registro}')
@@ -428,6 +510,23 @@ def publicar(url: str = typer.Option(..., help='URL pública del servicio web (R
                 if r.status_code != 200:
                     raise typer.BadParameter(f'No se pudo activar ({r.status_code}): {r.text[:300]}')
                 _decir(f'Paquete {subido} activo. Ejecute la corrida de demostración desde /admin/corridas.')
+
+
+# ====================================================================== programador
+
+@app.command()
+def programador(intervalo: int = typer.Option(30, min=5, help='segundos entre revisiones de la cola'),
+                una_vez: bool = typer.Option(False, '--una-vez', help='atender lo pendiente una vez y salir')) -> None:
+    """Servicio que ejecuta las corridas programadas o pedidas desde Administración y las aprobaciones de modelos
+    (ver maia_entrenamiento/programador.py). En el servidor on-premise es el proceso del contenedor trainer."""
+    from maia_entrenamiento.programador import Programador
+    p = Programador(intervalo=intervalo)
+    if una_vez:
+        p.arrancar()
+        while p.ciclo() is not None:
+            pass
+        return
+    p.bucle()
 
 
 def main() -> None:   # pragma: no cover

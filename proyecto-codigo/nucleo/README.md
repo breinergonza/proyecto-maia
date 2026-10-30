@@ -37,9 +37,10 @@ Los comandos se corren desde esta carpeta. `entradas/`, `salidas/` e `interno/` 
 ## Preparación
 
 1. `pip install -r requirements.txt` (probado con Python 3.14)
-2. Definir la variable de entorno `KMC_PW` con la clave de `kmc_estudiante` (la clave no está en ningún archivo).
-   - PowerShell: `$env:KMC_PW = "..."`
-   - bash: `export KMC_PW="..."`
+2. Definir las variables de entorno `KMC_HOST`, `KMC_USUARIO` y `KMC_PW` con el servidor, el usuario de solo lectura
+   y la clave que entregó el Observatorio (ninguno está en un archivo).
+   - PowerShell: `$env:KMC_HOST = "..."; $env:KMC_USUARIO = "..."; $env:KMC_PW = "..."`
+   - bash: `export KMC_HOST="..." KMC_USUARIO="..." KMC_PW="..."`
 
 ## La corrida
 

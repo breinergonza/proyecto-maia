@@ -4,14 +4,43 @@ from dataclasses import replace
 import numpy as np
 import pandas as pd
 import pytest
+from botocore.exceptions import ClientError
 from sqlalchemy import create_engine, inspect, select, text
 from sqlalchemy.orm import Session
 
 from maia_comun import sevarti_db as SDB
-from maia_comun.almacen import BUCKET_SEVARTI, separar_uri
+from maia_comun.almacen import BUCKET_MLFLOW, BUCKET_SEVARTI, BUCKETS, Almacen, separar_uri
 from maia_comun.config import Configuracion, normalizar_url_db
 from maia_comun.modelos_db import Corte
 from sevarti import contrato as SV
+
+
+class ClienteDeServicio:
+    """Como el usuario maia-servicio en MinIO: maia-mlflow existe pero es de otro usuario (403)."""
+
+    def __init__(self, existentes):
+        self.existentes, self.creados = set(existentes), []
+
+    def head_bucket(self, Bucket):
+        if Bucket == BUCKET_MLFLOW:
+            raise ClientError({'Error': {'Code': '403', 'Message': 'Forbidden'}}, 'HeadBucket')
+        if Bucket not in self.existentes:
+            raise ClientError({'Error': {'Code': '404', 'Message': 'Not Found'}}, 'HeadBucket')
+
+    def create_bucket(self, Bucket):
+        if Bucket == BUCKET_MLFLOW:
+            raise ClientError({'Error': {'Code': 'AccessDenied', 'Message': 'Access Denied.'}}, 'CreateBucket')
+        self.creados.append(Bucket)
+        self.existentes.add(Bucket)
+
+    def put_bucket_versioning(self, Bucket, VersioningConfiguration):
+        pass
+
+
+def test_asegurar_buckets_no_crea_el_de_mlflow_que_es_de_otro_usuario():
+    cliente = ClienteDeServicio(b for b in BUCKETS if b not in (BUCKET_MLFLOW, BUCKET_SEVARTI))
+    Almacen(cliente).asegurar_buckets()
+    assert cliente.creados == [BUCKET_SEVARTI]
 
 
 def test_url_de_railway_se_normaliza():
@@ -20,10 +49,12 @@ def test_url_de_railway_se_normaliza():
     assert Configuracion(database_url='postgres://a@b/c').database_url.startswith('postgresql+psycopg://')
 
 
-def test_fuera_de_local_no_se_arranca_con_secretos_de_ejemplo():
+def test_fuera_de_local_no_se_arranca_con_secretos_de_ejemplo(monkeypatch):
+    for n in ('MAIA_JWT_SECRETO', 'MAIA_PAQUETE_CLAVE', 'MAIA_ADMIN_CLAVE'):   # sin el .env ni el entorno del equipo
+        monkeypatch.delenv(n, raising=False)
     Configuracion(maia_entorno='local').exigir_secretos()
     with pytest.raises(RuntimeError, match='MAIA_JWT_SECRETO'):
-        Configuracion(maia_entorno='demo').exigir_secretos()
+        Configuracion(_env_file=None, maia_entorno='demo').exigir_secretos()
     Configuracion(maia_entorno='demo', maia_jwt_secreto='x' * 40, maia_paquete_clave='y' * 40,
                   maia_admin_clave='z' * 16).exigir_secretos()
 

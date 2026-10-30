@@ -13,6 +13,18 @@ export type Corrida = S['CorridaSalida']
 export type PeticionInferencia = S['PeticionInferencia']
 export type ConfigNotificacion = S['ConfigNotificacionEntrada']
 export type Respuesta = S['RevisionDatoEntrada']['es_error']
+export type ResumenAdministracion = S['ResumenAdministracion']
+export type Conexion = S['ConexionSalida']
+export type ConexionEntrada = S['ConexionEntrada']
+export type PruebaConexion = S['PruebaConexionSalida']
+export type Hiperparametros = S['HiperparametrosSalida']
+export type CampoHiperparametro = S['CampoHiperparametro']
+export type Calendario = S['Calendario']
+export type Programacion = S['ProgramacionSalida']
+export type ProgramacionEntrada = S['ProgramacionEntrada']
+export type Ejecucion = S['EjecucionSalida']
+export type Entrenamiento = S['Entrenamiento']
+export type Entrenamientos = S['Entrenamientos']
 
 export interface Pagina<T> {
   total: number
@@ -24,7 +36,7 @@ export interface Pagina<T> {
 export interface Salud {
   db: boolean
   paquete: string | null
-  entorno: 'local' | 'demo' | 'prueba'
+  entorno: 'local' | 'demo' | 'prueba' | 'produccion'
 }
 
 export interface RiesgoDesenlace {

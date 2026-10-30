@@ -2,7 +2,7 @@
 # Escribe la configuración que lee el frontend en tiempo de ejecución (la misma imagen sirve en local y en Railway).
 set -eu
 case "${MAIA_ENTORNO:-local}" in
-  local|demo|prueba) ;;
+  local|demo|prueba|produccion) ;;
   *) echo "MAIA_ENTORNO no válido: ${MAIA_ENTORNO}" >&2; exit 1 ;;
 esac
 printf "window.__MAIA__ = { entorno: '%s' }\n" "${MAIA_ENTORNO:-local}" > /usr/share/nginx/html/config.js

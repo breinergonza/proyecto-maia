@@ -66,8 +66,15 @@ def config_anomalias(config_json: str | None) -> MA.Config:
     return replace(MA.Config(), **cambios)
 
 
+def _etiqueta_ajustes(ajustes: dict | None) -> dict[str, str]:
+    """De dónde salen los hiperparámetros: los del núcleo o los que ajustó administración (los valores usados
+    quedan además como ``cfg.*``)."""
+    return {'hiperparametros': json.dumps(ajustes, sort_keys=True) if ajustes else 'nucleo'}
+
+
 def entrenar_anomalias(sev: Sevarti, fuente: str, cfg: MA.Config, validar: bool = True,
-                       registrar: bool = True) -> Entrenado:
+                       registrar: bool = True, *, extraccion: dict[str, str] | None = None,
+                       ajustes: dict | None = None) -> Entrenado:
     MA.DISPOSITIVOS_USADOS.clear()
     t0 = time.time()
     validacion = None
@@ -84,7 +91,8 @@ def entrenar_anomalias(sev: Sevarti, fuente: str, cfg: MA.Config, validar: bool 
     if registrar:
         with tempfile.TemporaryDirectory() as tmp:
             mv = R.registrar('anomalias', fuente, carpeta, cfg, metricas,
-                             _etiquetas_dispositivo(cfg.dispositivo), nombre, _artefactos(sev, Path(tmp), fuente))
+                             {**_etiquetas_dispositivo(cfg.dispositivo), **_etiqueta_ajustes(ajustes)}, nombre,
+                             _artefactos(sev, Path(tmp), fuente), extraccion=extraccion)
         numero = mv.version
     return Entrenado('anomalias', modelo.version, nombre, numero, carpeta, metricas, _dispositivos(),
                      (time.time() - t0) / 60)
@@ -100,7 +108,8 @@ def validar_clinico(sev: Sevarti, cfg: AC.ConfigClinica, tardias: list[str]
 
 
 def entrenar_clinico(sev: Sevarti, fuente: str, cfg: AC.ConfigClinica, validar: bool = True,
-                     registrar: bool = True) -> Entrenado:
+                     registrar: bool = True, *, extraccion: dict[str, str] | None = None,
+                     ajustes: dict | None = None) -> Entrenado:
     MA.DISPOSITIVOS_USADOS.clear()
     t0 = time.time()
     tardias = AC.ModeloClinico(cfg).detectar_tardias(sev)
@@ -121,9 +130,9 @@ def entrenar_clinico(sev: Sevarti, fuente: str, cfg: AC.ConfigClinica, validar: 
     if registrar:
         with tempfile.TemporaryDirectory() as tmp:
             mv = R.registrar('clinico', fuente, carpeta, cfg, metricas,
-                             {**_etiquetas_dispositivo(getattr(cfg, 'dispositivo', 'cpu')),
+                             {**_etiquetas_dispositivo(getattr(cfg, 'dispositivo', 'cpu')), **_etiqueta_ajustes(ajustes),
                               'omitidos': json.dumps(modelo.omitidos, ensure_ascii=False)[:5000]},
-                             nombre, _artefactos(sev, Path(tmp), fuente))
+                             nombre, _artefactos(sev, Path(tmp), fuente), extraccion=extraccion)
         numero = mv.version
     return Entrenado('clinico', modelo.version, nombre, numero, carpeta, metricas, _dispositivos(),
                      (time.time() - t0) / 60)

@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { edad, frase, posicion, riesgo } from '../lib/formato'
+import { edad, frase, medida, posicion, riesgo } from '../lib/formato'
 
 describe('formatos', () => {
+  it('valor medido sin ruido de coma flotante, sin esconder un dato mal registrado', () => {
+    expect(medida('12644.800000000001')).toBe('12.644,8')
+    expect(medida('3.123')).toBe('3,123')
+    expect(medida('positivo')).toBe('positivo')
+    expect(medida(null)).toBe('—')
+  })
   it('edad corregida en días, meses o años', () => {
     expect(edad(30)).toBe('30 d')
     expect(edad(91)).toBe('3,0 m')

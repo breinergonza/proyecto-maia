@@ -45,7 +45,7 @@ export default function Inferencia() {
         Escriba los datos de uno o varios niños (hasta 50) y vea los datos raros, el crecimiento y el riesgo que calcula el
         paquete {activo.data?.version ?? ''}. No se guarda nada.
       </Encabezado>
-      <div className="grid gap-6 xl:grid-cols-[1fr_1.1fr]">
+      <div className="grid items-start gap-4 lg:grid-cols-[1fr_1.1fr]">
         <Panel titulo="Datos de entrada"
           accion={<Boton chico variante="secundario" onClick={() => ejemplo.mutate()} disabled={ejemplo.isPending}>Cargar un niño de ejemplo</Boton>}>
           <p className="mb-2 text-sm text-salvia">
@@ -66,7 +66,7 @@ export default function Inferencia() {
           )}
         </Panel>
 
-        <div className="space-y-6">
+        <div className="space-y-4">
           {!r ? <Vacio titulo="Aquí aparecerá el resultado">Cargue el ejemplo y pulse Calcular para ver cómo se ve.</Vacio> : (
             <>
               {r.variables_ignoradas.length > 0 && (

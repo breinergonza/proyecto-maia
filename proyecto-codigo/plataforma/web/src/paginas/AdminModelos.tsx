@@ -42,8 +42,9 @@ export default function AdminModelos() {
         {salud.data?.entorno === 'demo' && ' En esta demostración solo se aceptan paquetes entrenados con datos simulados.'}
       </Encabezado>
 
-      <Panel titulo="Subir un paquete" className="mb-6">
-        <form className="flex flex-wrap items-center gap-3" onSubmit={(e) => {
+      <div className="grid items-start gap-4 xl:grid-cols-[1fr_22rem]">
+      <Panel titulo="Subir un paquete" className="xl:order-2">
+        <form className="flex flex-col gap-3" onSubmit={(e) => {
           e.preventDefault()
           const f = archivo.current?.files?.[0]
           if (f) subir.mutate(f)
@@ -58,11 +59,12 @@ export default function AdminModelos() {
         {subir.data && <div className="mt-3"><Aviso tono="teal">Paquete {subir.data.version} verificado y guardado. Actívelo para usarlo.</Aviso></div>}
       </Panel>
 
-      {activar.error && <div className="mb-4"><Aviso>{activar.error.message}</Aviso></div>}
+      <div className="min-w-0 space-y-4 xl:order-1">
+      {activar.error && <Aviso>{activar.error.message}</Aviso>}
       {lista.isPending ? <Cargando /> : lista.error ? <Aviso>{lista.error.message}</Aviso> : lista.data.length === 0 ? (
         <Vacio titulo="Todavía no hay paquetes">Suba el primero con el formulario de arriba.</Vacio>
       ) : (
-        <div className="space-y-4">
+        <div className="grid gap-4 2xl:grid-cols-2">
           {lista.data.map((p) => (
             <Panel key={p.version}
               titulo={<div className="flex items-center gap-2"><h2 className="text-base">{p.version}</h2>{p.activo && <Insignia tono="teal">Activo</Insignia>}<Insignia>{p.fuente}</Insignia></div>}
@@ -85,6 +87,8 @@ export default function AdminModelos() {
           ))}
         </div>
       )}
+      </div>
+      </div>
     </>
   )
 }

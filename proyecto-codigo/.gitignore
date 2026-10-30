@@ -14,6 +14,8 @@ respaldos/
 datos/
 mlruns/
 *.parquet
+# salvo las tablas esperadas de las pruebas del núcleo: 60 niños simulados (p0…p59), sin datos reales
+!nucleo/pruebas/esperado_kmc/*.parquet
 *.pkl
 *.tar.gz
 *.xlsx

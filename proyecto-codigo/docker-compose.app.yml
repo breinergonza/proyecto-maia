@@ -1,0 +1,60 @@
+# Solo la aplicación (base de datos, API y web) para verla funcionar en el equipo, con niños simulados.
+# Sin MinIO, MLflow ni trainer. Las claves salen de .env (el mismo de la pila completa; cópielo de .env.example):
+# ninguna va escrita aquí, y si falta una el arranque se detiene diciendo cuál.
+#
+#   make env                                                    crea .env desde .env.example (luego cambie las claves)
+#   docker compose -f docker-compose.app.yml up -d --build      luego http://localhost:8080
+#   docker compose -f docker-compose.app.yml down -v            detiene y borra los datos de prueba
+#
+# Ingreso: MAIA_ADMIN_EMAIL / MAIA_ADMIN_CLAVE del .env. Para ver riesgos hace falta un paquete de modelos firmado con
+# la misma MAIA_PAQUETE_CLAVE (make demo-entrenar / demo-exportar / demo-publicar con la pila completa de infra/local).
+name: maia-app
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: maia
+      POSTGRES_DB: maia
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD en .env}
+    volumes: [pg_app:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U maia -d maia"]
+      interval: 5s
+      retries: 20
+
+  api:
+    build: {context: ., dockerfile: infra/docker/api.Dockerfile}
+    environment:
+      DATABASE_URL: postgresql+psycopg://maia:${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD en .env}@postgres:5432/maia
+      MAIA_ENTORNO: demo                       # siembra la cohorte simulada al arrancar
+      MAIA_SOLO_SIMULADO: "true"
+      MAIA_DEMO_SUJETOS: ${MAIA_DEMO_SUJETOS:-1000}
+      MAIA_JWT_SECRETO: ${MAIA_JWT_SECRETO:?defina MAIA_JWT_SECRETO en .env}
+      MAIA_PAQUETE_CLAVE: ${MAIA_PAQUETE_CLAVE:?defina MAIA_PAQUETE_CLAVE en .env}
+      MAIA_ADMIN_EMAIL: ${MAIA_ADMIN_EMAIL:?defina MAIA_ADMIN_EMAIL en .env}
+      MAIA_ADMIN_CLAVE: ${MAIA_ADMIN_CLAVE:?defina MAIA_ADMIN_CLAVE en .env}
+      MAIA_URL_PUBLICA: http://localhost:${WEB_PUERTO:-8080}
+      MAIA_HOST: 0.0.0.0
+      PORT: "8000"
+    volumes: [paquetes_app:/datos/paquetes]
+    depends_on:
+      postgres: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/salud')"]
+      interval: 10s
+      retries: 30
+
+  web:
+    build: {context: ., dockerfile: infra/docker/web.Dockerfile}
+    environment:
+      API_INTERNA: http://api:8000
+      PORT: "8080"
+      MAIA_ENTORNO: demo
+    ports: ["127.0.0.1:${WEB_PUERTO:-8080}:8080"]
+    depends_on:
+      api: {condition: service_healthy}
+
+volumes:
+  pg_app:
+  paquetes_app:

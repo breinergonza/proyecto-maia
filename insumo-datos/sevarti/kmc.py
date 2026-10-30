@@ -5,8 +5,8 @@ generic engine contract: a normalized metadata table, a wide entity table and a
 ``DatasetSpec``. Supporting another source means writing another adapter like
 this one; the engine and the report stay the same.
 
-Connection: set the environment variable ``KMC_PW`` (the password shared by the
-Observatory through a private channel). Every session is opened read-only.
+Connection: set ``KMC_HOST``, ``KMC_USUARIO`` and ``KMC_PW`` (shared by the Observatory
+through a private channel; never in a file). Every session is opened read-only.
 """
 from __future__ import annotations
 
@@ -24,8 +24,8 @@ from anomalias.motor import DatasetSpec, Family, Stage, parse_dates
 from sevarti import diccionario as D
 from sevarti.contrato import Sevarti
 
-USER = 'kmc_estudiante.rfmxvnfbmbdpkjmhenrz'
-HOST = 'aws-1-us-east-1.pooler.supabase.com'
+# Server, user and password come from the environment (the Observatory shares them privately).
+CONEXION = ('KMC_HOST', 'KMC_USUARIO', 'KMC_PW')
 DOCUMENTED = dict(pacientes=15_641, variables=337, mediciones=4_521_712)
 
 KIND_BY_TYPE = {'FLOAT': 'numeric', 'INTEGER': 'numeric', 'CATEGORIC': 'categorical',
@@ -69,10 +69,10 @@ FAMILIES = (
 
 
 def connect() -> psycopg.Connection:
-    password = os.environ.get('KMC_PW')
-    if not password:
-        raise RuntimeError('Define la variable de entorno KMC_PW con la clave de kmc_estudiante.')
-    conn = psycopg.connect(host=HOST, port=5432, dbname='postgres', user=USER, password=password,
+    host, user, password = (os.environ.get(v) for v in CONEXION)
+    if not (host and user and password):
+        raise RuntimeError('Define las variables de entorno KMC_HOST, KMC_USUARIO y KMC_PW (las entrega el Observatorio).')
+    conn = psycopg.connect(host=host, port=5432, dbname='postgres', user=user, password=password,
                            sslmode='require', connect_timeout=20)
     conn.read_only = True
     return conn

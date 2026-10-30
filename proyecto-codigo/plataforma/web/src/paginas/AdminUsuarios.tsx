@@ -36,7 +36,7 @@ export default function AdminUsuarios() {
         Administración crea usuarios y cambia todo; un experto clínico responde las revisiones y calcula niños; consulta solo
         ve el tablero y la lista de niños.
       </Encabezado>
-      <div className="grid gap-6 2xl:grid-cols-[1fr_22rem]">
+      <div className="grid items-start gap-4 xl:grid-cols-[1fr_22rem]">
         <div className="min-w-0">
           {lista.isPending ? <Cargando /> : lista.error ? <Aviso>{lista.error.message}</Aviso> : (
             <div className="rounded-panel border border-linea bg-papel p-2">
@@ -47,8 +47,8 @@ export default function AdminUsuarios() {
             </div>
           )}
         </div>
-        <Panel titulo="Nuevo usuario" className="max-w-xl 2xl:max-w-none">
-          <form className="space-y-4" noValidate onSubmit={f.handleSubmit((d) => crear.mutate(d))}>
+        <Panel titulo="Nuevo usuario" className="max-w-xl xl:max-w-none">
+          <form className="space-y-3" noValidate onSubmit={f.handleSubmit((d) => crear.mutate(d))}>
             <Campo id="n-nombre" etiqueta="Nombre" error={e.nombre?.message}><Entrada id="n-nombre" aria-invalid={!!e.nombre} {...f.register('nombre')} /></Campo>
             <Campo id="n-email" etiqueta="Correo" error={e.email?.message}><Entrada id="n-email" type="email" aria-invalid={!!e.email} {...f.register('email')} /></Campo>
             <Campo id="n-rol" etiqueta="Perfil"><Selector id="n-rol" {...f.register('rol')}>{Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Selector></Campo>

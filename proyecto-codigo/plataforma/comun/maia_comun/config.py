@@ -29,15 +29,25 @@ class Configuracion(BaseSettings):
                                       case_sensitive=False)
 
     # --- comunes
-    maia_entorno: Literal['local', 'demo', 'prueba'] = 'local'
-    database_url: str = 'postgresql+psycopg://maia:cambiar@localhost:5432/maia'
+    maia_entorno: Literal['local', 'demo', 'prueba', 'produccion'] = 'local'
+    database_url: str = 'postgresql+psycopg://maia@localhost:5432/maia'   # la clave va en DATABASE_URL (.env)
     maia_raiz: Path | None = None
     maia_paquete_clave: str = INSEGURO
+    maia_cifrado_clave: str | None = None          # llave de las claves guardadas desde la web (32+ caracteres)
+    maia_zona_horaria: str = 'America/Bogota'      # zona por defecto de las ejecuciones programadas
 
     # --- solo local
-    kmc_pw: str | None = None
+    kmc_pw: str | None = None                       # nunca en .env: de la terminal o del llavero
+    kmc_host: str = ''                              # lo entrega el Observatorio: en .env o en Administración
+    kmc_port: int = 5432
+    kmc_db: str = 'postgres'
+    kmc_usuario: str = ''                           # igual que kmc_host; nunca en el código
+    kmc_esquema: str = 'consumo'
+    kmc_sslmode: Literal['disable', 'allow', 'prefer', 'require', 'verify-ca', 'verify-full'] = 'require'
+    kmc_timeout: int = 20                           # segundos para conectar
     maia_lgbm_device: str = 'cpu'
     mlflow_tracking_uri: str = 'http://localhost:5000'
+    mlflow_url_publica: str | None = None          # enlace a la interfaz de MLflow que muestra la web (p. ej. túnel SSH)
     minio_url: str = 'http://localhost:9000'
     minio_access_key: str = 'maia-servicio'
     minio_secret_key: str = INSEGURO
@@ -67,7 +77,7 @@ class Configuracion(BaseSettings):
     def _url(cls, v: str) -> str:
         return normalizar_url_db(v)
 
-    @field_validator('smtp_usuario', 'smtp_clave', 'kmc_pw', mode='before')
+    @field_validator('smtp_usuario', 'smtp_clave', 'kmc_pw', 'maia_cifrado_clave', 'mlflow_url_publica', mode='before')
     @classmethod
     def _vacio(cls, v):
         return v or None
