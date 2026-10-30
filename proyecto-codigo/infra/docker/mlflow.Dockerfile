@@ -7,7 +7,7 @@
 # (las mismas que usan trainer y API); después cambiar la variable no cambia la clave: se cambia en MLflow (ver README).
 # MLFLOW_FLASK_SERVER_SECRET_KEY firma las sesiones y el CSRF de la interfaz.
 FROM python:3.13-slim
-RUN pip install --no-cache-dir "mlflow[auth]==3.17.1""psycopg[binary]>=3.3" "boto3>=1.40" \
+RUN pip install --no-cache-dir "mlflow[auth]==3.17.1" "psycopg[binary]>=3.3" "boto3>=1.40" \
     && useradd --create-home --uid 10001 mlflow
 COPY --chmod=755 <<'EOF' /usr/local/bin/iniciar-mlflow
 #!/bin/sh
