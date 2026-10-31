@@ -67,6 +67,23 @@ class PorClasificar(Base):
     total: int                                     # lo que se muestra en la insignia del menú
 
 
+class ColumnaVista(Base):
+    clave: str
+    titulo: str                             # el encabezado del Excel
+
+
+class HojaVista(Base):
+    nombre: str
+    describe: str
+    columnas: list[ColumnaVista]
+    filas: list[list[str | None]]           # celdas como las muestra el Excel, en el orden de ``columnas``
+
+
+class VistaDiccionario(Base):
+    version: VersionDiccionarioSalida
+    hojas: list[HojaVista]
+
+
 class Clasificacion(Base):
     variable: str = Field(min_length=1, max_length=200)
     estado: Literal['Lista', 'No usar']

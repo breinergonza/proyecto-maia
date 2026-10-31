@@ -199,6 +199,13 @@ Todas las versiones de Python están fijadas en `uv.lock` y las de JavaScript en
    * En el compose local el trainer monta `nucleo/entradas` como `/datos/entradas`: bajar la vigente escribe en el
      archivo del repositorio cuando difiere de la que está en la base. On-premise no pasa: es un volumen.
 
+19. **Las corridas de la plataforma calculan los riesgos con los modelos aprobados (2026-10-30).** En producción se vio
+   que **Corrida ahora** (Programación) volvía a entrenar y calculaba los riesgos con esas versiones recién entrenadas,
+   todavía candidatas: la aprobación en Entrenamientos quedaba de adorno. Ahora el programador pasa siempre
+   `--usar produccion` a `maia corrida`: los riesgos salen de los modelos con alias `produccion` en MLflow. La pedida a
+   mano agrega `--sin-entrenar` (no entrena); la programada sigue entrenando y deja candidatos para aprobar. Sin modelos
+   aprobados la corrida falla con un mensaje que dice qué hacer. `maia corrida` sin `--usar` (equipo local) sigue igual.
+
 ## Pendiente fuera de este código
 
 * **Primera extracción real con `kmc_postgres`.** Supone que `perfil_paciente` trae `anio_parto`, que `diccionario`

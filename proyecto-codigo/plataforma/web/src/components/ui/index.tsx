@@ -1,5 +1,5 @@
 // Piezas de interfaz al estilo shadcn/ui: el código vive en el repositorio y usa los tokens de estilos.css.
-import { forwardRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes,
+import { forwardRef, useLayoutEffect, useRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes,
   type TextareaHTMLAttributes } from 'react'
 import { cn } from '../../lib/cn'
 
@@ -93,11 +93,41 @@ export function Insignia({ tono = 'neutro', children, className }: { tono?: Tono
   )
 }
 
-/** Tabla con el estilo de la aplicación. `densa`: filas más bajas, para paneles que deben caber en la ventana. */
-export function Tabla({ children, className, densa }: { children: ReactNode; className?: string; densa?: boolean }) {
+/** El título de cada columna en sus celdas (data-etiqueta), para la tabla apilada del teléfono. Un encabezado vacío o
+ *  marcado con data-acciones deja la celda sin título; uno solo para lectores de pantalla se usa tal cual. */
+function etiquetar(tabla: HTMLTableElement) {
+  const titulos = [...tabla.querySelectorAll('thead tr:last-child th')].map((th) => {
+    if (th instanceof HTMLElement && th.dataset.acciones !== undefined) return ''
+    const visible = [...th.childNodes].filter((n) => !(n instanceof HTMLElement && n.classList.contains('sr-only')))
+      .map((n) => n.textContent).join('').trim()
+    return visible || th.textContent?.trim() || ''
+  })
+  for (const fila of tabla.querySelectorAll('tbody tr')) {
+    let i = 0
+    for (const td of fila.children) {
+      const ancho = (td as HTMLTableCellElement).colSpan || 1
+      if (ancho > 1) td.setAttribute('data-ancha', '')   // una fila de detalle a todo lo ancho
+      else td.setAttribute('data-etiqueta', titulos[i] ?? '')
+      i += ancho
+    }
+  }
+}
+
+/** Tabla con el estilo de la aplicación. `densa`: filas más bajas, para paneles que deben caber en la ventana.
+ *  `apilar`: en el teléfono cada fila se vuelve una tarjeta (para listas de registros; no para matrices de números). */
+export function Tabla({ children, className, densa, apilar }: { children: ReactNode; className?: string; densa?: boolean; apilar?: boolean }) {
+  const ref = useRef<HTMLTableElement>(null)
+  useLayoutEffect(() => {
+    if (!apilar || !ref.current) return
+    const tabla = ref.current
+    etiquetar(tabla)
+    const observador = new MutationObserver(() => etiquetar(tabla))   // filas que llegan o cambian después
+    observador.observe(tabla, { childList: true, subtree: true, characterData: true })
+    return () => observador.disconnect()
+  }, [apilar])
   return (
-    <div className={cn('-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0', className)}>
-      <table className={cn(densa ? '[&_td]:px-2.5 [&_td]:py-1.5 [&_td]:leading-snug [&_th]:px-2.5' : '[&_td]:px-3 [&_td]:py-3 [&_th]:px-3',
+    <div className={cn('-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0', apilar && 'tabla-apilada', className)}>
+      <table ref={ref} className={cn(densa ? '[&_td]:px-2.5 [&_td]:py-1.5 [&_td]:leading-snug [&_th]:px-2.5' : '[&_td]:px-3 [&_td]:py-3 [&_th]:px-3',
         'w-full border-collapse text-sm [&_td]:border-b [&_td]:border-linea/70 [&_th]:border-b [&_th]:border-linea [&_th]:pb-2.5 [&_th]:pt-1 [&_th:not(.text-right)]:text-left [&_th]:text-xs [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-salvia [&_th]:whitespace-nowrap [&_tbody_tr]:transition-colors [&_tbody_tr:hover]:bg-teal-tinte/40 [&_tbody_tr:last-child_td]:border-b-0')}>
         {children}
       </table>

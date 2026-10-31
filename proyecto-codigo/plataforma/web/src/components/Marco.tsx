@@ -169,7 +169,7 @@ export function Marco({ children }: { children?: ReactNode }) {
         <Usuario />
       </aside>
 
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-linea/80 bg-papel/85 px-4 py-3 backdrop-blur-md lg:hidden">
+      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-linea/80 bg-papel/85 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-md lg:hidden">
         <Marca />
         <button className="grid size-10 place-items-center rounded-control text-tinta transition-colors hover:bg-fondo"
           onClick={() => setAbierto(true)} aria-expanded={abierto} aria-controls="menu-movil" aria-label="Abrir menú">

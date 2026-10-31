@@ -275,6 +275,18 @@ def _modelos_de_registro(fuente: str, alias_anomalias: str, alias_clinico: str, 
     return Modelos(anom, fa, clin, fc, origen=f'registro a{mva.version}/c{mvc.version}'), (mva, ca, run_a), (mvc, cc, run_c)
 
 
+def _modelos_para_riesgos(fuente: str, alias: str, tmp: Path):
+    """Los modelos con ``alias`` en MLflow para calcular los riesgos; si no hay, un error que dice qué hacer."""
+    from mlflow.exceptions import MlflowException
+    try:
+        modelos, (mva, _, _), (mvc, _, _) = _modelos_de_registro(fuente, alias, alias, tmp)
+    except MlflowException as ex:
+        raise RuntimeError(f'No hay modelos con alias {alias} para la fuente {fuente}: entrene y apruebe una versión de '
+                           'cada modelo en Administración › Entrenamientos.') from ex
+    _decir(f'Riesgos con los modelos {alias}: anomalías v{mva.version} · clínico v{mvc.version}')
+    return modelos
+
+
 def _silencio_previo(motor, modelos, sev) -> pd.DataFrame:
     """Riesgos guardados en silencio en corridas anteriores frente a lo que pasó (si hay)."""
     from sqlalchemy import text
@@ -298,6 +310,9 @@ def corrida(fuente: Fuente = typer.Option(Fuente.kmc, '--fuente', '-f'),
             sin_extraer: bool = typer.Option(False, '--sin-extraer', help='usar el último corte de MinIO'),
             sin_entrenar: bool = typer.Option(False, '--sin-entrenar', help='usar modelos ya registrados'),
             alias: str = typer.Option('candidato', help='alias de los modelos a usar con --sin-entrenar'),
+            usar: str | None = typer.Option(None, '--usar', help='alias de los modelos con que se calculan los riesgos '
+                                                                 '(por defecto, los recién entrenados; la plataforma '
+                                                                 'pasa produccion: los aprobados)'),
             desde: str | None = typer.Option(None, help='AAAA-MM-DD: inicio del periodo de revisión; por defecto desde '
                                                         'el corte anterior (no filtra la extracción)'),
             fecha_corte: str | None = FECHA_CORTE, anio_desde: int | None = ANIO_DESDE,
@@ -345,8 +360,8 @@ def corrida(fuente: Fuente = typer.Option(Fuente.kmc, '--fuente', '-f'),
     R.configurar()
     with tempfile.TemporaryDirectory() as tmp:
         if sin_entrenar:
-            _decir(f'=== 3. Modelos registrados con alias {alias} ===')
-            modelos, _, _ = _modelos_de_registro(f, alias, alias, Path(tmp))
+            _decir(f'=== 3. Modelos registrados con alias {usar or alias} ===')
+            modelos = _modelos_para_riesgos(f, usar or alias, Path(tmp))
         else:
             from maia_comun import hiperparametros as HP
             cfg_a, ajustes_a = HP.leer_y_aplicar(E.config_anomalias(None), 'anomalias', motor)
@@ -362,6 +377,8 @@ def corrida(fuente: Fuente = typer.Option(Fuente.kmc, '--fuente', '-f'),
             anom, fa = OP.cargar(ra.carpeta)
             clin, fc = AC.cargar(rc.carpeta)
             modelos = Modelos(anom, fa, clin, fc, origen=f'registro a{ra.version_registro}/c{rc.version_registro}')
+            if usar:   # los recién entrenados quedan como candidatos; los riesgos salen de los aprobados
+                modelos = _modelos_para_riesgos(f, usar, Path(tmp))
     _decir('=== 5. Riesgos guardados en silencio frente a lo que pasó ===')
     comparacion = _silencio_previo(motor, modelos, sev)
     _tabla('Silencio frente a lo que pasó', comparacion.round(3) if not comparacion.empty else comparacion)

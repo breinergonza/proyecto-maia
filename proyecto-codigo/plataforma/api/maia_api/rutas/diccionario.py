@@ -16,6 +16,7 @@ from maia_api.esquemas.diccionario import (
     DiferenciasDiccionario,
     PorClasificar,
     VersionDiccionarioSalida,
+    VistaDiccionario,
 )
 from maia_comun import diccionarios as DIC
 from maia_comun.modelos_db import Usuario, VersionDiccionario
@@ -86,6 +87,17 @@ def descargar_vigente(s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO
 @ruta.get('/versiones/{vid}/archivo', response_class=Response, responses={200: {'content': {XLSX: {}}}})
 def descargar(vid: int, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> Response:
     return _excel(_version(s, vid))
+
+
+@ruta.get('/versiones/{vid}/vista', response_model=VistaDiccionario)
+def vista(vid: int, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> VistaDiccionario:
+    """Las hojas de esa versión como se ven en el Excel, para previsualizarla sin descargarla."""
+    v = _version(s, vid)
+    try:
+        hojas = DIC.vista(DIC.leer(v.archivo))
+    except DIC.DiccionarioInvalido as e:
+        raise _invalido(e) from None
+    return VistaDiccionario(version=_salida(s, v), hojas=hojas)
 
 
 @ruta.post('/comparar', response_model=DiferenciasDiccionario)

@@ -105,11 +105,13 @@ def test_parametros_de_programacion_y_argumentos():
         EJ.validar_parametros('simulado', {'anio_desde': 2015})
     e = Ejecucion(fuente='kmc', parametros={'anio_desde': 2015, 'ventana_meses': 6, 'silencio': True,
                                             'solo_si_nuevo': True})
+    e.origen = 'programada'
     assert EJ.argumentos_corrida(e, hoy=date(2026, 3, 31)) == [
-        'corrida', '--fuente', 'kmc', '--silencio', '--solo-si-nuevo', '--anio-desde', '2015',
+        'corrida', '--fuente', 'kmc', '--usar', 'produccion', '--silencio', '--solo-si-nuevo', '--anio-desde', '2015',
         '--desde-visita', '2025-09-28']
-    assert EJ.argumentos_corrida(Ejecucion(fuente='simulado', parametros={'solo_si_nuevo': True})) == \
-        ['corrida', '--fuente', 'simulado', '--sin-extraer']
+    # la pedida a mano no entrena: calcula los riesgos con los modelos aprobados
+    assert EJ.argumentos_corrida(Ejecucion(fuente='simulado', origen='manual', parametros={'solo_si_nuevo': True})) == \
+        ['corrida', '--fuente', 'simulado', '--usar', 'produccion', '--sin-entrenar', '--sin-extraer']
 
 
 # ====================================================================== cola y conexión (Postgres)

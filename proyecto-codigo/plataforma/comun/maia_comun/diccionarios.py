@@ -201,6 +201,28 @@ def diferencias(antes: D.Diccionario | None, despues: D.Diccionario) -> dict[str
             'sin_cambios': not (nuevas or quitadas or estados or activados or apagados)}
 
 
+def _celda(v: Any) -> str | None:
+    if v is None or (not isinstance(v, str) and pd.isna(v)):
+        return None
+    if isinstance(v, float) and v.is_integer():
+        return str(int(v))
+    if hasattr(v, 'isoformat'):
+        return v.isoformat()[:10]
+    return str(v)
+
+
+def vista(dic: D.Diccionario) -> list[dict[str, Any]]:
+    """Las hojas del Excel como se ven en él (títulos de columna y respuestas en español), para previsualizarlo."""
+    hojas = []
+    for nombre, tabla in D.mostradas(dic).items():
+        hoja = D.LIBRO.hoja(nombre)
+        columnas = [c for c in hoja.columnas if c.clave in tabla.columns]
+        filas = [[_celda(f[c.clave]) for c in columnas] for f in tabla.to_dict('records')]
+        hojas.append({'nombre': nombre, 'describe': hoja.describe,
+                      'columnas': [{'clave': c.clave, 'titulo': c.titulo} for c in columnas], 'filas': filas})
+    return hojas
+
+
 def por_clasificar(dic: D.Diccionario) -> list[dict[str, Any]]:
     visitas = _visitas(dic)
     v = dic.variables

@@ -56,7 +56,7 @@ export default function AdminCorridas() {
         <Vacio titulo="Todavía no hay corridas" />
       ) : (
         <div className="rounded-panel border border-linea bg-papel p-2">
-          <Tabla>
+          <Tabla apilar>
             <thead><tr><th>N.º</th><th>Estado</th><th>Corte</th><th>Paquete</th><th>Inició</th><th className="text-right">Niños</th><th className="text-right">Por revisar</th><th>Detalle</th></tr></thead>
             <tbody>
               {lista.data.map((c) => (

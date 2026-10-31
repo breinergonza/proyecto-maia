@@ -324,9 +324,11 @@ valores usados.
 
 ### Programación
 
-Cada ejecución **extrae** la base de la entidad, **entrena** los dos modelos, los **registra en MLflow** como
-*candidatos*, **revisa** los datos y **calcula** los riesgos. Los modelos nuevos solo se usan en la solución cuando se
-aprueban en **Entrenamientos**.
+Cada ejecución **extrae** la base de la entidad, **revisa** los datos y **calcula** los riesgos siempre con los
+modelos **aprobados** en **Entrenamientos**. Las ejecuciones programadas además **entrenan** los dos modelos y los
+**registran en MLflow** como *candidatos*, que solo se usan cuando alguien los aprueba. **Corrida ahora** no entrena:
+calcula con los aprobados. Si todavía no hay modelos aprobados, la corrida no se hace y el mensaje dice que primero hay
+que entrenar y aprobar.
 
 * **Nueva programación** (derecha): **Nombre**, **Datos** (la base de la Fundación o los datos simulados),
   **Frecuencia** (cada semestre, trimestre, mes, semana o día, a las 02:00) u **Otra** con una expresión cron
@@ -403,8 +405,8 @@ tablero, la lista de niños y las colas de revisión.
   paso actual, el mensaje de error o el tipo de corrida: **Desde la plataforma**, **Semestral (equipo local)**, **Solo
   revisión de datos** o **Solo riesgos**.
 
-La corrida con la base de la Fundación (extraer y entrenar) se programa o se pide en **Programación**; cuando
-termina, aparece también en este historial.
+La corrida con la base de la Fundación (extraer y calcular con los modelos aprobados) se programa o se pide en
+**Programación**; cuando termina, aparece también en este historial.
 
 ### Notificaciones
 

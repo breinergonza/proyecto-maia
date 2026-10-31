@@ -177,6 +177,9 @@ export default function Ninos() {
   )
 }
 
+// la primera columna queda fija al desplazarse de lado (en el teléfono no se pierde de qué niño es la fila)
+const FIJA = 'first:sticky first:left-0 first:z-[1] first:bg-papel first:shadow-[inset_-1px_0_0_var(--color-linea)]'
+
 function Grilla({ filas, columnas, reordenar, orden, dir, ordenarPor }: {
   filas: NinoFila[]; columnas: string[]; reordenar: (c: string[]) => void
   orden: string; dir: 'asc' | 'desc'; ordenarPor: (c: Columna) => void
@@ -208,6 +211,7 @@ function Grilla({ filas, columnas, reordenar, orden, dir, ordenarPor }: {
                   onDrop={(e) => { e.preventDefault(); soltar(c.id) }}
                   onDragEnd={() => { setArrastrada(null); setSobre(null) }}
                   className={cn('group border-b border-linea px-3 py-2.5 text-xs font-semibold uppercase tracking-wider whitespace-nowrap text-salvia transition-colors',
+                    FIJA, 'first:z-20',
                     c.derecha ? 'text-right' : 'text-left',
                     arrastrada === c.id && 'opacity-40',
                     sobre === c.id && arrastrada !== c.id && 'bg-teal-tinte shadow-[inset_2px_0_0_var(--color-teal)]')}>
@@ -228,7 +232,7 @@ function Grilla({ filas, columnas, reordenar, orden, dir, ordenarPor }: {
           {filas.map((n) => (
             <tr key={n.sujeto} className="transition-colors hover:bg-teal-tinte/40">
               {cols.map((c) => (
-                <td key={c.id} className={cn('border-b border-linea/70 px-3 py-3', c.derecha && 'text-right')}>{c.celda(n)}</td>
+                <td key={c.id} className={cn('border-b border-linea/70 px-3 py-3', FIJA, c.derecha && 'text-right')}>{c.celda(n)}</td>
               ))}
             </tr>
           ))}

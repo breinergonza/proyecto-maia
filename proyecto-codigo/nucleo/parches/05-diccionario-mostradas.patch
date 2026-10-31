@@ -1,0 +1,22 @@
+diff --git a/sevarti/diccionario.py b/sevarti/diccionario.py
+index 9e6e029..fd4046a 100644
+--- a/sevarti/diccionario.py
++++ b/sevarti/diccionario.py
+@@ -350,11 +350,16 @@ def _mostrada(tabla: str, df: pd.DataFrame) -> pd.DataFrame:
+     return out
+ 
+ 
++def mostradas(dic: Diccionario) -> dict[str, pd.DataFrame]:
++    """Each sheet of the workbook, in order, as the Excel shows it."""
++    return {h.nombre: _mostrada(h.nombre, getattr(dic, _TABLA[h.nombre])) for h in LIBRO.hojas}
++
++
+ def escribir(dic: Diccionario, ruta: Path) -> Path:
+     """Writes the workbook through a temporary file, so a file that is open or a failure half way
+     never leaves the experts' dictionary damaged."""
+     ruta = Path(ruta)
+-    tablas = {h.nombre: _mostrada(h.nombre, getattr(dic, _TABLA[h.nombre])) for h in LIBRO.hojas}
++    tablas = mostradas(dic)
+     temporal = ruta.with_name(f'{ruta.stem}.tmp{ruta.suffix}')
+     try:
+         LB.escribir(LIBRO, temporal, tablas)

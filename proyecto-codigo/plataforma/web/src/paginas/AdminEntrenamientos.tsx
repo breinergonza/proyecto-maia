@@ -107,13 +107,13 @@ function TablaModelo({ tipo, lista, comparar, alternar, aprobar, elegir }: {
   return (
     <Panel titulo={MODELOS[tipo]}>
       {lista.length === 0 ? <Vacio titulo="Sin entrenamientos registrados">Programe una corrida o ejecute una ahora en Programación.</Vacio> : (
-        <Tabla densa>
+        <Tabla densa apilar>
           <thead>
             <tr>
               <th><span className="sr-only">Comparar</span></th><th>Fecha</th><th>Corte</th><th>Versión</th>
               {HP_VISIBLES.map((h) => <th key={h} className="text-right">{h}</th>)}
               {nombres.map((n) => <th key={n} className="text-right">{n}</th>)}
-              <th>Aprobar</th><th><span className="sr-only">Acciones</span></th>
+              <th>Aprobar</th><th data-acciones><span className="sr-only">Acciones</span></th>
             </tr>
           </thead>
           <tbody>

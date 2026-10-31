@@ -2,12 +2,14 @@
 // edita y se sube; antes de confirmar se ven los cambios frente al vigente. Las variables nuevas que trae una
 // actualización se clasifican aquí con un clic (Lista / No usar) y cada cambio queda como una versión que se puede volver.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Download } from 'lucide-react'
-import { useRef, useState, type ReactNode } from 'react'
+import { Download, Eye, Search, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { pedir } from '../api/cliente'
 import type {
-  CambioDesenlace, Clasificacion, DiferenciasDiccionario, VariableDiccionario, VersionDiccionario,
+  CambioDesenlace, Clasificacion, DiferenciasDiccionario, VariableDiccionario, VersionDiccionario, VistaDiccionario,
 } from '../api/tipos-diccionario'
+import { cn } from '../lib/cn'
 import { Aviso, Boton, Campo, Cargando, Encabezado, Entrada, Insignia, Panel, Tabla, Vacio } from '../components/ui'
 import { descargarVersion, origen, usePorClasificar } from '../lib/diccionario'
 import { fechaHora, num } from '../lib/formato'
@@ -23,6 +25,7 @@ export default function Diccionario() {
   const pendientes = usePorClasificar()
   const versiones = useQuery({ queryKey: ['diccionario', 'versiones'], queryFn: () => pedir<VersionDiccionario[]>('/diccionario/versiones') })
   const [aviso, setAviso] = useState<string | null>(null)
+  const [viendo, setViendo] = useState<VersionDiccionario | null>(null)
   const refrescar = (texto: string) => {
     setAviso(texto)
     void cliente.invalidateQueries({ queryKey: ['diccionario'] })
@@ -77,8 +80,8 @@ export default function Diccionario() {
             <Panel titulo="Historial de versiones">
               {versiones.isPending ? <Cargando /> : versiones.error ? <Aviso>{versiones.error.message}</Aviso>
                 : versiones.data.length === 0 ? <Vacio titulo="Todavía no hay versiones">Suba el primer diccionario.</Vacio> : (
-                  <Tabla>
-                    <thead><tr><th>Versión</th><th>Detalle</th><th className="sticky right-0 bg-papel"><span className="sr-only">Acciones</span></th></tr></thead>
+                  <Tabla apilar>
+                    <thead><tr><th>Versión</th><th>Detalle</th><th data-acciones className="sticky right-0 bg-papel"><span className="sr-only">Acciones</span></th></tr></thead>
                     <tbody>
                       {versiones.data.map((v) => (
                         <tr key={v.id}>
@@ -93,6 +96,8 @@ export default function Diccionario() {
                           </td>
                           <td className="sticky right-0 bg-papel">
                             <div className="flex flex-col items-end gap-1 sm:flex-row sm:justify-end">
+                              <Boton chico variante="fantasma" onClick={() => setViendo(v)}
+                                aria-label={`Ver la versión ${v.version}`}><Eye size={15} aria-hidden />Ver</Boton>
                               <Boton chico variante="fantasma" onClick={() => descargar.mutate(v)} disabled={descargar.isPending}
                                 aria-label={`Descargar la versión ${v.version}`}>Descargar</Boton>
                               {v.estado !== 'vigente' && (
@@ -114,7 +119,127 @@ export default function Diccionario() {
           <Subir alGuardar={(v) => refrescar(`La versión ${v.version} quedó en uso.`)} />
         </div>
       </div>
+
+      {viendo && <Vista v={viendo} alCerrar={() => setViendo(null)} alDescargar={() => descargar.mutate(viendo)}
+        descargando={descargar.isPending} />}
     </>
+  )
+}
+
+/** Previsualización de una versión: sus hojas como se ven en el Excel, sin descargarlo. */
+function Vista({ v, alCerrar, alDescargar, descargando }: {
+  v: VersionDiccionario; alCerrar: () => void; alDescargar: () => void; descargando: boolean
+}) {
+  const vista = useQuery({
+    queryKey: ['diccionario', 'vista', v.id],
+    queryFn: () => pedir<VistaDiccionario>(`/diccionario/versiones/${v.id}/vista`),
+    staleTime: Infinity,   // una versión guardada no cambia
+  })
+  const [hoja, setHoja] = useState(0)
+  const [buscar, setBuscar] = useState('')
+  const actual = vista.data?.hojas[hoja]
+  const filas = useMemo(() => {
+    const t = buscar.trim().toLocaleLowerCase('es')
+    if (!actual || !t) return actual?.filas ?? []
+    return actual.filas.filter((f) => f.some((c) => c?.toLocaleLowerCase('es').includes(t)))
+  }, [actual, buscar])
+
+  // abierta: Escape la cierra y la página de fondo no se desplaza
+  useEffect(() => {
+    const cerrar = (e: KeyboardEvent) => e.key === 'Escape' && alCerrar()
+    document.addEventListener('keydown', cerrar)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', cerrar)
+      document.body.style.overflow = ''
+    }
+  }, [alCerrar])
+
+  // en el body: la página entra con una animación (transform) que, si no, ataría el `fixed` a ella y no a la ventana
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6">
+      <div className="absolute inset-0 bg-tinta/40 backdrop-blur-[2px]" onClick={alCerrar} />
+      <div role="dialog" aria-modal="true" aria-labelledby="vista-titulo"
+        className="relative flex h-[92dvh] w-full max-w-6xl animate-aparecer flex-col rounded-t-panel bg-papel shadow-elevada sm:h-[85dvh] sm:rounded-panel">
+        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-linea px-4 py-3 sm:px-6 sm:py-4">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 id="vista-titulo" className="text-base">Diccionario · versión {num(v.version)}</h2>
+              <Insignia tono={ESTADOS[v.estado].tono}>{ESTADOS[v.estado].texto}</Insignia>
+            </div>
+            <p className="text-sm text-salvia">{origen(v)} · {fechaHora(v.creado_en)}</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <Boton chico variante="secundario" onClick={alDescargar} disabled={descargando}>
+              <Download size={15} aria-hidden /><span className="hidden sm:inline">{descargando ? 'Descargando…' : 'Descargar'}</span>
+            </Boton>
+            <button type="button" onClick={alCerrar} aria-label="Cerrar la vista previa"
+              className="grid size-10 place-items-center rounded-control text-salvia hover:bg-fondo hover:text-tinta">
+              <X size={20} aria-hidden />
+            </button>
+          </div>
+        </header>
+
+        {vista.isPending ? <div className="p-6"><Cargando /></div>
+          : vista.error ? <div className="p-6"><Aviso><span className="whitespace-pre-line">{vista.error.message}</span></Aviso></div> : (
+            <>
+              <div className="shrink-0 space-y-3 px-4 pt-3 sm:px-6">
+                <div role="tablist" aria-label="Hojas del diccionario" className="-mx-4 flex gap-1 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+                  {vista.data.hojas.map((h, i) => (
+                    <button key={h.nombre} type="button" role="tab" aria-selected={i === hoja}
+                      onClick={() => {
+                        setHoja(i)
+                        setBuscar('')
+                      }}
+                      className={cn('shrink-0 rounded-control px-3 py-1.5 text-sm font-semibold transition-colors',
+                        i === hoja ? 'bg-teal-tinte text-teal' : 'text-salvia hover:bg-fondo hover:text-tinta')}>
+                      {h.nombre} <span className="font-normal opacity-70">{num(h.filas.length)}</span>
+                    </button>
+                  ))}
+                </div>
+                {actual && (
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-salvia">{actual.describe}</p>
+                    <label className="relative block sm:w-72">
+                      <span className="sr-only">Buscar en la hoja {actual.nombre}</span>
+                      <Search size={16} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-salvia" />
+                      <Entrada value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar…" className="h-10 pl-9" />
+                    </label>
+                  </div>
+                )}
+              </div>
+              <div className="min-h-0 flex-1 overflow-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 sm:px-6">
+                {actual && (filas.length === 0
+                  ? <Vacio titulo={buscar ? 'Nada coincide con la búsqueda' : 'Esta hoja está vacía'} />
+                  : (
+                    <Tabla densa className="mx-0 overflow-visible px-0">
+                      <thead className="sticky top-0 z-10 bg-papel">
+                        <tr>{actual.columnas.map((c) => <th key={c.clave}>{c.titulo}</th>)}</tr>
+                      </thead>
+                      <tbody>
+                        {filas.map((f, i) => (
+                          <tr key={i}>
+                            {f.map((c, j) => (
+                              <td key={j} className={cn('max-w-80 align-top', j === 0 && 'font-mono text-xs whitespace-nowrap')}>
+                                {c ?? <span className="text-salvia/60">—</span>}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Tabla>
+                  ))}
+              </div>
+              {actual && buscar && (
+                <p className="shrink-0 border-t border-linea px-4 py-2 text-xs text-salvia sm:px-6">
+                  {num(filas.length)} de {num(actual.filas.length)} filas
+                </p>
+              )}
+            </>
+          )}
+      </div>
+    </div>,
+    document.body,
   )
 }
 

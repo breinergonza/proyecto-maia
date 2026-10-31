@@ -17,6 +17,7 @@ pytestmark = pytest.mark.integracion
 SALIDA_CORRIDA = """=== 2. Cargar el corte en Postgres ===
 Corte 2026-06-30 (id 7).
 Registrado en MLflow: maia-anomalias v4 · maia-clinico v9 (alias candidato)
+Riesgos con los modelos produccion: anomalías v3 · clínico v8
 Corrida 12 terminada en 3 min. Excel en /datos/salidas"""
 
 
@@ -66,15 +67,16 @@ def test_programacion_vencida_corre_con_la_conexion_guardada(motor, monkeypatch)
     eid = prog.ciclo()
     assert eid is not None and prog.ciclo() is None
     args, env = lanzador.llamadas[0]
-    assert args == ['corrida', '--fuente', 'kmc', '--solo-si-nuevo', '--anio-desde', '2015']
+    assert args == ['corrida', '--fuente', 'kmc', '--usar', 'produccion', '--solo-si-nuevo', '--anio-desde', '2015']
     assert env['KMC_HOST'] == 'db.entidad' and env['KMC_PORT'] == '6543' and env['KMC_PW'] == 'clave-de-la-entidad'
     assert env['MAIA_EJECUCION_ID'] == str(eid) and env['MAIA_PROGRAMACION_ID'] == str(pid)
     e = _ultima(motor)
     assert e.estado == 'ok' and e.origen == 'programada' and e.programacion_id == pid
     assert e.resultado == {'corrida': 12, 'corte': '2026-06-30', 'corte_id': 7,
                            'modelos': {'anomalias': {'registro': 'maia-anomalias', 'version': '4'},
-                                       'clinico': {'registro': 'maia-clinico', 'version': '9'}}}
-    assert 'candidatos' in e.mensaje and 'clave-de-la-entidad' not in (e.registro or '')
+                                       'clinico': {'registro': 'maia-clinico', 'version': '9'}},
+                           'modelos_riesgos': {'anomalias': '3', 'clinico': '8'}}
+    assert 'aprobados (anomalías v3 · clínico v8)' in e.mensaje and 'candidatos' in e.mensaje and 'clave-de-la-entidad' not in (e.registro or '')
     with Session(motor) as s:
         assert s.get(Programacion, pid).proxima > datetime.now(UTC)
 
@@ -195,3 +197,28 @@ def test_entrenar_ahora_que_falla_deja_el_paso_donde_fallo(motor):
     assert e.estado == 'error' and e.resultado == {'paso': 'entrenando_anomalias', 'hechos': []}
     assert 'Todavía no hay datos guardados' in e.mensaje and 'no hay cortes' in e.registro and len(lanzador.llamadas) == 1
     assert '--hiperparametros' not in lanzador.llamadas[0][0]
+
+
+def test_corrida_a_mano_usa_los_aprobados_sin_entrenar(motor):
+    with Session(motor) as s:
+        EJ.encolar(s, 'corrida', 'simulado', 'manual')
+        s.commit()
+    lanzador = Lanzador({'corrida': (0, 'Corte 2026-06-30 (id 7).\n'
+                                        'Riesgos con los modelos produccion: anomalías v3 · clínico v3\n'
+                                        'Corrida 4 terminada en 2 min.')})
+    Programador(motor=motor, lanzar=lanzador, cfg=CFG).ciclo()
+    assert lanzador.llamadas[0][0][:6] == ['corrida', '--fuente', 'simulado', '--usar', 'produccion', '--sin-entrenar']
+    e = _ultima(motor)
+    assert e.estado == 'ok' and e.mensaje == 'Riesgos calculados con los modelos aprobados (anomalías v3 · clínico v3).'
+    assert 'modelos' not in e.resultado and e.resultado['corrida'] == 4
+
+
+def test_corrida_sin_modelos_aprobados_dice_que_hacer(motor):
+    with Session(motor) as s:
+        EJ.encolar(s, 'corrida', 'simulado', 'manual')
+        s.commit()
+    salida = ('Traceback...\nRuntimeError: No hay modelos con alias produccion para la fuente simulado: entrene y '
+              'apruebe una versión de cada modelo en Administración › Entrenamientos.')
+    Programador(motor=motor, lanzar=Lanzador({'corrida': (1, salida)}), cfg=CFG).ciclo()
+    e = _ultima(motor)
+    assert e.estado == 'error' and e.mensaje.startswith('Todavía no hay modelos aprobados')

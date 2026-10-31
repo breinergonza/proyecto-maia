@@ -49,4 +49,13 @@ export type PorClasificar = {
   total: number
 }
 
-export type Clasificacion = { variable: string; estado: 'Lista' | 'No usar' }
+export type HojaVista = {
+  nombre: string
+  describe: string
+  columnas: { clave: string; titulo: string }[]
+  filas: (string | null)[][]
+}
+
+export type VistaDiccionario = { version: VersionDiccionario; hojas: HojaVista[] }
+
+export type Clasificacion ={ variable: string; estado: 'Lista' | 'No usar' }

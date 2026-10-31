@@ -70,6 +70,9 @@ _CONOCIDOS: tuple[tuple[str, str], ...] = (
      'No se pudo conectar con la base de datos: revise el servidor, el puerto y que la red lo permita.'),
     (r'(?i)no hay cortes',
      'Todavía no hay datos guardados de esta fuente. Marque «Traer datos nuevos» o ejecute primero una corrida.'),
+    (r'No hay modelos con alias produccion',
+     'Todavía no hay modelos aprobados: entrene y apruebe una versión de cada modelo en Administración › '
+     'Entrenamientos antes de la corrida.'),
     (r'(?i)no space left on device', 'El servidor se quedó sin espacio en disco.'),
     (r'(?i)cuda.*out of memory|out of memory.*cuda', 'La GPU se quedó sin memoria durante el entrenamiento.'),
     (r'MemoryError|código -9\b|código 137\b', 'El servidor se quedó sin memoria durante la ejecución.'),
@@ -268,13 +271,20 @@ class Programador:
         if m := re.search(r'Registrado en MLflow: (\S+) v(\d+) · (\S+) v(\d+)', salida):
             r['modelos'] = {'anomalias': {'registro': m[1], 'version': m[2]},
                             'clinico': {'registro': m[3], 'version': m[4]}}
+        if m := re.search(r'Riesgos con los modelos produccion: anomalías v(\d+) · clínico v(\d+)', salida):
+            r['modelos_riesgos'] = {'anomalias': m[1], 'clinico': m[2]}
         if m := re.search(r'Corrida (\d+) terminada', salida):
             r['corrida'] = int(m[1])
         if m := re.search(r'Corte (\d{4}-\d{2}-\d{2}) \(id (\d+)\)', salida):
             r['corte'], r['corte_id'] = m[1], int(m[2])
+        aprobados = r.get('modelos_riesgos')
+        con = f'anomalías v{aprobados["anomalias"]} · clínico v{aprobados["clinico"]}' if aprobados else ''
         if 'modelos' in r:
-            r['mensaje'] = ('Modelos registrados como candidatos: apruébelos en Administración › Entrenamientos para '
-                            'usarlos en la solución.')
+            r['mensaje'] = ((f'Riesgos calculados con los modelos aprobados ({con}). ' if con else '') +
+                            'Los recién entrenados quedaron como candidatos: apruébelos en Administración › '
+                            'Entrenamientos para usarlos en la solución.')
+        elif con:
+            r['mensaje'] = f'Riesgos calculados con los modelos aprobados ({con}).'
         return r
 
     def _paso(self, eid: int, paso: str, hechos: list[str]) -> None:

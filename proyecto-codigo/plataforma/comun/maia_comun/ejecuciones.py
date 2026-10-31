@@ -63,9 +63,12 @@ def meses_atras(hoy: date, meses: int) -> date:
 
 
 def argumentos_corrida(e: Ejecucion, hoy: date | None = None) -> list[str]:
-    """Los argumentos de ``maia corrida`` para esta ejecución."""
+    """Los argumentos de ``maia corrida`` para esta ejecución. Los riesgos salen siempre de los modelos aprobados
+    (alias produccion); la programada además entrena y deja candidatos, la pedida a mano no entrena."""
     p = e.parametros or {}
-    args = ['corrida', '--fuente', e.fuente]
+    args = ['corrida', '--fuente', e.fuente, '--usar', 'produccion']
+    if e.origen != 'programada':
+        args.append('--sin-entrenar')
     if e.fuente == 'simulado':
         args.append('--sin-extraer')
     if p.get('silencio'):

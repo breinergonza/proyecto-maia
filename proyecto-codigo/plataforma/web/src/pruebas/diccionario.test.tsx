@@ -87,6 +87,40 @@ describe('diccionario de variables', () => {
     expect(await screen.findByText('La versión 6 quedó en uso.')).toBeInTheDocument()
   })
 
+  it('el historial previsualiza una versión por hojas, con búsqueda, sin descargarla', async () => {
+    const vista = {
+      version: versiones[1],
+      hojas: [
+        { nombre: 'Variables', describe: 'Una fila por variable', columnas: [{ clave: 'variable', titulo: 'Variable' }, { clave: 'estado', titulo: 'Estado' }],
+          filas: [['var_simulada_a', 'Lista'], ['var_simulada_b', null]] },
+        { nombre: 'Visitas', describe: 'Una fila por visita', columnas: [{ clave: 'etapa', titulo: 'Visita' }], filas: [['40 sem']] },
+      ],
+    }
+    const llamadas = api((url) => url === '/api/diccionario/versiones/10/vista' ? { cuerpo: vista } : undefined)
+    montar('/diccionario')
+    await userEvent.click(await screen.findByRole('button', { name: 'Ver la versión 1' }))
+    const dialogo = await screen.findByRole('dialog', { name: /versión 1/ })
+    expect(await within(dialogo).findByText('var_simulada_a')).toBeInTheDocument()
+    expect(within(dialogo).getByRole('columnheader', { name: 'Estado' })).toBeInTheDocument()
+    await userEvent.type(within(dialogo).getByPlaceholderText('Buscar…'), 'simulada_b')
+    expect(within(dialogo).queryByText('var_simulada_a')).not.toBeInTheDocument()
+    expect(within(dialogo).getByText('1 de 2 filas')).toBeInTheDocument()
+    await userEvent.click(within(dialogo).getByRole('tab', { name: /Visitas/ }))
+    expect(within(dialogo).getByText('40 sem')).toBeInTheDocument()
+    expect(llamadas.some((l) => l.url.endsWith('/archivo'))).toBe(false)
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: /versión 1/ })).not.toBeInTheDocument()
+  })
+
+  it('en el teléfono el historial se apila: cada celda lleva el título de su columna', async () => {
+    api()
+    montar('/diccionario')
+    const celda = (await screen.findByText('Subida por Experta')).closest('td')!
+    const fila = celda.closest('tr')!
+    expect(celda.closest('.tabla-apilada')).not.toBeNull()
+    expect([...fila.children].map((td) => td.getAttribute('data-etiqueta'))).toEqual(['Versión', 'Detalle', ''])
+  })
+
   it('un archivo con errores los muestra en español sin guardar', async () => {
     api((url) => url === '/api/diccionario/comparar'
       ? { estado: 422, cuerpo: { detail: 'El diccionario mio.xlsx tiene 1 problema(s) por corregir:\n- hoja "Variables", fila 4: Tipo "Texto libre" no es válido.' } }

@@ -109,6 +109,21 @@ def test_descargar_la_vigente(cliente, experto):
     assert cliente.get('/api/diccionario/versiones/999/archivo', headers=experto).status_code == 404
 
 
+def test_previsualizar_una_version(cliente, experto, consulta):
+    r = cliente.get('/api/diccionario/versiones/1/vista', headers=experto)
+    assert r.status_code == 200
+    vista = r.json()
+    assert vista['version']['version'] == 1
+    hojas = {h['nombre']: h for h in vista['hojas']}
+    assert list(hojas)[:2] == ['Variables', 'Visitas'] and hojas['Variables']['filas']
+    variables = hojas['Variables']
+    assert len(variables['columnas']) == len(variables['filas'][0])
+    estado = [c['clave'] for c in variables['columnas']].index('estado')
+    assert {f[estado] for f in variables['filas']} <= {'Lista', 'Por clasificar', 'No usar'}   # como en el Excel
+    assert cliente.get('/api/diccionario/versiones/999/vista', headers=experto).status_code == 404
+    assert cliente.get('/api/diccionario/versiones/1/vista', headers=consulta).status_code == 403
+
+
 def test_archivo_invalido_en_espanol(cliente, experto):
     from maia_comun import diccionarios as DIC
     r = cliente.post('/api/diccionario/comparar', headers=experto, files=_archivo(b'no es excel', 'notas.xlsx'))

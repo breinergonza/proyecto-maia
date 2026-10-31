@@ -104,7 +104,7 @@ function Historial() {
         <p className="text-salvia">Todavía no se ha enviado ningún aviso.</p>
       ) : (
         <>
-          <Tabla>
+          <Tabla apilar>
             <thead><tr><th>Fecha</th><th>Destinatario</th><th>Niño</th><th>Desenlace</th><th className="text-right">Posición</th><th>Estado</th></tr></thead>
             <tbody>{q.data.items.map((n) => (
               <tr key={n.id}>

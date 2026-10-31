@@ -40,8 +40,8 @@ export default function AdminUsuarios() {
         <div className="min-w-0">
           {lista.isPending ? <Cargando /> : lista.error ? <Aviso>{lista.error.message}</Aviso> : (
             <div className="rounded-panel border border-linea bg-papel p-2">
-              <Tabla>
-                <thead><tr><th>Usuario</th><th>Perfil</th><th className="sticky right-0 bg-papel"><span className="sr-only">Acciones</span></th></tr></thead>
+              <Tabla apilar>
+                <thead><tr><th>Usuario</th><th>Perfil</th><th data-acciones className="sticky right-0 bg-papel"><span className="sr-only">Acciones</span></th></tr></thead>
                 <tbody>{lista.data.map((u) => <Fila key={u.id} u={u} />)}</tbody>
               </Tabla>
             </div>
