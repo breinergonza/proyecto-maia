@@ -10,6 +10,7 @@ medido hasta esa visita. La web arma con él la misma petición que antes se peg
 from __future__ import annotations
 
 import json
+import logging
 import math
 from collections import defaultdict
 from datetime import date, datetime
@@ -20,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from anomalias import modelo as MA
 from maia_api import estado as E
+from maia_api.consultas import opciones
 from maia_api.dependencias import EXPERTO, auditar, sesion
 from maia_api.esquemas import PeticionInferencia
 from maia_comun import puntuacion as PU
@@ -27,6 +29,7 @@ from maia_comun.modelos_db import Usuario
 from sevarti import contrato as SV
 
 ruta = APIRouter(prefix='/inferencia', tags=['inferencia'])
+registro = logging.getLogger(__name__)
 TIPOS_CAMPO = {'numeric': 'numero', 'categorical': 'lista', 'boolean': 'si_no', 'date': 'fecha', 'text': 'texto'}
 PRINCIPALES_POR_VISITA = 6   # además de las medidas de crecimiento
 
@@ -53,18 +56,6 @@ def _activo():
     if modelos is None or carpeta is None:
         raise HTTPException(status.HTTP_409_CONFLICT, 'No hay un paquete de modelos activo.')
     return modelos, manifest, carpeta
-
-
-def _opciones(texto: object) -> list[dict]:
-    """``'1=displasia;9=sin diagnóstico'`` → ``[{'valor': '1', 'etiqueta': 'displasia'}, ...]``."""
-    if not isinstance(texto, str) or not texto.strip():
-        return []
-    salida = []
-    for parte in texto.split(';'):
-        codigo, _, etiqueta = parte.partition('=')
-        if codigo.strip():
-            salida.append({'valor': codigo.strip(), 'etiqueta': (etiqueta or codigo).strip()})
-    return salida
 
 
 def _pesos(modelos, esquema: pd.DataFrame) -> dict[str, float]:
@@ -114,7 +105,10 @@ def inferir(p: PeticionInferencia, s: Session = Depends(sesion), u: Usuario = De
         sev = PU.completar(parcial, base, corte)
         salida = PU.inferir(sev, modelos)
     except (ValueError, KeyError) as e:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f'No se pudo calcular: {e}') from e
+        # el detalle es de Python y no le sirve a quien llena el formulario: queda en el registro del servidor
+        registro.warning('No se pudo calcular el riesgo: %s: %s', type(e).__name__, e, exc_info=True)
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                            'No se pudo calcular el riesgo con estos datos. Revise los valores que escribió e intente de nuevo.') from e
 
     alertas = _registros(salida['alertas_dato'])
     for a in alertas:
@@ -139,12 +133,12 @@ def formulario(_: Usuario = Depends(EXPERTO)) -> dict:
     maximo = max(pesos.values(), default=0.0) or 1.0
 
     def campo(f) -> dict:
-        opciones = _opciones(getattr(f, 'categorias', None))
+        lista = opciones(getattr(f, 'categorias', None))
         tipo = TIPOS_CAMPO.get(str(f.tipo), 'texto')
-        if tipo == 'lista' and not opciones:
+        if tipo == 'lista' and not lista:
             tipo = 'texto'   # categoría sin etiquetas en el diccionario: se escribe el código
         return {'variable': f.variable, 'etiqueta': _limpio(f.etiqueta) or f.variable, 'tipo': tipo,
-                'unidad': _limpio(f.unidad), 'tema': _limpio(f.tema), 'opciones': opciones,
+                'unidad': _limpio(f.unidad), 'tema': _limpio(f.tema), 'opciones': lista,
                 'minimo': _limpio(f.rango_min), 'maximo': _limpio(f.rango_max),
                 'crecimiento': isinstance(f.concepto, str), 'peso': round(pesos.get(f.variable, 0.0) / maximo, 3)}
 

@@ -30,6 +30,10 @@ export function nivelCorto(p: number | null | undefined): string {
   return `Más que ${cuantosMenos(p)} de 10`
 }
 
+/** Qué significa el mínimo (0 a 100) con que se configuran los avisos por correo. */
+export const ayudaMinimo = (minimo: number) =>
+  minimo <= 0 ? 'Con 0 se avisa de todos los niños.' : `Con ${minimo} se avisa del ${+(100 - minimo).toFixed(1)} % de niños con más riesgo.`
+
 /** La frase completa, con la posición técnica entre paréntesis (para title). */
 export const ayudaPosicion = (p: number | null | undefined) =>
   p == null ? '' : `Tiene más riesgo que ${cuantosMenos(p)} de cada 10 niños (posición ${Math.round(p)} de 100).`

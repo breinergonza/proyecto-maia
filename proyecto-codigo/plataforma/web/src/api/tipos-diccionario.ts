@@ -49,13 +49,38 @@ export type PorClasificar = {
   total: number
 }
 
+/** Una columna de una hoja, con lo que necesita su campo del formulario (sale del libro del núcleo). */
+export type ColumnaVista = {
+  clave: string
+  titulo: string
+  explica: string
+  opciones: string[]
+  lista: string | null
+  largo: boolean
+  tipo: 'texto' | 'numero' | 'fecha'
+  obligatoria: boolean
+}
+
 export type HojaVista = {
   nombre: string
   describe: string
-  columnas: { clave: string; titulo: string }[]
+  clave: string
+  agregar: boolean
+  columnas: ColumnaVista[]
   filas: (string | null)[][]
 }
 
 export type VistaDiccionario = { version: VersionDiccionario; hojas: HojaVista[] }
 
-export type Clasificacion ={ variable: string; estado: 'Lista' | 'No usar' }
+export type Clasificacion = { variable: string; estado: 'Lista' | 'No usar' }
+
+
+/** Un cambio de los formularios: la fila (por su primera columna) y las respuestas como se ven en el Excel. */
+export type CambioFila = {
+  hoja: string
+  accion: 'editar' | 'agregar' | 'borrar'
+  clave: string | null
+  valores: Record<string, string | null>
+}
+
+export type Edicion = { base: number; cambios: CambioFila[]; nota: string | null }

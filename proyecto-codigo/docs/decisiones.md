@@ -148,7 +148,7 @@ Todas las versiones de Python están fijadas en `uv.lock` y las de JavaScript en
    `title` y en Administración. Todo sale de `web/src/lib/lenguaje.ts`, el único lugar que hay que tocar cuando los
    médicos de la Fundación revisen las palabras (pendiente: validarlas con ellos).
    * Posición (percentil) → «N de 10 niños tienen menos riesgo»; ≥ 90 «Riesgo alto», ≥ 95 «Riesgo muy alto». En el
-     correo, «más riesgo que 97 de cada 100 niños del programa».
+     correo, con la misma escala, «más riesgo que 9 de cada 10 niños».
    * Puntaje z → «Bajo para la edad» (< −2), «En el rango esperado», «Alto para la edad» (> +2); caída de más de
      1 DE → «Cayó desde el último control».
    * Capas → tipos de alerta («Valor fuera de lo esperado», «No cuadra con el resto de sus datos», «Cambio raro entre

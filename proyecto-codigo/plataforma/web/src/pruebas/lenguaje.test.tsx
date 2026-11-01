@@ -2,7 +2,7 @@
 // en el texto visible de esas pantallas vuelve a aparecer un término técnico. El término técnico puede seguir en title.
 import { screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { alerta, cuantosMenos, frenteOms, motivo, nivelAlto, nivelCorto, peso } from '../lib/lenguaje'
+import { alerta, ayudaMinimo, cuantosMenos, frenteOms, motivo, nivelAlto, nivelCorto, peso } from '../lib/lenguaje'
 import { montar, simularApi, usuario } from './util'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -17,6 +17,12 @@ describe('glosario clínico', () => {
     expect(nivelCorto(97)).toBe('Muy alto')
     expect(nivelAlto(50)).toBeNull()
     expect(nivelAlto(90)).toBe('Riesgo alto')
+  })
+
+  it('dice el mínimo de las notificaciones como la parte de niños con más riesgo', () => {
+    expect(ayudaMinimo(95)).toBe('Con 95 se avisa del 5 % de niños con más riesgo.')
+    expect(ayudaMinimo(90)).toBe('Con 90 se avisa del 10 % de niños con más riesgo.')
+    expect(ayudaMinimo(0)).toBe('Con 0 se avisa de todos los niños.')
   })
 
   it('dice el puntaje z, las capas y los motivos del motor en palabras clínicas', () => {
@@ -61,11 +67,16 @@ const linea = {
 }
 const fila = { sujeto: 's1', eg_semanas: 31, grupo: null, percentil_max: 93, riesgo_max: 0.41, desenlace_max: 'readmisión a los 6 meses',
   clave_max: 'readm', n_riesgos: 2, n_alertas: 1, n_bajo_2de: 2, n_caida_1de: 1 }
+const notificaciones = [{ desenlace: 'readm', nombre: 'readmisión a los 3 meses', percentil_minimo: 95, destinatarios: ['a@maia.prueba'], activo: true }]
+const aviso = { id: 1, destinatario: 'a@maia.prueba', estado: 'enviado', error: null, enviado_en: '2026-07-01T10:00:00Z', sujeto: 's1',
+  desenlace: 'readmisión a los 3 meses', percentil: 93, corrida_id: 3 }
 const datoRevision = { ...alertaDato, sujeto: 's1', unidad: 'g', etapa_nombre: '3 meses', fecha: '2026-03-01', fuerza: 9, es_error: null, comentario: null }
 
-function api() {
+function api(rol: 'admin' | 'experto' = 'experto') {
   simularApi((url) => {
-    if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('experto') } }
+    if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario(rol) } }
+    if (url === '/api/notificaciones/config') return { cuerpo: notificaciones }
+    if (url.startsWith('/api/notificaciones/historial')) return { cuerpo: { total: 1, pagina: 1, tamano: 20, items: [aviso] } }
     if (url === '/api/tablero/resumen') return { cuerpo: resumen }
     if (url === '/api/tablero/alarmas-grupo') return { cuerpo: [{ grupo: null, periodo: '2026Q1', variable: 'peso_3m', etiqueta: 'Peso a los 3 meses', senal: 'cusum', valor: 1, referencia: 0, estadistico: 9, que_paso: 'subió de golpe en todo el programa' }] }
     if (url.startsWith('/api/ninos?')) return { cuerpo: { total: 1, pagina: 1, tamano: 25, items: [fila] } }
@@ -88,6 +99,15 @@ describe('pantallas del equipo clínico sin términos técnicos', () => {
     expect(screen.getByText('No cuadra con el resto de sus datos')).toBeInTheDocument()
     expect(visible()).toMatch(/Datos al 30 de jun/)
     expect(visible()).not.toMatch(PROHIBIDO)
+  })
+
+  it('notificaciones (administración)', async () => {
+    api('admin')
+    montar('/admin/notificaciones')
+    expect(await screen.findByText('Alto')).toBeInTheDocument()   // el aviso de posición 93, dicho como en el resto de la web
+    expect(screen.getByLabelText('Riesgo mínimo')).toHaveValue(95)
+    expect(screen.getByText('Con 95 se avisa del 5 % de niños con más riesgo.')).toBeInTheDocument()
+    expect(document.querySelector('main')?.textContent).not.toMatch(PROHIBIDO)
   })
 
   it('lista de niños', async () => {

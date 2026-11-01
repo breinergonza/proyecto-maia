@@ -153,3 +153,86 @@ def test_borrador_de_corrida_se_suma_a_la_vigente(motor, tmp_path):
         final = DIC.leer(v.archivo).variables.set_index('variable').estado
         assert final[variable] == D.NO_USAR and final['var_simulada_e'] == D.POR_CLASIFICAR
         assert s.get(VersionDiccionario, b.id).estado == 'archivado' and DIC.borrador_pendiente(s) is None
+
+
+# ------------------------------------------------------------------ editar con formularios
+
+def _primera(dic: D.Diccionario, tabla: str, columna: str) -> str:
+    return str(getattr(dic, tabla)[columna].iloc[0])
+
+
+def test_vista_trae_lo_que_necesita_cada_formulario():
+    hojas = {h['nombre']: h for h in DIC.vista(D.leer(DIC.SEMILLA))}
+    columnas = {c['clave']: c for c in hojas['Variables']['columnas']}
+    assert columnas['tipo']['opciones'] == ['Número', 'Categoría', 'Sí/No'] and columnas['tipo']['obligatoria']
+    assert columnas['etapa']['lista'] == 'Visitas' and columnas['etiqueta']['explica']
+    assert columnas['tolerancia']['tipo'] == 'numero' and columnas['nota']['largo']
+    assert {c['clave']: c['tipo'] for c in hojas['Quiebres']['columnas']}['fecha'] == 'fecha'
+    assert hojas['Variables']['clave'] == 'variable' and hojas['Desenlaces']['clave'] == 'clave'
+    # las variables las trae la base y la curva es una sola fila: no se agregan ni se borran
+    assert [h['nombre'] for h in hojas.values() if h['agregar']] == ['Visitas', 'Episodios', 'Quiebres', 'Desenlaces',
+                                                                     'Crecimiento']
+
+
+def test_editar_crea_una_version_vigente(motor):
+    with Session(motor) as s:
+        DIC.sembrar(s)
+        s.commit()
+        base = DIC.vigente(s)
+        dic = DIC.leer(base.archivo)
+        variable, visita = _primera(dic, 'variables', 'variable'), _primera(dic, 'visitas', 'etapa')
+        cambios = [{'hoja': 'Variables', 'accion': 'editar', 'clave': variable, 'valores': {'etiqueta': 'Nombre corregido'}},
+                   {'hoja': 'Visitas', 'accion': 'editar', 'clave': visita, 'valores': {'edad_min': '30,5'}},
+                   {'hoja': 'Quiebres', 'accion': 'agregar', 'clave': None,
+                    'valores': {'quiebre': 'Cambio simulado', 'fecha': '2024-01-01'}}]
+        assert DIC.revisar(s, base.id, cambios)['vigente'] == base.version
+        v = DIC.editar(s, base.id, cambios, usuario_id=None)
+        s.commit()
+        assert v.estado == 'vigente' and v.origen == 'subido' and v.version == 2
+        assert v.nota == 'Editado en la web: 3 cambios en Variables, Visitas y Quiebres.'
+        nuevo = DIC.leer(v.archivo)
+        assert nuevo.variables.set_index('variable').etiqueta[variable] == 'Nombre corregido'
+        assert nuevo.visitas.set_index('etapa').edad_min[visita] == 30.5
+        assert 'Cambio simulado' in set(nuevo.quiebres.quiebre)
+        assert len(nuevo.variables) == len(dic.variables)
+        # quitar lo que se agregó
+        v3 = DIC.editar(s, v.id, [{'hoja': 'Quiebres', 'accion': 'borrar', 'clave': 'Cambio simulado', 'valores': {}}],
+                        nota='Sin el quiebre de prueba.')
+        s.commit()
+        assert 'Cambio simulado' not in set(DIC.leer(v3.archivo).quiebres.quiebre) and v3.nota == 'Sin el quiebre de prueba.'
+        # editar sobre una versión que ya no es la vigente no pisa lo de otro
+        with pytest.raises(DIC.Desactualizado, match='versión 3'):
+            DIC.editar(s, base.id, cambios)
+
+
+def test_editar_rechaza_lo_que_no_vale_sin_guardar(motor):
+    with Session(motor) as s:
+        DIC.guardar(s, con_nuevas(('var_simulada_f', None)), 'subido', estado='vigente')
+        s.commit()
+        base = DIC.vigente(s)
+        variable = _primera(DIC.leer(base.archivo), 'variables', 'variable')
+
+        def editar(*cambios):
+            return DIC.editar(s, base.id, list(cambios))
+
+        # el error nombra la fila por su código, no por la fila del Excel
+        with pytest.raises(DIC.DiccionarioInvalido, match=r'Variables · var_simulada_f: falta Rol') as e:
+            editar({'hoja': 'Variables', 'accion': 'editar', 'clave': 'var_simulada_f', 'valores': {'estado': D.LISTA}})
+        assert 'diccionario.xlsx' not in str(e.value) and 'fila' not in str(e.value)
+        with pytest.raises(DIC.DiccionarioInvalido, match='no es un número'):
+            editar({'hoja': 'Variables', 'accion': 'editar', 'clave': variable, 'valores': {'tolerancia': 'mucho'}})
+        with pytest.raises(DIC.DiccionarioInvalido, match='No usar'):
+            editar({'hoja': 'Variables', 'accion': 'borrar', 'clave': variable, 'valores': {}})
+        with pytest.raises(DIC.DiccionarioInvalido, match='no se cambia'):
+            editar({'hoja': 'Variables', 'accion': 'editar', 'clave': variable, 'valores': {'variable': 'otra'}})
+        with pytest.raises(DIC.DiccionarioInvalido, match='columna'):
+            editar({'hoja': 'Variables', 'accion': 'editar', 'clave': variable, 'valores': {'no_existe': '1'}})
+        with pytest.raises(DIC.DiccionarioInvalido, match='hoja'):
+            editar({'hoja': 'Otra', 'accion': 'editar', 'clave': variable, 'valores': {}})
+        with pytest.raises(LookupError):
+            editar({'hoja': 'Variables', 'accion': 'editar', 'clave': 'no_existe', 'valores': {'nota': 'x'}})
+        with pytest.raises(DIC.SinCambios):
+            editar({'hoja': 'Variables', 'accion': 'editar', 'clave': variable,
+                    'valores': {'etiqueta': _primera(DIC.leer(base.archivo), 'variables', 'etiqueta')}})
+        s.rollback()
+        assert s.scalar(select(VersionDiccionario.version).order_by(VersionDiccionario.version.desc())) == 1

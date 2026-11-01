@@ -5,12 +5,14 @@ Entorno ``demo`` (como Railway): cookies seguras, solo paquetes simulados y una 
 from __future__ import annotations
 
 import io
+import re
 import socket
 import tarfile
 import time
 from dataclasses import replace
 from pathlib import Path
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -253,7 +255,9 @@ def test_corrida_y_tablero(cliente, admin, corrida, smtp):
     assert cliente.get('/api/tablero/desempeno', headers=admin).status_code == 404
     activo = cliente.get('/api/modelos/activo', headers=admin).json()
     assert activo['metricas'] and not any('regla' in k for k in activo['metricas'])
-    assert isinstance(cliente.get('/api/tablero/alarmas-grupo', headers=admin).json(), list)
+    alarmas = cliente.get('/api/tablero/alarmas-grupo', headers=admin).json()
+    assert isinstance(alarmas, list) and len(alarmas) <= 100   # lo que la web lista; el total está en el resumen
+    assert len(alarmas) == min(r['alarmas_grupo'], 100)
     if corrida['resumen'].get('notificaciones', {}).get('correos'):
         assert len(buzon.mensajes) >= 2   # el de prueba y al menos uno de riesgo alto
         h = cliente.get('/api/notificaciones/historial', headers=admin).json()
@@ -297,6 +301,11 @@ def test_revision(cliente, admin, corrida):
     assert cliente.post('/api/revision/datos/999999999', headers=experta, json={'es_error': 'si'}).status_code == 404
     muestra = cliente.get('/api/revision/riesgos', headers=experta).json()['items']
     assert len(muestra) <= 40
+    # lo que ve el médico: sin ".0" y con la etiqueta de cada categoría, no su código
+    lineas = [x for m in muestra for x in m['resumen']]
+    assert lineas and not [x for x in lineas if re.search(r'\d\.0', x)], lineas
+    oxigeno = [x for x in lineas if x.startswith('Oxígeno')]
+    assert oxigeno and all(x.rsplit(': ', 1)[1] in ('displasia broncopulmonar', 'sin diagnóstico') for x in oxigeno), oxigeno
     assert all('riesgo' not in m and 'percentil' not in m for m in muestra), 'la revisión es ciega'
     if muestra:
         assert cliente.post(f'/api/revision/riesgos/{muestra[0]["id"]}', headers=experta,
@@ -347,3 +356,41 @@ def test_formulario_de_calculo(cliente, admin, corrida):
     assert out['variables_ignoradas'] == [] and out['crecimiento']
     visor = _login(cliente, 'visor@maia.prueba', 'clave-larga-123')
     assert cliente.get('/api/inferencia/formulario', headers=visor).status_code == 403
+
+
+def test_inferencia_que_falla_no_muestra_el_error_de_python(cliente, admin, corrida, monkeypatch):
+    from maia_api.rutas import inferencia as RI
+    peticion = cliente.get('/api/inferencia/ejemplo', headers=admin).json()
+    peticion.pop('nota')
+
+    def falla(*_):
+        raise ValueError("cannot convert float NaN to integer 'detalle_interno'")
+    monkeypatch.setattr(RI.PU, 'inferir', falla)
+    r = cliente.post('/api/inferencia', headers=admin, json=peticion)
+    assert r.status_code == 422
+    assert r.json()['detail'] == 'No se pudo calcular el riesgo con estos datos. Revise los valores que escribió e intente de nuevo.'
+    assert 'detalle_interno' not in r.text and 'NaN' not in r.text
+
+
+def test_entrenamientos_sin_la_comparacion_con_la_regla_simple(cliente, admin, monkeypatch):
+    """Igual que Modelos: la validación interna (``*_regla*``) queda en MLflow."""
+    from maia_api.rutas import entrenamientos as RE
+    from maia_comun import mlflow_rest as ML
+
+    def mlflow(peticion: httpx.Request) -> httpx.Response:
+        ruta = peticion.url.path
+        if ruta.endswith('/experiments/get-by-name'):
+            return httpx.Response(200, json={'experiment': {'experiment_id': '1'}})
+        if ruta.endswith('/runs/search'):
+            return httpx.Response(200, json={'runs': [{
+                'info': {'run_id': 'run1', 'status': 'FINISHED', 'start_time': 1793000000000, 'end_time': 1793000600000},
+                'data': {'params': [], 'tags': [],
+                         'metrics': [{'key': 'auc__muerte', 'value': 0.81}, {'key': 'auc_regla__muerte', 'value': 0.7},
+                                     {'key': 'top10__muerte', 'value': 0.4}]}}]})
+        return httpx.Response(200, json={})
+    Lector = ML.Lector
+    monkeypatch.setattr(RE.ML, 'Lector', lambda uri, *_: Lector(uri, cliente=httpx.Client(transport=httpx.MockTransport(mlflow))))
+    r = cliente.get('/api/entrenamientos', headers=admin)
+    assert r.status_code == 200, r.text
+    for e in r.json()['clinico'] + r.json()['anomalias']:
+        assert e['metricas'] == {'auc__muerte': 0.81, 'top10__muerte': 0.4}

@@ -1,9 +1,13 @@
 """El diccionario de variables con versiones, para experto y administración (la consulta no entra).
 
-El Excel sigue siendo el formato de trabajo: se descarga, se edita y se sube. Antes de confirmar, la web muestra lo que
-cambia frente a la vigente. Las variables nuevas que trae una actualización se clasifican aquí (Lista / No usar).
+Se edita con formularios (``/editar``): la web manda los cambios por fila y aquí se aplican a la vigente, se validan con
+el núcleo y quedan como una versión nueva. El Excel queda para importar y exportar: se descarga, se edita y se sube, y
+antes de confirmar se ve lo que cambia. Las variables nuevas que trae una actualización se clasifican aquí (Lista / No
+usar).
 """
 from __future__ import annotations
+
+from collections.abc import Callable
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from sqlalchemy import func, select
@@ -14,6 +18,7 @@ from maia_api.esquemas.diccionario import (
     BorradorDiccionario,
     Clasificacion,
     DiferenciasDiccionario,
+    Edicion,
     PorClasificar,
     VersionDiccionarioSalida,
     VistaDiccionario,
@@ -172,5 +177,37 @@ def clasificar(c: Clasificacion, s: Session = Depends(sesion), u: Usuario = Depe
     except DIC.DiccionarioInvalido as e:
         raise _invalido(e) from None
     auditar(s, u, 'clasificar_variable', f'diccionario v{v.version}', {'variable': c.variable, 'estado': c.estado})
+    s.commit()
+    return _salida(s, v)
+
+
+def _cambios(e: Edicion) -> list[dict]:
+    return [c.model_dump() for c in e.cambios]
+
+
+def _edicion[T](f: Callable[[], T]) -> T:
+    """Los errores de editar con formularios, como respuestas en español."""
+    try:
+        return f()
+    except (DIC.Desactualizado, DIC.SinCambios) as x:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(x)) from None
+    except DIC.DiccionarioInvalido as x:
+        raise _invalido(x) from None
+    except LookupError as x:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(x)) from None
+
+
+@ruta.post('/editar/revisar', response_model=DiferenciasDiccionario)
+def revisar_edicion(e: Edicion, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> DiferenciasDiccionario:
+    """Valida los cambios de los formularios y dice qué cambia frente a la vigente, sin guardar nada."""
+    return DiferenciasDiccionario(**_edicion(lambda: DIC.revisar(s, e.base, _cambios(e))))
+
+
+@ruta.post('/editar', response_model=VersionDiccionarioSalida, status_code=status.HTTP_201_CREATED)
+def editar(e: Edicion, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> VersionDiccionarioSalida:
+    """Guarda los cambios de los formularios como una versión nueva, vigente."""
+    v = _edicion(lambda: DIC.editar(s, e.base, _cambios(e), nota=e.nota, usuario_id=u.id))
+    auditar(s, u, 'editar_diccionario', f'diccionario v{v.version}',
+            {'cambios': len(e.cambios), 'hojas': sorted({c.hoja for c in e.cambios})})
     s.commit()
     return _salida(s, v)

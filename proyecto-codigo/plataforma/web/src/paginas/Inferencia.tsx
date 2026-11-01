@@ -5,6 +5,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { ChevronDown } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { Link } from 'react-router'
 import { ErrorApi, pedir } from '../api/cliente'
 import type { CampoFormulario, FormularioCalculo, PeticionInferencia, ResultadoInferencia, VisitaFormulario } from '../api/tipos'
 import { puede, useSesion } from '../auth/sesion'
@@ -27,6 +28,22 @@ export const alNacer = (v: VisitaFormulario) =>
 function ventana(v: VisitaFormulario): string | undefined {
   if (v.edad_min == null || v.edad_max == null || alNacer(v)) return undefined
   return `Se espera entre ${edad(Math.max(0, v.edad_min))} y ${edad(v.edad_max)} de ${v.base === 'corregida' ? 'edad corregida' : 'vida'}.`
+}
+
+/** La edad gestacional tiene su propio campo en «Datos del niño» (y va en el niño, no como medición): el diccionario
+ * también la trae como un dato general y se pediría dos veces. */
+const EDAD_GESTACIONAL = 'eg_semanas'
+const quitarEdadGestacional = (f: FormularioCalculo): FormularioCalculo => ({
+  ...f,
+  generales: f.generales.filter((c) => c.variable !== EDAD_GESTACIONAL),
+  visitas: f.visitas.map((v) => ({ ...v, campos: v.campos.filter((c) => c.variable !== EDAD_GESTACIONAL) })),
+})
+
+/** Qué hacer cuando no hay un modelo activo: solo la administración puede activarlo. */
+function ActivarModelo({ admin }: { admin: boolean }) {
+  return admin
+    ? <>Active uno en <Link className="font-semibold text-teal underline" to="/admin/modelos">Modelos</Link>.</>
+    : <>Pídale a la administración que active un modelo.</>
 }
 
 /** Un valor escrito en el formulario, como lo espera la API: número si lo es (con coma o punto), si no, texto. */
@@ -116,7 +133,7 @@ export default function Inferencia() {
     return (
       <>
         <Encabezado titulo="Calcular el riesgo de un niño" />
-        <Vacio titulo="No hay un paquete de modelos activo">La administración debe subir y activar uno en Modelos.</Vacio>
+        <Vacio titulo="No hay un paquete de modelos activo"><ActivarModelo admin={puede(usuario, ['admin'])} /></Vacio>
       </>
     )
   }
@@ -138,7 +155,7 @@ export default function Inferencia() {
           {calcular.error && (
             <Aviso>
               {calcular.error.message}
-              {calcular.error instanceof ErrorApi && calcular.error.estado === 409 && ' Active un paquete en Modelos y vuelva a intentar.'}
+              {calcular.error instanceof ErrorApi && calcular.error.estado === 409 && <> <ActivarModelo admin={puede(usuario, ['admin'])} /></>}
             </Aviso>
           )}
           {calcular.data ? <Resultado r={calcular.data} varios={avanzado} />
@@ -150,7 +167,9 @@ export default function Inferencia() {
 }
 
 function Formulario({ calcular, pendiente }: { calcular: (p: PeticionInferencia) => void; pendiente: boolean }) {
-  const f = useQuery({ queryKey: ['inferencia', 'formulario'], queryFn: () => pedir<FormularioCalculo>('/inferencia/formulario') })
+  const f = useQuery({
+    queryKey: ['inferencia', 'formulario'], queryFn: () => pedir<FormularioCalculo>('/inferencia/formulario'), select: quitarEdadGestacional,
+  })
   const [nino, setNino] = useState<Nino>({ nacimiento: '', eg: '' })
   const [valores, setValores] = useState<Valores>({})
   const [fechas, setFechas] = useState<Valores>({})

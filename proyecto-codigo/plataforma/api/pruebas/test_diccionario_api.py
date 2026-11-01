@@ -197,3 +197,41 @@ def test_borrador_de_una_actualizacion(cliente, experto):
     assert r.status_code == 200 and r.json()['origen'] == 'corrida' and r.json()['estado'] == 'vigente'
     p = cliente.get('/api/diccionario/por-clasificar', headers=experto).json()
     assert p['borrador'] is None and [v['variable'] for v in p['variables']] == ['var_simulada_c']
+
+
+def test_editar_con_formularios(cliente, experto, consulta):
+    versiones = cliente.get('/api/diccionario/versiones', headers=experto).json()
+    base = next(v for v in versiones if v['estado'] == 'vigente')
+    hojas = {h['nombre']: h for h in cliente.get(f'/api/diccionario/versiones/{base["id"]}/vista', headers=experto).json()['hojas']}
+    tipo = next(c for c in hojas['Variables']['columnas'] if c['clave'] == 'tipo')
+    assert tipo['opciones'] == ['Número', 'Categoría', 'Sí/No'] and tipo['obligatoria'] and tipo['explica']
+    assert hojas['Desenlaces']['agregar'] and not hojas['Variables']['agregar'] and hojas['Variables']['clave'] == 'variable'
+    lista = {'base': base['id'], 'cambios': [{'hoja': 'Variables', 'accion': 'editar', 'clave': 'var_simulada_c',
+                                              'valores': {'estado': 'Lista', 'etiqueta': 'Variable simulada corregida'}}]}
+    for ruta in ('/api/diccionario/editar/revisar', '/api/diccionario/editar'):
+        assert cliente.post(ruta, headers=consulta, json=lista).status_code == 403
+    r = cliente.post('/api/diccionario/editar/revisar', headers=experto, json=lista)
+    assert r.status_code == 200, r.text
+    assert [(e['variable'], e['antes'], e['despues']) for e in r.json()['estados']] == [
+        ('var_simulada_c', 'Por clasificar', 'Lista')]
+    assert len(cliente.get('/api/diccionario/versiones', headers=experto).json()) == len(versiones)   # revisar no guarda
+    r = cliente.post('/api/diccionario/editar', headers=experto, json=lista)
+    assert r.status_code == 201, r.text
+    v = r.json()
+    assert v['estado'] == 'vigente' and v['creado_por'] == 'Experta' and v['nota'] == 'Editado en la web: 1 cambio en Variables.'
+    # otra vez sobre la base anterior: alguien ya guardó, no se pisa
+    r = cliente.post('/api/diccionario/editar', headers=experto, json=lista)
+    assert r.status_code == 409 and f'versión {v["version"]}' in r.json()['detail']
+    mal = {'base': v['id'], 'cambios': [{'hoja': 'Variables', 'accion': 'editar', 'clave': 'var_simulada_c',
+                                         'valores': {'tipo': 'Texto libre'}}]}
+    r = cliente.post('/api/diccionario/editar', headers=experto, json=mal)
+    assert r.status_code == 422 and 'Variables · var_simulada_c: Tipo "Texto libre" no es válido' in r.json()['detail']
+    mal['cambios'][0]['accion'] = 'renombrar'
+    assert cliente.post('/api/diccionario/editar', headers=experto, json=mal).status_code == 422
+    r = cliente.post('/api/diccionario/editar', headers=experto, json={'base': v['id'], 'cambios': [
+        {'hoja': 'Variables', 'accion': 'editar', 'clave': 'no_existe', 'valores': {'nota': 'x'}}]})
+    assert r.status_code == 404
+    from maia_comun import db
+    from maia_comun.modelos_db import Auditoria
+    with db.fabrica()() as s:
+        assert list(s.scalars(select(Auditoria.accion).where(Auditoria.accion == 'editar_diccionario'))) == ['editar_diccionario']

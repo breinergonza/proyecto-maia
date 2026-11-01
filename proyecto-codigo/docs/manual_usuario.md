@@ -99,7 +99,7 @@ Si aparece «Todavía no hay resultados», la administración aún no ha hecho l
 | **niños con datos** | Niños con datos en la base en esa fecha |
 | **datos leídos** | Total de mediciones revisadas por el modelo de anomalías |
 | **datos por revisar · N por mil** | Datos que el modelo encontró raros y cuántos son por cada mil datos leídos. Para expertos y administración es un enlace a **Datos por revisar** |
-| **sin respuesta del experto** | Datos por revisar que todavía no tienen respuesta de un experto |
+| **datos ya respondidos por expertos** | Datos por revisar que ya tienen respuesta de un experto |
 | **niños con algún riesgo alto** | Niños distintos con al menos un desenlace en riesgo alto (posición 90 o más: entre el 10 % de niños con más riesgo para ese desenlace). Un niño con riesgo alto en tres desenlaces cuenta una vez; al pasar el mouse se ve el total de riesgos altos. Lleva a la lista de **Niños** ya filtrada, que muestra la misma cifra |
 | **alarmas de grupo** | Cambios bruscos en todo un grupo de niños de un trimestre a otro (ver abajo) |
 
@@ -109,7 +109,8 @@ Si aparece «Todavía no hay resultados», la administración aún no ha hecho l
   **No cuadra con el resto de sus datos**, **Cambio raro entre controles** y **Cambio en todo un grupo** (ver el
   [glosario](#tipos-de-alerta-capas-del-modelo-de-anomalías)). Un mismo dato puede tener varias alertas.
 * **Alarmas de grupo.** Panel propio, con desplazamiento: cambios de un trimestre a otro en todo un grupo, que casi
-  siempre vienen de un cambio en la forma de medir y no de los niños. Las más recientes van primero.
+  siempre vienen de un cambio en la forma de medir y no de los niños. Las más recientes van primero. Arriba dice
+  cuántas hay en total y, si son más de 100, que se muestran las 100 más recientes.
 * **Riesgo por desenlace.** Una fila por desenlace, con el momento en que se calcula («se calcula a los …»):
   **Niños** (cuántos tienen el riesgo calculado), **Alto** (cuántos tienen riesgo alto; al pulsar el número se abre
   la lista filtrada) y **Medio** (riesgo promedio). El enlace **Ver riesgo alto** abre la lista de niños con riesgo
@@ -227,16 +228,26 @@ saberlo sin influir en usted, solo la administración ve el resumen mientras dur
 ### Diccionario
 
 El diccionario de variables dice qué es cada variable de la base, en qué visita se mide y si el sistema la usa. Se
-trabaja en Excel, como siempre, pero ahora vive en la plataforma con todas sus versiones:
+edita en la página, con formularios, y guarda todas sus versiones. El Excel queda para exportar e importar.
 
-* **Descargar el vigente:** baja el Excel que está en uso. Edítelo y súbalo en **Subir una versión nueva**: antes de
-  confirmar verá qué cambia (variables nuevas o quitadas, cambios de estado, desenlaces que empiezan o dejan de usarse).
-  Si el archivo tiene un error, la página dice en qué hoja y fila. Si es igual al que está en uso, no se guarda nada.
+* **Editar el diccionario:** una pestaña por hoja (**Variables**, **Visitas**, **Desenlaces**…) con un buscador.
+  Pulse el código de una fila y se abre su formulario: cada campo con su ayuda, listas desplegables donde las
+  respuestas son cerradas y un asterisco (*) en lo obligatorio. El código de una fila no se cambia. **Aplicar** deja el
+  cambio pendiente; **Quitar la fila** la marca para borrar (las variables no se borran: márquelas **No usar**).
+  **Agregar fila** está en las hojas donde se pueden sumar filas (visitas, desenlaces…); las variables las trae la base.
+* Con cambios pendientes aparece **N fila(s) con cambios sin guardar**, con **Descartar** y **Revisar y guardar**. Revisar
+  muestra cada cambio (antes → después) y qué cambia frente a la versión en uso. Si algo no cuadra, dice el problema
+  con la hoja y el código de la fila (por ejemplo «Variables · ac_adapseno: …») y no deja guardar. **Guardar versión
+  nueva** la deja en uso, con una nota opcional. Si alguien guardó otra versión mientras usted editaba, la página lo
+  avisa y sus cambios siguen ahí para revisarlos otra vez.
 * **Variables nuevas por clasificar:** cuando la base trae variables nuevas, aparecen aquí con su visita sugerida.
   Pulse **Lista** para que el sistema la use o **No usar** para descartarla. Si a una le falta información (por
-  ejemplo, el rol), la página le pedirá completarla en el Excel. Si una actualización trajo variables que aún no están
+  ejemplo, el rol), pulse **Completar**: abre su formulario. Si una actualización trajo variables que aún no están
   en el diccionario, verá un aviso con **Agregarlas al diccionario**.
 * El número junto a **Diccionario** en el menú, y el aviso del **Tablero**, dicen cuántas variables faltan por revisar.
+* **Exportar a Excel** (arriba) baja el que está en uso. **Importar desde Excel** sube uno editado fuera: antes de
+  confirmar verá qué cambia; si el archivo tiene un error, dice en qué hoja y fila; si es igual al que está en uso, no
+  se guarda nada.
 * **Historial de versiones:** cada versión con su estado, quién la subió, cuándo y su nota. Puede **Descargar**
   cualquiera o **Volver a esta**. Ninguna versión se borra.
 
@@ -273,7 +284,10 @@ El resultado aparece a la derecha (debajo en el celular), con las mismas palabra
 hasta 50 niños a la vez o casos que el formulario no cubre (por ejemplo, episodios de hospitalización), con
 `sujetos`, `mediciones` y `episodios` y los nombres de variable del diccionario.
 
-Si dice «No hay un paquete de modelos activo», la administración debe activar uno en **Modelos**.
+Si dice «No hay un paquete de modelos activo», la administración debe activar uno en **Modelos** (quien es de
+administración ve el enlace; los demás ven «Pídale a la administración que active un modelo.»). Si el cálculo falla
+con los datos escritos, dice «No se pudo calcular el riesgo con estos datos. Revise los valores que escribió e intente
+de nuevo.»; el detalle técnico queda en el registro de la API.
 
 Recuerde: si escribe datos de un niño real, no ponga su nombre ni su documento; el formulario no los pide.
 
@@ -411,18 +425,19 @@ La corrida con la base de la Fundación (extraer y calcular con los modelos apro
 ### Notificaciones
 
 Después de cada corrida que no es en silencio, se envía un correo por cada desenlace activo con los niños cuya posición
-es igual o mayor que la mínima. El correo lo leen clínicos, así que no dice «posición» sino «más riesgo que 97 de cada
-100 niños del programa». Lleva solo el código del niño, el desenlace, esa comparación y un enlace, nunca
-valores clínicos. Cada destinatario recibe un solo aviso por niño y por corrida.
+es igual o mayor que el riesgo mínimo. El correo lo leen clínicos, así que no dice «posición» sino, con la misma escala
+de la pantalla, «más riesgo que 9 de cada 10 niños». Lleva solo el código del niño, el desenlace, esa comparación y
+un enlace, nunca valores clínicos. Cada destinatario recibe un solo aviso por niño y por corrida.
 
 * **Un panel por desenlace** (se crean al activar un paquete), con la marca **Activa** o **Apagada**:
   * **Enviar avisos:** enciende o apaga los correos de ese desenlace.
-  * **Posición mínima:** de 0 a 100. Por ejemplo, 95 avisa del 5 % con más riesgo.
+  * **Riesgo mínimo:** la posición de 0 a 100 desde la que se avisa. Debajo dice qué significa: con 95, «Con 95 se
+    avisa del 5 % de niños con más riesgo.»
   * **Destinatarios:** un correo por línea. Para activar los avisos se necesita al menos uno.
   * **Guardar.** Aparece «Guardado.».
 * **Probar el correo:** escriba un correo en **Enviar un correo de prueba a** y pulse **Enviar**. Si no llega en unos
   minutos, el equipo técnico debe revisar la configuración del servidor de correo.
-* **Avisos enviados:** **Fecha**, **Destinatario**, **Niño**, **Desenlace**, **Posición** y **Estado** (**Enviado** o
+* **Avisos enviados:** **Fecha**, **Destinatario**, **Niño**, **Desenlace**, **Riesgo** y **Estado** (**Enviado** o
   **Error**, con el motivo).
 
 ### Resumen de la revisión (solo administración)
@@ -501,7 +516,8 @@ anotado en otra unidad», «la fecha no corresponde a esta visita», «cambió d
 
 * **Códigos seudonimizados.** Los niños aparecen solo con un código. La aplicación nunca muestra nombres ni
   documentos. Para saber quién es un niño hay que consultar la base de la Fundación, con los permisos de siempre.
-* **Correos sin datos clínicos.** Los avisos llevan solo el código, el desenlace, la posición y un enlace.
+* **Correos sin datos clínicos.** Los avisos llevan solo el código, el desenlace, «más riesgo que N de cada 10 niños»
+  y un enlace.
 * **Sin texto libre en la revisión ciega**, porque podría traer nombres.
 * **No escriba datos que identifiquen** (nombres, documentos, direcciones, teléfonos) en los comentarios ni en
   **Calcular el riesgo de un niño**.

@@ -1,6 +1,8 @@
 """Consultas que comparten varias rutas: la corrida de referencia, los nombres de las visitas y el esquema."""
 from __future__ import annotations
 
+import re
+
 from fastapi import HTTPException, status
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
@@ -47,3 +49,38 @@ def sujeto_existe(s: Session, corte_id: int | None, sujeto: str) -> bool:
         return False
     return s.execute(text('SELECT 1 FROM sevarti.sujetos WHERE corte_id = :c AND sujeto = :s'),
                      {'c': corte_id, 's': sujeto}).first() is not None
+
+
+def opciones(texto: object) -> list[dict]:
+    """``'1=displasia;9=sin diagnóstico'`` → ``[{'valor': '1', 'etiqueta': 'displasia'}, ...]``."""
+    if not isinstance(texto, str) or not texto.strip():
+        return []
+    salida = []
+    for parte in texto.split(';'):
+        codigo, _, etiqueta = parte.partition('=')
+        if codigo.strip():
+            salida.append({'valor': codigo.strip(), 'etiqueta': (etiqueta or codigo).strip()})
+    return salida
+
+
+_NUMERO = re.compile(r'-?\d+(\.\d+)?')
+
+
+def _numero(valor: str) -> str:
+    """Un número de la base como se lee: sin ".0" ni ruido de coma flotante (hasta 3 decimales), con coma decimal."""
+    if not _NUMERO.fullmatch(valor.strip()):
+        return valor
+    n = round(float(valor), 3)
+    return str(int(n)) if n.is_integer() else str(n).replace('.', ',')
+
+
+def valor_legible(d: dict, valor: str) -> str:
+    """El valor de una medición como lo diría el médico: la etiqueta de su categoría en el diccionario, Sí/No para lo
+    booleano y los números sin ".0". ``d`` es el esquema de la variable (``esquema()``)."""
+    numero = _numero(valor)
+    etiquetas = {_numero(o['valor']): o['etiqueta'] for o in opciones(d.get('categorias'))}
+    if numero in etiquetas:
+        return etiquetas[numero]
+    if d.get('tipo') == 'boolean' and numero in ('0', '1'):
+        return 'Sí' if numero == '1' else 'No'
+    return numero

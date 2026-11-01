@@ -249,7 +249,7 @@ function Crecimiento({ datos }: { datos: LineaTemporal }) {
               stroke="#56736d" fontSize={12} />
             <YAxis domain={[(m: number) => Math.min(-3, Math.floor(m)), (m: number) => Math.max(2, Math.ceil(m))]}
               allowDataOverflow stroke="#56736d" fontSize={12} width={36} />
-            <Tooltip labelFormatter={(v) => `${edad(Number(v))} de edad corregida`} formatter={(v, nombre) => [`${frenteOms(Number(v))} (z ${dec2(Number(v))})`, nombre]} />
+            <Tooltip labelFormatter={(v) => `${edad(Number(v))} de edad corregida`} formatter={(v, nombre) => [frenteOms(Number(v)), nombre]} />
             <Legend verticalAlign="top" height={28} />
             {indicadores.map((k, i) => (
               <Line key={k} dataKey={k} name={indicador(k)} stroke={HEX_SERIES[i % HEX_SERIES.length]} strokeWidth={2}
