@@ -34,14 +34,14 @@ const resultado = {
     bajo_2de: true, caida_1de: true, improbable: false }],
 }
 
-function api(rol: Usuario['rol'], enviados: unknown[] = []) {
+function api(rol: Usuario['rol'], enviados: unknown[] = [], extra?: { formulario?: unknown; inferencia?: { estado: number; cuerpo: unknown }; activo?: unknown }) {
   simularApi((url, init) => {
     if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario(rol) } }
-    if (url === '/api/modelos/activo') return { cuerpo: { version: 'p1', fuente: 'simulado', activo: true, metricas: {}, modelos: {} } }
-    if (url === '/api/inferencia/formulario') return { cuerpo: formulario }
+    if (url === '/api/modelos/activo') return { cuerpo: extra?.activo === undefined ? { version: 'p1', fuente: 'simulado', activo: true, metricas: {}, modelos: {} } : extra.activo }
+    if (url === '/api/inferencia/formulario') return { cuerpo: extra?.formulario ?? formulario }
     if (url === '/api/inferencia') {
       enviados.push(JSON.parse(String(init?.body)))
-      return { cuerpo: resultado }
+      return extra?.inferencia ?? { cuerpo: resultado }
     }
     return { cuerpo: {} }
   })
@@ -92,5 +92,71 @@ describe('calcular el riesgo de un niño', () => {
     expect(await screen.findByText('Más datos del niño y la familia (1)')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Modo avanzado (JSON)' }))
     expect(screen.getByLabelText('Petición en JSON')).toBeInTheDocument()
+  })
+
+  it('la edad gestacional se pide una sola vez, aunque el diccionario también la tenga como dato', async () => {
+    const enviados = api('experto', [], {
+      formulario: { ...formulario, generales: [campo('eg_semanas', 'Semanas de gestación al nacer'), ...formulario.generales] },
+    })
+    montar('/inferencia')
+    await userEvent.type(await screen.findByLabelText('Fecha de nacimiento'), '2026-01-10')
+    expect(screen.getAllByLabelText(/gestación/i)).toHaveLength(1)
+    await userEvent.type(screen.getByLabelText('Semanas de gestación al nacer'), '30')
+    await userEvent.click(screen.getByRole('button', { name: /3 meses \(edad corregida\)/ }))
+    await userEvent.type(screen.getByLabelText('Peso a 3 m EC (g)'), '5000')
+    await userEvent.type(screen.getByLabelText('Fecha de la visita'), '2026-05-10')
+    await userEvent.click(screen.getByRole('button', { name: 'Calcular el riesgo' }))
+    await waitFor(() => expect(enviados).toHaveLength(1))
+    expect(enviados[0]).toEqual({
+      sujetos: [{ sujeto: 'calculo', fecha_nacimiento: '2026-01-10', eg_semanas: 30 }],
+      mediciones: [{ sujeto: 'calculo', variable: 'peso_3m', valor: 5000, fecha: '2026-05-10', edad_dias: 120 }],
+    })
+  })
+})
+
+describe('cuando no se puede calcular, cada rol sabe a quién acudir', () => {
+  const sinModelo = { estado: 409, cuerpo: { detail: 'No hay un paquete de modelos activo.' } }
+  const falla = { estado: 422, cuerpo: { detail: 'No se pudo calcular el riesgo con estos datos. Revise los valores que escribió e intente de nuevo.' } }
+
+  async function calcularConError(rol: Usuario['rol'], inferencia: { estado: number; cuerpo: unknown }) {
+    api(rol, [], { inferencia })
+    montar('/inferencia')
+    await userEvent.type(await screen.findByLabelText('Fecha de nacimiento'), '2026-01-10')
+    await userEvent.type(screen.getByLabelText('Semanas de gestación al nacer'), '30')
+    await userEvent.click(screen.getByRole('button', { name: /Nacimiento/ }))
+    await userEvent.type(screen.getByLabelText('Peso al nacer (g)'), '900')
+    await userEvent.click(screen.getByRole('button', { name: 'Calcular el riesgo' }))
+    return screen.findByRole('alert')
+  }
+
+  it('la administración recibe un enlace a Modelos', async () => {
+    const aviso = await calcularConError('admin', sinModelo)
+    expect(within(aviso).getByRole('link', { name: 'Modelos' })).toHaveAttribute('href', '/admin/modelos')
+  })
+
+  it('un experto no es enviado a una pantalla que no puede abrir', async () => {
+    const aviso = await calcularConError('experto', sinModelo)
+    expect(aviso).toHaveTextContent('Pídale a la administración que active un modelo.')
+    expect(within(aviso).queryByRole('link')).not.toBeInTheDocument()
+    expect(aviso).not.toHaveTextContent('Modelos')
+  })
+
+  it('un cálculo que falla muestra lo que dice el servidor, sin mandar a nadie a Modelos', async () => {
+    const aviso = await calcularConError('experto', falla)
+    expect(aviso).toHaveTextContent('No se pudo calcular el riesgo con estos datos.')
+    expect(aviso).not.toHaveTextContent(/Modelos|Pídale/)
+  })
+
+  it('sin paquete activo, la administración tiene el enlace a Modelos', async () => {
+    api('admin', [], { activo: null })
+    montar('/inferencia')
+    const vacio = (await screen.findByText('No hay un paquete de modelos activo')).parentElement!
+    expect(within(vacio).getByRole('link', { name: 'Modelos' })).toHaveAttribute('href', '/admin/modelos')
+  })
+
+  it('sin paquete activo, el experto sabe a quién pedirlo', async () => {
+    api('experto', [], { activo: null })
+    montar('/inferencia')
+    expect(await screen.findByText('Pídale a la administración que active un modelo.')).toBeInTheDocument()
   })
 })

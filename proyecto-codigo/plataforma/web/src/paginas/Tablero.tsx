@@ -41,7 +41,7 @@ export default function Tablero() {
     <div className="flex flex-col gap-4 lg:h-full">
       <Encabezado titulo="Tablero">
         {datosAl(r.corte)}, actualizados el {fecha(r.corrida.terminada)}.
-        {puede(usuario, ['admin']) && <> Paquete {r.paquete ?? '—'} · corrida {r.corrida.id}.</>}
+        {puede(usuario, ['admin']) && r.paquete && <> Paquete {r.paquete}.</>}
       </Encabezado>
 
       {porClasificar > 0 && <AvisoDiccionario n={porClasificar} />}
@@ -51,7 +51,7 @@ export default function Tablero() {
         <Indicador valor={num(r.datos)} texto="datos leídos" />
         <Indicador valor={num(r.datos_revisar)} texto={`datos por revisar · ${dec(r.alertas_por_1000)} por mil`} tono="coral"
           a={puede(usuario, ['admin', 'experto']) ? '/revision/datos' : undefined} />
-        <Indicador valor={num(pendientes)} texto="sin respuesta del experto" />
+        <Indicador valor={num(r.datos_revisados)} texto="datos ya respondidos por expertos" />
         <Indicador valor={num(r.ninos_riesgo_alto)} texto="niños con algún riesgo alto" tono="coral" a={verAltos}
           ayuda={`${AYUDA_RIESGO_ALTO} Un niño puede tenerlo en varios desenlaces: son ${num(r.riesgos_altos)} riesgos altos en total.`} />
         <Indicador valor={num(r.alarmas_grupo)} texto="alarmas de grupo" />
@@ -104,7 +104,7 @@ export default function Tablero() {
           <Crecimiento filas={r.crecimiento_por_etapa} />
         </Panel>
 
-        <AlarmasGrupo className="lg:col-span-5" />
+        <AlarmasGrupo total={r.alarmas_grupo} className="lg:col-span-5" />
       </div>
     </div>
   )
@@ -182,19 +182,25 @@ function Crecimiento({ filas }: { filas: CrecimientoEtapa[] }) {
 }
 
 /** En su propio panel, con desplazamiento propio: las frases son largas y pueden ser decenas. */
-function AlarmasGrupo({ className }: { className?: string }) {
+function AlarmasGrupo({ total, className }: { total: number | null; className?: string }) {
   const q = useQuery({ queryKey: ['tablero', 'alarmas'], queryFn: () => pedir<AlarmaGrupo[]>('/tablero/alarmas-grupo') })
   return (
     <Panel llenar className={cn('max-lg:[&>div]:max-h-[26rem]', className)}
       titulo={<h2 className="text-base" title="Cambios de un trimestre a otro en todo un grupo: suelen venir de un cambio en la forma de medir.">Alarmas de grupo</h2>}
-      accion={q.data && q.data.length > 0 && <span className="text-xs text-salvia">{num(q.data.length)} · las más recientes primero</span>}>
+      accion={q.data && q.data.length > 0 && (
+        <span className="text-xs text-salvia">
+          {total != null && total > q.data.length
+            ? `${num(total)} · se muestran las ${num(q.data.length)} más recientes`
+            : `${num(q.data.length)} · las más recientes primero`}
+        </span>
+      )}>
       {q.isPending ? <Cargando /> : q.error ? <Aviso>{q.error.message}</Aviso> : q.data.length === 0 ? (
         <p className="text-sm text-salvia">Ningún grupo cambió de forma llamativa de un trimestre a otro.</p>
       ) : (
         <>
           <p className="mb-3 text-xs text-salvia">Cambios de un trimestre a otro en todo un grupo: suelen venir de un cambio en la forma de medir.</p>
           <ul className="divide-y divide-linea/70 text-sm">
-            {q.data.slice(0, 100).map((a, i) => (
+            {q.data.map((a, i) => (
               <li key={i} className="py-2 first:pt-0">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="font-semibold">{a.etiqueta ?? a.variable}</span>

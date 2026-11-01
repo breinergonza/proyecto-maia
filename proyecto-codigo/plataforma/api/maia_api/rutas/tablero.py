@@ -13,6 +13,7 @@ from maia_api.esquemas import CorridaSalida
 from maia_comun.modelos_db import PERCENTIL_ALTO, Usuario
 
 ruta = APIRouter(prefix='/tablero', tags=['tablero'])
+MAXIMO_ALARMAS = 100   # las que lista la web; el total de la corrida está en /tablero/resumen (``alarmas_grupo``)
 
 
 def _filas(s: Session, sql: str, **p) -> list[dict]:
@@ -72,4 +73,4 @@ def alarmas_grupo(variable: str | None = None, corrida_id: int | None = None, s:
     return _filas(s, f"""
         SELECT grupo, periodo, variable, etiqueta, senal, valor, referencia, estadistico, que_paso
         FROM resultados.alarmas_grupo WHERE corrida_id = :c{filtro}
-        ORDER BY periodo DESC, abs(estadistico) DESC NULLS LAST LIMIT 500""", c=c.id, v=variable)
+        ORDER BY periodo DESC, abs(estadistico) DESC NULLS LAST LIMIT {MAXIMO_ALARMAS}""", c=c.id, v=variable)
