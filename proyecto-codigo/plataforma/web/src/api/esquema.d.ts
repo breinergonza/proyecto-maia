@@ -829,6 +829,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/diccionario/versiones/{vid}/vista": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Vista
+         * @description Las hojas de esa versión como se ven en el Excel, para previsualizarla sin descargarla.
+         */
+        get: operations["vista_api_diccionario_versiones__vid__vista_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/diccionario/comparar": {
         parameters: {
             query?: never;
@@ -926,6 +946,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/diccionario/editar/revisar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revisar Edicion
+         * @description Valida los cambios de los formularios y dice qué cambia frente a la vigente, sin guardar nada.
+         */
+        post: operations["revisar_edicion_api_diccionario_editar_revisar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/diccionario/editar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Editar
+         * @description Guarda los cambios de los formularios como una versión nueva, vigente.
+         */
+        post: operations["editar_api_diccionario_editar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1014,6 +1074,25 @@ export interface components {
             /** Despues */
             despues?: string | null;
         };
+        /** CambioFila */
+        CambioFila: {
+            /** Hoja */
+            hoja: string;
+            /**
+             * Accion
+             * @enum {string}
+             */
+            accion: "editar" | "agregar" | "borrar";
+            /** Clave */
+            clave?: string | null;
+            /**
+             * Valores
+             * @default {}
+             */
+            valores: {
+                [key: string]: string | null;
+            };
+        };
         /** CampoHiperparametro */
         CampoHiperparametro: {
             /** Nombre */
@@ -1045,6 +1124,41 @@ export interface components {
              * @enum {string}
              */
             estado: "Lista" | "No usar";
+        };
+        /** ColumnaVista */
+        ColumnaVista: {
+            /** Clave */
+            clave: string;
+            /** Titulo */
+            titulo: string;
+            /**
+             * Explica
+             * @default
+             */
+            explica: string;
+            /**
+             * Opciones
+             * @default []
+             */
+            opciones: string[];
+            /** Lista */
+            lista?: string | null;
+            /**
+             * Largo
+             * @default false
+             */
+            largo: boolean;
+            /**
+             * Tipo
+             * @default texto
+             * @enum {string}
+             */
+            tipo: "texto" | "numero" | "fecha";
+            /**
+             * Obligatoria
+             * @default false
+             */
+            obligatoria: boolean;
         };
         /** ConexionEntrada */
         ConexionEntrada: {
@@ -1193,6 +1307,15 @@ export interface components {
             sin_cambios: boolean;
             /** Vigente */
             vigente?: number | null;
+        };
+        /** Edicion */
+        Edicion: {
+            /** Base */
+            base: number;
+            /** Cambios */
+            cambios: components["schemas"]["CambioFila"][];
+            /** Nota */
+            nota?: string | null;
         };
         /** EjecucionNueva */
         EjecucionNueva: {
@@ -1375,6 +1498,21 @@ export interface components {
             campos: components["schemas"]["CampoHiperparametro"][];
             /** Actualizado En */
             actualizado_en?: string | null;
+        };
+        /** HojaVista */
+        HojaVista: {
+            /** Nombre */
+            nombre: string;
+            /** Describe */
+            describe: string;
+            /** Clave */
+            clave: string;
+            /** Agregar */
+            agregar: boolean;
+            /** Columnas */
+            columnas: components["schemas"]["ColumnaVista"][];
+            /** Filas */
+            filas: (string | null)[][];
         };
         /** Login */
         Login: {
@@ -1716,6 +1854,12 @@ export interface components {
              * Format: date-time
              */
             creado_en: string;
+        };
+        /** VistaDiccionario */
+        VistaDiccionario: {
+            version: components["schemas"]["VersionDiccionarioSalida"];
+            /** Hojas */
+            hojas: components["schemas"]["HojaVista"][];
         };
     };
     responses: never;
@@ -3299,6 +3443,37 @@ export interface operations {
             };
         };
     };
+    vista_api_diccionario_versiones__vid__vista_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VistaDiccionario"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     comparar_api_diccionario_comparar_post: {
         parameters: {
             query?: never;
@@ -3429,6 +3604,72 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionDiccionarioSalida"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revisar_edicion_api_diccionario_editar_revisar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Edicion"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiferenciasDiccionario"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    editar_api_diccionario_editar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Edicion"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };

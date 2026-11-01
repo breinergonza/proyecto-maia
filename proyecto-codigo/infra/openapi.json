@@ -2561,6 +2561,54 @@
     }
    }
   },
+  "/api/diccionario/versiones/{vid}/vista": {
+   "get": {
+    "tags": [
+     "diccionario"
+    ],
+    "summary": "Vista",
+    "description": "Las hojas de esa versión como se ven en el Excel, para previsualizarla sin descargarla.",
+    "operationId": "vista_api_diccionario_versiones__vid__vista_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "vid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Vid"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/VistaDiccionario"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/diccionario/comparar": {
    "post": {
     "tags": [
@@ -2750,6 +2798,100 @@
     },
     "responses": {
      "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/VersionDiccionarioSalida"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/diccionario/editar/revisar": {
+   "post": {
+    "tags": [
+     "diccionario"
+    ],
+    "summary": "Revisar Edicion",
+    "description": "Valida los cambios de los formularios y dice qué cambia frente a la vigente, sin guardar nada.",
+    "operationId": "revisar_edicion_api_diccionario_editar_revisar_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/Edicion"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DiferenciasDiccionario"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/diccionario/editar": {
+   "post": {
+    "tags": [
+     "diccionario"
+    ],
+    "summary": "Editar",
+    "description": "Guarda los cambios de los formularios como una versión nueva, vigente.",
+    "operationId": "editar_api_diccionario_editar_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/Edicion"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
       "description": "Successful Response",
       "content": {
        "application/json": {
@@ -3067,6 +3209,58 @@
     ],
     "title": "CambioEstado"
    },
+   "CambioFila": {
+    "properties": {
+     "hoja": {
+      "type": "string",
+      "maxLength": 40,
+      "minLength": 1,
+      "title": "Hoja"
+     },
+     "accion": {
+      "type": "string",
+      "enum": [
+       "editar",
+       "agregar",
+       "borrar"
+      ],
+      "title": "Accion"
+     },
+     "clave": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Clave"
+     },
+     "valores": {
+      "additionalProperties": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "type": "object",
+      "title": "Valores",
+      "default": {}
+     }
+    },
+    "type": "object",
+    "required": [
+     "hoja",
+     "accion"
+    ],
+    "title": "CambioFila"
+   },
    "CampoHiperparametro": {
     "properties": {
      "nombre": {
@@ -3162,6 +3356,68 @@
      "estado"
     ],
     "title": "Clasificacion"
+   },
+   "ColumnaVista": {
+    "properties": {
+     "clave": {
+      "type": "string",
+      "title": "Clave"
+     },
+     "titulo": {
+      "type": "string",
+      "title": "Titulo"
+     },
+     "explica": {
+      "type": "string",
+      "title": "Explica",
+      "default": ""
+     },
+     "opciones": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Opciones",
+      "default": []
+     },
+     "lista": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Lista"
+     },
+     "largo": {
+      "type": "boolean",
+      "title": "Largo",
+      "default": false
+     },
+     "tipo": {
+      "type": "string",
+      "enum": [
+       "texto",
+       "numero",
+       "fecha"
+      ],
+      "title": "Tipo",
+      "default": "texto"
+     },
+     "obligatoria": {
+      "type": "boolean",
+      "title": "Obligatoria",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "clave",
+     "titulo"
+    ],
+    "title": "ColumnaVista"
    },
    "ConexionEntrada": {
     "properties": {
@@ -3585,6 +3841,41 @@
      "sin_cambios"
     ],
     "title": "DiferenciasDiccionario"
+   },
+   "Edicion": {
+    "properties": {
+     "base": {
+      "type": "integer",
+      "title": "Base"
+     },
+     "cambios": {
+      "items": {
+       "$ref": "#/components/schemas/CambioFila"
+      },
+      "type": "array",
+      "maxItems": 2000,
+      "minItems": 1,
+      "title": "Cambios"
+     },
+     "nota": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 500
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Nota"
+     }
+    },
+    "type": "object",
+    "required": [
+     "base",
+     "cambios"
+    ],
+    "title": "Edicion"
    },
    "EjecucionNueva": {
     "properties": {
@@ -4124,6 +4415,60 @@
      "campos"
     ],
     "title": "HiperparametrosSalida"
+   },
+   "HojaVista": {
+    "properties": {
+     "nombre": {
+      "type": "string",
+      "title": "Nombre"
+     },
+     "describe": {
+      "type": "string",
+      "title": "Describe"
+     },
+     "clave": {
+      "type": "string",
+      "title": "Clave"
+     },
+     "agregar": {
+      "type": "boolean",
+      "title": "Agregar"
+     },
+     "columnas": {
+      "items": {
+       "$ref": "#/components/schemas/ColumnaVista"
+      },
+      "type": "array",
+      "title": "Columnas"
+     },
+     "filas": {
+      "items": {
+       "items": {
+        "anyOf": [
+         {
+          "type": "string"
+         },
+         {
+          "type": "null"
+         }
+        ]
+       },
+       "type": "array"
+      },
+      "type": "array",
+      "title": "Filas"
+     }
+    },
+    "type": "object",
+    "required": [
+     "nombre",
+     "describe",
+     "clave",
+     "agregar",
+     "columnas",
+     "filas"
+    ],
+    "title": "HojaVista"
    },
    "Login": {
     "properties": {
@@ -5223,6 +5568,26 @@
      "creado_en"
     ],
     "title": "VersionDiccionarioSalida"
+   },
+   "VistaDiccionario": {
+    "properties": {
+     "version": {
+      "$ref": "#/components/schemas/VersionDiccionarioSalida"
+     },
+     "hojas": {
+      "items": {
+       "$ref": "#/components/schemas/HojaVista"
+      },
+      "type": "array",
+      "title": "Hojas"
+     }
+    },
+    "type": "object",
+    "required": [
+     "version",
+     "hojas"
+    ],
+    "title": "VistaDiccionario"
    }
   },
   "securitySchemes": {

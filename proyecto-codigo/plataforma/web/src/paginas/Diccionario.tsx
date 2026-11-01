@@ -1,14 +1,17 @@
-// Diccionario de variables (experto y administración). El Excel sigue siendo el formato de trabajo: se descarga, se
-// edita y se sube; antes de confirmar se ven los cambios frente al vigente. Las variables nuevas que trae una
-// actualización se clasifican aquí con un clic (Lista / No usar) y cada cambio queda como una versión que se puede volver.
+// Diccionario de variables (experto y administración). Se edita aquí con formularios (EditorDiccionario): cada hoja
+// es una pestaña y cada fila un formulario; antes de guardar se ven los cambios frente al vigente. El Excel queda para
+// exportar e importar. Las variables nuevas que trae una actualización se clasifican aquí con un clic (Lista / No usar)
+// o se completan en su formulario, y cada cambio queda como una versión a la que se puede volver.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Download, Eye, Search, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { pedir } from '../api/cliente'
 import type {
-  CambioDesenlace, Clasificacion, DiferenciasDiccionario, VariableDiccionario, VersionDiccionario, VistaDiccionario,
+  Clasificacion, DiferenciasDiccionario as Diferencias, VariableDiccionario, VersionDiccionario, VistaDiccionario,
 } from '../api/tipos-diccionario'
+import DiferenciasDiccionario from '../components/DiferenciasDiccionario'
+import EditorDiccionario, { type FilaPedida } from '../components/EditorDiccionario'
 import { cn } from '../lib/cn'
 import { Aviso, Boton, Campo, Cargando, Encabezado, Entrada, Insignia, Panel, Tabla, Vacio } from '../components/ui'
 import { descargarVersion, origen, usePorClasificar } from '../lib/diccionario'
@@ -26,6 +29,9 @@ export default function Diccionario() {
   const versiones = useQuery({ queryKey: ['diccionario', 'versiones'], queryFn: () => pedir<VersionDiccionario[]>('/diccionario/versiones') })
   const [aviso, setAviso] = useState<string | null>(null)
   const [viendo, setViendo] = useState<VersionDiccionario | null>(null)
+  const [pedida, setPedida] = useState<FilaPedida | null>(null)
+  const abierta = useCallback(() => setPedida(null), [])
+  const vigente = versiones.data?.find((v) => v.estado === 'vigente')
   const refrescar = (texto: string) => {
     setAviso(texto)
     void cliente.invalidateQueries({ queryKey: ['diccionario'] })
@@ -45,10 +51,10 @@ export default function Diccionario() {
     <>
       <Encabezado titulo="Diccionario de variables"
         accion={<Boton variante="secundario" onClick={() => descargar.mutate(null)} disabled={descargar.isPending}>
-          <Download size={16} aria-hidden />{descargar.isPending ? 'Descargando…' : 'Descargar el vigente'}
+          <Download size={16} aria-hidden />{descargar.isPending ? 'Descargando…' : 'Exportar a Excel'}
         </Boton>}>
-        Define qué es cada variable de la base, en qué visita se mide y si el sistema la usa. Se trabaja en Excel: descárguelo,
-        edítelo y súbalo; antes de confirmar verá qué cambia. Cada cambio queda guardado y se puede volver a una versión anterior.
+        Define qué es cada variable de la base, en qué visita se mide y si el sistema la usa. Se edita aquí: elija una hoja, abra
+        una fila y guarde; antes de guardar verá qué cambia. Cada cambio queda como una versión y se puede volver a una anterior.
       </Encabezado>
 
       <div className="space-y-4">
@@ -60,23 +66,24 @@ export default function Diccionario() {
             ocupado={activar.isPending} alAgregar={() => activar.mutate(pendientes.data!.borrador!.version)} />
         )}
 
+        {pendientes.error ? <Aviso>{pendientes.error.message}</Aviso> : !!pendientes.data?.variables.length && (
+          <Panel titulo={<div className="flex items-center gap-2"><h2 className="text-base">Variables nuevas por clasificar</h2>
+            <Insignia tono="ocre">{pendientes.data.variables.length}</Insignia></div>}>
+            <ul className="divide-y divide-linea/70">
+              {pendientes.data.variables.map((v) => (
+                <Pendiente key={v.variable} v={v} ocupado={clasificar.isPending && clasificar.variables?.variable === v.variable}
+                  deshabilitado={clasificar.isPending} alElegir={(estado) => clasificar.mutate({ variable: v.variable, estado })}
+                  alCompletar={() => setPedida({ hoja: 'Variables', clave: v.variable })} />
+              ))}
+            </ul>
+          </Panel>
+        )}
+
+        {vigente ? <EditorDiccionario vigente={vigente} pedida={pedida} alAbrirPedida={abierta}
+          alGuardar={(v) => refrescar(`La versión ${v.version} quedó en uso.`)} /> : versiones.isPending && <Cargando />}
+
         <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
           <div className="min-w-0 space-y-4">
-            <Panel titulo={<div className="flex items-center gap-2"><h2 className="text-base">Variables nuevas por clasificar</h2>
-              {!!pendientes.data?.variables.length && <Insignia tono="ocre">{pendientes.data.variables.length}</Insignia>}</div>}>
-              {pendientes.isPending ? <Cargando /> : pendientes.error ? <Aviso>{pendientes.error.message}</Aviso>
-                : pendientes.data.variables.length === 0 ? (
-                  <p className="text-sm text-salvia">No hay variables por clasificar. Cuando la base traiga variables nuevas aparecerán aquí.</p>
-                ) : (
-                  <ul className="divide-y divide-linea/70">
-                    {pendientes.data.variables.map((v) => (
-                      <Pendiente key={v.variable} v={v} ocupado={clasificar.isPending && clasificar.variables?.variable === v.variable}
-                        deshabilitado={clasificar.isPending} alElegir={(estado) => clasificar.mutate({ variable: v.variable, estado })} />
-                    ))}
-                  </ul>
-                )}
-            </Panel>
-
             <Panel titulo="Historial de versiones">
               {versiones.isPending ? <Cargando /> : versiones.error ? <Aviso>{versiones.error.message}</Aviso>
                 : versiones.data.length === 0 ? <Vacio titulo="Todavía no hay versiones">Suba el primer diccionario.</Vacio> : (
@@ -243,8 +250,9 @@ function Vista({ v, alCerrar, alDescargar, descargando }: {
   )
 }
 
-function Pendiente({ v, ocupado, deshabilitado, alElegir }: {
+function Pendiente({ v, ocupado, deshabilitado, alElegir, alCompletar }: {
   v: VariableDiccionario; ocupado: boolean; deshabilitado: boolean; alElegir: (e: Clasificacion['estado']) => void
+  alCompletar: () => void
 }) {
   return (
     <li className="flex flex-col gap-3 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
@@ -255,7 +263,8 @@ function Pendiente({ v, ocupado, deshabilitado, alElegir }: {
           {' · '}{v.visita ? <>visita sugerida: {v.visita}</> : 'sin visita sugerida'}
         </p>
       </div>
-      <div className="flex shrink-0 gap-2">
+      <div className="flex shrink-0 flex-wrap gap-2">
+        <Boton chico variante="fantasma" onClick={alCompletar} aria-label={`Completar ${v.variable}`}>Completar</Boton>
         <Boton chico onClick={() => alElegir('Lista')} disabled={deshabilitado} aria-label={`Marcar ${v.variable} como Lista`}>
           {ocupado ? 'Guardando…' : 'Lista'}
         </Boton>
@@ -304,7 +313,7 @@ function Subir({ alGuardar }: { alGuardar: (v: VersionDiccionario) => void }) {
     return fd
   }
   const comparar = useMutation({
-    mutationFn: (f: File) => pedir<DiferenciasDiccionario>('/diccionario/comparar', { formulario: formulario(f) }),
+    mutationFn: (f: File) => pedir<Diferencias>('/diccionario/comparar', { formulario: formulario(f) }),
   })
   const reiniciar = () => {
     setArchivo(null)
@@ -325,7 +334,9 @@ function Subir({ alGuardar }: { alGuardar: (v: VersionDiccionario) => void }) {
   })
 
   return (
-    <Panel titulo="Subir una versión nueva" className="xl:sticky xl:top-0">
+    <Panel titulo="Importar desde Excel" className="xl:sticky xl:top-0">
+      <p className="mb-3 text-sm text-salvia">Para cambios grandes: exporte el vigente, edítelo en Excel y súbalo aquí. Antes de
+        confirmar verá qué cambia.</p>
       <form className="flex flex-col gap-3" onSubmit={(e) => {
         e.preventDefault()
         if (archivo) comparar.mutate(archivo)
@@ -345,7 +356,7 @@ function Subir({ alGuardar }: { alGuardar: (v: VersionDiccionario) => void }) {
       {comparar.error && <div className="mt-3"><Aviso><span className="whitespace-pre-line">{comparar.error.message}</span></Aviso></div>}
       {comparar.data && archivo && (
         <div className="mt-4 space-y-4">
-          <Diferencias d={comparar.data} />
+          <DiferenciasDiccionario d={comparar.data} />
           <Campo id="nota-diccionario" etiqueta="Nota (opcional)" ayuda="Qué cambió y por qué, para quien lo revise después.">
             <Entrada id="nota-diccionario" value={nota} maxLength={500} onChange={(e) => setNota(e.target.value)} />
           </Campo>
@@ -359,49 +370,5 @@ function Subir({ alGuardar }: { alGuardar: (v: VersionDiccionario) => void }) {
         </div>
       )}
     </Panel>
-  )
-}
-
-function Grupo({ titulo, n, children }: { titulo: string; n: number; children: ReactNode }) {
-  if (!n) return null
-  return (
-    <details className="text-sm" open={n <= 8}>
-      <summary className="cursor-pointer font-semibold">{titulo} ({num(n)})</summary>
-      <ul className="mt-1.5 space-y-1 pl-1">{children}</ul>
-    </details>
-  )
-}
-
-const nombre = (v: VariableDiccionario) => v.etiqueta ? `${v.etiqueta} (${v.variable})` : v.variable
-const desenlace = (d: CambioDesenlace) => d.nombre ?? d.clave
-
-function Diferencias({ d }: { d: DiferenciasDiccionario }) {
-  if (d.sin_cambios) {
-    return (
-      <Aviso tono="teal">
-        No cambian variables, estados ni desenlaces frente al vigente{d.vigente ? ` (versión ${d.vigente})` : ''}. Si editó otras
-        columnas, como nombres o rangos, puede confirmarlo igual.
-      </Aviso>
-    )
-  }
-  return (
-    <div className="space-y-3 rounded-control border border-linea bg-fondo/50 p-3">
-      <p className="text-sm font-semibold">Cambios frente al vigente{d.vigente ? ` (versión ${d.vigente})` : ''}</p>
-      <Grupo titulo="Variables nuevas" n={d.nuevas.length}>
-        {d.nuevas.map((v) => <li key={v.variable}>{nombre(v)} · {v.estado ?? '—'}</li>)}
-      </Grupo>
-      <Grupo titulo="Variables quitadas" n={d.quitadas.length}>
-        {d.quitadas.map((v) => <li key={v.variable} className="text-coral-hondo">{nombre(v)}</li>)}
-      </Grupo>
-      <Grupo titulo="Cambios de estado" n={d.estados.length}>
-        {d.estados.map((v) => <li key={v.variable}>{nombre(v)}: {v.antes ?? '—'} → <strong>{v.despues ?? '—'}</strong></li>)}
-      </Grupo>
-      <Grupo titulo="Desenlaces que empiezan a usarse" n={d.desenlaces_activados.length}>
-        {d.desenlaces_activados.map((x) => <li key={x.clave}>{desenlace(x)}: {x.antes ?? 'nuevo'} → <strong>{x.despues}</strong></li>)}
-      </Grupo>
-      <Grupo titulo="Desenlaces que dejan de usarse" n={d.desenlaces_apagados.length}>
-        {d.desenlaces_apagados.map((x) => <li key={x.clave} className="text-coral-hondo">{desenlace(x)}: {x.antes} → {x.despues ?? 'quitado'}</li>)}
-      </Grupo>
-    </div>
   )
 }

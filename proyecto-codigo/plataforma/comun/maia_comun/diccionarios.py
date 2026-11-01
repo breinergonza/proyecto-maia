@@ -21,11 +21,13 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 from sqlalchemy import func, select, text, update
 from sqlalchemy.orm import Session
 
 from archivos import carpetas as CA
+from archivos import libros as LB
 from maia_comun.modelos_db import VersionDiccionario
 from sevarti import diccionario as D
 
@@ -211,15 +213,30 @@ def _celda(v: Any) -> str | None:
     return str(v)
 
 
+def _tipo(hoja: str, clave: str) -> str:
+    r = D.reglas(hoja)
+    return 'numero' if clave in r['numeros'] else 'fecha' if clave in r['fechas'] else 'texto'
+
+
+def _columna(hoja: str, c: LB.Columna) -> dict[str, Any]:
+    """Lo que el formulario necesita de una columna: el título y la ayuda del Excel, las respuestas de su lista
+    desplegable (``opciones``) o la hoja de la que salen (``lista``), y si es obligatoria, un número o una fecha."""
+    return {'clave': c.clave, 'titulo': c.titulo, 'explica': c.explica, 'opciones': list(c.opciones),
+            'lista': c.lista.split('!')[0].strip("'") if c.lista else None, 'largo': c.largo,
+            'tipo': _tipo(hoja, c.clave), 'obligatoria': c.clave in D.reglas(hoja)['obligatorias']}
+
+
 def vista(dic: D.Diccionario) -> list[dict[str, Any]]:
-    """Las hojas del Excel como se ven en él (títulos de columna y respuestas en español), para previsualizarlo."""
+    """Las hojas del Excel como se ven en él (títulos de columna y respuestas en español), para previsualizarlo y para
+    los formularios que lo editan. ``clave`` es la columna que nombra cada fila."""
     hojas = []
     for nombre, tabla in D.mostradas(dic).items():
         hoja = D.LIBRO.hoja(nombre)
         columnas = [c for c in hoja.columnas if c.clave in tabla.columns]
         filas = [[_celda(f[c.clave]) for c in columnas] for f in tabla.to_dict('records')]
-        hojas.append({'nombre': nombre, 'describe': hoja.describe,
-                      'columnas': [{'clave': c.clave, 'titulo': c.titulo} for c in columnas], 'filas': filas})
+        hojas.append({'nombre': nombre, 'describe': hoja.describe, 'clave': hoja.columnas[0].clave,
+                      'agregar': nombre not in _SIN_FILAS_NUEVAS,
+                      'columnas': [_columna(nombre, c) for c in columnas], 'filas': filas})
     return hojas
 
 
@@ -247,9 +264,136 @@ def clasificar(s: Session, variable: str, estado: str, usuario_id=None) -> Versi
         leer(contenido)
     except DiccionarioInvalido as e:
         raise DiccionarioInvalido(f'No se pudo marcar «{variable}» como «{estado}» porque le falta información. '
-                                  f'Descargue el diccionario, complete la fila y súbalo.\n{e}') from None
+                                  f'Use «Completar» para llenar lo que falta.\n{e}') from None
     return guardar(s, contenido, 'subido', estado='vigente', usuario_id=usuario_id, validar=False,
                    nota=f'«{variable}» marcada como «{estado}».')
+
+
+# ------------------------------------------------------------------ editar con formularios
+
+_SIN_FILAS_NUEVAS = ('Variables', 'Curva OMS')   # las variables las trae la base; la curva es una sola fila
+_FILA = re.compile(r'^- hoja "(?P<hoja>[^"]+)", fila (?P<fila>\d+): ', re.M)
+
+
+class Desactualizado(Exception):
+    """Mientras se editaba, alguien guardó otra versión: los cambios se revisan otra vez sobre la nueva."""
+
+
+class SinCambios(ValueError):
+    """Los cambios dejan el diccionario igual al vigente."""
+
+
+def _hoja(nombre: str) -> LB.Hoja:
+    if nombre not in {h.nombre for h in D.LIBRO.hojas}:
+        raise DiccionarioInvalido(f'El diccionario no tiene la hoja «{nombre}».')
+    return D.LIBRO.hoja(nombre)
+
+
+def _valor(tipo: str, v: str | None) -> Any:
+    """Lo escrito en el formulario como lo guarda el Excel. Un número admite coma decimal; si no es un número queda
+    como texto, para que el núcleo diga cuál está mal."""
+    texto = (v or '').strip()
+    if not texto:
+        return np.nan
+    if tipo == 'numero':
+        try:
+            return float(texto.replace(',', '.'))
+        except ValueError:
+            return texto
+    return texto
+
+
+def _aplicar(tablas: dict[str, pd.DataFrame], cambio: dict[str, Any]) -> None:
+    nombre, accion, fila, valores = cambio['hoja'], cambio['accion'], cambio.get('clave'), cambio.get('valores') or {}
+    hoja = _hoja(nombre)
+    clave = hoja.columnas[0].clave
+    titulos = {c.clave: c.titulo for c in hoja.columnas}
+    if desconocidas := sorted(set(valores) - set(titulos)):
+        raise DiccionarioInvalido(f'La hoja «{nombre}» no tiene la columna {", ".join(desconocidas)}.')
+    t = tablas[nombre]
+    if accion == 'agregar':
+        if nombre in _SIN_FILAS_NUEVAS:
+            raise DiccionarioInvalido(f'En la hoja «{nombre}» no se agregan filas.')
+        nueva = pd.DataFrame([{k: _valor(_tipo(nombre, k), v) for k, v in valores.items()}])
+        tablas[nombre] = pd.concat([t.astype(object), nueva.astype(object)], ignore_index=True)
+        return
+    filas = t.index[t[clave].map(_celda) == fila]
+    if not len(filas):
+        raise LookupError(f'«{fila}» ya no está en la hoja «{nombre}».')
+    if accion == 'borrar':
+        if nombre in _SIN_FILAS_NUEVAS:
+            raise DiccionarioInvalido('Las variables no se borran: la base las sigue trayendo. Márquela «No usar».'
+                                      if nombre == 'Variables' else f'En la hoja «{nombre}» no se borran filas.')
+        tablas[nombre] = t.drop(filas).reset_index(drop=True)
+        return
+    if clave in valores and (valores[clave] or '').strip() != fila:
+        raise DiccionarioInvalido(f'{titulos[clave]} no se cambia: es como el sistema reconoce la fila «{fila}».')
+    t = t.copy()
+    for k, v in valores.items():
+        t[k] = t[k].astype(object)
+        t.loc[filas, k] = _valor(_tipo(nombre, k), v)
+    tablas[nombre] = t
+
+
+def _por_fila(mensaje: str, tablas: dict[str, pd.DataFrame]) -> str:
+    """El error del núcleo, que cuenta filas del Excel, nombrando cada fila por su código como la ve el formulario."""
+    def nombre(m: re.Match[str]) -> str:
+        hoja, i = m['hoja'], int(m['fila']) - 2
+        t = tablas.get(hoja)
+        if t is None or not 0 <= i < len(t):
+            return m[0]
+        return f'- {hoja} · {_celda(t.iloc[i][D.LIBRO.hoja(hoja).columnas[0].clave]) or "fila nueva"}: '
+    return re.sub(r'^El diccionario \S+ tiene', 'El diccionario tiene', _FILA.sub(nombre, mensaje))
+
+
+def _editado(s: Session, base: int, cambios: list[dict[str, Any]]) -> tuple[VersionDiccionario, D.Diccionario, bytes]:
+    """La vigente (que debe ser ``base``), lo que tenía y el .xlsx con los cambios, ya validado con el núcleo."""
+    actual = vigente(s)
+    if actual is None:
+        raise LookupError('Todavía no hay un diccionario vigente.')
+    if actual.id != base:
+        raise Desactualizado(f'Mientras editaba se guardó la versión {actual.version}. Sus cambios siguen aquí: '
+                             'revíselos otra vez sobre la versión nueva.')
+    antes = leer(actual.archivo)
+    tablas = {n: t.copy() for n, t in D.mostradas(antes).items()}
+    for c in cambios:
+        _aplicar(tablas, c)
+    with tempfile.TemporaryDirectory() as tmp:
+        ruta = Path(tmp) / 'diccionario.xlsx'
+        LB.escribir(D.LIBRO, ruta, tablas)
+        contenido = ruta.read_bytes()
+    try:
+        despues = leer(contenido)
+    except DiccionarioInvalido as e:
+        raise DiccionarioInvalido(_por_fila(str(e), tablas)) from None
+    previas = D.mostradas(antes)
+    if all(t.equals(previas[n]) for n, t in D.mostradas(despues).items()):
+        raise SinCambios('Los cambios dejan el diccionario igual al vigente: no hay nada que guardar.')
+    return actual, antes, contenido
+
+
+def revisar(s: Session, base: int, cambios: list[dict[str, Any]]) -> dict[str, Any]:
+    """Valida los cambios de los formularios y dice qué cambia frente a la vigente, sin guardar nada."""
+    actual, antes, contenido = _editado(s, base, cambios)
+    return {**diferencias(antes, leer(contenido)), 'vigente': actual.version}
+
+
+def _nota(cambios: list[dict[str, Any]]) -> str:
+    hojas = list(dict.fromkeys(c['hoja'] for c in cambios))
+    lista = hojas[0] if len(hojas) == 1 else f'{", ".join(hojas[:-1])} y {hojas[-1]}'
+    n = len(cambios)
+    return f'Editado en la web: {n} cambio{"" if n == 1 else "s"} en {lista}.'
+
+
+def editar(s: Session, base: int, cambios: list[dict[str, Any]], *, nota: str | None = None,
+           usuario_id=None) -> VersionDiccionario:
+    """Aplica los cambios de los formularios a la vigente (``base``) y los guarda como una versión nueva, vigente.
+
+    Cada cambio es ``{'hoja', 'accion': 'editar' | 'agregar' | 'borrar', 'clave': la fila, 'valores': {columna: texto}}``,
+    con las respuestas como se ven en el Excel. El núcleo valida el resultado igual que un archivo subido."""
+    _, _, contenido = _editado(s, base, cambios)
+    return guardar(s, contenido, 'subido', estado='vigente', nota=(nota or '').strip() or _nota(cambios),
+                   usuario_id=usuario_id, validar=False)
 
 
 # ------------------------------------------------------------------ el programador
