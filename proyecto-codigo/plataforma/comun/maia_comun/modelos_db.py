@@ -173,12 +173,19 @@ class Paquete(Base):
     subido_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+# «Riesgo alto»: estar en el 10 % de mayor riesgo de su desenlace (percentil dentro de la corrida), no un umbral clínico.
+# La web tiene los mismos valores (RIESGO_ALTO, RIESGO_MUY_ALTO); pruebas/test_umbrales.py los mantiene iguales.
+PERCENTIL_ALTO = 90
+# «Riesgo muy alto»: el 5 % de mayor riesgo; es también el mínimo con que parten los avisos por correo.
+PERCENTIL_MUY_ALTO = 95
+
+
 class ConfigNotificacion(Base):
     __tablename__ = 'config_notificaciones'
     __table_args__ = {'schema': 'app'}
     desenlace: Mapped[str] = mapped_column(Text, primary_key=True)   # clave del desenlace
     nombre: Mapped[str | None] = mapped_column(Text)
-    percentil_minimo: Mapped[float] = mapped_column(Float, server_default=text('95'))
+    percentil_minimo: Mapped[float] = mapped_column(Float, server_default=text(str(PERCENTIL_MUY_ALTO)))
     destinatarios: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default=text("'{}'"))
     activo: Mapped[bool] = mapped_column(Boolean, server_default=text('false'))
 
@@ -346,10 +353,6 @@ class AlarmaGrupo(Base):
     referencia: Mapped[float | None] = mapped_column(Float)
     estadistico: Mapped[float | None] = mapped_column(Float)
     que_paso: Mapped[str | None] = mapped_column(Text)
-
-
-# «Riesgo alto»: estar en el 10 % de mayor riesgo de su desenlace (percentil dentro de la corrida), no un umbral clínico.
-PERCENTIL_ALTO = 90
 
 
 class Riesgo(Base):

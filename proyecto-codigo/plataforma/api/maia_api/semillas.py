@@ -18,7 +18,7 @@ from maia_comun import db
 from maia_comun import diccionarios as DIC
 from maia_comun import sevarti_db as SDB
 from maia_comun.config import Configuracion, obtener
-from maia_comun.modelos_db import ConfigNotificacion, Usuario
+from maia_comun.modelos_db import PERCENTIL_MUY_ALTO, ConfigNotificacion, Usuario
 
 
 def admin_inicial(s: Session, cfg: Configuracion) -> bool:
@@ -47,7 +47,7 @@ def config_notificaciones_de(s: Session) -> int:
     nuevos = 0
     for clave, m in E.estado.modelos.clinico.modelos.items():
         if clave not in existentes:
-            s.add(ConfigNotificacion(desenlace=clave, nombre=m.desenlace.nombre, percentil_minimo=95,
+            s.add(ConfigNotificacion(desenlace=clave, nombre=m.desenlace.nombre, percentil_minimo=PERCENTIL_MUY_ALTO,
                                      destinatarios=[], activo=False))
             nuevos += 1
     s.commit()

@@ -3291,6 +3291,18 @@
       "type": "string",
       "title": "Ayuda"
      },
+     "escala": {
+      "anyOf": [
+       {
+        "type": "string",
+        "const": "por_mil"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Escala"
+     },
      "defecto": {
       "anyOf": [
        {

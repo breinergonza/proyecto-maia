@@ -93,6 +93,19 @@ def test_hiperparametros_se_validan():
     assert cfg.rondas == 50 and cfg.alpha == 0.002 and cfg.dispositivo == 'cpu'
 
 
+
+def test_un_valor_igual_al_del_nucleo_no_es_un_ajuste():
+    """Vacío y el valor del núcleo son lo mismo: guardarlo no cuenta como ajuste (ni en la insignia ni en MLflow)."""
+    assert HP.validar('anomalias', {'alpha': 0.005, 'rondas': 300, 'tasa': 0.1}) == {'tasa': 0.1}
+    assert HP.ajustes('anomalias', {'alpha': 0.005, 'z_alerta': 3.5}) == {}
+    assert HP.ajustes('anomalias', {'alpha': 0.05}) == {'alpha': 0.05}
+
+
+def test_la_meta_de_falsas_alertas_dice_su_escala():
+    alpha = next(c for c in HP.CAMPOS['anomalias'] if c.nombre == 'alpha')
+    assert alpha.escala == 'por_mil'
+    assert all(c.escala is None for c in HP.CAMPOS['anomalias'] + HP.CAMPOS['clinico'] if c.nombre != 'alpha')
+
 # ====================================================================== parámetros de una programación
 
 def test_parametros_de_programacion_y_argumentos():

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 
 from fastapi import HTTPException, status
 from sqlalchemy import select, text
@@ -84,3 +85,35 @@ def valor_legible(d: dict, valor: str) -> str:
     if d.get('tipo') == 'boolean' and numero in ('0', '1'):
         return 'Sí' if numero == '1' else 'No'
     return numero
+
+
+def _sin_tildes(texto: str) -> str:
+    return ''.join(c for c in unicodedata.normalize('NFD', texto.lower()) if unicodedata.category(c) != 'Mn')
+
+
+def unidad_mostrada(d: dict) -> str | None:
+    """La unidad que acompaña a un valor: ninguna para una categoría o un sí/no (su etiqueta ya lo dice), ni cuando la
+    etiqueta de la variable ya la nombra ("Número de controles: 1", no "1 controles")."""
+    unidad = (d.get('unidad') or '').strip()
+    if not unidad or d.get('tipo') in ('categorical', 'boolean'):
+        return None
+    if re.search(rf'(?<!\w){re.escape(_sin_tildes(unidad))}(?!\w)', _sin_tildes(str(d.get('etiqueta') or ''))):
+        return None
+    return unidad
+
+
+_MOTIVO = re.compile(r'^(?P<texto>.*\((?P<variable>\w+)\)) = (?P<valor>.*)$')
+
+
+def motivo_legible(motivo: str, esq: dict) -> str:
+    """Un motivo del modelo ("Etiqueta (variable) = valor") con el valor como lo diría el médico: "Sarampión = No",
+    no "= 0"; "Peso al nacer = 1.372 g", con su unidad. El núcleo ya escribe los números como se leen aquí ("1.372",
+    "44,4"), así que solo se traducen los códigos de una categoría o un sí/no. La web quita después el código de la
+    variable."""
+    m = _MOTIVO.match(motivo)
+    if not m or m['variable'] not in esq:
+        return motivo
+    d = esq[m['variable']]
+    valor = valor_legible(d, m['valor']) if d.get('tipo') in ('categorical', 'boolean') else m['valor']
+    unidad = unidad_mostrada(d)
+    return f"{m['texto']} = {valor}{f' {unidad}' if unidad else ''}"

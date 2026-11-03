@@ -13,7 +13,7 @@ from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from maia_api.consultas import corrida_de, esquema, etapas, nombre_etapa, valor_legible
+from maia_api.consultas import corrida_de, esquema, etapas, nombre_etapa, unidad_mostrada, valor_legible
 from maia_api.dependencias import EXPERTO, auditar, sesion
 from maia_api.esquemas import RevisionDatoEntrada, RevisionRiesgoEntrada
 from maia_comun.modelos_db import PERCENTIL_ALTO, AlertaDato, RevisionDato, RevisionRiesgo, Riesgo, Usuario
@@ -84,8 +84,7 @@ def _resumen_nino(s: Session, corte_id: int, sujeto: str, momento: str, esq: dic
             continue
         if d.get('rol') == 'basal' or d.get('etapa') == momento:
             valor = valor_legible(d, m.valor)
-            # la unidad acompaña a lo medido, no a la etiqueta de una categoría
-            unidad = f' {d["unidad"]}' if d.get('unidad') and d.get('tipo') not in ('categorical', 'boolean') else ''
+            unidad = f' {u}' if (u := unidad_mostrada(d)) else ''
             donde = '' if d.get('rol') == 'basal' else f' ({nombre_etapa(mapa, momento)})'
             lineas.append(f'{etiqueta}{donde}: {valor}{unidad}')
     return lineas[:14]
