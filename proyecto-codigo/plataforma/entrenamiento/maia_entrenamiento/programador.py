@@ -44,6 +44,7 @@ from maia_comun.modelos_db import Ejecucion, VersionDiccionario
 
 CADA_ANOTAR = 5.0   # segundos entre escrituras del registro mientras corre
 USAN_DICCIONARIO = ('corrida', 'entrenamiento')
+NOMBRES_MODELO = {'anomalias': 'anomalías', 'clinico': 'clínico'}   # en los mensajes de la web
 
 Lanzador = Callable[[list[str], dict[str, str], Callable[[str], None]], int]
 
@@ -330,7 +331,7 @@ class Programador:
             if fecha is None and (m := re.search(r'Corte (\d{4}-\d{2}-\d{2}) \(', salida)):
                 fecha = m[1]
             hechos.append(paso)
-        versiones = ' · '.join(f'{t} v{v["version"]}' for t, v in modelos.items())
+        versiones = ' · '.join(f'{NOMBRES_MODELO.get(t, t)} v{v["version"]}' for t, v in modelos.items())
         return {'paso': 'entrenado', 'hechos': hechos, 'modelos': modelos, 'corte': fecha,
                 'mensaje': f'Entrenado ({versiones}); quedó como candidato en MLflow. Apruébelo para usarlo.'}
 

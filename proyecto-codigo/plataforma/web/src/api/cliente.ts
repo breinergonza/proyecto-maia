@@ -75,9 +75,21 @@ export function conParams(ruta: string, params?: Opciones['params']): string {
   return s ? `${ruta}?${s}` : ruta
 }
 
+const SIN_CONEXION = 'No se pudo conectar con el servidor. Revise su conexión e intente de nuevo.'
+
+/** ``fetch`` que, si la red falla (el navegador solo dice «Failed to fetch»), lo explica en español. */
+async function traer(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init)
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') throw e
+    throw new ErrorApi(0, SIN_CONEXION)
+  }
+}
+
 /** Un archivo (p. ej. un .xlsx) con la sesión actual: el token va en la cabecera, no en la dirección. */
 export async function pedirArchivo(ruta: string, reintento = true): Promise<Blob> {
-  const r = await fetch(`/api${ruta}`, {
+  const r = await traer(`/api${ruta}`, {
     headers: acceso ? { Authorization: `Bearer ${acceso}` } : {},
     credentials: 'same-origin',
   })
@@ -95,7 +107,7 @@ export async function pedir<T>(ruta: string, op: Opciones = {}, reintento = true
     cabeceras['Content-Type'] = 'application/json'
     cuerpo = JSON.stringify(op.cuerpo)
   }
-  const r = await fetch(conParams(`/api${ruta}`, op.params), {
+  const r = await traer(conParams(`/api${ruta}`, op.params), {
     method: op.metodo ?? (cuerpo ? 'POST' : 'GET'),
     headers: cabeceras,
     body: cuerpo,

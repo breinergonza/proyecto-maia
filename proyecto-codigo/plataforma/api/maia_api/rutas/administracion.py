@@ -64,7 +64,7 @@ def resumen(s: Session = Depends(sesion), cfg: Configuracion = Depends(configura
         clave_disponible=clave,
         programaciones_activas=s.scalar(select(func.count()).select_from(Programacion)
                                         .where(Programacion.activo.is_(True))) or 0,
-        hiperparametros_ajustados=any(h.valores for h in s.scalars(select(Hiperparametro))),
+        hiperparametros_ajustados=any(HP.ajustes(h.modelo, h.valores or {}) for h in s.scalars(select(Hiperparametro))),
         paquete_activo=activo, ultima_ejecucion=EjecucionSalida.model_validate(ultima) if ultima else None)
 
 
@@ -133,7 +133,7 @@ def _salida_hp(s: Session, modelo: str) -> HiperparametrosSalida:
     h = s.get(Hiperparametro, modelo)
     guardados, defecto = (h.valores if h else {}), HP.por_defecto(modelo)
     campos = [CampoHiperparametro(nombre=c.nombre, etiqueta=c.etiqueta, tipo=c.tipo.__name__, minimo=c.minimo,
-                                  maximo=c.maximo, ayuda=c.ayuda, defecto=defecto.get(c.nombre),
+                                  maximo=c.maximo, ayuda=c.ayuda, escala=c.escala, defecto=defecto.get(c.nombre),
                                   valor=guardados.get(c.nombre)) for c in HP.CAMPOS[modelo]]
     return HiperparametrosSalida(modelo=modelo, campos=campos, actualizado_en=h.actualizado_en if h else None)
 

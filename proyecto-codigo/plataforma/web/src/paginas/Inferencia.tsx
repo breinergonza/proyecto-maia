@@ -12,7 +12,7 @@ import { puede, useSesion } from '../auth/sesion'
 import { Aviso, Boton, Cargando, Encabezado, Entrada, Insignia, Panel, Selector, Tabla, Texto, Vacio } from '../components/ui'
 import { cn } from '../lib/cn'
 import { usePaqueteActivo } from '../lib/consultas'
-import { dec, dec2, edad, indicador, riesgo, RIESGO_ALTO } from '../lib/formato'
+import { aproximado, dec, edad, indicador, riesgo, RIESGO_ALTO } from '../lib/formato'
 import { alerta, AYUDA_OMS, ayudaAlerta, ayudaPosicion, ayudaZ, CAYO, cuantosMenos, frenteOms, motivo, nivelAlto, peso } from '../lib/lenguaje'
 
 const SUJETO = 'calculo'
@@ -210,7 +210,7 @@ function Formulario({ calcular, pendiente }: { calcular: (p: PeticionInferencia)
     <form onSubmit={enviar} noValidate className="space-y-4">
       <Panel titulo="Datos del niño"
         accion={<div className="flex flex-wrap gap-2">
-          <Boton type="button" chico variante="secundario" onClick={() => ejemplo.mutate()} disabled={ejemplo.isPending}>Cargar un niño de ejemplo</Boton>
+          <Boton type="button" chico variante="secundario" onClick={() => ejemplo.mutate()} disabled={ejemplo.isPending}>{ejemplo.isPending ? 'Armando el ejemplo…' : 'Cargar un niño de ejemplo'}</Boton>
           <Boton type="button" chico variante="fantasma" onClick={limpiar}>Limpiar</Boton>
         </div>}>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -350,7 +350,7 @@ function ModoAvanzado({ calcular, pendiente }: { calcular: (p: unknown) => void;
   }
   return (
     <Panel titulo="Modo avanzado (JSON)"
-      accion={<Boton chico variante="secundario" onClick={() => ejemplo.mutate()} disabled={ejemplo.isPending}>Cargar un niño de ejemplo</Boton>}>
+      accion={<Boton chico variante="secundario" onClick={() => ejemplo.mutate()} disabled={ejemplo.isPending}>{ejemplo.isPending ? 'Armando el ejemplo…' : 'Cargar un niño de ejemplo'}</Boton>}>
       <p className="mb-2 text-sm text-salvia">
         Hasta 50 niños en JSON con <code>sujetos</code>, <code>mediciones</code> y, si hay, <code>episodios</code>, con los nombres de
         variable del diccionario. El ejemplo es un niño simulado.
@@ -414,7 +414,7 @@ function Resultado({ r, varios }: { r: ResultadoInferencia; varios: boolean }) {
                 <p>
                   <span className="font-semibold">{a.etiqueta ?? a.variable}</span>{quien(a.sujeto)}:{' '}
                   <span className="font-semibold text-coral-hondo">{a.valor}</span>
-                  {a.rango_bajo != null && <span className="text-salvia"> · esperado {dec2(a.rango_bajo)} a {dec2(a.rango_alto)}</span>}
+                  {a.rango_bajo != null && <span className="text-salvia"> · esperado {aproximado(a.rango_bajo)} a {aproximado(a.rango_alto)}</span>}
                 </p>
                 {a.motivo && <p className="text-salvia">{motivo(a.motivo)}.</p>}
                 <p className="mt-1 flex flex-wrap gap-1">

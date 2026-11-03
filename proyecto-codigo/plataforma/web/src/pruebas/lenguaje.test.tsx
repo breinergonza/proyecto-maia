@@ -98,6 +98,8 @@ describe('pantallas del equipo clínico sin términos técnicos', () => {
     expect(await screen.findByText('subió de golpe en todo el programa')).toBeInTheDocument()
     expect(screen.getByText('No cuadra con el resto de sus datos')).toBeInTheDocument()
     expect(visible()).toMatch(/Datos al 30 de jun/)
+    expect(screen.getByText('Visita: 40 semanas')).toBeInTheDocument()   // no «se calcula a los 40 semanas»
+    expect(screen.getByRole('columnheader', { name: 'Promedio' })).toBeInTheDocument()
     expect(visible()).not.toMatch(PROHIBIDO)
   })
 
@@ -127,6 +129,7 @@ describe('pantallas del equipo clínico sin términos técnicos', () => {
     expect(screen.getByText(/Valor muy distinto al de los demás niños; la fecha no corresponde a esta visita/)).toBeInTheDocument()
     expect(screen.getByText('Peso al nacer: 769')).toBeInTheDocument()
     expect(screen.getByText('Nació después del cambio de sistema 2022')).toBeInTheDocument()
+    expect(visible()).toMatch(/Nació a las 31 semanas de gestación/)   // sin «31,0»
     expect(visible()).not.toMatch(PROHIBIDO)
     expect(visible()).not.toMatch(/\([a-z]+_[a-z0-9_]+\)|quiebre_/)
   })

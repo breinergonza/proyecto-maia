@@ -416,8 +416,8 @@ tablero, la lista de niños y las colas de revisión.
 * Mientras corre, el botón dice «Hay una corrida en curso» y la lista se actualiza sola cada pocos segundos.
 * **Historial:** **N.º**, **Estado** (**En curso**, **Terminada** o **Con error**, y **En silencio** si aplica),
   **Corte** (fecha y fuente), **Paquete**, **Inició**, **Niños**, **Por revisar** y **Detalle**. El detalle muestra el
-  paso actual, el mensaje de error o el tipo de corrida: **Desde la plataforma**, **Semestral (equipo local)**, **Solo
-  revisión de datos** o **Solo riesgos**.
+  paso actual, el mensaje de error o el tipo de corrida: **Recálculo con el corte vigente** (esta página), **Extracción y
+  cálculo** (Corrida ahora o una programación de Programación), **Solo revisión de datos** o **Solo riesgos**.
 
 La corrida con la base de la Fundación (extraer y calcular con los modelos aprobados) se programa o se pide en
 **Programación**; cuando termina, aparece también en este historial.

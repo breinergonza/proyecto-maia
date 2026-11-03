@@ -54,6 +54,20 @@ describe('ingreso y permisos', () => {
     expect(screen.queryAllByRole('link', { name: 'Usuarios' })).toHaveLength(0)
     expect(screen.queryAllByRole('link', { name: 'Datos por revisar' })).toHaveLength(0)
     expect(screen.getAllByRole('link', { name: 'Niños' }).length).toBeGreaterThan(0)
+    expect(screen.getByText(/Su perfil \(Consulta\)/)).toBeInTheDocument()
+  })
+
+  it('después de ingresar vuelve a la página que se pidió, con sus filtros', async () => {
+    const llamadas = simularApi((url) => {
+      if (url === '/api/auth/refrescar') return { estado: 401, cuerpo: {} }
+      if (url === '/api/auth/login') return { cuerpo: { acceso: 't', usuario: usuario('experto') } }
+      if (url.startsWith('/api/ninos')) return { cuerpo: { total: 0, pagina: 1, tamano: 25, items: [] } }
+    })
+    montar('/ninos?desenlace=readm_3m')
+    await userEvent.type(await screen.findByLabelText('Correo electrónico'), 'experto@maia.prueba')
+    await userEvent.type(screen.getByLabelText('Contraseña'), 'buena-clave')
+    await userEvent.click(screen.getByRole('button', { name: 'Ingresar al sistema' }))
+    await waitFor(() => expect(llamadas.some((l) => l.url.startsWith('/api/ninos?') && l.url.includes('desenlace=readm_3m'))).toBe(true))
   })
 })
 

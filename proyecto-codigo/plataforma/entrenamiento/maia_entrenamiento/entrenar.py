@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 import tempfile
 import time
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, fields, replace
 from pathlib import Path
 
 import pandas as pd
@@ -15,6 +15,7 @@ from anomalias import modelo as MA
 from anomalias import operacion as OP
 from archivos import carpetas as CA
 from clinico import modelo as AC
+from maia_comun import hiperparametros as HP
 from maia_entrenamiento import datos as D
 from maia_entrenamiento import registro as R
 from sevarti import contrato as SV
@@ -62,8 +63,15 @@ def _artefactos(sev: Sevarti, tmp: Path, fuente: str) -> dict[str, Path]:
 
 
 def config_anomalias(config_json: str | None) -> MA.Config:
+    """La configuración de anomalías con los cambios de ``--config``: los hiperparámetros que también ajusta la web
+    se validan con sus mismos límites; el resto tiene que ser un campo del núcleo. Levanta ``ValueError``."""
     cambios = json.loads(Path(config_json).read_text(encoding='utf-8')) if config_json else {}
-    return replace(MA.Config(), **cambios)
+    campos = {f.name for f in fields(MA.Config)}
+    if fuera := sorted(set(cambios) - campos):
+        raise ValueError(f'{fuera[0]} no es un parámetro de anomalías')
+    web = {c.nombre for c in HP.CAMPOS['anomalias']}
+    validos = HP.validar('anomalias', {k: v for k, v in cambios.items() if k in web})
+    return replace(MA.Config(), **{k: v for k, v in cambios.items() if k not in web}, **validos)
 
 
 def _etiqueta_ajustes(ajustes: dict | None) -> dict[str, str]:

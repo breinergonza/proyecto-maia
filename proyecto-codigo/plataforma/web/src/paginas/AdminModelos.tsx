@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
+import { Link } from 'react-router'
 import { pedir } from '../api/cliente'
 import type { Paquete } from '../api/tipos'
 import { Aviso, Boton, Cargando, Encabezado, Insignia, Panel, Tabla, Vacio } from '../components/ui'
@@ -37,8 +38,10 @@ export default function AdminModelos() {
   return (
     <>
       <Encabezado titulo="Modelos">
-        Los modelos llegan como un paquete firmado que se arma en el equipo de entrenamiento (maia exportar). Al subirlo se
-        verifican la firma, cada archivo y la versión de LightGBM.
+        Los modelos se usan como un paquete firmado. Se arma solo al aprobar versiones en{' '}
+        <Link className="text-teal underline" to="/admin/entrenamientos">Entrenamientos</Link>; aquí también se puede subir
+        uno armado fuera de la plataforma (maia exportar). Al subirlo se verifican la firma, cada archivo y la versión de
+        LightGBM.
         {salud.data?.entorno === 'demo' && ' En esta demostración solo se aceptan paquetes entrenados con datos simulados.'}
       </Encabezado>
 

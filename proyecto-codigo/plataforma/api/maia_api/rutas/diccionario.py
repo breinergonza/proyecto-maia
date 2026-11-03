@@ -118,14 +118,15 @@ def subir(archivo: UploadFile = File(...), nota: str | None = Form(None, max_len
     """Guarda el archivo como versión nueva, vigente (o como borrador, si se pide; un campo ausente es «no»)."""
     contenido = _contenido(archivo)
     try:
-        DIC.leer(contenido, archivo.filename)
+        nuevo = DIC.leer(contenido, archivo.filename)
     except DIC.DiccionarioInvalido as e:
         raise _invalido(e) from None
     actual = DIC.vigente(s)
-    if actual is not None and actual.sha256 == DIC.huella(contenido):
+    if actual is not None and DIC.iguales(DIC.leer(actual.archivo), nuevo):
         raise HTTPException(status.HTTP_409_CONFLICT, 'El archivo es igual al diccionario vigente: no hay nada que guardar.')
+    # ``guardar`` valida y guarda el libro regenerado desde las tablas (lo que se descarga después), no el archivo subido
     v = DIC.guardar(s, contenido, 'subido', estado='borrador' if borrador else 'vigente',
-                    nota=(nota or '').strip() or None, usuario_id=u.id, validar=False)
+                    nota=(nota or '').strip() or None, usuario_id=u.id)
     auditar(s, u, 'subir_diccionario', f'diccionario v{v.version}', {'estado': v.estado, 'sha256': v.sha256})
     s.commit()
     return _salida(s, v)

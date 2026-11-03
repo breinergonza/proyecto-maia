@@ -201,7 +201,11 @@ def entrenar(tipo: Tipo, fuente: Fuente = FUENTE,
     _decir(f'Corte {info.fecha} ({info.filas["sujetos"]:,} niños).')
     if tipo == Tipo.anomalias:
         if config:   # el archivo manda sobre los ajustes de administración
-            cfg, ajustes = E.config_anomalias(str(config)), json.loads(config.read_text(encoding='utf-8'))
+            try:
+                cfg = E.config_anomalias(str(config))
+            except (ValueError, TypeError) as e:
+                raise typer.BadParameter(f'--config: {e}') from None
+            ajustes = json.loads(config.read_text(encoding='utf-8'))
         elif pedidos is not None:
             cfg, ajustes = HP.aplicar(E.config_anomalias(None), pedidos), pedidos
         else:

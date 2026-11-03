@@ -10,6 +10,7 @@ import socket
 import tarfile
 import time
 from dataclasses import replace
+from datetime import date
 from pathlib import Path
 
 import httpx
@@ -356,6 +357,45 @@ def test_formulario_de_calculo(cliente, admin, corrida):
     assert out['variables_ignoradas'] == [] and out['crecimiento']
     visor = _login(cliente, 'visor@maia.prueba', 'clave-larga-123')
     assert cliente.get('/api/inferencia/formulario', headers=visor).status_code == 403
+
+
+def test_el_nino_de_ejemplo_llena_las_variables_principales_del_paquete(cliente, admin, corrida, monkeypatch):
+    """Con el paquete de la Fundación el niño simulado no tenía ninguna variable del paquete (producción: 0 datos).
+    El ejemplo sale del diccionario del paquete activo: un valor habitual en cada campo principal de cada visita."""
+    from maia_comun import simulados
+    simular = simulados.simular
+
+    def con_otros_nombres(*a, **k):   # como el paquete de la Fundación: sus variables no son las del simulador
+        sev = simular(*a, **k)
+        sev.mediciones['variable'] = 'otra_' + sev.mediciones['variable']
+        return sev
+    monkeypatch.setattr(simulados, 'simular', con_otros_nombres)
+    f = cliente.get('/api/inferencia/formulario', headers=admin).json()
+    ej = cliente.get('/api/inferencia/ejemplo', headers=admin).json()
+    llenas = {m['variable'] for m in ej['mediciones']}
+    # cada visita va completa (un valor en cada campo principal) o vacía, y las llenas son las primeras
+    principales = [{c['variable'] for c in v['campos'] if c['principal'] and (
+        c['opciones'] or c['tipo'] == 'si_no' or (c['minimo'] is not None and c['maximo'] is not None))}
+        for v in f['visitas']]
+    principales = [p for p in principales if p]
+    llena = [p <= llenas for p in principales]
+    assert any(llena) and all(lista or not (p & llenas) for lista, p in zip(llena, principales))
+    assert llena == sorted(llena, reverse=True)
+    nacimiento = date.fromisoformat(ej['sujetos'][0]['fecha_nacimiento'])
+    assert all(date.fromisoformat(m['fecha']) >= nacimiento for m in ej['mediciones'])
+    assert ej['sujetos'][0]['eg_semanas'] is not None
+
+
+def test_el_nino_de_ejemplo_muestra_un_riesgo_sin_datos_raros(cliente, admin, corrida):
+    """El ejemplo es para ver cómo se ve un resultado: tiene que dar al menos un riesgo (no puede llenar hasta la última
+    visita, que ya no deja nada por predecir) y ningún dato raro (ni un peso al nacer de bebé a término con 32 semanas,
+    ni una salida del hospital después de las 40 semanas)."""
+    ej = cliente.get('/api/inferencia/ejemplo', headers=admin).json()
+    ej.pop('nota')
+    r = cliente.post('/api/inferencia', headers=admin, json=ej)
+    assert r.status_code == 200, r.text
+    assert r.json()['riesgos']
+    assert r.json()['alertas_dato'] == []
 
 
 def test_inferencia_que_falla_no_muestra_el_error_de_python(cliente, admin, corrida, monkeypatch):

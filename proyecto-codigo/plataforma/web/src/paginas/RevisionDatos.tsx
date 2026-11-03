@@ -7,7 +7,7 @@ import { pedir } from '../api/cliente'
 import type { DatoRevision, Pagina, Respuesta } from '../api/tipos'
 import { Aviso, Boton, Cargando, Encabezado, Insignia, Paginador, Selector, Texto, Vacio } from '../components/ui'
 import { cn } from '../lib/cn'
-import { dec2, fecha, medida, num, RESPUESTAS } from '../lib/formato'
+import { aproximado, fecha, medida, num, RESPUESTAS } from '../lib/formato'
 import { alerta, ayudaAlerta, motivo } from '../lib/lenguaje'
 
 const TAMANO = 12
@@ -91,8 +91,8 @@ function Tarjeta({ dato }: { dato: DatoRevision }) {
         </h2>
         {rango && (
           <p className="text-sm">
-            Para este niño se esperaba entre {dec2(dato.rango_bajo)} y {dec2(dato.rango_alto)}
-            {dato.esperado != null && <> (lo más probable: {dec2(dato.esperado)})</>}.
+            Para este niño se esperaba entre {aproximado(dato.rango_bajo)} y {aproximado(dato.rango_alto)}
+            {dato.esperado != null && <> (lo más probable: {aproximado(dato.esperado)})</>}.
           </p>
         )}
         {dato.motivo && <p className="mt-0.5 text-sm text-salvia">{motivo(dato.motivo)}.</p>}
@@ -105,7 +105,7 @@ function Tarjeta({ dato }: { dato: DatoRevision }) {
         <div className="flex justify-end">
           <div className="grid grid-cols-3 gap-1.5">
             {(['si', 'no', 'no_se'] as Respuesta[]).map((r) => (
-              <Boton key={r} chico variante={elegida === r ? 'primario' : 'secundario'} aria-pressed={elegida === r}
+              <Boton key={r} chico className="whitespace-nowrap" variante={elegida === r ? 'primario' : 'secundario'} aria-pressed={elegida === r}
                 disabled={m.isPending} onClick={() => m.mutate(r)}>
                 {RESPUESTAS[r]}
               </Boton>

@@ -68,14 +68,14 @@ export default function Tablero() {
           ) : (
             <Tabla densa>
               <thead>
-                <tr><th>Desenlace</th><th className="text-right">Niños</th><th className="text-right">Alto</th><th className="text-right">Medio</th></tr>
+                <tr><th>Desenlace</th><th className="text-right">Niños</th><th className="text-right">Alto</th><th className="text-right" title="Riesgo promedio de los niños en ese desenlace">Promedio</th></tr>
               </thead>
               <tbody>
                 {r.riesgos_por_desenlace.map((d) => (
                   <tr key={d.clave}>
                     <td>
                       <span className="font-semibold">{d.desenlace}</span>
-                      <span className="block text-xs text-salvia">se calcula a los {d.momento_nombre}</span>
+                      <span className="block text-xs text-salvia">Visita: {d.momento_nombre}</span>
                     </td>
                     <td className="text-right">{num(d.ninos)}</td>
                     <td className="text-right">
@@ -83,7 +83,7 @@ export default function Tablero() {
                         {num(d.altos)}
                       </Link>
                     </td>
-                    <td className="text-right">{riesgo(d.riesgo_medio)}</td>
+                    <td className="whitespace-nowrap text-right">{riesgo(d.riesgo_medio)}</td>
                   </tr>
                 ))}
               </tbody>

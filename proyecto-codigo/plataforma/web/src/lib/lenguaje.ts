@@ -1,14 +1,14 @@
 // Glosario clínico: cómo se dicen en las pantallas del equipo clínico los términos técnicos del modelo. El término
 // técnico no desaparece: queda al pasar el mouse (title) y en Administración, donde sí hace falta. Es el único lugar
 // que hay que tocar cuando los médicos de la Fundación ajusten las palabras.
-import { CAPAS, dec2, fecha, frase, indicador, RIESGO_ALTO } from './formato'
+import { CAPAS, dec2, fecha, frase, indicador, numero, RIESGO_ALTO } from './formato'
 
 // ------------------------------------------------------------------ riesgo (posición = percentil dentro del desenlace)
 
 /** El 5 % con más riesgo; es también el mínimo por defecto de los correos de alerta. */
 export const RIESGO_MUY_ALTO = 95
 
-export const AYUDA_RIESGO_ALTO = 'Riesgo alto: estar entre el 10 % de niños con más riesgo para ese desenlace. Es una ' +
+export const AYUDA_RIESGO_ALTO = `Riesgo alto: estar entre el ${100 - RIESGO_ALTO} % de niños con más riesgo para ese desenlace. Es una ` +
   'comparación entre los niños del programa, no un umbral clínico.'
 
 export const esAlto = (p: number | null | undefined) => p != null && p >= RIESGO_ALTO
@@ -32,7 +32,7 @@ export function nivelCorto(p: number | null | undefined): string {
 
 /** Qué significa el mínimo (0 a 100) con que se configuran los avisos por correo. */
 export const ayudaMinimo = (minimo: number) =>
-  minimo <= 0 ? 'Con 0 se avisa de todos los niños.' : `Con ${minimo} se avisa del ${+(100 - minimo).toFixed(1)} % de niños con más riesgo.`
+  minimo <= 0 ? 'Con 0 se avisa de todos los niños.' : `Con ${numero(minimo)} se avisa del ${numero(100 - minimo)} % de niños con más riesgo.`
 
 /** La frase completa, con la posición técnica entre paréntesis (para title). */
 export const ayudaPosicion = (p: number | null | undefined) =>

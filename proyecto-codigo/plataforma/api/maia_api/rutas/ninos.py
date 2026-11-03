@@ -9,7 +9,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from maia_api.consultas import corrida_de, esquema, etapas, nombre_etapa, sujeto_existe
+from maia_api.consultas import (
+    corrida_de,
+    esquema,
+    etapas,
+    motivo_legible,
+    nombre_etapa,
+    sujeto_existe,
+    unidad_mostrada,
+    valor_legible,
+)
 from maia_api.dependencias import CUALQUIERA, sesion
 from maia_comun.modelos_db import Usuario
 
@@ -114,8 +123,10 @@ def linea_temporal(sujeto: str, corrida_id: int | None = None, s: Session = Depe
 
     for m in meds:
         d = esq.get(m.variable, {})
-        item = {'variable': m.variable, 'etiqueta': d.get('etiqueta') or m.variable, 'valor': m.valor,
-                'unidad': d.get('unidad'), 'fecha': m.fecha, 'tema': d.get('tema')}
+        # como lo diría el médico: «Sí», «1.500 g», no «1.0 SI/NO» ni «1500.0 GRAMOS» (igual que en la revisión)
+        item = {'variable': m.variable, 'etiqueta': d.get('etiqueta') or m.variable,
+                'valor': None if m.valor is None else valor_legible(d, m.valor),
+                'unidad': unidad_mostrada(d), 'fecha': m.fecha, 'tema': d.get('tema')}
         etapa = d.get('etapa')
         if etapa:
             v = visita(etapa)
@@ -133,7 +144,7 @@ def linea_temporal(sujeto: str, corrida_id: int | None = None, s: Session = Depe
             sin_visita.append({'variable': a.variable, 'etiqueta': a.etiqueta, 'valor': a.valor, 'alerta': d})
     for r in riesgos:
         d = dict(r._mapping)
-        d['motivos'] = _texto_motivos(d['motivos'])
+        d['motivos'] = [motivo_legible(x, esq) for x in _texto_motivos(d['motivos'])]
         visita(r.momento)['riesgos'].append(d)
     serie = defaultdict(list)
     for g in crec:

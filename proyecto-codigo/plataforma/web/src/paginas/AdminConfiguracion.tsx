@@ -6,8 +6,9 @@ import { useEffect, useState, type ChangeEvent, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { pedir } from '../api/cliente'
 import type { Conexion, ConexionEntrada, Hiperparametros, PruebaConexion, ResumenAdministracion } from '../api/tipos'
+import { CampoHiperparametro } from '../components/CampoHiperparametro'
 import { Aviso, Boton, Campo, Cargando, Encabezado, Entrada, Insignia, Panel, Selector } from '../components/ui'
-import { fechaHora, MODELOS } from '../lib/formato'
+import { conPunto, fechaHora, MODELOS } from '../lib/formato'
 
 const SSL = ['disable', 'allow', 'prefer', 'require', 'verify-ca', 'verify-full'] as const
 type Datos = Omit<ConexionEntrada, 'clave' | 'borrar_clave'>
@@ -107,7 +108,7 @@ function FormConexion({ soloSimulado }: { soloSimulado: boolean }) {
         <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); guardar.mutate() }}>
           <p className="text-sm text-salvia">
             Postgres de la Fundación, en solo lectura. Las consultas usan valores enlazados y nunca piden las columnas
-            restringidas. {actual.data.guardada ? `Guardada el ${fechaHora(actual.data.actualizado_en)}.` : 'Hoy se usan los valores del entorno del servidor (KMC_*).'}
+            restringidas. {actual.data.guardada ? `Guardada el ${conPunto(fechaHora(actual.data.actualizado_en))}` : 'Hoy se usan los valores del entorno del servidor (KMC_*).'}
           </p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_7rem]">
             <Campo id="c-host" etiqueta="Servidor"><Entrada id="c-host" required value={d.host} onChange={cambio('host')} /></Campo>
@@ -171,29 +172,31 @@ function PanelModelo({ h }: { h: Hiperparametros }) {
       for (const k of ['hiperparametros', 'resumen']) void cliente.invalidateQueries({ queryKey: ['administracion', k] })
     },
   })
-  const ajustados = h.campos.filter((c) => c.valor != null).length
+  // un valor guardado igual al del núcleo no es un ajuste
+  const ajustados = h.campos.filter((c) => c.valor != null && c.valor !== c.defecto).length
+  const volver = () => {
+    if (window.confirm(`¿Volver a los valores del núcleo en ${MODELOS[h.modelo]}? Se borran los ajustes guardados.`)) {
+      guardar.mutate(Object.fromEntries(h.campos.map((c) => [c.nombre, ''])))
+    }
+  }
   return (
     <Panel titulo={<>Hiperparámetros · {MODELOS[h.modelo]} {ajustados > 0 && <Insignia tono="ocre" className="ml-1">{ajustados} ajustado(s)</Insignia>}</>}>
       <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); guardar.mutate(v) }}>
         <p className="text-sm text-salvia">
           Vacío = el valor del núcleo (en gris). Aplican al próximo entrenamiento y MLflow registra los valores usados.
-          {h.actualizado_en && <> Último cambio: {fechaHora(h.actualizado_en)}.</>}
+          {h.actualizado_en && <> Último cambio: {conPunto(fechaHora(h.actualizado_en))}</>}
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {h.campos.map((c) => (
-            <Campo key={c.nombre} id={`hp-${h.modelo}-${c.nombre}`} etiqueta={c.etiqueta} ayuda={`${c.ayuda} (${c.minimo}–${c.maximo})`}>
-              <Entrada id={`hp-${h.modelo}-${c.nombre}`} type="number" inputMode="decimal" min={c.minimo} max={c.maximo}
-                step={c.tipo === 'int' ? 1 : 'any'} placeholder={String(c.defecto ?? '')} value={v[c.nombre] ?? ''}
-                onChange={(e) => setV({ ...v, [c.nombre]: e.target.value })} />
-            </Campo>
+            <CampoHiperparametro key={c.nombre} c={c} id={`hp-${h.modelo}-${c.nombre}`} sugerirNucleo
+              valor={v[c.nombre] ?? ''} cambiar={(x) => setV({ ...v, [c.nombre]: x })} />
           ))}
         </div>
         {guardar.error && <Aviso>{guardar.error.message}</Aviso>}
         {guardar.isSuccess && <Aviso tono="teal">Guardado. Se usará en el próximo entrenamiento.</Aviso>}
         <div className="flex flex-wrap gap-2">
           <Boton type="submit" disabled={guardar.isPending}>Guardar</Boton>
-          <Boton variante="fantasma" disabled={guardar.isPending || !ajustados}
-            onClick={() => guardar.mutate(Object.fromEntries(h.campos.map((c) => [c.nombre, ''])))}>
+          <Boton variante="fantasma" disabled={guardar.isPending || !h.campos.some((c) => c.valor != null)} onClick={volver}>
             Volver a los del núcleo
           </Boton>
         </div>

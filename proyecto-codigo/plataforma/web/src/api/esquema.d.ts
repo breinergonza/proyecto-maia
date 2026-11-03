@@ -1110,6 +1110,8 @@ export interface components {
             maximo: number;
             /** Ayuda */
             ayuda: string;
+            /** Escala */
+            escala?: "por_mil" | null;
             /** Defecto */
             defecto: number | null;
             /** Valor */
