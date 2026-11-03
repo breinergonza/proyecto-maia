@@ -8,8 +8,8 @@ import { pedir } from '../api/cliente'
 import type { NinoFila, Pagina, ResumenTablero } from '../api/tipos'
 import { Aviso, Boton, Cargando, Encabezado, Entrada, Insignia, Paginador, Selector, Vacio } from '../components/ui'
 import { cn } from '../lib/cn'
-import { dec, num } from '../lib/formato'
-import { ayudaPosicion, AYUDA_OMS, BAJO_EDAD, CAYO, esAlto, nivelCorto } from '../lib/lenguaje'
+import { dec, num, RIESGO_ALTO } from '../lib/formato'
+import { ayudaPosicion, AYUDA_OMS, BAJO_EDAD, CAYO, esAlto, nivelCorto, RIESGO_MUY_ALTO } from '../lib/lenguaje'
 
 const TAMANOS = [5, 10, 25, 50]
 const TAMANO = 5
@@ -29,23 +29,24 @@ const COLUMNAS: Columna[] = [
     id: 'sujeto', titulo: 'Niño', primero: 'asc',
     celda: (n) => <Link className="font-semibold text-teal underline-offset-2 hover:underline" to={`/ninos/${encodeURIComponent(n.sujeto)}`}>{n.sujeto}</Link>,
   },
+  // el nivel de riesgo va justo después del niño: en el teléfono es lo que se ve sin desplazarse de lado
   {
-    id: 'eg_semanas', titulo: 'Edad gestacional', derecha: true, primero: 'asc',
-    celda: (n) => (n.eg_semanas == null ? '—' : `${dec(n.eg_semanas)} sem`),
+    id: 'percentil_max', titulo: 'Nivel de riesgo', primero: 'desc',
+    celda: (n) => (n.percentil_max == null ? '—' : esAlto(n.percentil_max)
+      ? <span title={ayudaPosicion(n.percentil_max)}><Insignia tono="coral">{nivelCorto(n.percentil_max)}</Insignia></span>
+      : <span title={ayudaPosicion(n.percentil_max)} className="whitespace-nowrap">{nivelCorto(n.percentil_max)}</span>),
   },
   {
     id: 'desenlace_max', titulo: 'Riesgo más alto', primero: 'asc',
     celda: (n) => <>{n.desenlace_max ?? <span className="text-salvia">Sin riesgo calculado</span>}{n.n_riesgos > 1 && <span className="text-salvia"> y {n.n_riesgos - 1} más</span>}</>,
   },
   {
-    id: 'percentil_max', titulo: 'Nivel de riesgo', derecha: true, primero: 'desc',
-    celda: (n) => (n.percentil_max == null ? '—' : esAlto(n.percentil_max)
-      ? <span title={ayudaPosicion(n.percentil_max)}><Insignia tono="coral">{nivelCorto(n.percentil_max)}</Insignia></span>
-      : <span title={ayudaPosicion(n.percentil_max)} className="whitespace-nowrap">{nivelCorto(n.percentil_max)}</span>),
-  },
-  {
     id: 'n_alertas', titulo: 'Datos por revisar', derecha: true, primero: 'desc',
     celda: (n) => (n.n_alertas ? <span className="font-semibold">{num(n.n_alertas)}</span> : '—'),
+  },
+  {
+    id: 'eg_semanas', titulo: 'Edad gestacional', derecha: true, primero: 'asc',
+    celda: (n) => (n.eg_semanas == null ? '—' : `${dec(n.eg_semanas)} sem`),
   },
   {
     id: 'crecimiento', titulo: 'Crecimiento', primero: 'desc',
@@ -147,8 +148,8 @@ export default function Ninos() {
         <label className="sr-only" htmlFor="percentil">Nivel de riesgo</label>
         <Selector id="percentil" value={percentil} onChange={(e) => cambiar({ percentil_min: e.target.value })}>
           <option value="">Cualquier riesgo</option>
-          <option value="90">Riesgo alto (el 10 % con más riesgo)</option>
-          <option value="95">Riesgo muy alto (el 5 % con más riesgo)</option>
+          <option value={RIESGO_ALTO}>Riesgo alto (el {100 - RIESGO_ALTO} % con más riesgo)</option>
+          <option value={RIESGO_MUY_ALTO}>Riesgo muy alto (el {100 - RIESGO_MUY_ALTO} % con más riesgo)</option>
           <option value="0">Con algún riesgo calculado</option>
         </Selector>
         <MenuColumnas columnas={columnas} reordenar={reordenar} />

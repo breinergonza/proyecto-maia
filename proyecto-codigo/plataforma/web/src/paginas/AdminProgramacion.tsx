@@ -9,7 +9,7 @@ import { Aviso, Boton, Campo, Cargando, Encabezado, Entrada, Insignia, Panel, Se
 import { ESTADOS_EJECUCION, fechaHora, FUENTES, TIPOS_EJECUCION } from '../lib/formato'
 
 const PRESETS: Record<string, { texto: string; cron: string }> = {
-  semestral: { texto: 'Cada semestre (1 de enero y 1 de julio, 02:00)', cron: '0 2 1 1,7 *' },
+  semestral: { texto: 'Cada semestre (enero y julio)', cron: '0 2 1 1,7 *' },
   trimestral: { texto: 'Cada trimestre (día 1, 02:00)', cron: '0 2 1 1,4,7,10 *' },
   mensual: { texto: 'Cada mes (día 1, 02:00)', cron: '0 2 1 * *' },
   semanal: { texto: 'Cada semana (domingo, 02:00)', cron: '0 2 * * 0' },
@@ -39,7 +39,8 @@ export default function AdminProgramacion() {
         Cada ejecución extrae la base de la entidad con los filtros indicados, revisa los datos y calcula los riesgos con
         los modelos aprobados en <Link className="text-teal underline" to="/admin/entrenamientos">Entrenamientos</Link>.
         Las programadas además entrenan los dos modelos (con los hiperparámetros de Configuración) y los dejan en MLflow
-        como candidatos; <strong>Corrida ahora</strong> no entrena.
+        como candidatos; <strong>Corrida ahora</strong> no entrena. Para recalcular sin extraer, use{' '}
+        <Link className="text-teal underline" to="/admin/corridas">Corridas</Link>.
       </Encabezado>
       <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_26rem]">
         <div className="flex min-w-0 flex-col gap-4">
@@ -190,7 +191,7 @@ function ListaEjecuciones() {
     <Panel titulo="Ejecuciones" accion={
       <div className="flex items-center gap-2">
         <label htmlFor="e-fuente" className="sr-only">Datos de la corrida</label>
-        <Selector id="e-fuente" className="h-9 w-48 text-sm sm:h-8" value={fuente} onChange={(e) => setFuente(e.target.value as 'kmc' | 'simulado')}>
+        <Selector id="e-fuente" className="h-9 w-auto text-sm sm:h-8" value={fuente} onChange={(e) => setFuente(e.target.value as 'kmc' | 'simulado')}>
           {Object.entries(FUENTES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </Selector>
         <Boton chico disabled={ahora.isPending} onClick={() => ahora.mutate()}>Corrida ahora</Boton>

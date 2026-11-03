@@ -10,7 +10,7 @@ import type { AlertaDato, LineaTemporal, Visita } from '../api/tipos'
 import { Aviso, Cargando, Insignia, Panel, Tabla, Vacio } from '../components/ui'
 import { cn } from '../lib/cn'
 import { HEX_SERIES } from '../lib/consultas'
-import { dec, dec2, edad, fecha, indicador, riesgo, RIESGO_ALTO } from '../lib/formato'
+import { aproximado, dec, edad, fecha, indicador, riesgo, RIESGO_ALTO } from '../lib/formato'
 import { alerta, AYUDA_OMS, ayudaAlerta, ayudaPosicion, ayudaZ, cuantosMenos, datosAl, frenteOms, motivo, nivelAlto, peso } from '../lib/lenguaje'
 
 export default function Nino() {
@@ -146,7 +146,7 @@ function Recorrido({ visitas, elegida, elegir }: { visitas: Visita[]; elegida: s
 
 function rango(a: AlertaDato) {
   if (a.rango_bajo == null && a.rango_alto == null) return null
-  return `${dec2(a.rango_bajo)} a ${dec2(a.rango_alto)}`
+  return `${aproximado(a.rango_bajo)} a ${aproximado(a.rango_alto)}`
 }
 
 function DetalleVisita({ visita }: { visita: Visita }) {

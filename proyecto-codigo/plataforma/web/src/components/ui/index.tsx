@@ -47,13 +47,15 @@ export const Texto = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTML
   return <textarea ref={ref} className={cn(control, 'py-2', className)} {...p} />
 })
 
-export function Campo({ etiqueta, error, ayuda, children, id }: {
-  etiqueta: string; error?: string; ayuda?: string; children: ReactNode; id: string
+export function Campo({ etiqueta, error, aviso, ayuda, children, id }: {
+  etiqueta: string; error?: string; aviso?: string; ayuda?: string; children: ReactNode; id: string
 }) {
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={id} className="text-sm font-semibold text-tinta/90">{etiqueta}</label>
       {children}
+      {/* aviso: el valor se puede guardar, pero conviene revisarlo */}
+      {!error && aviso && <p className="text-sm font-semibold text-ocre">{aviso}</p>}
       {error ? <p className="text-sm text-coral-hondo" role="alert">{error}</p>
         : ayuda ? <p className="text-sm text-salvia">{ayuda}</p> : null}
     </div>

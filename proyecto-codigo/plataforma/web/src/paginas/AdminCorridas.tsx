@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router'
 import { pedir } from '../api/cliente'
 import type { Corrida } from '../api/tipos'
 import { Aviso, Boton, Cargando, Encabezado, Insignia, Panel, Tabla, Vacio } from '../components/ui'
@@ -34,10 +35,11 @@ export default function AdminCorridas() {
   return (
     <>
       <Encabezado titulo="Corridas">
-        Una corrida pasa los datos del corte vigente por los dos modelos del paquete activo y deja los resultados en el
-        tablero. La corrida semestral con los datos de la Fundación se hace en el equipo local (maia corrida).
+        Una corrida pasa los datos por los dos modelos del paquete activo y deja los resultados en el tablero. Aquí se
+        recalcula con el corte que ya está cargado; para traer antes los datos nuevos de la base de la entidad, use{' '}
+        <strong>Corrida ahora</strong> en <Link className="text-teal underline" to="/admin/programacion">Programación</Link>.
       </Encabezado>
-      <Panel titulo="Ejecutar una corrida" className="mb-4">
+      <Panel titulo="Recalcular con el corte vigente" className="mb-4">
         {activo.data === null ? <Aviso>No hay un paquete activo. Actívelo en Modelos antes de ejecutar.</Aviso> : (
           <div className="flex flex-wrap items-center gap-4">
             <label className="flex items-center gap-2">

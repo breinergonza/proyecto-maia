@@ -285,7 +285,7 @@ function Actualizacion({ nuevas, version, ocupado, alAgregar }: {
         <div className="min-w-0">
           <h2 className="text-base">La última actualización trajo {n} variable{n === 1 ? '' : 's'} nueva{n === 1 ? '' : 's'}</h2>
           <p className="mt-1 text-sm text-tinta/75">
-            Del {fechaHora(version.creado_en)}. Al agregarlas al diccionario quedan «Por clasificar»: el sistema no las usa
+            Del {fechaHora(version.creado_en)} Al agregarlas al diccionario quedan «Por clasificar»: el sistema no las usa
             hasta que alguien las marque como «Lista».
           </p>
         </div>

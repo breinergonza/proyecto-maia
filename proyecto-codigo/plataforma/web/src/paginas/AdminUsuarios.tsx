@@ -90,7 +90,10 @@ function Fila({ u }: { u: Usuario }) {
         <td>
           <label className="sr-only" htmlFor={`rol-${u.id}`}>Perfil de {u.nombre}</label>
           <Selector id={`rol-${u.id}`} className="h-8 w-40 text-sm" value={u.rol} disabled={soyYo || cambiar.isPending}
-            onChange={(e) => cambiar.mutate({ rol: e.target.value as Rol })}>
+            onChange={(e) => {
+              const rol = e.target.value as Rol
+              if (window.confirm(`¿Cambiar el perfil de ${u.nombre} de ${ROLES[u.rol]} a ${ROLES[rol]}?`)) cambiar.mutate({ rol })
+            }}>
             {Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </Selector>
         </td>

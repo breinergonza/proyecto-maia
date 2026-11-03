@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { Navigate, useLocation } from 'react-router'
 import { alCambiarSesion, fijarAcceso, pedir, refrescar } from '../api/cliente'
 import type { RespuestaLogin, Rol, Usuario } from '../api/tipos'
+import { ROLES } from '../lib/formato'
 
 interface Sesion {
   usuario: Usuario | null
@@ -57,12 +58,12 @@ export function Requiere({ roles, children }: { roles?: Rol[]; children: ReactNo
   const { usuario, cargando } = useSesion()
   const lugar = useLocation()
   if (cargando) return null
-  if (!usuario) return <Navigate to="/ingresar" replace state={{ desde: lugar.pathname }} />
+  if (!usuario) return <Navigate to="/ingresar" replace state={{ desde: `${lugar.pathname}${lugar.search}${lugar.hash}` }} />
   if (roles && !roles.includes(usuario.rol)) {
     return (
       <div className="rounded-panel border border-linea bg-papel p-6">
         <h1>Sin permiso</h1>
-        <p className="mt-2 text-salvia">Su perfil ({usuario.rol}) no puede ver esta sección. Pida acceso a la administración.</p>
+        <p className="mt-2 text-salvia">Su perfil ({ROLES[usuario.rol]}) no puede ver esta sección. Pida acceso a la administración.</p>
       </div>
     )
   }
