@@ -75,7 +75,7 @@ describe('administración de las ejecuciones', () => {
   it('configuración: la meta de falsas alertas se lee en su unidad y avisa si se aleja 10 veces del núcleo', async () => {
     const anomalias = [{ modelo: 'anomalias', actualizado_en: '2026-10-28T22:13:42Z', campos: [
       { nombre: 'alpha', etiqueta: 'Meta de falsas alertas por dato (capa 2)', tipo: 'float', minimo: 0.0005, maximo: 0.05,
-        ayuda: 'Fracción de los datos sanos que la capa 2 puede marcar.', escala: 'por_mil', defecto: 0.005, valor: 0.05 },
+        ayuda: 'Fracción de los datos sanos que la capa 2 puede marcar.', escala: 'por_mil', defecto: 0.05, valor: 0.005 },
       { nombre: 'rondas', etiqueta: 'Rondas de boosting (máximo)', tipo: 'int', minimo: 20, maximo: 5000, ayuda: 'Árboles.', defecto: 300, valor: 300 },
     ] }]
     const llamadas = simularApi((url) => comoAdmin(url) ?? (
@@ -87,15 +87,15 @@ describe('administración de las ejecuciones', () => {
     vi.stubGlobal('confirm', confirmar)
     montar('/admin/configuracion')
     const alpha = await screen.findByLabelText('Meta de falsas alertas por dato (capa 2)')
-    expect(screen.getByText(/0,05 = 50 por cada 1\.000 datos/)).toBeInTheDocument()
-    expect(screen.getByText(/10 veces más que el valor del núcleo \(0,005\)/)).toBeInTheDocument()
-    expect(screen.getByText(/De 0,0005 a 0,05 · núcleo: 0,005/)).toBeInTheDocument()
+    expect(screen.getByText(/0,005 = 5 por cada 1\.000 datos/)).toBeInTheDocument()
+    expect(screen.getByText(/10 veces menos que el valor del núcleo \(0,05\)/)).toBeInTheDocument()
+    expect(screen.getByText(/De 0,0005 a 0,05 · núcleo: 0,05/)).toBeInTheDocument()
     expect(screen.getByText('1 ajustado(s)')).toBeInTheDocument()        // 300 rondas es el valor del núcleo
     expect(screen.queryByText(/p\. m\.\./)).not.toBeInTheDocument()
     await userEvent.clear(alpha)
-    await userEvent.type(alpha, '0.005')
-    expect(screen.getByText(/0,005 = 5 por cada 1\.000 datos/)).toBeInTheDocument()
-    expect(screen.queryByText(/veces más que el valor del núcleo/)).not.toBeInTheDocument()
+    await userEvent.type(alpha, '0.05')
+    expect(screen.getByText(/0,05 = 50 por cada 1\.000 datos/)).toBeInTheDocument()
+    expect(screen.queryByText(/veces (más|menos) que el valor del núcleo/)).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Volver a los del núcleo' }))
     expect(confirmar).toHaveBeenCalled()
     expect(llamadas.some((l) => l.init?.method === 'PUT')).toBe(false)     // no confirmó: no guarda

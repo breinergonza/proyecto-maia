@@ -96,9 +96,10 @@ def test_hiperparametros_se_validan():
 
 def test_un_valor_igual_al_del_nucleo_no_es_un_ajuste():
     """Vacío y el valor del núcleo son lo mismo: guardarlo no cuenta como ajuste (ni en la insignia ni en MLflow)."""
-    assert HP.validar('anomalias', {'alpha': 0.005, 'rondas': 300, 'tasa': 0.1}) == {'tasa': 0.1}
-    assert HP.ajustes('anomalias', {'alpha': 0.005, 'z_alerta': 3.5}) == {}
-    assert HP.ajustes('anomalias', {'alpha': 0.05}) == {'alpha': 0.05}
+    from anomalias import modelo as MA
+    assert HP.validar('anomalias', {'alpha': MA.Config().alpha, 'rondas': 300, 'tasa': 0.1}) == {'tasa': 0.1}
+    assert HP.ajustes('anomalias', {'alpha': MA.Config().alpha, 'z_alerta': 3.5}) == {}
+    assert HP.ajustes('anomalias', {'alpha': 0.005}) == {'alpha': 0.005}
 
 
 def test_la_meta_de_falsas_alertas_dice_su_escala():
