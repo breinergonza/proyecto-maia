@@ -52,6 +52,9 @@ export function fechaHora(v: string | null | undefined): string {
     : d.toLocaleString('es-CO', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
+/** Cierra una frase que termina en un valor: «p. m.» ya trae su punto y no lleva otro. */
+export const conPunto = (texto: string) => (texto.endsWith('.') ? texto : `${texto}.`)
+
 /** Edad corregida en días, en palabras cortas. */
 export function edad(dias: number | null | undefined): string {
   if (dias == null) return '—'

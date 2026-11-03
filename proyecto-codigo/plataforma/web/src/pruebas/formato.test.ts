@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aproximado, dec, edad, frase, medida, numero, parametro, posicion, riesgo } from '../lib/formato'
+import { aproximado, conPunto, dec, edad, fechaHora, frase, medida, numero, parametro, posicion, riesgo } from '../lib/formato'
 
 describe('formatos', () => {
   it('valor medido sin ruido de coma flotante, sin esconder un dato mal registrado', () => {
@@ -38,5 +38,12 @@ describe('formatos', () => {
     expect(parametro('0.05')).toBe('0,05')
     expect(parametro('cpu')).toBe('cpu')
     expect(parametro('{"rondas": 800}')).toBe('{"rondas": 800}')
+  })
+
+  it('cierra una frase con una fecha sin dejar dos puntos ni ninguno', () => {
+    expect(conPunto('2 de nov. de 2026, 09:43 p. m.')).toBe('2 de nov. de 2026, 09:43 p. m.')
+    expect(conPunto('2 de nov. de 2026, 21:43')).toBe('2 de nov. de 2026, 21:43.')
+    expect(conPunto(fechaHora('2026-11-02T21:43:00')).endsWith('..')).toBe(false)
+    expect(conPunto(fechaHora('2026-11-02T21:43:00')).endsWith('.')).toBe(true)
   })
 })
