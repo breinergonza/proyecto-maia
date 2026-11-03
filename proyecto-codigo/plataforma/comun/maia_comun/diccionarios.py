@@ -33,6 +33,8 @@ from sevarti import diccionario as D
 
 SEMILLA = Path(CA.__file__).resolve().parent.parent / 'entradas' / 'diccionario.xlsx'
 MAX_BYTES = 10 * 1024 * 1024
+MAX_DESCOMPRIMIDO = 50 * 1024 * 1024   # lo que pesan juntos los archivos de dentro del .xlsx (un zip chico puede expandirse a GB)
+MAX_MIEMBROS = 200                     # un .xlsx de este diccionario trae unas pocas decenas
 LISTA, POR_CLASIFICAR, NO_USAR = D.LISTA, D.POR_CLASIFICAR, D.NO_USAR
 _NO_EXCEL = 'El archivo no es un Excel (.xlsx) que se pueda leer. Guárdelo como libro de Excel y vuelva a intentarlo.'
 _CACHE: dict[str, D.Diccionario] = {}   # lo leído, por sha (cada lectura del Excel toma un momento)
@@ -51,6 +53,19 @@ def _nombre_seguro(nombre: str | None) -> str:
     return base if base.lower().endswith('.xlsx') else f'{base}.xlsx'
 
 
+def _revisar_zip(contenido: bytes) -> None:
+    """Un .xlsx es un zip: se mira su índice, sin descomprimir nada, antes de que alguien lo abra."""
+    try:
+        with zipfile.ZipFile(io.BytesIO(contenido)) as z:
+            miembros = z.infolist()
+    except zipfile.BadZipFile:
+        raise DiccionarioInvalido(_NO_EXCEL) from None
+    if len(miembros) > MAX_MIEMBROS:
+        raise DiccionarioInvalido('El archivo trae demasiados archivos por dentro: no parece un diccionario de variables.')
+    if sum(m.file_size for m in miembros) > MAX_DESCOMPRIMIDO:
+        raise DiccionarioInvalido('El archivo descomprimido pasa de 50 MB: no parece un diccionario de variables.')
+
+
 def leer(contenido: bytes, nombre: str | None = None) -> D.Diccionario:
     """El diccionario de un .xlsx, validado con el núcleo. Levanta ``DiccionarioInvalido`` sin traza."""
     sha = huella(contenido)
@@ -62,6 +77,7 @@ def leer(contenido: bytes, nombre: str | None = None) -> D.Diccionario:
         raise DiccionarioInvalido('El archivo pasa de 10 MB: no parece un diccionario de variables.')
     if not zipfile.is_zipfile(io.BytesIO(contenido)):   # un .xlsx es un zip; si no, pandas responde en inglés
         raise DiccionarioInvalido(_NO_EXCEL)
+    _revisar_zip(contenido)
     with tempfile.TemporaryDirectory() as tmp:
         ruta = Path(tmp) / _nombre_seguro(nombre)
         ruta.write_bytes(contenido)
@@ -85,6 +101,18 @@ def escribir(dic: D.Diccionario) -> bytes:
         return ruta.read_bytes()
 
 
+def normalizar(contenido: bytes, nombre: str | None = None) -> bytes:
+    """El libro regenerado desde las tablas que se leyeron del .xlsx subido. Es lo único que se guarda y se sirve de un
+    archivo de afuera: fórmulas, vínculos, hojas extra o cualquier otra cosa que traiga no pasan."""
+    return escribir(leer(contenido, nombre))
+
+
+def iguales(a: D.Diccionario, b: D.Diccionario) -> bool:
+    """Si dos diccionarios dicen lo mismo, sin importar cómo vengan empaquetados los bytes."""
+    ta, tb = D.mostradas(a), D.mostradas(b)
+    return ta.keys() == tb.keys() and all(ta[n].equals(tb[n]) for n in ta)
+
+
 # ------------------------------------------------------------------ versiones
 
 def vigente(s: Session) -> VersionDiccionario | None:
@@ -100,9 +128,12 @@ def obtener(s: Session, vid: int) -> VersionDiccionario:
 
 def guardar(s: Session, contenido: bytes, origen: str, *, estado: str = 'borrador', nota: str | None = None,
             usuario_id=None, validar: bool = True) -> VersionDiccionario:
-    """Una versión nueva (número siguiente). Si queda ``vigente``, la anterior pasa a ``archivado``."""
+    """Una versión nueva (número siguiente). Si queda ``vigente``, la anterior pasa a ``archivado``.
+
+    Con ``validar`` el archivo viene de afuera: se lee y lo que queda guardado (y la ``sha256``) es el libro regenerado
+    desde sus tablas. Sin ``validar``, el llamador ya trae un libro que generó este sistema."""
     if validar:
-        leer(contenido)
+        contenido = normalizar(contenido)
     s.execute(text('LOCK TABLE app.diccionarios IN SHARE ROW EXCLUSIVE MODE'))   # el número de versión, sin choques
     numero = (s.scalar(select(func.max(VersionDiccionario.version))) or 0) + 1
     if estado == 'vigente':

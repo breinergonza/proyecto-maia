@@ -3,6 +3,7 @@ diferencias antes de confirmar, archivo inválido en español, descargar, volver
 de una actualización. Variables inventadas (``var_simulada_*``); entorno ``local`` contra Postgres real."""
 from __future__ import annotations
 
+import zipfile
 from datetime import date
 from io import BytesIO
 
@@ -105,7 +106,7 @@ def test_descargar_la_vigente(cliente, experto):
     from maia_comun import diccionarios as DIC
     r = cliente.get('/api/diccionario/vigente/archivo', headers=experto)
     assert r.status_code == 200 and r.headers['content-type'] == XLSX
-    assert 'diccionario_v1.xlsx' in r.headers['content-disposition'] and r.content == DIC.SEMILLA.read_bytes()
+    assert 'diccionario_v1.xlsx' in r.headers['content-disposition'] and r.content == DIC.SEMILLA.read_bytes()   # la semilla es del repositorio
     assert cliente.get('/api/diccionario/versiones/999/archivo', headers=experto).status_code == 404
 
 
@@ -235,3 +236,27 @@ def test_editar_con_formularios(cliente, experto, consulta):
     from maia_comun.modelos_db import Auditoria
     with db.fabrica()() as s:
         assert list(s.scalars(select(Auditoria.accion).where(Auditoria.accion == 'editar_diccionario'))) == ['editar_diccionario']
+
+
+def test_lo_subido_se_sirve_regenerado_y_el_zip_bomba_se_rechaza(cliente, experto):
+    from maia_comun import diccionarios as DIC
+    libro = load_workbook(BytesIO(_con_nuevas(('var_simulada_x', 'medicion'))))
+    libro['Variables']['Z60'] = '=HYPERLINK("http://ejemplo.invalid","clic")'
+    libro.create_sheet('Extra')['A1'] = '=1+1'
+    salida = BytesIO()
+    libro.save(salida)
+    r = cliente.post('/api/diccionario/versiones', headers=experto, files=_archivo(salida.getvalue()))
+    assert r.status_code == 201, r.text
+    v = r.json()
+    r = cliente.get(f'/api/diccionario/versiones/{v["id"]}/archivo', headers=experto)
+    servido = load_workbook(BytesIO(r.content))
+    assert 'Extra' not in servido.sheetnames and servido['Variables']['Z60'].value is None
+    assert v['sha256'] == DIC.huella(r.content) and r.content != salida.getvalue()
+    bomba = BytesIO()
+    with zipfile.ZipFile(bomba, 'w', zipfile.ZIP_DEFLATED) as z:
+        z.writestr('relleno.bin', b'\0' * (60 * 1024 * 1024))
+    r = cliente.post('/api/diccionario/versiones', headers=experto, files=_archivo(bomba.getvalue(), 'bomba.xlsx'))
+    assert r.status_code == 422 and 'descomprimido' in r.json()['detail']
+    # el mismo contenido subido otra vez no es un cambio: se compara lo que dice el libro, no sus bytes
+    r = cliente.post('/api/diccionario/versiones', headers=experto, files=_archivo(salida.getvalue()))
+    assert r.status_code == 409 and 'igual' in r.json()['detail']

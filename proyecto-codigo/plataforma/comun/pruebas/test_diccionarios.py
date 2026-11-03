@@ -2,6 +2,7 @@
 Las variables nuevas son inventadas (``var_simulada_*``): ningún dato de niños."""
 from __future__ import annotations
 
+import zipfile
 from dataclasses import replace
 from datetime import date
 from io import BytesIO
@@ -12,6 +13,7 @@ from openpyxl import load_workbook
 from sqlalchemy import create_engine, delete, select
 from sqlalchemy.orm import Session
 
+from archivos import libros as LB
 from maia_comun import diccionarios as DIC
 from maia_comun.modelos_db import VersionDiccionario
 from sevarti import diccionario as D
@@ -65,6 +67,24 @@ def test_archivo_invalido_dice_hoja_y_fila_sin_traza():
     libro.save(salida)
     with pytest.raises(DIC.DiccionarioInvalido, match='Desenlaces'):
         DIC.leer(salida.getvalue())
+
+
+def test_el_formulario_rechaza_un_numero_en_otra_escala_nombrando_la_fila_por_su_codigo(tmp_path):
+    """Lo que hace ``_editado`` sin base de datos: aplicar el cambio, escribir el .xlsx y leerlo con el núcleo."""
+    tablas = {n: t.copy() for n, t in D.mostradas(DIC.leer(DIC.SEMILLA.read_bytes())).items()}
+    DIC._aplicar(tablas, {'hoja': 'Desenlaces', 'accion': 'editar', 'clave': 'desarrollo_6m',
+                          'valores': {'percentil': '0.05'}})
+    ruta = tmp_path / 'diccionario.xlsx'
+    LB.escribir(D.LIBRO, ruta, tablas)
+    with pytest.raises(DIC.DiccionarioInvalido) as e:
+        DIC.leer(ruta.read_bytes())
+    texto = DIC._por_fila(str(e.value), tablas)
+    assert 'Desenlaces · desarrollo_6m: Porcentaje más bajo' in texto and 'entre 1 y 50' in texto
+    assert 'fila' not in texto
+
+
+def test_la_semilla_se_lee_con_las_escalas_validadas():
+    assert len(DIC.leer(DIC.SEMILLA.read_bytes()).desenlaces)
 
 
 def test_diferencias_entre_versiones():
@@ -236,3 +256,65 @@ def test_editar_rechaza_lo_que_no_vale_sin_guardar(motor):
                     'valores': {'etiqueta': _primera(DIC.leer(base.archivo), 'variables', 'etiqueta')}})
         s.rollback()
         assert s.scalar(select(VersionDiccionario.version).order_by(VersionDiccionario.version.desc())) == 1
+
+
+# ------------------------------------------------------------------ un .xlsx subido no se guarda ni se sirve tal cual
+
+def _con_formula_y_hoja_extra() -> bytes:
+    libro = load_workbook(DIC.SEMILLA)
+    libro['Variables']['Z60'] = '=HYPERLINK("http://ejemplo.invalid","clic")'   # fuera de la tabla: el núcleo no la lee
+    libro.create_sheet('Extra')['A1'] = '=1+1'
+    salida = BytesIO()
+    libro.save(salida)
+    return salida.getvalue()
+
+
+def _bomba(miembros: int = 1, tamano: int = 60 * 1024 * 1024) -> bytes:
+    """Un zip pequeño cuyos miembros declaran mucho más de lo que pesa el archivo."""
+    salida = BytesIO()
+    with zipfile.ZipFile(salida, 'w', zipfile.ZIP_DEFLATED) as z:
+        for i in range(miembros):
+            z.writestr(f'relleno{i}.bin', b'\0' * tamano)
+    return salida.getvalue()
+
+
+def test_normalizar_guarda_solo_las_tablas_sin_formulas_ni_hojas_extra():
+    original = _con_formula_y_hoja_extra()
+    assert 'Extra' in load_workbook(BytesIO(original)).sheetnames   # el archivo subido sí las trae
+    contenido = DIC.normalizar(original, 'mio.xlsx')
+    libro = load_workbook(BytesIO(contenido))
+    regenerado = load_workbook(BytesIO(DIC.escribir(DIC.leer(DIC.SEMILLA.read_bytes())))).sheetnames
+    assert libro.sheetnames == regenerado and 'Extra' not in libro.sheetnames
+    assert libro['Variables']['Z60'].value is None
+    assert not [c for hoja in libro for fila in hoja.iter_rows() for c in fila if c.data_type == 'f']
+    assert DIC.iguales(DIC.leer(contenido), DIC.leer(DIC.SEMILLA.read_bytes()))   # y las tablas quedan intactas
+
+
+def test_la_semilla_se_normaliza_y_se_sigue_leyendo_igual():
+    semilla = DIC.SEMILLA.read_bytes()
+    contenido = DIC.normalizar(semilla)
+    assert DIC.iguales(DIC.leer(contenido), DIC.leer(semilla)) and DIC.normalizar(contenido) != b''
+    assert not DIC.iguales(DIC.leer(con_nuevas(('var_simulada_a', 'medicion'))), DIC.leer(semilla))
+
+
+def test_un_zip_que_se_expande_demasiado_se_rechaza_antes_de_leerlo(monkeypatch):
+    def no_debe_leerse(*_a, **_k):
+        raise AssertionError('se leyó el archivo')
+    monkeypatch.setattr(D, 'leer', no_debe_leerse)
+    bomba = _bomba()
+    assert len(bomba) < DIC.MAX_BYTES
+    with pytest.raises(DIC.DiccionarioInvalido, match=r'descomprimido.*50 MB') as e:
+        DIC.leer(bomba, 'bomba.xlsx')
+    assert 'Traceback' not in str(e.value)
+    with pytest.raises(DIC.DiccionarioInvalido, match='demasiados archivos'):
+        DIC.leer(_bomba(miembros=DIC.MAX_MIEMBROS + 1, tamano=10), 'muchos.xlsx')
+
+
+def test_guardar_lo_subido_guarda_el_libro_regenerado(motor):
+    original = _con_formula_y_hoja_extra()
+    with Session(motor) as s:
+        v = DIC.guardar(s, original, 'subido', estado='vigente')
+        s.commit()
+        libro = load_workbook(BytesIO(v.archivo))
+        assert 'Extra' not in libro.sheetnames and libro['Variables']['Z60'].value is None and v.archivo != original
+        assert v.sha256 == DIC.huella(v.archivo)   # la huella es la del archivo que se sirve
