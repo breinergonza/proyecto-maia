@@ -68,7 +68,8 @@
     -webkit-tap-highlight-color: transparent;
     text-size-adjust: 100%;
   }
-  body { min-height: 100dvh; overflow-x: hidden; }
+  /* viewport-fit=cover: en el iPhone acostado, que la muesca no tape el contenido */
+  body { min-height: 100dvh; overflow-x: hidden; padding-inline: env(safe-area-inset-left) env(safe-area-inset-right); }
   h1 { font-size: 1.5rem; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em; }
   h2 { font-size: 1.125rem; line-height: 1.3; font-weight: 600; letter-spacing: -0.01em; }
   h3 { font-size: 1rem; line-height: 1.4; font-weight: 600; }
@@ -81,4 +82,43 @@
       transition-duration: 0.01ms !important;
     }
   }
+}
+
+/* Fuera de las capas a propósito: lo que sigue debe ganarle a las utilidades de los componentes. */
+
+/* Con el dedo, casillas y opciones más grandes (las de 16 px se escapan del toque). */
+@media (pointer: coarse) {
+  input[type='checkbox'], input[type='radio'] { width: 1.25rem; height: 1.25rem; flex-shrink: 0; }
+}
+
+/* Tabla `apilar` en el teléfono: cada fila es una tarjeta y cada celda lleva el título de su columna
+   (data-etiqueta, lo pone <Tabla> a partir del encabezado). Así no hay que desplazarse de lado. */
+@media (max-width: 639.98px) {
+  .tabla-apilada { margin-inline: 0; padding-inline: 0; overflow: visible; }
+  .tabla-apilada table, .tabla-apilada tbody, .tabla-apilada tr, .tabla-apilada td { display: block; width: 100%; }
+  .tabla-apilada thead {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
+  .tabla-apilada tbody { display: flex; flex-direction: column; gap: 0.75rem; }
+  .tabla-apilada tbody tr {
+    border: 1px solid var(--color-linea); border-radius: var(--radius-control); padding: 0.375rem 0.875rem;
+    background: var(--color-papel);
+  }
+  .tabla-apilada tbody td {
+    position: static; min-width: 0; max-width: none; padding: 0.5rem 0; border: 0; background: transparent;
+    text-align: left; white-space: normal; overflow-wrap: anywhere;
+  }
+  .tabla-apilada tbody td + td { border-top: 1px solid color-mix(in srgb, var(--color-linea) 70%, transparent); }
+  /* el título arriba y el valor debajo: sirve igual para un número que para una celda con varios párrafos */
+  .tabla-apilada tbody td::before {
+    content: attr(data-etiqueta); display: block; margin-bottom: 0.125rem;
+    font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--color-salvia);
+  }
+  /* la celda de acciones (encabezado vacío o con data-acciones) va sin título, con los botones en línea */
+  .tabla-apilada tbody td[data-etiqueta='']::before, .tabla-apilada tbody td[data-ancha]::before { content: none; }
+  .tabla-apilada tbody td[data-etiqueta=''] { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 0.25rem; }
+  .tabla-apilada tbody td[data-etiqueta=''] > * { margin: 0; }
+  .tabla-apilada tbody td[data-etiqueta=''] > div { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; }
+  /* una fila de detalle (colSpan) va pegada a su tarjeta, a lo ancho y sin título */
+  .tabla-apilada tbody td[data-ancha] { display: block; text-align: left; }
 }

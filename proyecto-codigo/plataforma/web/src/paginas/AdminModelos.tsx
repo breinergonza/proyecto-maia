@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
+import { Link } from 'react-router'
 import { pedir } from '../api/cliente'
 import type { Paquete } from '../api/tipos'
 import { Aviso, Boton, Cargando, Encabezado, Insignia, Panel, Tabla, Vacio } from '../components/ui'
 import { useSalud } from '../lib/consultas'
-import { dec2, fecha, fechaHora } from '../lib/formato'
+import { dec2, fecha, fechaHora, pct } from '../lib/formato'
 
 export default function AdminModelos() {
   const cliente = useQueryClient()
@@ -37,12 +38,14 @@ export default function AdminModelos() {
   return (
     <>
       <Encabezado titulo="Modelos">
-        Los modelos llegan como un paquete firmado que se arma en el equipo de entrenamiento (maia exportar). Al subirlo se
-        verifican la firma, cada archivo y la versión de LightGBM.
+        Los modelos se usan como un paquete firmado. Se arma solo al aprobar versiones en{' '}
+        <Link className="text-teal underline" to="/admin/entrenamientos">Entrenamientos</Link>; aquí también se puede subir
+        uno armado fuera de la plataforma (maia exportar). Al subirlo se verifican la firma, cada archivo y la versión de
+        LightGBM.
         {salud.data?.entorno === 'demo' && ' En esta demostración solo se aceptan paquetes entrenados con datos simulados.'}
       </Encabezado>
 
-      <div className="grid items-start gap-4 xl:grid-cols-[1fr_22rem]">
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
       <Panel titulo="Subir un paquete" className="xl:order-2">
         <form className="flex flex-col gap-3" onSubmit={(e) => {
           e.preventDefault()
@@ -64,7 +67,7 @@ export default function AdminModelos() {
       {lista.isPending ? <Cargando /> : lista.error ? <Aviso>{lista.error.message}</Aviso> : lista.data.length === 0 ? (
         <Vacio titulo="Todavía no hay paquetes">Suba el primero con el formulario de arriba.</Vacio>
       ) : (
-        <div className="grid gap-4 2xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 2xl:grid-cols-2">
           {lista.data.map((p) => (
             <Panel key={p.version}
               titulo={<div className="flex items-center gap-2"><h2 className="text-base">{p.version}</h2>{p.activo && <Insignia tono="teal">Activo</Insignia>}<Insignia>{p.fuente}</Insignia></div>}
@@ -73,7 +76,7 @@ export default function AdminModelos() {
                   {activar.isPending && activar.variables === p.version ? 'Activando…' : 'Activar'}
                 </Boton>
               )}>
-              <dl className="grid gap-x-8 gap-y-2 text-sm sm:grid-cols-3">
+              <dl className="grid grid-cols-1 gap-x-8 gap-y-2 text-sm sm:grid-cols-3">
                 <div><dt className="text-salvia">Corte de entrenamiento</dt><dd>{fecha(p.corte)}</dd></div>
                 <div><dt className="text-salvia">Creado</dt><dd>{fechaHora(p.creado)}</dd></div>
                 <div><dt className="text-salvia">Subido</dt><dd>{fechaHora(p.subido_en)}</dd></div>
@@ -100,10 +103,11 @@ function Metricas({ metricas }: { metricas: Record<string, number> }) {
     <details className="mt-4 text-sm">
       <summary className="cursor-pointer font-semibold text-teal">AUC de validación por desenlace</summary>
       <Tabla className="mt-2">
-        <thead><tr><th>Desenlace</th><th className="text-right">Modelo</th><th className="text-right">Regla simple</th></tr></thead>
+        <thead><tr><th>Desenlace</th><th className="text-right">AUC</th><th className="text-right" title="De los niños que tuvieron el desenlace, qué parte estaba en el 10 % de mayor riesgo">Top 10 %</th></tr></thead>
         <tbody>{auc.map(([k, v]) => {
           const clave = k.slice(5)
-          return <tr key={k}><td>{clave}</td><td className="text-right">{dec2(v)}</td><td className="text-right">{dec2(metricas[`auc_regla__${clave}`])}</td></tr>
+          const top = metricas[`top10__${clave}`]
+          return <tr key={k}><td>{clave}</td><td className="text-right">{dec2(v)}</td><td className="text-right">{top === undefined ? '—' : pct(top)}</td></tr>
         })}</tbody>
       </Tabla>
     </details>

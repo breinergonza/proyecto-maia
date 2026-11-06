@@ -1,0 +1,22 @@
+diff --git a/anomalias/modelo.py b/anomalias/modelo.py
+index 296e68f..a9c6e83 100644
+--- a/anomalias/modelo.py
++++ b/anomalias/modelo.py
+@@ -52,7 +52,7 @@ class Config:
+     min_valores_ref: int = 20       # layers 1 and 3 need this many values for a reference
+     frecuente: float = 0.01         # layer 1: a value this common is not rare, whatever its z
+     ceros: float = 0.3              # layer 1: with this share of zeros the scale comes from the rest
+-    alpha: float = 0.005            # layer 2 false-alert target per datum (5 per 1,000)
++    alpha: float = 0.05             # layer 2 false-alert target per datum (50 per 1,000)
+     cuantiles: tuple[float, float, float] = (0.25, 0.5, 0.75)
+     min_nivel: int = 20             # categorical levels rarer than this become missing
+     max_niveles: int = 64           # categorical inputs with more levels are dropped (free text)
+@@ -1061,7 +1061,7 @@ def _capas(d: pd.DataFrame, esquema: pd.DataFrame) -> pd.DataFrame:
+     return c
+ 
+ 
+-ALPHAS = (0.001, 0.002, 0.005, 0.01, 0.02)
++ALPHAS = (0.001, 0.002, 0.005, 0.01, 0.02, 0.05)
+ 
+ 
+ @dataclass

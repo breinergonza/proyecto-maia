@@ -25,6 +25,8 @@ COPY nucleo/anomalias nucleo/anomalias
 COPY nucleo/clinico nucleo/clinico
 COPY nucleo/retroalimentacion nucleo/retroalimentacion
 COPY nucleo/archivos nucleo/archivos
+# el diccionario inicial: la API lo siembra como versión vigente si la base no tiene ninguna (no tiene datos por niño)
+COPY nucleo/entradas nucleo/entradas
 COPY nucleo/pipeline.py nucleo/README.md nucleo/
 COPY plataforma/comun plataforma/comun
 COPY plataforma/api plataforma/api

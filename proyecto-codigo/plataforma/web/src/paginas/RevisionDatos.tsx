@@ -7,7 +7,8 @@ import { pedir } from '../api/cliente'
 import type { DatoRevision, Pagina, Respuesta } from '../api/tipos'
 import { Aviso, Boton, Cargando, Encabezado, Insignia, Paginador, Selector, Texto, Vacio } from '../components/ui'
 import { cn } from '../lib/cn'
-import { CAPAS, dec2, fecha, frase, medida, num, RESPUESTAS } from '../lib/formato'
+import { aproximado, fecha, medida, num, RESPUESTAS } from '../lib/formato'
+import { alerta, ayudaAlerta, motivo } from '../lib/lenguaje'
 
 const TAMANO = 12
 
@@ -32,26 +33,26 @@ export default function RevisionDatos() {
               <option value="revisado">Ya respondidos</option>
               <option value="todos">Todos</option>
             </Selector>
-            <label className="sr-only" htmlFor="capa">Capa</label>
+            <label className="sr-only" htmlFor="capa">Tipo de alerta</label>
             <Selector id="capa" className="sm:w-52" value={capa} onChange={(e) => { setCapa(e.target.value); setPagina(1) }}>
-              <option value="">Todas las capas</option>
-              {['1', '2', '3'].map((c) => <option key={c} value={c}>Capa {c}: {CAPAS[c]}</option>)}
+              <option value="">Todas las alertas</option>
+              {['1', '2', '3'].map((c) => <option key={c} value={c}>{alerta(c)}</option>)}
             </Selector>
           </div>
         }>
         Datos que el modelo de anomalías encontró raros. Diga si cree que cada uno es un error de registro: sus respuestas
-        miden qué tan bien acierta cada capa y ajustan la exigencia del siguiente entrenamiento.
+        miden qué tan bien acierta cada tipo de alerta y ajustan la exigencia del siguiente entrenamiento.
       </Encabezado>
       {q.isPending ? <Cargando /> : q.error ? <Aviso>{q.error.message}</Aviso> : q.data.items.length === 0 ? (
         <Vacio titulo={estado === 'pendiente' ? 'No queda nada por revisar' : 'No hay datos con estos filtros'}>
-          {estado === 'pendiente' ? 'Cuando haya una corrida nueva, aquí aparecerán sus datos raros.' : undefined}
+          {estado === 'pendiente' ? 'Cuando lleguen datos nuevos, aquí aparecerán los que parezcan raros.' : undefined}
         </Vacio>
       ) : (
         <>
           <p className="mb-2 shrink-0 text-xs text-salvia">
-            {num(q.data.total)} datos. Primero los que marcan más capas y con más fuerza.
+            {num(q.data.total)} datos. Primero los que tienen más alertas y más fuertes.
           </p>
-          <ol className="grid content-start gap-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1 xl:grid-cols-2 2xl:grid-cols-3">
+          <ol className="grid grid-cols-1 content-start gap-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1 xl:grid-cols-2 2xl:grid-cols-3">
             {q.data.items.map((d) => <Tarjeta key={d.id} dato={d} />)}
           </ol>
           <div className="shrink-0 [&>nav]:mt-3">
@@ -90,13 +91,13 @@ function Tarjeta({ dato }: { dato: DatoRevision }) {
         </h2>
         {rango && (
           <p className="text-sm">
-            Para este niño se esperaba entre {dec2(dato.rango_bajo)} y {dec2(dato.rango_alto)}
-            {dato.esperado != null && <> (lo más probable: {dec2(dato.esperado)})</>}.
+            Para este niño se esperaba entre {aproximado(dato.rango_bajo)} y {aproximado(dato.rango_alto)}
+            {dato.esperado != null && <> (lo más probable: {aproximado(dato.esperado)})</>}.
           </p>
         )}
-        {dato.motivo && <p className="mt-0.5 text-sm text-salvia">{frase(dato.motivo)}.</p>}
+        {dato.motivo && <p className="mt-0.5 text-sm text-salvia">{motivo(dato.motivo)}.</p>}
         <div className="mt-2 flex flex-wrap gap-1">
-          {dato.capas.map((c) => <Insignia key={c}>Capa {c}: {CAPAS[c] ?? c}</Insignia>)}
+          {dato.capas.map((c) => <span key={c} title={ayudaAlerta(c)}><Insignia>{alerta(c)}</Insignia></span>)}
         </div>
       </div>
       <fieldset className="mt-auto border-t border-linea/70 pt-3">
@@ -104,7 +105,7 @@ function Tarjeta({ dato }: { dato: DatoRevision }) {
         <div className="flex justify-end">
           <div className="grid grid-cols-3 gap-1.5">
             {(['si', 'no', 'no_se'] as Respuesta[]).map((r) => (
-              <Boton key={r} chico variante={elegida === r ? 'primario' : 'secundario'} aria-pressed={elegida === r}
+              <Boton key={r} chico className="whitespace-nowrap" variante={elegida === r ? 'primario' : 'secundario'} aria-pressed={elegida === r}
                 disabled={m.isPending} onClick={() => m.mutate(r)}>
                 {RESPUESTAS[r]}
               </Boton>

@@ -15,6 +15,7 @@ from maia_api.esquemas import PaqueteSalida
 from maia_api.semillas import config_notificaciones_de
 from maia_comun import paquete as PQ
 from maia_comun.config import Configuracion
+from maia_comun.metricas import interna
 from maia_comun.modelos_db import Paquete, Usuario
 
 ruta = APIRouter(prefix='/modelos', tags=['modelos'])
@@ -25,7 +26,7 @@ def _salida(p: Paquete) -> PaqueteSalida:
     m = p.manifest or {}
     return PaqueteSalida(version=p.version, fuente=p.fuente, activo=p.activo, subido_en=p.subido_en,
                          corte=m.get('corte'), creado=m.get('creado'), modelos=m.get('modelos', {}),
-                         metricas=m.get('metricas', {}))
+                         metricas={k: v for k, v in (m.get('metricas') or {}).items() if not interna(k)})
 
 
 @ruta.get('/activo', response_model=PaqueteSalida | None)

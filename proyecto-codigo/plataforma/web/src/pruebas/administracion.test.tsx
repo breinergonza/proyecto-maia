@@ -72,6 +72,79 @@ describe('administración de las ejecuciones', () => {
     expect(JSON.parse(String(post.init!.body))).toMatchObject({ fuente: 'kmc', cron: '0 2 1 1,7 *', solo_si_nuevo: true, parametros: { anio_desde: 2015 } })
   })
 
+  it('configuración: la meta de falsas alertas se lee en su unidad y avisa si se aleja 10 veces del núcleo', async () => {
+    const anomalias = [{ modelo: 'anomalias', actualizado_en: '2026-10-28T22:13:42Z', campos: [
+      { nombre: 'alpha', etiqueta: 'Meta de falsas alertas por dato (capa 2)', tipo: 'float', minimo: 0.0005, maximo: 0.05,
+        ayuda: 'Fracción de los datos sanos que la capa 2 puede marcar.', escala: 'por_mil', defecto: 0.05, valor: 0.005 },
+      { nombre: 'rondas', etiqueta: 'Rondas de boosting (máximo)', tipo: 'int', minimo: 20, maximo: 5000, ayuda: 'Árboles.', defecto: 300, valor: 300 },
+    ] }]
+    const llamadas = simularApi((url) => comoAdmin(url) ?? (
+      url === '/api/administracion/resumen' ? { cuerpo: resumen }
+        : url === '/api/administracion/conexion' ? { cuerpo: conexion }
+          : url.startsWith('/api/administracion/hiperparametros') ? { cuerpo: anomalias }
+            : undefined))
+    const confirmar = vi.fn(() => false)
+    vi.stubGlobal('confirm', confirmar)
+    montar('/admin/configuracion')
+    const alpha = await screen.findByLabelText('Meta de falsas alertas por dato (capa 2)')
+    expect(screen.getByText(/0,005 = 5 por cada 1\.000 datos/)).toBeInTheDocument()
+    expect(screen.getByText(/10 veces menos que el valor del núcleo \(0,05\)/)).toBeInTheDocument()
+    expect(screen.getByText(/De 0,0005 a 0,05 · núcleo: 0,05/)).toBeInTheDocument()
+    expect(screen.getByText('1 ajustado(s)')).toBeInTheDocument()        // 300 rondas es el valor del núcleo
+    expect(screen.queryByText(/p\. m\.\./)).not.toBeInTheDocument()
+    await userEvent.clear(alpha)
+    await userEvent.type(alpha, '0.05')
+    expect(screen.getByText(/0,05 = 50 por cada 1\.000 datos/)).toBeInTheDocument()
+    expect(screen.queryByText(/veces (más|menos) que el valor del núcleo/)).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Volver a los del núcleo' }))
+    expect(confirmar).toHaveBeenCalled()
+    expect(llamadas.some((l) => l.init?.method === 'PUT')).toBe(false)     // no confirmó: no guarda
+  })
+
+  it('usuarios: cambiar el perfil pide confirmación antes de guardar', async () => {
+    const otra = { ...usuario('experto'), id: '00000000-0000-0000-0000-000000000002', nombre: 'Ana Pérez', ultimo_ingreso: null }
+    const llamadas = simularApi((url, init) => comoAdmin(url) ?? (
+      url === '/api/usuarios' ? { cuerpo: [{ ...usuario('admin'), ultimo_ingreso: null }, otra] }
+        : url === `/api/usuarios/${otra.id}` && init?.method === 'PATCH' ? { cuerpo: { ...otra, rol: 'visualizador' } }
+          : undefined))
+    const confirmar = vi.fn(() => false)
+    vi.stubGlobal('confirm', confirmar)
+    montar('/admin/usuarios')
+    const perfil = await screen.findByLabelText('Perfil de Ana Pérez')
+    await userEvent.selectOptions(perfil, 'Consulta')
+    expect(confirmar).toHaveBeenCalledWith('¿Cambiar el perfil de Ana Pérez de Experto clínico a Consulta?')
+    expect(llamadas.some((l) => l.init?.method === 'PATCH')).toBe(false)
+    expect(perfil).toHaveValue('experto')
+    confirmar.mockReturnValue(true)
+    await userEvent.selectOptions(perfil, 'Consulta')
+    await waitFor(() => expect(llamadas.some((l) => l.init?.method === 'PATCH')).toBe(true))
+  })
+
+  it('programación: cada ejecución dice su tipo, también los entrenamientos', async () => {
+    simularApi((url) => comoAdmin(url) ?? (
+      url === '/api/administracion/programaciones' ? { cuerpo: [] }
+        : url === '/api/administracion/ejecuciones'
+          ? { cuerpo: [{ id: 5, tipo: 'entrenamiento', origen: 'manual', fuente: 'kmc', estado: 'ok', creada_en: '2026-10-30T13:35:00Z',
+            parametros: {}, resultado: { paso: 'entrenado' }, mensaje: 'Entrenado.' }] }
+          : url.startsWith('/api/administracion/calendario')
+            ? { cuerpo: { cron: '0 2 1 1,7 *', zona: 'America/Bogota', descripcion: 'x', proximas: [] } }
+            : undefined))
+    montar('/admin/programacion')
+    expect(await screen.findByText('Entrenamiento · Base de la Fundación')).toBeInTheDocument()
+  })
+
+  it('corridas: la hecha con datos nuevos no se llama «Semestral (equipo local)» y el encabezado lleva a Programación', async () => {
+    simularApi((url) => comoAdmin(url) ?? (
+      url === '/api/corridas' ? { cuerpo: [{ id: 2, tipo: 'completa', estado: 'ok', silencio: false, corte_id: 1, fuente: 'kmc',
+        fecha_corte: '2026-07-24', modelo_version: 'abc', iniciada_en: '2026-10-30T23:36:00Z', terminada_en: null,
+        sujetos: 10, alertas_datos: 3, riesgos: 5, paso: null, mensaje: null }] }
+        : undefined))
+    montar('/admin/corridas')
+    expect(await screen.findByText('Extracción y cálculo')).toBeInTheDocument()
+    expect(screen.queryByText(/equipo local/)).not.toBeInTheDocument()
+    expect(within(screen.getByRole('main')).getByRole('link', { name: 'Programación' })).toHaveAttribute('href', '/admin/programacion')
+  })
+
   it('entrenamientos: hiperparámetros, métricas, comparación y aprobación', async () => {
     const run = (id: string, version: string, rondas: string, auc: number, alias: string[]): Entrenamiento => ({
       run_id: id, experimento_id: '2', tipo: 'clinico', nombre: id, estado: 'FINISHED', inicio: '2026-10-01T10:00:00Z',
@@ -91,6 +164,8 @@ describe('administración de las ejecuciones', () => {
     expect(within(clinico).getByText('produccion')).toBeInTheDocument()
     expect(within(clinico).getByText('ajustado')).toBeInTheDocument()
     expect(within(clinico).getByText('0,83')).toBeInTheDocument()
+    expect(within(clinico).getAllByText('0,05').length).toBeGreaterThan(0)    // la tasa con coma, como el resto
+    expect(within(clinico).queryByText('0.05')).not.toBeInTheDocument()
     await userEvent.click(within(clinico).getByLabelText('Comparar c2'))
     await userEvent.click(within(clinico).getByLabelText('Comparar c1'))
     expect(await within(clinico).findByText('Comparación de 2 entrenamientos')).toBeInTheDocument()

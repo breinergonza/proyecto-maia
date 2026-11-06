@@ -13,6 +13,7 @@ from maia_comun import ejecuciones as EJ
 from maia_comun import hiperparametros as HP
 from maia_comun import mlflow_rest as ML
 from maia_comun.config import Configuracion
+from maia_comun.metricas import interna
 from maia_comun.modelos_db import Ejecucion, Hiperparametro, Usuario
 
 ruta = APIRouter(prefix='/entrenamientos', tags=['entrenamientos'])
@@ -27,7 +28,7 @@ def _enlace(cfg: Configuracion, e: dict) -> str | None:
 @ruta.get('', response_model=Entrenamientos)
 def listar(fuente: Fuente | None = Query(None), limite: int = Query(30, ge=1, le=200),
            cfg: Configuracion = Depends(configuracion), _: Usuario = Depends(ADMIN)) -> Entrenamientos:
-    lector = ML.Lector(cfg.mlflow_tracking_uri)
+    lector = ML.Lector(cfg.mlflow_tracking_uri, cfg.mlflow_tracking_username, cfg.mlflow_tracking_password)
     try:
         datos = {t: lector.entrenamientos(t, fuente, limite) for t in ML.EXPERIMENTOS}
     except ML.MlflowNoDisponible as e:
@@ -35,6 +36,7 @@ def listar(fuente: Fuente | None = Query(None), limite: int = Query(30, ge=1, le
     for lista in datos.values():
         for e in lista:
             e['enlace'] = _enlace(cfg, e)
+            e['metricas'] = {k: v for k, v in e['metricas'].items() if not interna(k)}
     return Entrenamientos(mlflow_url=cfg.mlflow_url_publica, **datos)
 
 

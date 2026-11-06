@@ -5,12 +5,15 @@ Entorno ``demo`` (como Railway): cookies seguras, solo paquetes simulados y una 
 from __future__ import annotations
 
 import io
+import re
 import socket
 import tarfile
 import time
 from dataclasses import replace
+from datetime import date
 from pathlib import Path
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -245,9 +248,17 @@ def test_corrida_y_tablero(cliente, admin, corrida, smtp):
     r = cliente.get('/api/tablero/resumen', headers=admin).json()
     assert r['corrida']['id'] == corrida['id'] and r['ninos'] == 600
     assert r['crecimiento_por_etapa']
-    d = cliente.get('/api/tablero/desempeno', headers=admin).json()
-    assert d['desenlaces'] and 'auc' in d['desenlaces'][0]
-    assert isinstance(cliente.get('/api/tablero/alarmas-grupo', headers=admin).json(), list)
+    # riesgo alto: niños distintos, igual que la lista que se abre al hacer clic
+    altos = cliente.get('/api/ninos', headers=admin, params={'percentil_min': r['percentil_alto'], 'tamano': 1}).json()
+    assert r['ninos_riesgo_alto'] == altos['total'] <= r['riesgos_altos']
+    assert r['riesgos_altos'] == sum(d['altos'] for d in r['riesgos_por_desenlace'])
+    # la validación técnica (y la regla simple) no sale por la API
+    assert cliente.get('/api/tablero/desempeno', headers=admin).status_code == 404
+    activo = cliente.get('/api/modelos/activo', headers=admin).json()
+    assert activo['metricas'] and not any('regla' in k for k in activo['metricas'])
+    alarmas = cliente.get('/api/tablero/alarmas-grupo', headers=admin).json()
+    assert isinstance(alarmas, list) and len(alarmas) <= 100   # lo que la web lista; el total está en el resumen
+    assert len(alarmas) == min(r['alarmas_grupo'], 100)
     if corrida['resumen'].get('notificaciones', {}).get('correos'):
         assert len(buzon.mensajes) >= 2   # el de prueba y al menos uno de riesgo alto
         h = cliente.get('/api/notificaciones/historial', headers=admin).json()
@@ -291,6 +302,11 @@ def test_revision(cliente, admin, corrida):
     assert cliente.post('/api/revision/datos/999999999', headers=experta, json={'es_error': 'si'}).status_code == 404
     muestra = cliente.get('/api/revision/riesgos', headers=experta).json()['items']
     assert len(muestra) <= 40
+    # lo que ve el médico: sin ".0" y con la etiqueta de cada categoría, no su código
+    lineas = [x for m in muestra for x in m['resumen']]
+    assert lineas and not [x for x in lineas if re.search(r'\d\.0', x)], lineas
+    oxigeno = [x for x in lineas if x.startswith('Oxígeno')]
+    assert oxigeno and all(x.rsplit(': ', 1)[1] in ('displasia broncopulmonar', 'sin diagnóstico') for x in oxigeno), oxigeno
     assert all('riesgo' not in m and 'percentil' not in m for m in muestra), 'la revisión es ciega'
     if muestra:
         assert cliente.post(f'/api/revision/riesgos/{muestra[0]["id"]}', headers=experta,
@@ -315,3 +331,106 @@ def test_inferencia(cliente, admin, corrida):
     assert cliente.post('/api/inferencia', headers=admin, json=malo).status_code == 422
     visor = _login(cliente, 'visor@maia.prueba', 'clave-larga-123')
     assert cliente.post('/api/inferencia', headers=visor, json=peticion).status_code == 403
+
+
+def test_formulario_de_calculo(cliente, admin, corrida):
+    r = cliente.get('/api/inferencia/formulario', headers=admin)
+    assert r.status_code == 200, r.text
+    f = r.json()
+    ordenes = [v['orden'] for v in f['visitas']]
+    assert ordenes == sorted(ordenes) and len(ordenes) >= 3
+    campos = [c for v in f['visitas'] for c in v['campos']] + f['generales']
+    assert all(c['tipo'] in ('numero', 'lista', 'si_no', 'fecha', 'texto') for c in campos)
+    assert any(c['principal'] and not c['crecimiento'] for c in campos), 'las variables que más pesan van primero'
+    assert all(c['principal'] for c in campos if c['crecimiento']), 'las medidas de crecimiento siempre se ven'
+    assert any(c['opciones'] for c in campos if c['tipo'] == 'lista')
+    assert sum(len(v['desenlaces']) for v in f['visitas']) >= 1
+    for v in f['visitas']:   # en cada visita, primero los principales y luego por peso
+        principales = [c['principal'] for c in v['campos']]
+        assert principales == sorted(principales, reverse=True)
+    # la web arma la petición con estos campos: el niño de ejemplo, solo con variables del formulario, calcula
+    conocidas = {c['variable'] for c in campos}
+    peticion = cliente.get('/api/inferencia/ejemplo', headers=admin).json()
+    peticion.pop('nota')
+    peticion['mediciones'] = [m for m in peticion['mediciones'] if m['variable'] in conocidas]
+    out = cliente.post('/api/inferencia', headers=admin, json=peticion).json()
+    assert out['variables_ignoradas'] == [] and out['crecimiento']
+    visor = _login(cliente, 'visor@maia.prueba', 'clave-larga-123')
+    assert cliente.get('/api/inferencia/formulario', headers=visor).status_code == 403
+
+
+def test_el_nino_de_ejemplo_llena_las_variables_principales_del_paquete(cliente, admin, corrida, monkeypatch):
+    """Con el paquete de la Fundación el niño simulado no tenía ninguna variable del paquete (producción: 0 datos).
+    El ejemplo sale del diccionario del paquete activo: un valor habitual en cada campo principal de cada visita."""
+    from maia_comun import simulados
+    simular = simulados.simular
+
+    def con_otros_nombres(*a, **k):   # como el paquete de la Fundación: sus variables no son las del simulador
+        sev = simular(*a, **k)
+        sev.mediciones['variable'] = 'otra_' + sev.mediciones['variable']
+        return sev
+    monkeypatch.setattr(simulados, 'simular', con_otros_nombres)
+    f = cliente.get('/api/inferencia/formulario', headers=admin).json()
+    ej = cliente.get('/api/inferencia/ejemplo', headers=admin).json()
+    llenas = {m['variable'] for m in ej['mediciones']}
+    # cada visita va completa (un valor en cada campo principal) o vacía, y las llenas son las primeras
+    principales = [{c['variable'] for c in v['campos'] if c['principal'] and (
+        c['opciones'] or c['tipo'] == 'si_no' or (c['minimo'] is not None and c['maximo'] is not None))}
+        for v in f['visitas']]
+    principales = [p for p in principales if p]
+    llena = [p <= llenas for p in principales]
+    assert any(llena) and all(lista or not (p & llenas) for lista, p in zip(llena, principales))
+    assert llena == sorted(llena, reverse=True)
+    nacimiento = date.fromisoformat(ej['sujetos'][0]['fecha_nacimiento'])
+    assert all(date.fromisoformat(m['fecha']) >= nacimiento for m in ej['mediciones'])
+    assert ej['sujetos'][0]['eg_semanas'] is not None
+
+
+def test_el_nino_de_ejemplo_muestra_un_riesgo_sin_datos_raros(cliente, admin, corrida):
+    """El ejemplo es para ver cómo se ve un resultado: tiene que dar al menos un riesgo (no puede llenar hasta la última
+    visita, que ya no deja nada por predecir) y ningún dato raro (ni un peso al nacer de bebé a término con 32 semanas,
+    ni una salida del hospital después de las 40 semanas)."""
+    ej = cliente.get('/api/inferencia/ejemplo', headers=admin).json()
+    ej.pop('nota')
+    r = cliente.post('/api/inferencia', headers=admin, json=ej)
+    assert r.status_code == 200, r.text
+    assert r.json()['riesgos']
+    assert r.json()['alertas_dato'] == []
+
+
+def test_inferencia_que_falla_no_muestra_el_error_de_python(cliente, admin, corrida, monkeypatch):
+    from maia_api.rutas import inferencia as RI
+    peticion = cliente.get('/api/inferencia/ejemplo', headers=admin).json()
+    peticion.pop('nota')
+
+    def falla(*_):
+        raise ValueError("cannot convert float NaN to integer 'detalle_interno'")
+    monkeypatch.setattr(RI.PU, 'inferir', falla)
+    r = cliente.post('/api/inferencia', headers=admin, json=peticion)
+    assert r.status_code == 422
+    assert r.json()['detail'] == 'No se pudo calcular el riesgo con estos datos. Revise los valores que escribió e intente de nuevo.'
+    assert 'detalle_interno' not in r.text and 'NaN' not in r.text
+
+
+def test_entrenamientos_sin_la_comparacion_con_la_regla_simple(cliente, admin, monkeypatch):
+    """Igual que Modelos: la validación interna (``*_regla*``) queda en MLflow."""
+    from maia_api.rutas import entrenamientos as RE
+    from maia_comun import mlflow_rest as ML
+
+    def mlflow(peticion: httpx.Request) -> httpx.Response:
+        ruta = peticion.url.path
+        if ruta.endswith('/experiments/get-by-name'):
+            return httpx.Response(200, json={'experiment': {'experiment_id': '1'}})
+        if ruta.endswith('/runs/search'):
+            return httpx.Response(200, json={'runs': [{
+                'info': {'run_id': 'run1', 'status': 'FINISHED', 'start_time': 1793000000000, 'end_time': 1793000600000},
+                'data': {'params': [], 'tags': [],
+                         'metrics': [{'key': 'auc__muerte', 'value': 0.81}, {'key': 'auc_regla__muerte', 'value': 0.7},
+                                     {'key': 'top10__muerte', 'value': 0.4}]}}]})
+        return httpx.Response(200, json={})
+    Lector = ML.Lector
+    monkeypatch.setattr(RE.ML, 'Lector', lambda uri, *_: Lector(uri, cliente=httpx.Client(transport=httpx.MockTransport(mlflow))))
+    r = cliente.get('/api/entrenamientos', headers=admin)
+    assert r.status_code == 200, r.text
+    for e in r.json()['clinico'] + r.json()['anomalias']:
+        assert e['metricas'] == {'auc__muerte': 0.81, 'top10__muerte': 0.4}

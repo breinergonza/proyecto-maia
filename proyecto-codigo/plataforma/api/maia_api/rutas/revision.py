@@ -13,14 +13,13 @@ from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from maia_api.consultas import corrida_de, esquema, etapas, nombre_etapa
+from maia_api.consultas import corrida_de, esquema, etapas, nombre_etapa, unidad_mostrada, valor_legible
 from maia_api.dependencias import EXPERTO, auditar, sesion
 from maia_api.esquemas import RevisionDatoEntrada, RevisionRiesgoEntrada
-from maia_comun.modelos_db import AlertaDato, RevisionDato, RevisionRiesgo, Riesgo, Usuario
+from maia_comun.modelos_db import PERCENTIL_ALTO, AlertaDato, RevisionDato, RevisionRiesgo, Riesgo, Usuario
 
 ruta = APIRouter(prefix='/revision', tags=['revisión'])
 MUESTRA_POR_GRUPO = 20
-PERCENTIL_ALTO = 90
 
 
 @ruta.get('/datos')
@@ -84,9 +83,10 @@ def _resumen_nino(s: Session, corte_id: int, sujeto: str, momento: str, esq: dic
         if m.valor is None or d.get('tipo') in ('text', 'texto') or 'texto' in etiqueta.lower() or len(str(m.valor)) > 40:
             continue
         if d.get('rol') == 'basal' or d.get('etapa') == momento:
-            unidad = f' {d["unidad"]}' if d.get('unidad') else ''
+            valor = valor_legible(d, m.valor)
+            unidad = f' {u}' if (u := unidad_mostrada(d)) else ''
             donde = '' if d.get('rol') == 'basal' else f' ({nombre_etapa(mapa, momento)})'
-            lineas.append(f'{etiqueta}{donde}: {m.valor}{unidad}')
+            lineas.append(f'{etiqueta}{donde}: {valor}{unidad}')
     return lineas[:14]
 
 

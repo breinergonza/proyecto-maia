@@ -100,3 +100,17 @@ def test_metricas_de_validacion_clinica_tienen_nombres_validos():
     m = metricas_clinicas(tabla, None, {'readmisión (3 meses)': 'readm'})
     assert m['auc__readm'] == 0.8 and m['top10__readm'] == 40.0 and m['desenlaces_que_superan_la_regla'] == 1
     assert nombre_metrica('casos en el riesgo más alto (%)') == 'casos en el riesgo más alto pct'
+
+
+def test_config_de_archivo_se_valida_como_en_la_web(tmp_path):
+    """``maia entrenar --config``: los hiperparámetros de la web con sus límites; lo demás, campos del núcleo."""
+    from maia_entrenamiento import entrenar as E
+    f = tmp_path / 'config.json'
+    f.write_text('{"alpha": 0.002, "dispositivo": "cpu"}', encoding='utf-8')
+    cfg = E.config_anomalias(str(f))
+    assert cfg.alpha == 0.002 and cfg.dispositivo == 'cpu'
+    for malo, texto in (('{"alpha": 0.5}', 'entre'), ('{"alfa": 0.002}', 'no es un parámetro')):
+        f.write_text(malo, encoding='utf-8')
+        with pytest.raises(ValueError, match=texto):
+            E.config_anomalias(str(f))
+

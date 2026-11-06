@@ -10,6 +10,12 @@ Cada ``intervalo`` segundos:
    * ``aprobacion``: ``maia promover`` de las dos versiones y ``maia exportar``; la API importa el paquete y lo activa.
 3. guarda en la ejecución las últimas líneas de la salida, el resultado (corrida, versiones registradas, paquete) o
    el error.
+
+El diccionario de variables vive con versiones en Postgres (``maia_comun.diccionarios``). Antes de cada ``corrida`` o
+``entrenamiento`` se baja la versión vigente a ``MAIA_RAIZ/entradas/diccionario.xlsx``; si al terminar el archivo
+cambió (la corrida agregó variables nuevas de la base como «Por clasificar»), queda un borrador para que los expertos
+lo revisen en la web y la ejecución anota ``resultado.variables_nuevas``. Al arrancar, si no hay ninguna versión, se
+siembra la del núcleo.
 """
 from __future__ import annotations
 
@@ -23,23 +29,70 @@ import time
 import traceback
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
+from archivos import carpetas as CA
 from maia_comun import conexion_origen as CO
 from maia_comun import db
+from maia_comun import diccionarios as DIC
 from maia_comun import ejecuciones as EJ
 from maia_comun.config import Configuracion, obtener
-from maia_comun.modelos_db import Ejecucion
+from maia_comun.modelos_db import Ejecucion, VersionDiccionario
 
 CADA_ANOTAR = 5.0   # segundos entre escrituras del registro mientras corre
+USAN_DICCIONARIO = ('corrida', 'entrenamiento')
+NOMBRES_MODELO = {'anomalias': 'anomalías', 'clinico': 'clínico'}   # en los mensajes de la web
 
 Lanzador = Callable[[list[str], dict[str, str], Callable[[str], None]], int]
 
 
 class FalloEjecucion(RuntimeError):
-    pass
+    """Un fallo que el programador ya explica en español (sin clave, sin servidor, ``maia`` terminó con error)."""
+
+
+# Fallos conocidos: lo que se busca en la salida y lo que se le dice a administración. El texto original queda en el
+# registro, bajo «Detalle técnico».
+_CONOCIDOS: tuple[tuple[str, str], ...] = (
+    (r'(AccessDenied|Access Denied|403 Forbidden).*(Bucket|bucket|S3|s3)|(CreateBucket|PutObject|GetObject).*AccessDenied',
+     'MinIO no le dio permiso al servicio para leer o escribir los archivos. Revise los usuarios de MinIO (minio-init) '
+     'o avise a quien administra el servidor.'),
+    (r'EndpointConnectionError|Could not connect to the endpoint URL',
+     'No se pudo conectar con MinIO, el almacén de archivos. Revise que el servicio esté encendido.'),
+    (r'(?i)mlflow.*(connection refused|max retries exceeded|connectionerror)|(connection refused|max retries exceeded).*:5000',
+     'No se pudo conectar con MLflow. Revise que el servicio esté encendido.'),
+    (r'(?i)password authentication failed',
+     'La base de la entidad rechazó el usuario o la clave. Revíselos en Administración › Configuración.'),
+    (r'(?i)could not translate host name|name or service not known|nodename nor servname',
+     'No se encontró el servidor de la base de la entidad. Revise el nombre en Administración › Configuración.'),
+    (r'(?i)connection refused|connection timed out|timeout expired|could not connect to server',
+     'No se pudo conectar con la base de datos: revise el servidor, el puerto y que la red lo permita.'),
+    (r'(?i)no hay cortes',
+     'Todavía no hay datos guardados de esta fuente. Marque «Traer datos nuevos» o ejecute primero una corrida.'),
+    (r'No hay modelos con alias produccion',
+     'Todavía no hay modelos aprobados: entrene y apruebe una versión de cada modelo en Administración › '
+     'Entrenamientos antes de la corrida.'),
+    (r'(?i)no space left on device', 'El servidor se quedó sin espacio en disco.'),
+    (r'(?i)cuda.*out of memory|out of memory.*cuda', 'La GPU se quedó sin memoria durante el entrenamiento.'),
+    (r'MemoryError|código -9\b|código 137\b', 'El servidor se quedó sin memoria durante la ejecución.'),
+)
+
+
+def explicar(ex: Exception, salida: str = '') -> str:
+    """El mensaje para la web: un fallo conocido en palabras claras; si no, qué paso falló y dónde ver el detalle."""
+    texto = f'{salida}\n{type(ex).__name__}: {ex}'
+    for patron, mensaje in _CONOCIDOS:
+        if re.search(patron, texto):
+            return mensaje
+    if isinstance(ex, FalloEjecucion):
+        if m := re.match(r'maia (\S+) terminó con código', str(ex)):
+            return (f'Falló el paso «maia {m[1]}». Abra «Ver detalle técnico» y compártalo con quien administra el '
+                    'servidor.')
+        return str(ex)[:1000]
+    return ('La ejecución se detuvo por un error inesperado. Abra «Ver detalle técnico» y compártalo con quien '
+            'administra el servidor.')
 
 
 def lanzar_maia(args: list[str], entorno: dict[str, str], al_linea: Callable[[str], None]) -> int:
@@ -58,9 +111,11 @@ class Programador:
     lanzar: Lanzador = lanzar_maia
     cfg: Configuracion = field(default_factory=obtener)
     intervalo: float = 30.0
+    diccionario: Path | None = None   # donde lo lee maia; por defecto MAIA_RAIZ/entradas/diccionario.xlsx
 
     def __post_init__(self) -> None:
         self.motor = self.motor or db.motor()
+        self.diccionario = Path(self.diccionario or CA.PROYECTO.diccionario)
 
     # ------------------------------------------------------------ ciclo
 
@@ -88,6 +143,7 @@ class Programador:
     def bucle(self, parar: threading.Event | None = None) -> None:
         parar = parar or threading.Event()
         n = self.arrancar()
+        self.sembrar_diccionario()
         print(f'Programador listo (cada {self.intervalo:g} s{f"; {n} interrumpidas cerradas" if n else ""}).', flush=True)
         while not parar.is_set():
             try:
@@ -113,16 +169,67 @@ class Programador:
                     EJ.anotar(s, e.id, lineas)
                     s.commit()
 
+        base = self._bajar_diccionario(al_linea) if e.tipo in USAN_DICCIONARIO else None
         try:
             atender = {'corrida': self._corrida, 'aprobacion': self._aprobacion, 'entrenamiento': self._entrenamiento}
             resultado = atender[e.tipo](e, al_linea)
             ok, mensaje = True, resultado.pop('mensaje', None)
         except Exception as ex:
-            ok, mensaje, resultado = False, f'{type(ex).__name__}: {ex}'[:1000], None
+            ok, mensaje, resultado = False, explicar(ex, '\n'.join(lineas[-80:])), None
+            lineas += ['', '--- Detalle técnico ---', f'{type(ex).__name__}: {ex}'[:2000]]
+            if not isinstance(ex, FalloEjecucion):
+                lineas += traceback.format_exc().splitlines()[-30:]
+        # aunque la ejecución falle después, las variables nuevas ya quedaron en el archivo: no se pierden
+        nuevas = self._borrador_diccionario(base, e.id, lineas.append) if base is not None else []
+        if ok and nuevas and resultado is not None:
+            resultado['variables_nuevas'] = nuevas
+            aviso = (f'La base trajo {len(nuevas)} variable{"s" if len(nuevas) != 1 else ""} nueva'
+                     f'{"s" if len(nuevas) != 1 else ""}: revísela{"s" if len(nuevas) != 1 else ""} en Diccionario.')
+            mensaje = f'{mensaje} {aviso}' if mensaje else aviso
         with Session(self.motor) as s:
             EJ.terminar(s, e.id, ok, mensaje, resultado, lineas)
             s.commit()
         print(f'Ejecución {e.id} {"terminada" if ok else "con error"}{": " + mensaje if mensaje else ""}', flush=True)
+
+    # ------------------------------------------------------------ el diccionario de variables
+
+    def sembrar_diccionario(self) -> bool:
+        """Si la base no tiene ninguna versión, la del núcleo queda vigente (reemplaza el antiguo ``cp -f``)."""
+        try:
+            with Session(self.motor) as s:
+                hecho = DIC.sembrar(s)
+                s.commit()
+        except Exception:   # sin la migración 0005 o sin archivo: se sigue con el diccionario que haya en disco
+            traceback.print_exc()
+            return False
+        if hecho:
+            print('Diccionario: se guardó el del núcleo como versión vigente.', flush=True)
+        return hecho
+
+    def _bajar_diccionario(self, al_linea: Callable[[str], None]) -> VersionDiccionario | None:
+        """La versión vigente al archivo que lee ``maia``. Sin versiones (o si falla), queda el archivo que haya."""
+        try:
+            with Session(self.motor, expire_on_commit=False) as s:
+                v = DIC.bajar_vigente(s, self.diccionario)
+        except Exception as ex:
+            al_linea(f'No se pudo bajar el diccionario vigente ({type(ex).__name__}); se usa el que haya en disco.')
+            return None
+        if v is not None:
+            al_linea(f'Diccionario de variables: versión {v.version}.')
+        return v
+
+    def _borrador_diccionario(self, base: VersionDiccionario, eid: int, anotar: Callable[[str], None]) -> list[str]:
+        """Si el archivo cambió durante la ejecución, un borrador con las variables nuevas. Nunca hace fallar."""
+        try:
+            with Session(self.motor, expire_on_commit=False) as s:
+                v, nuevas = DIC.guardar_de_corrida(s, base, self.diccionario, eid)
+                s.commit()
+        except Exception as ex:
+            anotar(f'No se pudo guardar el diccionario actualizado ({type(ex).__name__}: {ex})'[:500])
+            return []
+        if v is not None:
+            anotar(f'Diccionario: borrador versión {v.version} con {len(nuevas)} variable(s) nueva(s).')
+        return nuevas
 
     def _entorno(self, e: Ejecucion) -> dict[str, str]:
         env = {k: v for k, v in os.environ.items() if not k.startswith('KMC_')}
@@ -165,13 +272,20 @@ class Programador:
         if m := re.search(r'Registrado en MLflow: (\S+) v(\d+) · (\S+) v(\d+)', salida):
             r['modelos'] = {'anomalias': {'registro': m[1], 'version': m[2]},
                             'clinico': {'registro': m[3], 'version': m[4]}}
+        if m := re.search(r'Riesgos con los modelos produccion: anomalías v(\d+) · clínico v(\d+)', salida):
+            r['modelos_riesgos'] = {'anomalias': m[1], 'clinico': m[2]}
         if m := re.search(r'Corrida (\d+) terminada', salida):
             r['corrida'] = int(m[1])
         if m := re.search(r'Corte (\d{4}-\d{2}-\d{2}) \(id (\d+)\)', salida):
             r['corte'], r['corte_id'] = m[1], int(m[2])
+        aprobados = r.get('modelos_riesgos')
+        con = f'anomalías v{aprobados["anomalias"]} · clínico v{aprobados["clinico"]}' if aprobados else ''
         if 'modelos' in r:
-            r['mensaje'] = ('Modelos registrados como candidatos: apruébelos en Administración › Entrenamientos para '
-                            'usarlos en la solución.')
+            r['mensaje'] = ((f'Riesgos calculados con los modelos aprobados ({con}). ' if con else '') +
+                            'Los recién entrenados quedaron como candidatos: apruébelos en Administración › '
+                            'Entrenamientos para usarlos en la solución.')
+        elif con:
+            r['mensaje'] = f'Riesgos calculados con los modelos aprobados ({con}).'
         return r
 
     def _paso(self, eid: int, paso: str, hechos: list[str]) -> None:
@@ -217,7 +331,7 @@ class Programador:
             if fecha is None and (m := re.search(r'Corte (\d{4}-\d{2}-\d{2}) \(', salida)):
                 fecha = m[1]
             hechos.append(paso)
-        versiones = ' · '.join(f'{t} v{v["version"]}' for t, v in modelos.items())
+        versiones = ' · '.join(f'{NOMBRES_MODELO.get(t, t)} v{v["version"]}' for t, v in modelos.items())
         return {'paso': 'entrenado', 'hechos': hechos, 'modelos': modelos, 'corte': fecha,
                 'mensaje': f'Entrenado ({versiones}); quedó como candidato en MLflow. Apruébelo para usarlo.'}
 

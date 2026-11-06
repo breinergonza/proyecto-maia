@@ -196,7 +196,7 @@ def test_entrenamientos_de_mlflow(cliente, admin, monkeypatch):
     from maia_comun import mlflow_rest as ML
     Lector = ML.Lector
     monkeypatch.setattr(RE.ML, 'Lector',
-                        lambda uri: Lector(uri, cliente=httpx.Client(transport=httpx.MockTransport(_mlflow_falso))))
+                        lambda uri, *_: Lector(uri, cliente=httpx.Client(transport=httpx.MockTransport(_mlflow_falso))))
     r = cliente.get('/api/entrenamientos', headers=admin, params={'fuente': 'kmc'})
     assert r.status_code == 200, r.text
     e = r.json()['clinico'][0]
@@ -206,7 +206,7 @@ def test_entrenamientos_de_mlflow(cliente, admin, monkeypatch):
     assert e['etiquetas'] == {'fuente': 'kmc', 'mlflow.runName': 'clinico kmc', 'hiperparametros': '{"rondas": 500}'}
     assert e['enlace'] == 'http://localhost:5000/#/experiments/2/runs/run2'
     # MLflow caído
-    monkeypatch.setattr(RE.ML, 'Lector', lambda uri: Lector('http://127.0.0.1:9', timeout=0.5))
+    monkeypatch.setattr(RE.ML, 'Lector', lambda uri, *_: Lector('http://127.0.0.1:9', timeout=0.5))
     assert cliente.get('/api/entrenamientos', headers=admin).status_code == 503
 
 
@@ -265,3 +265,20 @@ def test_entrenar_ahora(cliente, admin, experto):
     assert [x['id'] for x in lista] == [e['id']]
     hp = {h['modelo']: h for h in cliente.get('/api/administracion/hiperparametros', headers=admin).json()}
     assert {c['nombre']: c['valor'] for c in hp['clinico']['campos']}['rondas'] == 800   # guardar=True
+
+
+def test_lector_mlflow_envia_credenciales_y_avisa_si_las_rechaza():
+    from maia_comun import mlflow_rest as ML
+
+    vistos = []
+
+    def _mlflow(req: httpx.Request) -> httpx.Response:
+        vistos.append(req.headers.get('authorization'))
+        return httpx.Response(401, text='Unauthorized')
+
+    lector = ML.Lector('http://mlflow:5000', 'admin', 'clave')
+    lector.h = httpx.Client(auth=lector.h.auth, transport=httpx.MockTransport(_mlflow))
+    with pytest.raises(ML.MlflowNoDisponible, match='credenciales'):
+        lector.experimento('maia-anomalias')
+    assert vistos == ['Basic YWRtaW46Y2xhdmU=']
+    assert ML.Lector('http://mlflow:5000').h.auth is None

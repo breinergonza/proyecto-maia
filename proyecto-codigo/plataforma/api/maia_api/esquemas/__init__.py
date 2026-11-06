@@ -8,6 +8,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from maia_comun.modelos_db import PERCENTIL_MUY_ALTO
+
 Rol = Literal['admin', 'experto', 'visualizador']
 Respuesta = Literal['si', 'no', 'no_se']
 _EMAIL = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
@@ -148,7 +150,8 @@ class PeticionInferencia(Base):
 class ConfigNotificacionEntrada(Base):
     desenlace: str
     nombre: str | None = None
-    percentil_minimo: float = Field(default=95, ge=0, le=100)
+    # posición entera de 0 a 100 (95 = el 5 % con más riesgo); 0,95 avisaría de casi todos los niños
+    percentil_minimo: int = Field(default=PERCENTIL_MUY_ALTO, ge=0, le=100)
     destinatarios: list[str] = Field(default_factory=list, max_length=50)
     activo: bool = False
 
@@ -226,6 +229,7 @@ class CampoHiperparametro(Base):
     minimo: float
     maximo: float
     ayuda: str
+    escala: Literal['por_mil'] | None = None        # 'por_mil': fracción que la web dice también por cada 1.000
     defecto: float | int | None
     valor: float | int | None                       # ajuste guardado; None = el del núcleo
 

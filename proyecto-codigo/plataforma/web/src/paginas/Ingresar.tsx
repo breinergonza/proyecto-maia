@@ -37,13 +37,15 @@ export default function Ingresar() {
   const [olvido, setOlvido] = useState(false)
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Datos>({ resolver: zodResolver(esquema) })
 
-  if (!cargando && usuario) return <Navigate to="/" replace />
+  // a la página que se pidió antes de ingresar (con sus filtros), o al tablero
+  const desde = (lugar.state as { desde?: string } | null)?.desde ?? '/'
+  if (!cargando && usuario) return <Navigate to={desde} replace />
 
   const enviar = async (d: Datos) => {
     setError(null)
     try {
       await ingresar(d.email, d.clave)
-      ir((lugar.state as { desde?: string } | null)?.desde ?? '/', { replace: true })
+      ir(desde, { replace: true })
     } catch (e) {
       setError(e instanceof ErrorApi ? e.message : 'No hubo respuesta de la API. Revise su conexión.')
     }
@@ -236,11 +238,12 @@ function Circuito() {
   )
 }
 
-/** Tarjeta de vidrio con una curva de crecimiento de ejemplo frente a la banda de la OMS (sin datos de nadie). */
+/** Tarjeta de vidrio con los controles de un niño de ejemplo frente al rango de la OMS y la caída que la plataforma
+ * avisa (sin datos de nadie). La plataforma no predice crecimiento: compara cada control con la OMS. */
 function Grafico() {
   const x = (v: number) => 34 + ((v - 20) / 80) * 390          // eje x: 20 a 100
   const y = (v: number) => 196 - (v / 100) * 170               // eje y: 0 a 100
-  const nino = [[20, 18], [30, 27], [40, 40], [50, 46], [60, 56], [70, 60], [80, 64], [90, 74]]
+  const nino = [[20, 18], [30, 27], [40, 40], [50, 46], [60, 56], [70, 47], [80, 54], [90, 62]]
   const alto = [[20, 14], [40, 26], [60, 38], [80, 50], [100, 62]]
   const bajo = [[20, 4], [40, 14], [60, 25], [80, 36], [100, 46]]
   const curva = (p: number[][]) => p.map(([a, b], i) => `${i ? 'L' : 'M'}${x(a)},${y(b)}`).join(' ')
@@ -276,12 +279,13 @@ function Grafico() {
         ) : (
           <circle key={i} cx={x(a)} cy={y(b)} r={4} fill="white" className="animate-aparecer" style={tras(0.4 + i * 0.25)} />
         ))}
-        <Etiqueta x={42} y={10} punto="#a8f0e2" texto="Percentil OMS" />
-        <Etiqueta x={262} y={10} punto="white" texto="Predicción de crecimiento IA" />
+        <Etiqueta x={42} y={10} punto="#a8f0e2" texto="Rango esperado (OMS)" />
+        <Etiqueta x={290} y={10} punto="white" texto="Controles del niño" />
         <g className="animate-aparecer" style={tras(2.4)}>
-          <rect x={ax + 14} y={ay + 6} width={104} height={22} rx={11} fill="#d9694c" fillOpacity="0.9" />
-          <circle cx={ax + 26} cy={ay + 17} r={3} fill="white" />
-          <text x={ax + 34} y={ay + 20.5} fontSize="10" fontWeight="600" fill="white">Riesgo moderado</text>
+          <path d={`M${ax - 40},62 L${ax - 6},${ay - 8}`} stroke="#ef8d6f" strokeWidth="1.2" strokeDasharray="3 3" />
+          <rect x={ax - 196} y={42} width={182} height={22} rx={11} fill="#d9694c" fillOpacity="0.9" />
+          <circle cx={ax - 184} cy={53} r={3} fill="white" />
+          <text x={ax - 176} y={56.5} fontSize="10" fontWeight="600" fill="white">Cayó desde el último control</text>
         </g>
       </svg>
     </div>

@@ -9,7 +9,7 @@ import type { Ejecucion, Entrenamiento, Entrenamientos } from '../api/tipos'
 import { EntrenarAhora } from '../components/EntrenarAhora'
 import { Aviso, Boton, Cargando, Encabezado, Insignia, Panel, Selector, Tabla, Vacio } from '../components/ui'
 import { cn } from '../lib/cn'
-import { dec2, fechaHora, FUENTES, MODELOS } from '../lib/formato'
+import { dec2, fechaHora, FUENTES, MODELOS, parametro } from '../lib/formato'
 
 type Tipo = 'anomalias' | 'clinico'
 type Fuente = 'kmc' | 'simulado'
@@ -107,13 +107,13 @@ function TablaModelo({ tipo, lista, comparar, alternar, aprobar, elegir }: {
   return (
     <Panel titulo={MODELOS[tipo]}>
       {lista.length === 0 ? <Vacio titulo="Sin entrenamientos registrados">Programe una corrida o ejecute una ahora en Programación.</Vacio> : (
-        <Tabla densa>
+        <Tabla densa apilar>
           <thead>
             <tr>
               <th><span className="sr-only">Comparar</span></th><th>Fecha</th><th>Corte</th><th>Versión</th>
               {HP_VISIBLES.map((h) => <th key={h} className="text-right">{h}</th>)}
               {nombres.map((n) => <th key={n} className="text-right">{n}</th>)}
-              <th>Aprobar</th><th><span className="sr-only">Acciones</span></th>
+              <th>Aprobar</th><th data-acciones><span className="sr-only">Acciones</span></th>
             </tr>
           </thead>
           <tbody>
@@ -129,7 +129,7 @@ function TablaModelo({ tipo, lista, comparar, alternar, aprobar, elegir }: {
                     {e.modelo?.alias?.map((a) => <Insignia key={a} tono={a === 'produccion' ? 'teal' : 'ocre'} className="ml-1">{a}</Insignia>)}
                     {e.etiquetas?.hiperparametros && e.etiquetas.hiperparametros !== 'nucleo' && <Insignia className="ml-1">ajustado</Insignia>}
                   </td>
-                  {HP_VISIBLES.map((h) => <td key={h} className="text-right tabular-nums">{e.hiperparametros?.[h] ?? '—'}</td>)}
+                  {HP_VISIBLES.map((h) => <td key={h} className="text-right tabular-nums">{parametro(e.hiperparametros?.[h])}</td>)}
                   {principales(tipo, e.metricas ?? {}).map(([n, v]) => <td key={n} className="text-right tabular-nums">{dec2(v)}</td>)}
                   <td>{e.modelo ? <input type="radio" name={`aprobar-${tipo}`} className="size-4 accent-teal" aria-label={`Aprobar ${etiquetaVersion(e)}`}
                     checked={aprobar === e.modelo.version} onChange={() => elegir(e.modelo!.version)} /> : '—'}</td>
@@ -151,7 +151,9 @@ function TablaModelo({ tipo, lista, comparar, alternar, aprobar, elegir }: {
   )
 }
 
-function Pares({ titulo, datos, formato }: { titulo: string; datos?: Record<string, string | number>; formato?: (v: number) => string }) {
+function Pares({ titulo, datos, formato, texto = String }: {
+  titulo: string; datos?: Record<string, string | number>; formato?: (v: number) => string; texto?: (v: string | number) => string
+}) {
   const filas = Object.entries(datos ?? {}).sort(([a], [b]) => a.localeCompare(b))
   if (!filas.length) return null
   return (
@@ -159,7 +161,7 @@ function Pares({ titulo, datos, formato }: { titulo: string; datos?: Record<stri
       <p className="mb-1 text-sm font-semibold">{titulo}</p>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 text-sm">
         {filas.map(([k, v]) => (
-          <Fragment key={k}><dt className="text-salvia">{k}</dt><dd className="tabular-nums">{typeof v === 'number' && formato ? formato(v) : String(v)}</dd></Fragment>
+          <Fragment key={k}><dt className="text-salvia">{k}</dt><dd className="tabular-nums">{typeof v === 'number' && formato ? formato(v) : texto(v)}</dd></Fragment>
         ))}
       </dl>
     </div>
@@ -168,8 +170,8 @@ function Pares({ titulo, datos, formato }: { titulo: string; datos?: Record<stri
 
 function Detalle({ e }: { e: Entrenamiento }) {
   return (
-    <div className="grid gap-4 py-2 md:grid-cols-3">
-      <Pares titulo="Hiperparámetros" datos={e.hiperparametros} />
+    <div className="grid grid-cols-1 gap-4 py-2 md:grid-cols-3">
+      <Pares titulo="Hiperparámetros" datos={e.hiperparametros} texto={parametro} />
       <Pares titulo="Métricas de validación" datos={e.metricas} formato={(v) => dec2(v)} />
       <div className="flex flex-col gap-4">
         <Pares titulo="Extracción" datos={e.extraccion} />
@@ -185,7 +187,7 @@ function Comparacion({ lista }: { lista: Entrenamiento[] }) {
   const filas = useMemo(() => {
     const claves = (f: (e: Entrenamiento) => Record<string, unknown> | undefined) => [...new Set(lista.flatMap((e) => Object.keys(f(e) ?? {})))].sort()
     return [
-      ...claves((e) => e.hiperparametros).map((k) => ({ grupo: 'Hiperparámetro', clave: k, valores: lista.map((e) => e.hiperparametros?.[k] ?? '—') })),
+      ...claves((e) => e.hiperparametros).map((k) => ({ grupo: 'Hiperparámetro', clave: k, valores: lista.map((e) => parametro(e.hiperparametros?.[k])) })),
       ...claves((e) => e.metricas).map((k) => ({ grupo: 'Métrica', clave: k, valores: lista.map((e) => dec2(e.metricas?.[k])) })),
     ]
   }, [lista])

@@ -22,6 +22,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     MetaData,
     PrimaryKeyConstraint,
     Text,
@@ -172,12 +173,19 @@ class Paquete(Base):
     subido_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+# «Riesgo alto»: estar en el 10 % de mayor riesgo de su desenlace (percentil dentro de la corrida), no un umbral clínico.
+# La web tiene los mismos valores (RIESGO_ALTO, RIESGO_MUY_ALTO); pruebas/test_umbrales.py los mantiene iguales.
+PERCENTIL_ALTO = 90
+# «Riesgo muy alto»: el 5 % de mayor riesgo; es también el mínimo con que parten los avisos por correo.
+PERCENTIL_MUY_ALTO = 95
+
+
 class ConfigNotificacion(Base):
     __tablename__ = 'config_notificaciones'
     __table_args__ = {'schema': 'app'}
     desenlace: Mapped[str] = mapped_column(Text, primary_key=True)   # clave del desenlace
     nombre: Mapped[str | None] = mapped_column(Text)
-    percentil_minimo: Mapped[float] = mapped_column(Float, server_default=text('95'))
+    percentil_minimo: Mapped[float] = mapped_column(Float, server_default=text(str(PERCENTIL_MUY_ALTO)))
     destinatarios: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default=text("'{}'"))
     activo: Mapped[bool] = mapped_column(Boolean, server_default=text('false'))
 
@@ -258,6 +266,26 @@ class Hiperparametro(Base):
     valores: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'"))
     actualizado_por: Mapped[uuid.UUID | None] = mapped_column(ForeignKey('app.usuarios.id', ondelete='SET NULL'))
     actualizado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ---- diccionario de variables con versiones (0005): el Excel de los expertos, guardado aquí y no en MinIO
+
+class VersionDiccionario(Base):
+    __tablename__ = 'diccionarios'
+    __table_args__ = (CheckConstraint("estado IN ('vigente','borrador','archivado')", name='estado'),
+                      CheckConstraint("origen IN ('subido','corrida','semilla')", name='origen'),
+                      Index('ix_diccionarios_un_vigente', 'estado', unique=True,
+                            postgresql_where=text("estado = 'vigente'")),
+                      {'schema': 'app'})
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    version: Mapped[int] = mapped_column(Integer, unique=True)
+    archivo: Mapped[bytes] = mapped_column(LargeBinary)          # el .xlsx tal cual (pesa poco)
+    sha256: Mapped[str] = mapped_column(Text)
+    estado: Mapped[str] = mapped_column(Text, server_default=text("'borrador'"))
+    origen: Mapped[str] = mapped_column(Text)
+    nota: Mapped[str | None] = mapped_column(Text)
+    creado_por: Mapped[uuid.UUID | None] = mapped_column(ForeignKey('app.usuarios.id', ondelete='SET NULL'))
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 # ============================================================ esquema resultados

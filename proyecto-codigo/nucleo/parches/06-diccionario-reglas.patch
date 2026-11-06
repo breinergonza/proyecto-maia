@@ -1,0 +1,18 @@
+diff --git a/sevarti/diccionario.py b/sevarti/diccionario.py
+index fd4046a..8aa158d 100644
+--- a/sevarti/diccionario.py
++++ b/sevarti/diccionario.py
+@@ -284,6 +284,13 @@ class Diccionario:
+         self.visitas['orden'] = pd.to_numeric(self.visitas.orden).astype('int64')
+ 
+ 
++def reglas(hoja: str) -> dict[str, tuple[str, ...]]:
++    """What reading a sheet checks besides its closed answers (those are each column's ``opciones``):
++    the columns it requires, and those that must be numbers or dates. For forms that fill the
++    dictionary outside Excel. A variable marked "Lista" also needs its "Rol"."""
++    return {'obligatorias': _OBLIGATORIAS[hoja], 'numeros': _NUMEROS.get(hoja, ()), 'fechas': _FECHAS.get(hoja, ())}
++
++
+ def mostrado(hoja: str, clave: str, valor: str) -> str:
+     """How the Excel shows an internal value of a closed column, to name it in a message."""
+     return _CERRADAS[hoja][clave].get(valor, valor)

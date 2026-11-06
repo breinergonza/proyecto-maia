@@ -211,6 +211,44 @@ def test_cada_error_dice_la_hoja_la_fila_y_el_valor(archivo, hoja, clave, cambio
     assert f'hoja "{hoja}"' in texto and f'fila {fila}' in texto and valor in texto
 
 
+# a number on the wrong scale is read as a number but means something else: each is rejected, naming its column
+@pytest.mark.parametrize('hoja, clave, cambio, columna, pista', [
+    ('Desenlaces', 'desarrollo_6m', {'Porcentaje_más_bajo': 0.05}, 'Porcentaje más bajo', 'como porcentaje'),
+    ('Desenlaces', 'desarrollo_6m', {'Porcentaje_más_bajo': 0}, 'Porcentaje más bajo', 'entre 1 y 50'),
+    ('Desenlaces', 'desarrollo_6m', {'Porcentaje_más_bajo': 60}, 'Porcentaje más bajo', 'entre 1 y 50'),
+    ('Crecimiento', 'Peso para la edad', {'Bajo_si_z_menor_que': 2}, 'Bajo si z menor que', 'negativo'),
+    ('Crecimiento', 'Peso para la edad', {'Caída_que_alerta': -1}, 'Caída que alerta', 'positiv'),
+    ('Crecimiento', 'Peso para la edad', {'Dato_improbable_si_z_menor_que': 6}, 'Dato improbable si z menor que',
+     'negativo'),
+    ('Crecimiento', 'Peso para la edad', {'Dato_improbable_si_z_mayor_que': -6}, 'Dato improbable si z mayor que',
+     'positivo'),
+    ('Visitas', '3 m EC', {'Edad_desde_(días)': 135, 'Edad_hasta_(días)': 45}, 'Edad desde (días)', 'Edad hasta'),
+    ('Variables', 'v261', {'Cuánto_puede_bajar': -5}, 'Cuánto puede bajar', 'no puede ser negativ'),
+])
+def test_un_numero_en_otra_escala_se_rechaza_con_su_columna(archivo, hoja, clave, cambio, columna, pista):
+    fila = _editar(archivo, hoja, clave, **cambio)
+    with pytest.raises(ValueError) as error:
+        D.leer(archivo)
+    texto = str(error.value)
+    assert f'hoja "{hoja}", fila {fila}: {columna}' in texto and pista in texto
+
+
+def test_los_limites_de_cada_escala_valen_y_lo_vacio_usa_el_defecto(archivo):
+    _editar(archivo, 'Desenlaces', 'desarrollo_6m', Porcentaje_más_bajo=1)
+    _editar(archivo, 'Desenlaces', 'desarrollo_12m', Porcentaje_más_bajo=50)
+    _editar(archivo, 'Crecimiento', 'Peso para la edad', Bajo_si_z_menor_que=-1.5, Caída_que_alerta=0.5,
+            Dato_improbable_si_z_menor_que=-5, Dato_improbable_si_z_mayor_que=5)
+    _editar(archivo, 'Visitas', '3 m EC', **{'Edad_desde_(días)': 90, 'Edad_hasta_(días)': 90})
+    _editar(archivo, 'Variables', 'v261', Cuánto_puede_bajar=0)
+    dic = D.leer(archivo)
+    assert dic.desenlaces.set_index('clave').percentil[['desarrollo_6m', 'desarrollo_12m']].tolist() == [1, 50]
+    assert dic.crecimiento.set_index('indicador').loc['talla', ['z_bajo', 'caida']].isna().all()
+
+
+def test_el_diccionario_de_origen_se_lee_sin_errores():
+    assert len(D.leer(CARPETA.parent / 'entradas' / 'diccionario.xlsx').desenlaces)
+
+
 @pytest.mark.parametrize('que_falta', ['Estado', 'Tipo', 'Rol', 'Variable'])
 def test_una_celda_obligatoria_vacia_se_nombra(archivo, que_falta):
     wb = load_workbook(archivo)

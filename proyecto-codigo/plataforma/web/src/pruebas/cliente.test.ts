@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ErrorApi, conParams, fijarAcceso, pedir } from '../api/cliente'
+import { ErrorApi, conParams, fijarAcceso, pedir, pedirArchivo } from '../api/cliente'
 import { simularApi, usuario } from './util'
 
 afterEach(() => {
@@ -39,5 +39,15 @@ describe('cliente de la API', () => {
     expect(e).toBeInstanceOf(ErrorApi)
     expect(e.estado).toBe(422)
     expect(e.message).toBe('clave: muy corta')
+  })
+
+  it('sin conexión explica el problema en español, no «Failed to fetch»', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch') }))
+    for (const llamada of [() => pedir('/tablero/resumen'), () => pedirArchivo('/diccionario/vigente/archivo')]) {
+      const e = await llamada().catch((x: unknown) => x)
+      expect(e).toBeInstanceOf(ErrorApi)
+      expect((e as ErrorApi).estado).toBe(0)
+      expect((e as ErrorApi).message).toBe('No se pudo conectar con el servidor. Revise su conexión e intente de nuevo.')
+    }
   })
 })

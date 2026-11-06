@@ -26,6 +26,7 @@ class Campo:
     minimo: float
     maximo: float
     ayuda: str
+    escala: str | None = None   # 'por_mil': una fracción que la web dice también «N por cada 1.000»
 
 
 _LGBM = (
@@ -38,7 +39,8 @@ _LGBM = (
 CAMPOS: dict[str, tuple[Campo, ...]] = {
     'anomalias': _LGBM + (
         Campo('z_alerta', 'Desvío robusto que alerta (capas 1 y 3)', float, 2.0, 10.0, 'z robusto desde el que un dato se revisa.'),
-        Campo('alpha', 'Meta de falsas alertas por dato (capa 2)', float, 0.0005, 0.05, '0,005 = 5 por cada 1.000 datos.'),
+        Campo('alpha', 'Meta de falsas alertas por dato (capa 2)', float, 0.0005, 0.05,
+              'Fracción de los datos sanos que la capa 2 puede marcar.', escala='por_mil'),
         Campo('min_sujetos', 'Niños mínimos para modelar una variable', int, 50, 5000, 'Con menos, la capa 2 no la modela.'),
     ),
     'clinico': _LGBM + (
@@ -74,7 +76,13 @@ def validar(tipo: str, valores: dict[str, Any]) -> dict[str, Any]:
         if not c.minimo <= n <= c.maximo:
             raise ValueError(f'{c.etiqueta}: debe estar entre {c.minimo:g} y {c.maximo:g}')
         salida[k] = n
-    return salida
+    return ajustes(tipo, salida)
+
+
+def ajustes(tipo: str, valores: dict[str, Any]) -> dict[str, Any]:
+    """Solo los valores que cambian algo: uno igual al del núcleo es lo mismo que dejarlo vacío."""
+    defecto = por_defecto(tipo)
+    return {k: v for k, v in valores.items() if k not in defecto or v != defecto[k]}
 
 
 def guardados(s: Session, tipo: str) -> dict[str, Any]:
@@ -94,7 +102,7 @@ def leer_y_aplicar(cfg, tipo: str, motor=None) -> tuple[Any, dict[str, Any]]:
     from maia_comun import db
     try:
         with Session(motor or db.motor()) as s:
-            valores = validar(tipo, guardados(s, tipo))
+            valores = validar(tipo, guardados(s, tipo))   # sin los iguales al núcleo
     except SQLAlchemyError as e:
         print(f'Sin ajustes de hiperparámetros ({type(e).__name__}); se usan los del núcleo.', flush=True)
         valores = {}

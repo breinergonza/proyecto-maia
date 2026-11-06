@@ -3,7 +3,8 @@ import { useState } from 'react'
 import { pedir } from '../api/cliente'
 import type { ConfigNotificacionSalida, Notificacion, Pagina } from '../api/tipos'
 import { Aviso, Boton, Campo, Cargando, Encabezado, Entrada, Insignia, Paginador, Panel, Tabla, Texto, Vacio } from '../components/ui'
-import { fechaHora, posicion } from '../lib/formato'
+import { fechaHora } from '../lib/formato'
+import { ayudaMinimo, ayudaPosicion, nivelCorto } from '../lib/lenguaje'
 
 const CORREO = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 
@@ -12,16 +13,17 @@ export default function AdminNotificaciones() {
   return (
     <>
       <Encabezado titulo="Notificaciones">
-        Después de cada corrida que no es en silencio, se envía un correo por desenlace activo con los niños cuya posición de
-        riesgo es igual o mayor que la mínima. El correo lleva solo el código del niño, el desenlace, la posición y un
-        enlace; nunca valores clínicos. A cada destinatario se le avisa una sola vez por niño y corrida.
+        Después de cada actualización de resultados que no es en silencio, se envía un correo por desenlace activo con los
+        niños cuyo riesgo llega al mínimo. El correo lleva solo el código del niño, el desenlace, cuántos niños tienen
+        menos riesgo que él y un enlace; nunca valores clínicos. A cada destinatario se le avisa una sola vez por niño y
+        actualización.
       </Encabezado>
       {configs.isPending ? <Cargando /> : configs.error ? <Aviso>{configs.error.message}</Aviso> : configs.data.length === 0 ? (
         <Vacio titulo="No hay desenlaces para configurar">Se crean al activar un paquete de modelos.</Vacio>
       ) : (
-        <div className="grid gap-4 xl:grid-cols-2">{configs.data.map((c) => <Config key={c.desenlace} c={c} />)}</div>
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">{configs.data.map((c) => <Config key={c.desenlace} c={c} />)}</div>
       )}
-      <div className="mt-4 grid items-start gap-4 xl:grid-cols-[22rem_1fr]">
+      <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[22rem_minmax(0,1fr)]">
         <Prueba />
         <Historial />
       </div>
@@ -53,8 +55,8 @@ function Config({ c }: { c: ConfigNotificacionSalida }) {
           Enviar avisos
         </label>
       }>
-      <form className="grid items-start gap-3 sm:grid-cols-[9rem_1fr]" onSubmit={(e) => { e.preventDefault(); guardar.mutate() }}>
-        <Campo id={`${id}-min`} etiqueta="Posición mínima" error={errorMinimo} ayuda="95: el 5 % con más riesgo.">
+      <form className="grid grid-cols-1 items-start gap-3 sm:grid-cols-[9rem_minmax(0,1fr)]" onSubmit={(e) => { e.preventDefault(); guardar.mutate() }}>
+        <Campo id={`${id}-min`} etiqueta="Riesgo mínimo" error={errorMinimo} ayuda={errorMinimo || !minimo.trim() ? undefined : ayudaMinimo(n)}>
           <Entrada id={`${id}-min`} type="number" min={0} max={100} step={1} value={minimo}
             aria-invalid={!!errorMinimo} onChange={(e) => setMinimo(e.target.value)} />
         </Campo>
@@ -104,15 +106,15 @@ function Historial() {
         <p className="text-salvia">Todavía no se ha enviado ningún aviso.</p>
       ) : (
         <>
-          <Tabla>
-            <thead><tr><th>Fecha</th><th>Destinatario</th><th>Niño</th><th>Desenlace</th><th className="text-right">Posición</th><th>Estado</th></tr></thead>
+          <Tabla apilar>
+            <thead><tr><th>Fecha</th><th>Destinatario</th><th>Niño</th><th>Desenlace</th><th>Riesgo</th><th>Estado</th></tr></thead>
             <tbody>{q.data.items.map((n) => (
               <tr key={n.id}>
                 <td className="whitespace-nowrap">{fechaHora(n.enviado_en)}</td>
                 <td>{n.destinatario}</td>
                 <td>{n.sujeto}</td>
                 <td>{n.desenlace}</td>
-                <td className="text-right">{posicion(n.percentil)}</td>
+                <td title={ayudaPosicion(n.percentil)}>{nivelCorto(n.percentil)}</td>
                 <td>{n.estado === 'enviado' ? <Insignia tono="teal">Enviado</Insignia> : <Insignia tono="coral">Error</Insignia>}{n.error && <p className="text-xs text-coral-hondo">{n.error}</p>}</td>
               </tr>
             ))}</tbody>
