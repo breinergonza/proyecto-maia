@@ -7,13 +7,15 @@ import { ChevronDown } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { ErrorApi, pedir } from '../api/cliente'
-import type { CampoFormulario, FormularioCalculo, PeticionInferencia, ResultadoInferencia, VisitaFormulario } from '../api/tipos'
+import type { CampoFormulario, FormularioCalculo, PeticionInferencia, PuntoCrecimiento, ResultadoInferencia, VisitaFormulario } from '../api/tipos'
 import { puede, useSesion } from '../auth/sesion'
 import { Aviso, Boton, Cargando, Encabezado, Entrada, Insignia, Panel, Selector, Tabla, Texto, Vacio } from '../components/ui'
 import { cn } from '../lib/cn'
 import { usePaqueteActivo } from '../lib/consultas'
-import { aproximado, dec, edad, indicador, riesgo, RIESGO_ALTO } from '../lib/formato'
-import { alerta, AYUDA_OMS, ayudaAlerta, ayudaPosicion, ayudaZ, CAYO, cuantosMenos, frenteOms, motivo, nivelAlto, peso } from '../lib/lenguaje'
+import { CrecimientoOms, TarjetaRiesgo } from '../components/ficha'
+import { RangoEsperado } from '../components/graficos'
+import { aproximado, dec, edad, indicador, medida } from '../lib/formato'
+import { alerta, AYUDA_DOS_CIFRAS, AYUDA_OMS, ayudaAlerta, ayudaZ, CAYO, frenteOms, motivoExtra } from '../lib/lenguaje'
 
 const SUJETO = 'calculo'
 const DIA = 86_400_000
@@ -364,84 +366,89 @@ function ModoAvanzado({ calcular, pendiente }: { calcular: (p: unknown) => void;
   )
 }
 
+/** Las medidas de crecimiento de un niño agrupadas por indicador y en orden de edad, como las trae la ficha. */
+function porIndicador(crecimiento: ResultadoInferencia['crecimiento']): Record<string, PuntoCrecimiento[]> {
+  const series: Record<string, PuntoCrecimiento[]> = {}
+  for (const c of crecimiento) (series[c.indicador] ??= []).push(c)
+  for (const ps of Object.values(series)) ps.sort((a, b) => (a.edad_corregida ?? 0) - (b.edad_corregida ?? 0))
+  return series
+}
+
 function Resultado({ r, varios }: { r: ResultadoInferencia; varios: boolean }) {
   const quien = (s: string) => (varios ? <span className="font-normal text-salvia"> · {s}</span> : null)
+  // con un solo niño, el crecimiento se dibuja como en su ficha; con varios, una tabla deja comparar
+  const grafica = !varios && r.crecimiento.some((c) => c.z != null && c.edad_corregida != null && !c.improbable)
   return (
     <>
       {r.variables_ignoradas.length > 0 && (
         <Aviso tono="teal">No se usaron estos datos porque el modelo no los conoce: {r.variables_ignoradas.join(', ')}.</Aviso>
       )}
-      <Panel titulo="Riesgo">
-        {r.riesgos.length === 0 ? (
+      {r.riesgos.length === 0 ? (
+        <Panel titulo="Riesgo">
           <p className="text-sm text-salvia">
             No se calculó ningún riesgo. El riesgo se calcula en la <strong>última visita con datos</strong>: para verlo, esa
             visita debe ser una de las que dicen «Aquí se calcula» (deje vacías las posteriores).
           </p>
-        ) : (
-          <ul className="space-y-3">
-            {r.riesgos.map((x) => (
-              <li key={`${x.sujeto}-${x.clave}`} className={cn('rounded-control border p-3',
-                x.percentil >= RIESGO_ALTO ? 'border-coral/50 shadow-[inset_4px_0_0_var(--color-coral)]' : 'border-linea')}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-semibold">{x.desenlace}{quien(x.sujeto)}</p>
-                    <p className="text-sm">Riesgo estimado: <strong>{riesgo(x.riesgo)}</strong></p>
-                  </div>
-                  <div className="shrink-0 text-right" title={ayudaPosicion(x.percentil)}>
-                    {nivelAlto(x.percentil) && <Insignia tono="coral" className="mb-1">{nivelAlto(x.percentil)}</Insignia>}
-                    <p className={cn('text-xl font-bold leading-none', x.percentil >= RIESGO_ALTO ? 'text-coral-hondo' : 'text-teal')}>
-                      {cuantosMenos(x.percentil)} de 10
-                    </p>
-                    <p className="text-xs text-salvia">niños tienen menos riesgo</p>
-                  </div>
-                </div>
-                {x.motivos.length > 0 && (
-                  <>
-                    <p className="mt-2 text-sm font-semibold">Lo que más pesó</p>
-                    <ul className="mt-0.5 list-disc space-y-0.5 pl-5 text-sm">{x.motivos.map((m) => <li key={m} title={m}>{peso(m)}</li>)}</ul>
-                  </>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Panel>
+        </Panel>
+      ) : (
+        <section aria-label="Riesgo calculado" className="space-y-3">
+          <p className="text-sm">{AYUDA_DOS_CIFRAS}</p>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {r.riesgos.map((x) => <TarjetaRiesgo key={`${x.sujeto}-${x.clave}`} r={x} nota={varios ? `Niño ${x.sujeto}` : undefined} />)}
+          </div>
+        </section>
+      )}
       <Panel titulo="Datos que parecen raros">
         {r.alertas_dato.length === 0 ? <p className="text-sm text-salvia">Ningún dato quedó marcado.</p> : (
           <ul className="divide-y divide-linea/70 text-sm">
-            {r.alertas_dato.map((a, i) => (
-              <li key={i} className="py-2 first:pt-0">
-                <p>
-                  <span className="font-semibold">{a.etiqueta ?? a.variable}</span>{quien(a.sujeto)}:{' '}
-                  <span className="font-semibold text-coral-hondo">{a.valor}</span>
-                  {a.rango_bajo != null && <span className="text-salvia"> · esperado {aproximado(a.rango_bajo)} a {aproximado(a.rango_alto)}</span>}
-                </p>
-                {a.motivo && <p className="text-salvia">{motivo(a.motivo)}.</p>}
-                <p className="mt-1 flex flex-wrap gap-1">
-                  {a.capas.map((c) => <span key={c} title={ayudaAlerta(c)}><Insignia>{alerta(c)}</Insignia></span>)}
-                </p>
-              </li>
-            ))}
+            {r.alertas_dato.map((a, i) => {
+              const nombre = a.etiqueta ?? a.variable
+              const valor = Number(a.valor)
+              const extra = motivoExtra(a.motivo)
+              return (
+                <li key={i} className="py-3 first:pt-0 last:pb-0">
+                  <p>
+                    <span className="font-semibold">{nombre}</span>{quien(a.sujeto)}:{' '}
+                    <span className="font-semibold text-coral-hondo">{medida(a.valor)}</span>
+                    {a.rango_bajo != null && a.rango_alto != null && (
+                      <span> · se esperaba entre {aproximado(a.rango_bajo)} y {aproximado(a.rango_alto)}</span>
+                    )}
+                  </p>
+                  {extra && <p>{extra}.</p>}
+                  {a.rango_bajo != null && a.rango_alto != null && Number.isFinite(valor) && (
+                    <div className="mt-1 max-w-md">
+                      <RangoEsperado bajo={a.rango_bajo} alto={a.rango_alto} esperado={a.esperado} valor={valor}
+                        etiqueta={`${nombre}: ${medida(a.valor)}; se esperaba entre ${aproximado(a.rango_bajo)} y ${aproximado(a.rango_alto)}`} />
+                    </div>
+                  )}
+                  <p className="mt-1 flex flex-wrap gap-1">
+                    {a.capas.map((c) => <span key={c} title={ayudaAlerta(c)}><Insignia>{alerta(c)}</Insignia></span>)}
+                  </p>
+                </li>
+              )
+            })}
           </ul>
         )}
       </Panel>
-      <Panel titulo="Crecimiento frente a la OMS" accion={<span className="text-xs text-salvia" title={AYUDA_OMS}>para la edad corregida</span>}>
-        {r.crecimiento.length === 0 ? <p className="text-sm text-salvia">Sin medidas de crecimiento.</p> : (
-          <Tabla densa>
-            <thead><tr><th>Medida</th><th className="text-right">Edad corregida</th><th>Frente a la OMS</th></tr></thead>
-            <tbody>{r.crecimiento.map((c, i) => (
-              <tr key={i}>
-                <td>{indicador(c.indicador)}{quien(c.sujeto)}</td>
-                <td className="text-right whitespace-nowrap">{edad(c.edad_corregida)}</td>
-                <td>
-                  <span title={ayudaZ(c.z)} className={cn('mr-1', (c.z ?? 0) < -2 && 'font-semibold text-[#7a5717]')}>{frenteOms(c.z)}</span>
-                  {c.caida_1de && <Insignia>{CAYO}</Insignia>} {c.improbable && <Insignia tono="coral">Dato improbable: revisar</Insignia>}
-                </td>
-              </tr>
-            ))}</tbody>
-          </Tabla>
-        )}
-      </Panel>
+      {grafica ? <CrecimientoOms crecimiento={porIndicador(r.crecimiento)} /> : (
+        <Panel titulo="Crecimiento frente a la OMS" accion={<span className="text-xs text-salvia" title={AYUDA_OMS}>para la edad corregida</span>}>
+          {r.crecimiento.length === 0 ? <p className="text-sm text-salvia">Sin medidas de crecimiento.</p> : (
+            <Tabla densa>
+              <thead><tr><th>Medida</th><th className="text-right">Edad corregida</th><th>Frente a la OMS</th></tr></thead>
+              <tbody>{r.crecimiento.map((c, i) => (
+                <tr key={i}>
+                  <td>{indicador(c.indicador)}{quien(c.sujeto)}</td>
+                  <td className="text-right whitespace-nowrap">{edad(c.edad_corregida)}</td>
+                  <td>
+                    <span title={ayudaZ(c.z)} className={cn('mr-1', (c.z ?? 0) < -2 && 'font-semibold text-[#7a5717]')}>{frenteOms(c.z)}</span>
+                    {c.caida_1de && <Insignia>{CAYO}</Insignia>} {c.improbable && <Insignia tono="coral">Dato improbable: revisar</Insignia>}
+                  </td>
+                </tr>
+              ))}</tbody>
+            </Tabla>
+          )}
+        </Panel>
+      )}
     </>
   )
 }

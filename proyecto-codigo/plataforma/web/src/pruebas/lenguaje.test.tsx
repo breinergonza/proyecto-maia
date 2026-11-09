@@ -121,7 +121,12 @@ const perfil = { variables: [
   { variable: 'peso_nacer', etiqueta: 'Peso al nacer', unidad: 'g', ninos: 790, cuantiles: { p5: 900, p25: 1300, p50: 1700, p75: 2000, p95: 2400 }, valor: null, posicion: null },
 ] }
 const fila = { sujeto: 's1', eg_semanas: 31, grupo: null, percentil_max: 93, riesgo_max: 0.41, desenlace_max: 'readmisión a los 6 meses',
-  clave_max: 'readm', n_riesgos: 2, n_alertas: 1, n_bajo_2de: 2, n_caida_1de: 1 }
+  clave_max: 'readm', n_riesgos: 2, n_alertas: 1, n_bajo_2de: 2, n_caida_1de: 1, n_crecimiento: 6,
+  ultima_visita: '3 meses (edad corregida)', ultima_fecha: '2026-03-01', ultima_edad_corregida: 91 }
+// crece bien (tiene medidas, ninguna baja) y sin ninguna medida de crecimiento: no es lo mismo
+const sinProblema = { ...fila, sujeto: 's2', percentil_max: 40, n_bajo_2de: 0, n_caida_1de: 0, n_crecimiento: 4 }
+const sinDato = { ...fila, sujeto: 's3', percentil_max: 20, n_bajo_2de: 0, n_caida_1de: 0, n_crecimiento: 0, ultima_visita: null,
+  ultima_fecha: null, ultima_edad_corregida: null }
 const notificaciones = [{ desenlace: 'readm', nombre: 'readmisión a los 3 meses', percentil_minimo: 95, destinatarios: ['a@maia.prueba'], activo: true }]
 const aviso = { id: 1, destinatario: 'a@maia.prueba', estado: 'enviado', error: null, enviado_en: '2026-07-01T10:00:00Z', sujeto: 's1',
   desenlace: 'readmisión a los 3 meses', percentil: 93, corrida_id: 3 }
@@ -134,7 +139,7 @@ function api(rol: 'admin' | 'experto' = 'experto') {
     if (url.startsWith('/api/notificaciones/historial')) return { cuerpo: { total: 1, pagina: 1, tamano: 20, items: [aviso] } }
     if (url === '/api/tablero/resumen') return { cuerpo: resumen }
     if (url === '/api/tablero/alarmas-grupo') return { cuerpo: [{ grupo: null, periodo: '2026Q1', variable: 'peso_3m', etiqueta: 'Peso a los 3 meses', senal: 'cusum', valor: 1, referencia: 0, estadistico: 9, que_paso: 'subió de golpe en todo el programa' }] }
-    if (url.startsWith('/api/ninos?')) return { cuerpo: { total: 1, pagina: 1, tamano: 25, items: [fila] } }
+    if (url.startsWith('/api/ninos?')) return { cuerpo: { total: 3, pagina: 1, tamano: 25, items: [fila, sinProblema, sinDato] } }
     if (url === '/api/ninos/s1/linea-temporal') return { cuerpo: linea }
     if (url === '/api/ninos/s1/historia-riesgo') return { cuerpo: historia }
     if (url === '/api/ninos/s1/perfil') return { cuerpo: perfil }
@@ -174,6 +179,12 @@ describe('pantallas del equipo clínico sin términos técnicos', () => {
     montar('/ninos')
     expect(await screen.findByText('Alto')).toBeInTheDocument()
     expect(screen.getByText('Bajo para la edad ×2')).toBeInTheDocument()
+    expect(screen.getByText('Sin problema')).toBeInTheDocument()
+    expect(screen.getByText('Sin dato')).toBeInTheDocument()
+    // el último control: la visita y la edad corregida de ese día
+    expect(screen.getAllByText('3 meses').length).toBe(2)
+    expect(screen.getAllByText('3 m de edad corregida').length).toBe(2)
+    expect(screen.getByText('Sin controles')).toBeInTheDocument()
     expect(visible()).not.toMatch(PROHIBIDO)
   })
 

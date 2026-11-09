@@ -113,6 +113,12 @@ export interface NinoFila {
   n_alertas: number
   n_bajo_2de: number
   n_caida_1de: number
+  /** Medidas de crecimiento con puntaje (0: no hay con qué decir si crece bien). */
+  n_crecimiento: number
+  /** El último control con medidas de crecimiento. */
+  ultima_visita: string | null
+  ultima_fecha: string | null
+  ultima_edad_corregida: number | null
 }
 
 export interface MedicionVisita {

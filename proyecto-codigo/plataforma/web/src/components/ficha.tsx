@@ -200,6 +200,7 @@ export function CrecimientoOms({ crecimiento }: { crecimiento: Record<string, Pu
                   {frenteOms(ultimo.z)}
                 </span>
               </div>
+              {ultimo.caida_1de && <p className="text-xs font-semibold text-coral-hondo">{CAYO}</p>}
               <MiniSerie
                 etiqueta={`${indicador(k)}: ${puntos.map((p) => `${edad(p.edad_corregida)}, ${frenteOms(p.z).toLowerCase()}`).join('; ')}`}
                 puntos={puntos.map((p): PuntoSerie => ({

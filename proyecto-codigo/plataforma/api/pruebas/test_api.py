@@ -292,6 +292,19 @@ def test_ninos_y_linea_temporal(cliente, admin, corrida):
     codigos = [i['sujeto'] for i in desc['items']]
     assert codigos == sorted(codigos, reverse=True)
     assert cliente.get('/api/ninos', headers=admin, params={'orden': 'columna_inexistente'}).status_code == 422
+    # el último control: la visita (con nombre), su fecha y la edad corregida; y cuántas medidas de crecimiento hay
+    ultimo = cliente.get('/api/ninos', headers=admin, params={'orden': 'edad_corregida', 'dir': 'desc', 'tamano': 50}).json()
+    edades = [i['ultima_edad_corregida'] for i in ultimo['items'] if i['ultima_edad_corregida'] is not None]
+    assert edades and edades == sorted(edades, reverse=True)
+    for i in ultimo['items']:
+        assert i['n_crecimiento'] >= i['n_bajo_2de']
+        assert (i['ultima_visita'] is None) == (i['ultima_edad_corregida'] is None)
+    con = next(i for i in ultimo['items'] if i['ultima_visita'] is not None)
+    ficha = cliente.get(f'/api/ninos/{con["sujeto"]}/linea-temporal', headers=admin).json()
+    medidas = [p for serie in ficha['crecimiento'].values() for p in serie if p['edad_corregida'] is not None]
+    ultima = max(medidas, key=lambda p: p['edad_corregida'])
+    assert con['ultima_edad_corregida'] == ultima['edad_corregida']
+    assert con['ultima_visita'] == ficha['nombre_etapa'].get(ultima['etapa'], ultima['etapa'])
 
 
 def test_ficha_riesgo_medio_historia_y_perfil(cliente, admin, corrida):

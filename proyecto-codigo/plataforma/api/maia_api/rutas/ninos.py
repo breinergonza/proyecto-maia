@@ -41,6 +41,7 @@ ORDENES = {
     'percentil_max': 'r.percentil_max',
     'n_alertas': 'coalesce(a.n_alertas, 0)',
     'crecimiento': 'coalesce(g.n_bajo, 0) + coalesce(g.n_caida, 0)',
+    'edad_corregida': 'u.edad_corregida',
 }
 
 
@@ -48,7 +49,8 @@ ORDENES = {
 def listar(buscar: str | None = None, desenlace: str | None = None,
            percentil_min: float | None = Query(None, ge=0, le=100), pagina: int = Query(1, ge=1),
            tamano: int = Query(25, ge=1, le=200), corrida_id: int | None = None,
-           orden: Literal['sujeto', 'eg_semanas', 'desenlace_max', 'percentil_max', 'n_alertas', 'crecimiento'] | None = None,
+           orden: Literal['sujeto', 'eg_semanas', 'desenlace_max', 'percentil_max', 'n_alertas', 'crecimiento',
+                          'edad_corregida'] | None = None,
            dir: Literal['asc', 'desc'] = 'desc',
            s: Session = Depends(sesion), _: Usuario = Depends(CUALQUIERA)) -> dict:
     c = corrida_de(s, corrida_id)
@@ -76,8 +78,13 @@ def listar(buscar: str | None = None, desenlace: str | None = None,
         ) r ON r.sujeto = s.sujeto
         LEFT JOIN (SELECT sujeto, count(*) AS n_alertas FROM resultados.alertas_dato WHERE corrida_id = :c GROUP BY sujeto)
             a ON a.sujeto = s.sujeto
-        LEFT JOIN (SELECT sujeto, count(*) FILTER (WHERE bajo_2de) AS n_bajo, count(*) FILTER (WHERE caida_1de) AS n_caida
+        LEFT JOIN (SELECT sujeto, count(*) FILTER (WHERE bajo_2de) AS n_bajo, count(*) FILTER (WHERE caida_1de) AS n_caida,
+                          count(*) FILTER (WHERE NOT improbable AND z IS NOT NULL) AS n_medidas
                    FROM resultados.crecimiento WHERE corrida_id = :c GROUP BY sujeto) g ON g.sujeto = s.sujeto
+        -- el último control con medidas de crecimiento: su visita, su fecha y la edad corregida de ese día
+        LEFT JOIN (SELECT DISTINCT ON (sujeto) sujeto, etapa, fecha, edad_corregida FROM resultados.crecimiento
+                   WHERE corrida_id = :c AND edad_corregida IS NOT NULL ORDER BY sujeto, edad_corregida DESC) u
+            ON u.sujeto = s.sujeto
         WHERE {' AND '.join(filtros)}"""
     p = {'c': c.id, 'corte': c.corte_id, 'd': desenlace, 'b': f'%{buscar}%' if buscar else None, 'p': percentil_min}
     total = s.execute(text(f'SELECT count(*) {base}'), p).scalar_one()
@@ -85,11 +92,19 @@ def listar(buscar: str | None = None, desenlace: str | None = None,
     filas = s.execute(text(f"""
         SELECT s.sujeto, s.eg_semanas, s.grupo, r.percentil_max, r.riesgo_max, r.desenlace_max, r.clave_max,
                coalesce(r.n_riesgos, 0) AS n_riesgos, coalesce(a.n_alertas, 0) AS n_alertas,
-               coalesce(g.n_bajo, 0) AS n_bajo_2de, coalesce(g.n_caida, 0) AS n_caida_1de
+               coalesce(g.n_bajo, 0) AS n_bajo_2de, coalesce(g.n_caida, 0) AS n_caida_1de,
+               coalesce(g.n_medidas, 0) AS n_crecimiento, u.etapa AS ultima_etapa, u.fecha AS ultima_fecha,
+               u.edad_corregida AS ultima_edad_corregida
         {base}
         ORDER BY {orden_sql}r.percentil_max DESC NULLS LAST, a.n_alertas DESC NULLS LAST, s.sujeto
         LIMIT :lim OFFSET :off"""), {**p, 'lim': tamano, 'off': (pagina - 1) * tamano})
-    return {'total': total, 'pagina': pagina, 'tamano': tamano, 'items': [dict(f._mapping) for f in filas]}
+    mapa = etapas(s, c.corte_id)
+    items = []
+    for f in filas:
+        d = dict(f._mapping)
+        d['ultima_visita'] = nombre_etapa(mapa, d.pop('ultima_etapa'))
+        items.append(d)
+    return {'total': total, 'pagina': pagina, 'tamano': tamano, 'items': items}
 
 
 def _tabla(s: Session, sql: str, p: dict) -> pd.DataFrame:

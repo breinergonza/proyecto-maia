@@ -8,11 +8,11 @@ import { pedir } from '../api/cliente'
 import type { NinoFila, Pagina, ResumenTablero } from '../api/tipos'
 import { Aviso, Boton, Cargando, Encabezado, Entrada, Insignia, Paginador, Selector, Vacio } from '../components/ui'
 import { cn } from '../lib/cn'
-import { dec, num, RIESGO_ALTO } from '../lib/formato'
+import { dec, edad, fecha, num, RIESGO_ALTO } from '../lib/formato'
 import { ayudaPosicion, AYUDA_OMS, BAJO_EDAD, CAYO, esAlto, nivelCorto, RIESGO_MUY_ALTO } from '../lib/lenguaje'
 
-const TAMANOS = [5, 10, 25, 50]
-const TAMANO = 5
+const TAMANOS = [10, 25, 50, 100]
+const TAMANO = 25
 const GUARDADO = 'maia.ninos.columnas'
 
 type Columna = {
@@ -54,9 +54,21 @@ const COLUMNAS: Columna[] = [
       <span className="flex flex-wrap gap-1">
         {n.n_bajo_2de > 0 && <span title={AYUDA_OMS}><Insignia tono="ocre">{BAJO_EDAD} ×{n.n_bajo_2de}</Insignia></span>}
         {n.n_caida_1de > 0 && <span title={`${CAYO}. ${AYUDA_OMS}`}><Insignia>Cayó ×{n.n_caida_1de}</Insignia></span>}
-        {!n.n_bajo_2de && !n.n_caida_1de && <span className="text-salvia">—</span>}
+        {!n.n_bajo_2de && !n.n_caida_1de && (n.n_crecimiento > 0
+          ? <span className="text-teal" title={`${num(n.n_crecimiento)} medidas, ninguna baja para la edad ni con caída. ${AYUDA_OMS}`}>Sin problema</span>
+          : <span className="text-salvia" title="No hay peso, talla ni perímetro con que compararlo">Sin dato</span>)}
       </span>
     ),
+  },
+  // el último control con medidas: la visita y la edad corregida de ese día (ordena por la edad)
+  {
+    id: 'edad_corregida', titulo: 'Último control', derecha: true, primero: 'desc',
+    celda: (n) => (n.ultima_visita == null ? <span className="text-salvia">Sin controles</span> : (
+      <span className="whitespace-nowrap" title={fecha(n.ultima_fecha)}>
+        {n.ultima_visita.replace(' (edad corregida)', '')}
+        <span className="block text-xs text-salvia">{edad(n.ultima_edad_corregida)} de edad corregida</span>
+      </span>
+    )),
   },
 ]
 const POR_ID = new Map(COLUMNAS.map((c) => [c.id, c]))
@@ -65,8 +77,10 @@ const ORDEN_INICIAL = COLUMNAS.map((c) => c.id)
 function leerOrden(): string[] {
   try {
     const guardado = JSON.parse(localStorage.getItem(GUARDADO) ?? 'null') as unknown
-    if (Array.isArray(guardado) && guardado.length === ORDEN_INICIAL.length && ORDEN_INICIAL.every((id) => guardado.includes(id))) {
-      return guardado as string[]
+    if (Array.isArray(guardado)) {
+      // el orden guardado, sin columnas que ya no existen y con las nuevas al final
+      const propio = guardado.filter((id): id is string => typeof id === 'string' && POR_ID.has(id))
+      return [...new Set([...propio, ...ORDEN_INICIAL])]
     }
   } catch { /* sin almacenamiento: el orden de siempre */ }
   return ORDEN_INICIAL
