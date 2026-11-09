@@ -41,7 +41,8 @@ export const ayudaPosicion = (p: number | null | undefined) =>
 // ------------------------------------------------------------------ crecimiento frente a la OMS (puntaje z)
 
 export const AYUDA_OMS = 'Comparado con las curvas de la OMS para la edad corregida. Bajo para la edad: por debajo de ' +
-  '−2 desviaciones estándar (DE). Cayó: bajó más de 1 DE desde el control anterior.'
+  '−2 desviaciones estándar (DE). Cayó: bajó más de 1 DE desde el control anterior. El peso para la talla se ' +
+  'compara con la talla medida, no con la edad.'
 export const BAJO_EDAD = 'Bajo para la edad'
 export const CAYO = 'Cayó desde el último control'
 

@@ -86,7 +86,7 @@ describe('tablero', () => {
     })
     montar('/')
     // visitas en orden (40 semanas antes que 3 meses) y una medida sin dato en una visita no corre a las demás
-    expect(await screen.findByRole('figure', { name: 'Porcentaje de niños bajo para la edad en cada visita: '
+    expect(await screen.findByRole('figure', { name: 'Porcentaje de niños medidos con crecimiento bajo frente a la OMS en cada visita: '
       + 'Peso para la edad, 40 semanas 12,0 %, 3 meses EC 8,0 %; Talla para la edad, 40 semanas 15,0 %, 3 meses EC sin dato' }))
       .toBeInTheDocument()
     expect(screen.getByText('Ver la tabla')).toBeInTheDocument()

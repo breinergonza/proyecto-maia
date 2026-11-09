@@ -101,7 +101,7 @@ export default function Tablero() {
 
         <Panel llenar className="lg:col-span-7"
           titulo={<h2 className="text-base">Crecimiento frente a la OMS</h2>}
-          accion={<span className="text-xs text-salvia" title={AYUDA_OMS}>% de los niños medidos que quedan bajo para la edad · EC: edad corregida</span>}>
+          accion={<span className="text-xs text-salvia" title={AYUDA_OMS}>% de los niños medidos con crecimiento bajo frente a la OMS · EC: edad corregida</span>}>
           <Crecimiento filas={r.crecimiento_por_etapa} />
         </Panel>
 
@@ -162,7 +162,7 @@ export function seriesCrecimiento(medidas: string[]): Serie[] {
   return [...conocidas, ...otras]
 }
 
-/** Una línea por medida con el % de niños bajo para la edad en cada visita; la tabla con la caída y los datos queda
+/** Una línea por medida con el % de niños medidos con crecimiento bajo (bajo para la edad, o para la talla) en cada visita; la tabla con la caída y los datos queda
  * debajo, plegada. Cada medida conserva su color aunque falte en alguna visita. */
 function Crecimiento({ filas }: { filas: CrecimientoEtapa[] }) {
   if (filas.length === 0) return <p className="text-sm text-salvia">Sin datos de crecimiento.</p>
@@ -184,7 +184,7 @@ function Crecimiento({ filas }: { filas: CrecimientoEtapa[] }) {
     <>
       <LeyendaSeries series={series} />
       <LineasSeries filas={datos} series={series} alto={200} formatoY={(v) => `${num(v)} %`}
-        etiqueta={`Porcentaje de niños bajo para la edad en cada visita: ${series.map((s) =>
+        etiqueta={`Porcentaje de niños medidos con crecimiento bajo frente a la OMS en cada visita: ${series.map((s) =>
           `${s.nombre}, ${datos.map((f) => `${f.x} ${typeof f[s.clave] === 'number' ? pct(f[s.clave] as number) : 'sin dato'}`).join(', ')}`).join('; ')}`}
         formatoTooltip={(v, f, s) => `${pct(v)} bajo · ${pct(Number(f[`${s.clave}:caida`]))} cayó · ${num(Number(f[`${s.clave}:datos`]))} datos`} />
       {series.length < medidas.length && <p className="mt-1 text-sm">Las demás medidas están en la tabla.</p>}
