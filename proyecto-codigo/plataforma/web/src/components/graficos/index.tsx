@@ -301,6 +301,19 @@ export function RangoEsperado({ bajo, alto, esperado, valor, etiqueta }: {
 }
 
 /** Marcas de eje enteras que siempre incluyen las líneas de referencia (p. ej. −2, 0 y 2 en un puntaje z). */
+/** Un eje de valores redondos (pasos de 1, 2 o 5 por una potencia de 10) que cubre [a, b] con unas ``n`` marcas: el
+ * dominio se abre hasta la marca redonda más cercana, así ninguna etiqueta queda en un valor raro ni pegada a otra. */
+export function escalaRedonda([a, b]: [number, number], n = 4): { dominio: [number, number]; ticks: number[] } {
+  const bruto = (b - a || Math.abs(b) || 1) / n
+  const potencia = 10 ** Math.floor(Math.log10(bruto))
+  const paso = ([1, 2, 5, 10].find((m) => m * potencia >= bruto) ?? 10) * potencia
+  const desde = Math.floor(a / paso) * paso
+  const hasta = Math.ceil(b / paso) * paso
+  const ticks: number[] = []
+  for (let v = desde; v <= hasta + paso / 2; v += paso) ticks.push(Math.round(v / paso) * paso)
+  return { dominio: [desde, hasta], ticks }
+}
+
 export function ticksEnteros([a, b]: [number, number], obligatorios: number[] = []): number[] {
   const paso = b - a > 8 ? 2 : 1
   const desde = paso === 2 ? Math.ceil(a / 2) * 2 : Math.ceil(a)

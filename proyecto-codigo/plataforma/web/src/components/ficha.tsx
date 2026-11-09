@@ -135,7 +135,7 @@ export function TrayectoriaRiesgo({ sujeto }: { sujeto: string }) {
                 titulo: `${p.momento_nombre}: ${p.desenlace}`,
                 detalle: [`Probabilidad estimada: ${riesgo(p.riesgo)}`, frenteDemas(p.percentil)],
               }))}
-              dominioY={[0, 100]} ticksY={[0, 50, RIESGO_ALTO, 100]} formatoY={(v) => posicion(v)}
+              dominioY={[0, 100]} ticksY={[0, 50, RIESGO_ALTO]} formatoY={(v) => posicion(v)}
               franjas={[{ desde: RIESGO_ALTO, hasta: 100, tono: 'alerta' }]} guias={[{ y: RIESGO_MUY_ALTO, punteada: true }]}
               dominioX={dominioX} ticksX={ordenes} formatoX={(v) => visitas.get(v) ?? ''}
             />

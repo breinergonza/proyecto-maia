@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { aproximado, conPunto, dec, edad, fechaHora, frase, medida, meses, numero, parametro, posicion, riesgo } from '../lib/formato'
+import { escalaRedonda } from '../components/graficos'
 
 describe('formatos', () => {
   it('valor medido sin ruido de coma flotante, sin esconder un dato mal registrado', () => {
@@ -52,5 +53,15 @@ describe('formatos', () => {
     expect(conPunto('2 de nov. de 2026, 21:43')).toBe('2 de nov. de 2026, 21:43.')
     expect(conPunto(fechaHora('2026-11-02T21:43:00')).endsWith('..')).toBe(false)
     expect(conPunto(fechaHora('2026-11-02T21:43:00')).endsWith('.')).toBe(true)
+  })
+})
+
+describe('eje redondo', () => {
+  it('marcas en valores redondos que cubren todos los datos', () => {
+    // la serie de la revisión: de 2.139 a 9.177 g
+    expect(escalaRedonda([2139, 9177])).toEqual({ dominio: [2000, 10000], ticks: [2000, 4000, 6000, 8000, 10000] })
+    expect(escalaRedonda([3.2, 4.1])).toEqual({ dominio: [3, 4.5], ticks: [3, 3.5, 4, 4.5] })
+    // un solo valor: igual hay un eje
+    expect(escalaRedonda([50, 50]).ticks.length).toBeGreaterThan(1)
   })
 })

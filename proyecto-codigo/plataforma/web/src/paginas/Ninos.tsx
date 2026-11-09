@@ -179,7 +179,7 @@ export default function Ninos() {
           <div className="flex shrink-0 flex-col gap-3 border-t border-linea px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <label className="flex items-center gap-2 text-sm text-salvia">
               Filas por página
-              <Selector className="h-9 w-20 sm:h-8" value={tamano} onChange={(e) => cambiar({ tamano: e.target.value === String(TAMANO) ? '' : e.target.value })}>
+              <Selector className="h-9 w-24 sm:h-8" value={tamano} onChange={(e) => cambiar({ tamano: e.target.value === String(TAMANO) ? '' : e.target.value })}>
                 {TAMANOS.map((t) => <option key={t} value={t}>{t}</option>)}
               </Selector>
             </label>
@@ -227,7 +227,7 @@ function Grilla({ filas, columnas, reordenar, orden, dir, ordenarPor }: {
                   onDragLeave={() => setSobre((s) => (s === c.id ? null : s))}
                   onDrop={(e) => { e.preventDefault(); soltar(c.id) }}
                   onDragEnd={() => { setArrastrada(null); setSobre(null) }}
-                  className={cn('group border-b border-linea px-3 py-2.5 text-xs font-semibold uppercase tracking-wider whitespace-nowrap text-salvia transition-colors',
+                  className={cn('group border-b border-linea px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-salvia transition-colors',
                     FIJA, 'first:z-20',
                     c.derecha ? 'text-right' : 'text-left',
                     arrastrada === c.id && 'opacity-40',
@@ -235,7 +235,7 @@ function Grilla({ filas, columnas, reordenar, orden, dir, ordenarPor }: {
                   <span className={cn('inline-flex items-center gap-1', c.derecha && 'flex-row-reverse')}>
                     <GripVertical size={14} aria-hidden className="hidden cursor-grab text-salvia/40 group-hover:text-salvia sm:block" />
                     <button type="button" onClick={() => ordenarPor(c)} title={`Ordenar por ${c.titulo.toLowerCase()}`}
-                      className={cn('inline-flex items-center gap-1 rounded px-1 py-0.5 uppercase tracking-wider hover:text-tinta', activa && 'text-teal')}>
+                      className={cn('inline-flex items-center gap-1 rounded px-1 py-0.5 uppercase tracking-wider hover:text-tinta', c.derecha ? 'text-right' : 'text-left', activa && 'text-teal')}>
                       {c.titulo}
                       <Icono size={13} aria-hidden className={cn(!activa && 'opacity-40 group-hover:opacity-100')} />
                     </button>

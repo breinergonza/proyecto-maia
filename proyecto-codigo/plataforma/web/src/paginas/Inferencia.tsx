@@ -393,7 +393,8 @@ function Resultado({ r, varios }: { r: ResultadoInferencia; varios: boolean }) {
       ) : (
         <section aria-label="Riesgo calculado" className="space-y-3">
           <p className="text-sm">{AYUDA_DOS_CIFRAS}</p>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {/* el resultado ocupa una columna angosta junto al formulario: una tarjeta por fila */}
+          <div className="grid grid-cols-1 gap-4">
             {r.riesgos.map((x) => <TarjetaRiesgo key={`${x.sujeto}-${x.clave}`} r={x} nota={varios ? `Niño ${x.sujeto}` : undefined} />)}
           </div>
         </section>
