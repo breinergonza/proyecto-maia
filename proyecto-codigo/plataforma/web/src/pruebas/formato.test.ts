@@ -63,5 +63,10 @@ describe('eje redondo', () => {
     expect(escalaRedonda([3.2, 4.1])).toEqual({ dominio: [3, 4.5], ticks: [3, 3.5, 4, 4.5] })
     // un solo valor: igual hay un eje
     expect(escalaRedonda([50, 50]).ticks.length).toBeGreaterThan(1)
+    expect(escalaRedonda([0, 0])).toEqual({ dominio: [-0.5, 0.5], ticks: [-0.5, 0, 0.5] })
+    expect(escalaRedonda([0.1, 0.3]).ticks).toEqual([0.1, 0.15, 0.2, 0.25, 0.3])
+    // un rango casi nulo por coma flotante no se divide en pasos diminutos
+    expect(escalaRedonda([1.001, 1001 * 0.001]).ticks.length).toBeLessThanOrEqual(6)
+    expect(escalaRedonda([-7, -2])).toEqual({ dominio: [-8, -2], ticks: [-8, -6, -4, -2] })
   })
 })

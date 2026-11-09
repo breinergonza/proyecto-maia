@@ -304,14 +304,17 @@ export function RangoEsperado({ bajo, alto, esperado, valor, etiqueta }: {
 /** Un eje de valores redondos (pasos de 1, 2 o 5 por una potencia de 10) que cubre [a, b] con unas ``n`` marcas: el
  * dominio se abre hasta la marca redonda más cercana, así ninguna etiqueta queda en un valor raro ni pegada a otra. */
 export function escalaRedonda([a, b]: [number, number], n = 4): { dominio: [number, number]; ticks: number[] } {
-  const bruto = (b - a || Math.abs(b) || 1) / n
+  // un rango por debajo de la precisión de coma flotante (1,001 frente a 1001 × 0,001) cuenta como un solo valor
+  const ancho = b - a > Math.abs(b) * 1e-9 ? b - a : 0
+  const bruto = (ancho || Math.abs(b) || 1) / n
   const potencia = 10 ** Math.floor(Math.log10(bruto))
   const paso = ([1, 2, 5, 10].find((m) => m * potencia >= bruto) ?? 10) * potencia
-  const desde = Math.floor(a / paso) * paso
-  const hasta = Math.ceil(b / paso) * paso
-  const ticks: number[] = []
-  for (let v = desde; v <= hasta + paso / 2; v += paso) ticks.push(Math.round(v / paso) * paso)
-  return { dominio: [desde, hasta], ticks }
+  // en pasos enteros, para no acumular ruido de coma flotante (0,1 × 3 no da 0,3)
+  const redondo = (k: number) => Number((k * paso).toPrecision(12))
+  let [k0, k1] = [Math.floor(a / paso), Math.ceil(b / paso)]
+  if (k0 === k1) { k0 -= 1; k1 += 1 }   // un solo valor justo en una marca: igual hay un eje alrededor
+  const ticks = Array.from({ length: k1 - k0 + 1 }, (_, i) => redondo(k0 + i))
+  return { dominio: [redondo(k0), redondo(k1)], ticks }
 }
 
 export function ticksEnteros([a, b]: [number, number], obligatorios: number[] = []): number[] {
