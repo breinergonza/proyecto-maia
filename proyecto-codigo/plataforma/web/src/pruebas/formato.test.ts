@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aproximado, conPunto, dec, edad, fechaHora, frase, medida, numero, parametro, posicion, riesgo } from '../lib/formato'
+import { aproximado, conPunto, dec, edad, fechaHora, frase, medida, meses, numero, parametro, posicion, riesgo } from '../lib/formato'
 
 describe('formatos', () => {
   it('valor medido sin ruido de coma flotante, sin esconder un dato mal registrado', () => {
@@ -15,10 +15,17 @@ describe('formatos', () => {
     expect(edad(200)).toBe('6,6 m')
     expect(edad(null)).toBe('—')
   })
+  it('edad en meses para un eje que no mezcle unidades', () => {
+    expect(meses(91.3125)).toBe('3 m')
+    expect(meses(15)).toBe('0,5 m')
+    expect(meses(400)).toBe('13,1 m')
+  })
   it('riesgo como porcentaje y posición entera', () => {
     expect(riesgo(0.857)).toBe('85,7 %')
     expect(riesgo(0.0003)).toBe('menos de 0,1 %')
     expect(riesgo(0)).toBe('0,0 %')
+    expect(riesgo(0.9996)).toBe('más de 99,9 %')   // un modelo nunca está seguro: no «100,0 %»
+    expect(riesgo(0.999)).toBe('99,9 %')
     expect(posicion(98.6)).toBe('99')
   })
   it('primera letra en mayúscula', () => expect(frase('valor atípico')).toBe('Valor atípico'))

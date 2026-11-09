@@ -25,10 +25,13 @@ export const aproximado = (v: number | null | undefined) => {
   return new Intl.NumberFormat('es-CO', { maximumFractionDigits: a >= 100 ? 0 : a >= 10 ? 1 : 2 }).format(v)
 }
 export const pct = (v: number | null | undefined) => (v == null ? '—' : `${nf1.format(v)} %`)
-/** Riesgo (0 a 1) como porcentaje. */
-/** Probabilidad en porcentaje; una mayor que cero que se redondearía a 0,0 % se dice «menos de 0,1 %» (no es cero). */
+/** Riesgo (0 a 1) como porcentaje. Un modelo nunca está seguro: lo que se redondearía a 0,0 % o a 100,0 % se dice
+ * «menos de 0,1 %» o «más de 99,9 %». */
 export const riesgo = (v: number | null | undefined) =>
-  v == null ? '—' : v > 0 && 100 * v < 0.05 ? 'menos de 0,1 %' : `${nf1.format(100 * v)} %`
+  v == null ? '—'
+    : v > 0 && 100 * v < 0.05 ? 'menos de 0,1 %'
+      : 100 * v >= 99.95 ? 'más de 99,9 %'
+        : `${nf1.format(100 * v)} %`
 export const posicion = (v: number | null | undefined) => (v == null ? '—' : nf.format(Math.round(v)))
 /** Valor medido tal como llega de la base (texto): si es un número, sin ruido de coma flotante y con hasta 3
  * decimales, para que un dato mal registrado (p. ej. un peso en kilos donde van gramos) se siga viendo como es. */
@@ -54,6 +57,9 @@ export function fechaHora(v: string | null | undefined): string {
 
 /** Cierra una frase que termina en un valor: «p. m.» ya trae su punto y no lleva otro. */
 export const conPunto = (texto: string) => (texto.endsWith('.') ? texto : `${texto}.`)
+
+/** Edad corregida (días) en meses, para un eje que no mezcle unidades: 0,5 m, 3 m, 13 m. */
+export const meses = (dias: number) => `${nf01.format(dias / 30.4375)} m`
 
 /** Edad corregida en días, en palabras cortas. */
 export function edad(dias: number | null | undefined): string {
@@ -82,6 +88,8 @@ export const INDICADORES: Record<string, string> = {
   perimetro_cefalico: 'Perímetro cefálico',
 }
 export const indicador = (k: string) => INDICADORES[k] ?? k.replaceAll('_', ' ')
+/** Unidad en que se guarda cada medida de crecimiento (peso en gramos; talla y perímetro en centímetros). */
+export const UNIDADES_CRECIMIENTO: Record<string, string> = { peso: 'g', talla: 'cm', perimetro_cefalico: 'cm' }
 export const ESTADOS_CORRIDA: Record<string, string> = { en_curso: 'En curso', ok: 'Terminada', error: 'Con error' }
 
 /** Primera letra en mayúscula (los motivos del modelo vienen en minúscula). */

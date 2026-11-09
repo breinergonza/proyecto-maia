@@ -62,6 +62,15 @@ def cargar_activo(s: Session, cfg: Configuracion) -> str | None:
         return None
 
 
+def activo() -> tuple[Modelos, dict, Path] | None:
+    """Los modelos, el manifiesto y la carpeta del paquete activo, leídos juntos; None si no hay uno cargado."""
+    with estado.lock:
+        modelos, manifest, carpeta = estado.modelos, estado.manifest, estado.carpeta
+    if modelos is None or manifest is None or carpeta is None:
+        return None
+    return modelos, manifest, carpeta
+
+
 def limpiar() -> None:
     with estado.lock:
         estado.modelos = estado.manifest = estado.carpeta = None

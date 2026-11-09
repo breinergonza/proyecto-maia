@@ -2,7 +2,7 @@
 // en el texto visible de esas pantallas vuelve a aparecer un término técnico. El término técnico puede seguir en title.
 import { screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { alerta, ayudaMinimo, cuantosMenos, frenteOms, motivo, nivelAlto, nivelCorto, peso } from '../lib/lenguaje'
+import { alerta, ayudaMinimo, cuantosMenos, familia, frenteOms, motivo, motivosRiesgo, nivelAlto, nivelCorto, nombreFamilia, peso } from '../lib/lenguaje'
 import { montar, simularApi, usuario } from './util'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -43,6 +43,28 @@ describe('glosario clínico', () => {
     expect(peso('z_peso_40_sem = -2,4')).toBe('Peso para la edad a 40 sem: bajo para la edad')
     expect(peso('Sexo = Femenino')).toBe('Sexo: Femenino')
   })
+
+  it('separa lo que sube el riesgo de los datos que faltan', () => {
+    expect(motivosRiesgo(['Días en UCI (dias_uci) = 20', 'Talla a 40 sem (talla_40) = sin dato', 'z_peso_3m = sin dato',
+      'Vacunas (vac) = No hay dato'])).toEqual({
+      suben: ['Días en UCI: 20'],
+      faltan: ['Talla a 40 sem', 'Peso para la edad a 3m', 'Vacunas'],
+    })
+  })
+
+  it('agrupa los desenlaces que son el mismo evento visto desde distintas visitas', () => {
+    expect(familia('readm_40s')).toBe('readm')
+    expect(familia('no_vuelve_12m')).toBe('no_vuelve')
+    expect(familia('oxigeno_ambulatorio_6m')).toBe('oxigeno_ambulatorio')
+    expect(familia('talla_baja_12m_desde_40')).toBe('talla_baja_12m')
+    expect(nombreFamilia(['readmisión antes de las 40 semanas', 'readmisión entre los 3 y los 6 meses'])).toBe('Readmisión')
+    expect(nombreFamilia(['no vuelve a la visita de 3 meses', 'no vuelve a la visita de 6 meses'])).toBe('No vuelve a la visita')
+    expect(nombreFamilia(['enfermedad respiratoria aguda antes de los 3 meses', 'enfermedad respiratoria aguda antes de los 6 meses']))
+      .toBe('Enfermedad respiratoria aguda')
+    expect(nombreFamilia(['talla baja para la edad a los 12 meses (riesgo calculado a 40 sem)',
+      'talla baja para la edad a los 12 meses (riesgo calculado a 3 m EC)'])).toBe('Talla baja para la edad a los 12 meses')
+    expect(nombreFamilia(['desarrollo psicomotor bajo a los 6 meses'])).toBe('Desarrollo psicomotor bajo a los 6 meses')
+  })
 })
 
 const corrida = { id: 3, estado: 'ok', tipo: 'demo', fuente: 'simulado', terminada: '2026-07-01T10:00:00Z', creada_en: '2026-07-01T09:00:00Z' }
@@ -62,9 +84,20 @@ const linea = {
     etapa: 'm3', nombre: '3 meses', orden: 3, fecha: '2026-03-01', edad_corregida: 90,
     mediciones: [{ variable: 'peso_3m', etiqueta: 'Peso a los 3 meses', valor: '9999', unidad: 'g', fecha: '2026-03-01', tema: 'crecimiento' }],
     z: { peso: -2.4, talla: 0.2 }, alertas_dato: [alertaDato],
-    riesgos: [{ id: 9, clave: 'readm', desenlace: 'readmisión a los 6 meses', momento: 'm3', riesgo: 0.41, percentil: 93, motivos: ['Peso al nacer (peso_nacer) = 769', 'quiebre_cambio_de_sistema_2022 = 1'], fecha_visita: '2026-03-01' }],
+    riesgos: [{ id: 9, clave: 'readm', desenlace: 'readmisión a los 6 meses', momento: 'm3', riesgo: 0.41, percentil: 93, motivos: ['Peso al nacer (peso_nacer) = 769', 'quiebre_cambio_de_sistema_2022 = 1', 'Talla a 40 sem (talla_40) = sin dato'], fecha_visita: '2026-03-01', riesgo_medio: 0.12 }],
   }],
 }
+const historia = {
+  paquete: 'p1', paquete_corrida: 'p1',
+  puntos: [
+    { clave: 'readm_40s', desenlace: 'readmisión antes de las 40 semanas', momento: 's40', momento_nombre: '40 semanas', orden: 2, riesgo: 0.2, percentil: 70, fecha_visita: '2025-12-01' },
+    { clave: 'readm_6m', desenlace: 'readmisión entre los 3 y los 6 meses', momento: 'm3', momento_nombre: '3 meses', orden: 3, riesgo: 0.41, percentil: 93, fecha_visita: '2026-03-01' },
+  ],
+}
+const perfil = { variables: [
+  { variable: 'eg_semanas', etiqueta: 'Edad gestacional', unidad: 'semanas', ninos: 800, cuantiles: { p5: 28, p25: 31, p50: 33, p75: 35, p95: 36 }, valor: 31, posicion: 40 },
+  { variable: 'peso_nacer', etiqueta: 'Peso al nacer', unidad: 'g', ninos: 790, cuantiles: { p5: 900, p25: 1300, p50: 1700, p75: 2000, p95: 2400 }, valor: null, posicion: null },
+] }
 const fila = { sujeto: 's1', eg_semanas: 31, grupo: null, percentil_max: 93, riesgo_max: 0.41, desenlace_max: 'readmisión a los 6 meses',
   clave_max: 'readm', n_riesgos: 2, n_alertas: 1, n_bajo_2de: 2, n_caida_1de: 1 }
 const notificaciones = [{ desenlace: 'readm', nombre: 'readmisión a los 3 meses', percentil_minimo: 95, destinatarios: ['a@maia.prueba'], activo: true }]
@@ -81,6 +114,8 @@ function api(rol: 'admin' | 'experto' = 'experto') {
     if (url === '/api/tablero/alarmas-grupo') return { cuerpo: [{ grupo: null, periodo: '2026Q1', variable: 'peso_3m', etiqueta: 'Peso a los 3 meses', senal: 'cusum', valor: 1, referencia: 0, estadistico: 9, que_paso: 'subió de golpe en todo el programa' }] }
     if (url.startsWith('/api/ninos?')) return { cuerpo: { total: 1, pagina: 1, tamano: 25, items: [fila] } }
     if (url === '/api/ninos/s1/linea-temporal') return { cuerpo: linea }
+    if (url === '/api/ninos/s1/historia-riesgo') return { cuerpo: historia }
+    if (url === '/api/ninos/s1/perfil') return { cuerpo: perfil }
     if (url.startsWith('/api/revision/datos?')) return { cuerpo: { total: 1, pagina: 1, tamano: 10, items: [datoRevision] } }
     if (url === '/api/revision/riesgos') return { cuerpo: { corrida_id: 3, items: [] } }
     if (url === '/api/revision/resumen') return { cuerpo: { datos_por_capa: [{ capa: '2', respuestas: 4, si: 3, no: 1, no_se: 0, precision_pct: 75 }], riesgos_por_grupo: [] } }
@@ -123,13 +158,19 @@ describe('pantallas del equipo clínico sin términos técnicos', () => {
   it('ficha del niño', async () => {
     api()
     montar('/ninos/s1')
-    expect(await screen.findByText('9 de 10')).toBeInTheDocument()
+    expect((await screen.findAllByText('9 de 10')).length).toBeGreaterThan(0)
     expect(screen.getAllByText('Riesgo alto').length).toBeGreaterThan(0)
-    expect(screen.getByText('Bajo para la edad')).toBeInTheDocument()
+    expect(screen.getAllByText('Bajo para la edad').length).toBeGreaterThan(0)
     expect(screen.getByText(/Valor muy distinto al de los demás niños; la fecha no corresponde a esta visita/)).toBeInTheDocument()
     expect(screen.getByText('Peso al nacer: 769')).toBeInTheDocument()
     expect(screen.getByText('Nació después del cambio de sistema 2022')).toBeInTheDocument()
+    expect(screen.getByText(/También suben el riesgo: Talla a 40 sem\./)).toBeInTheDocument()   // no entre lo que sube por su valor
+    expect(visible()).toMatch(/Probabilidad estimada: 41,0 % · promedio de los niños: 12,0 %/)
     expect(visible()).toMatch(/Nació a las 31 semanas de gestación/)   // sin «31,0»
+    expect(await screen.findByText('Readmisión', { selector: 'h3' })).toBeInTheDocument()   // riesgo en cada visita, por familia
+    expect(await screen.findByText(/más que 40 de cada 100 niños/)).toBeInTheDocument()   // perfil al nacer
+    expect(screen.getByText('31 semanas', { selector: 'strong' })).toBeInTheDocument()
+    expect(screen.getByText('Sin dato')).toBeInTheDocument()
     expect(visible()).not.toMatch(PROHIBIDO)
     expect(visible()).not.toMatch(/\([a-z]+_[a-z0-9_]+\)|quiebre_/)
   })

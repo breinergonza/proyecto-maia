@@ -2,9 +2,12 @@
 de la OMS, alertas de dato y riesgos). Los códigos son los seudonimizados de la base; nunca hay nombres."""
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from typing import Literal
 
+import numpy as np
+import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -19,10 +22,14 @@ from maia_api.consultas import (
     unidad_mostrada,
     valor_legible,
 )
+from maia_api import estado as E
 from maia_api.dependencias import CUALQUIERA, sesion
+from maia_comun import puntuacion as PU
 from maia_comun.modelos_db import Usuario
 
 ruta = APIRouter(prefix='/ninos', tags=['niños'])
+registro = logging.getLogger(__name__)
+MINIMO_COHORTE = 20   # con menos niños, los cuantiles dirían más de cada uno que del grupo
 
 # Columnas por las que se puede ordenar la lista (lista cerrada: el nombre nunca llega al SQL sin pasar por aquí).
 ORDENES = {
@@ -83,6 +90,11 @@ def listar(buscar: str | None = None, desenlace: str | None = None,
     return {'total': total, 'pagina': pagina, 'tamano': tamano, 'items': [dict(f._mapping) for f in filas]}
 
 
+def _tabla(s: Session, sql: str, p: dict) -> pd.DataFrame:
+    r = s.execute(text(sql), p)
+    return pd.DataFrame(r.fetchall(), columns=list(r.keys()))
+
+
 def _texto_motivos(m) -> list[str]:
     return list(m) if isinstance(m, list) else []
 
@@ -103,9 +115,14 @@ def linea_temporal(sujeto: str, corrida_id: int | None = None, s: Session = Depe
     alertas = s.execute(text('SELECT id, variable, etiqueta, etapa, valor, esperado, rango_bajo, rango_alto, capas, motivo, '
                              'prioridad FROM resultados.alertas_dato WHERE corrida_id = :c AND sujeto = :s ORDER BY prioridad'),
                         {'c': c.id, 's': sujeto})
-    riesgos = s.execute(text('SELECT id, clave, desenlace, momento, riesgo, percentil, motivos, fecha_visita '
-                             'FROM resultados.riesgos WHERE corrida_id = :c AND sujeto = :s AND NOT silencio '
-                             'ORDER BY percentil DESC'), {'c': c.id, 's': sujeto})
+    # con el riesgo promedio de su desenlace en la corrida: un 3 % solo se entiende al lado de lo habitual
+    riesgos = s.execute(text("""
+        SELECT r.id, r.clave, r.desenlace, r.momento, r.riesgo, r.percentil, r.motivos, r.fecha_visita, m.riesgo_medio
+        FROM resultados.riesgos r
+        JOIN (SELECT clave, avg(riesgo) AS riesgo_medio FROM resultados.riesgos
+              WHERE corrida_id = :c AND NOT silencio GROUP BY clave) m ON m.clave = r.clave
+        WHERE r.corrida_id = :c AND r.sujeto = :s AND NOT r.silencio
+        ORDER BY r.percentil DESC"""), {'c': c.id, 's': sujeto})
     crec = s.execute(text('SELECT etapa, indicador, fecha, edad_corregida, valor, z, bajo_2de, caida_1de, improbable '
                           'FROM resultados.crecimiento WHERE corrida_id = :c AND sujeto = :s ORDER BY edad_corregida'),
                      {'c': c.id, 's': sujeto})
@@ -165,3 +182,120 @@ def linea_temporal(sujeto: str, corrida_id: int | None = None, s: Session = Depe
         'crecimiento': {k: v for k, v in serie.items()},
         'nombre_etapa': {k: nombre_etapa(mapa, k) for k in mapa},
     }
+
+
+@ruta.get('/{sujeto}/historia-riesgo')
+def historia_riesgo(sujeto: str, corrida_id: int | None = None, s: Session = Depends(sesion),
+                    _: Usuario = Depends(CUALQUIERA)) -> dict:
+    """El riesgo de cada desenlace en cada visita del niño, calculado ahora con el paquete activo: cada punto usa solo lo
+    medido hasta su visita. La corrida guarda solo la última visita, así que esto no sale de ``resultados.riesgos``."""
+    c = corrida_de(s, corrida_id)
+    if not sujeto_existe(s, c.corte_id, sujeto):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f'No hay un niño {sujeto} en el corte de la corrida.')
+    activo = E.activo()
+    if activo is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, 'No hay un paquete de modelos activo para calcular la historia.')
+    modelos, manifest, carpeta = activo
+    base = carpeta / 'sevarti_base'
+    variables = list(pd.read_parquet(base / 'esquema.parquet', columns=['variable']).variable)
+    p = {'c': c.corte_id, 's': sujeto}
+    parcial = {
+        'sujetos': _tabla(s, 'SELECT sujeto, grupo, fecha_nacimiento, eg_semanas, anio_nacimiento FROM sevarti.sujetos '
+                             'WHERE corte_id = :c AND sujeto = :s', p),
+        'mediciones': _tabla(s, 'SELECT sujeto, variable, valor, fecha, edad_dias FROM sevarti.mediciones '
+                                'WHERE corte_id = :c AND sujeto = :s AND variable = ANY(:v)', {**p, 'v': variables}),
+        'episodios': _tabla(s, 'SELECT sujeto, tipo, edad_inicio, edad_fin FROM sevarti.episodios '
+                               'WHERE corte_id = :c AND sujeto = :s', p),
+    }
+    corte = pd.Timestamp(c.fecha_corte) if c.fecha_corte else None
+    try:
+        tabla = PU.historia_riesgo(PU.completar(parcial, base, corte), modelos)
+    except (ValueError, KeyError) as e:
+        registro.warning('No se pudo calcular la historia de riesgo de %s: %s: %s', sujeto, type(e).__name__, e,
+                         exc_info=True)
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                            'No se pudo calcular el riesgo en las visitas anteriores de este niño.') from e
+    mapa = etapas(s, c.corte_id)
+    puntos = [{
+        'clave': f.clave, 'desenlace': f.desenlace, 'momento': f.momento,
+        'momento_nombre': nombre_etapa(mapa, f.momento), 'orden': mapa.get(f.momento, {}).get('orden', 99),
+        'riesgo': float(f.riesgo), 'percentil': float(f.percentil),
+        'fecha_visita': None if pd.isna(f.fecha_visita) else str(f.fecha_visita)[:10],
+    } for f in tabla.itertuples()]
+    puntos.sort(key=lambda x: (x['orden'], x['desenlace']))
+    return {'paquete': manifest['version'], 'paquete_corrida': c.paquete, 'puntos': puntos}
+
+
+# Valores de cada variable del perfil, por corte y ordenados. Los datos de un corte no cambian: se leen una vez.
+_COHORTE: dict[tuple[int, str], np.ndarray] = {}
+_NUMERO_SQL = "valor ~ '^-?[0-9]+([.][0-9]+)?$'"
+
+
+def _valores_cohorte(s: Session, corte_id: int, variables: list[str]) -> dict[str, np.ndarray]:
+    faltan = [v for v in variables if (corte_id, v) not in _COHORTE]
+    if faltan:
+        leidos: dict[str, list[float]] = {v: [] for v in faltan}
+        if 'eg_semanas' in leidos:
+            leidos['eg_semanas'] = [r[0] for r in s.execute(text(
+                'SELECT eg_semanas FROM sevarti.sujetos WHERE corte_id = :c AND eg_semanas IS NOT NULL'),
+                {'c': corte_id})]
+        otras = [v for v in faltan if v != 'eg_semanas']
+        if otras:
+            for variable, valor in s.execute(text(
+                    f'SELECT variable, valor FROM sevarti.mediciones WHERE corte_id = :c AND variable = ANY(:v) '
+                    f'AND {_NUMERO_SQL}'), {'c': corte_id, 'v': otras}):
+                leidos[variable].append(float(valor))
+        for v, valores in leidos.items():
+            _COHORTE[(corte_id, v)] = np.sort(np.asarray(valores, dtype=float))
+    return {v: _COHORTE[(corte_id, v)] for v in variables}
+
+
+def _variables_perfil(esq: dict) -> list[str]:
+    """Edad gestacional y las medidas al nacer: los datos basales numéricos que el diccionario une a un concepto de
+    crecimiento (peso, talla, perímetro). Lo decide el diccionario, no el código."""
+    al_nacer = sorted(v for v, d in esq.items()
+                      if d.get('rol') == 'basal' and d.get('tipo') == 'numeric' and isinstance(d.get('concepto'), str)
+                      and d['concepto'])
+    return ['eg_semanas', *al_nacer]
+
+
+@ruta.get('/{sujeto}/perfil')
+def perfil(sujeto: str, corrida_id: int | None = None, s: Session = Depends(sesion),
+           _: Usuario = Depends(CUALQUIERA)) -> dict:
+    """Dónde queda el niño frente a los demás niños del corte en su edad gestacional y sus medidas al nacer. De la
+    cohorte solo salen agregados (cuantiles y cuántos niños), nunca valores de otro niño."""
+    c = corrida_de(s, corrida_id)
+    if not sujeto_existe(s, c.corte_id, sujeto):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f'No hay un niño {sujeto} en el corte de la corrida.')
+    esq = esquema(s, c.corte_id)
+    variables = _variables_perfil(esq)
+    cohorte = _valores_cohorte(s, c.corte_id, variables)
+    propios: dict[str, float] = {}
+    eg = s.execute(text('SELECT eg_semanas FROM sevarti.sujetos WHERE corte_id = :c AND sujeto = :s'),
+                   {'c': c.corte_id, 's': sujeto}).scalar()
+    if eg is not None:
+        propios['eg_semanas'] = float(eg)
+    for variable, valor in s.execute(text(
+            f'SELECT variable, valor FROM sevarti.mediciones WHERE corte_id = :c AND sujeto = :s AND variable = ANY(:v) '
+            f'AND {_NUMERO_SQL} ORDER BY id'), {'c': c.corte_id, 's': sujeto, 'v': variables[1:]}):
+        propios.setdefault(variable, float(valor))
+    filas = []
+    for v in variables:
+        valores = cohorte[v]
+        if len(valores) < MINIMO_COHORTE:
+            continue
+        x = propios.get(v)
+        d = esq.get(v, {})
+        filas.append({
+            'variable': v,
+            'etiqueta': 'Edad gestacional' if v == 'eg_semanas' else d.get('etiqueta') or v,
+            'unidad': 'semanas' if v == 'eg_semanas' else unidad_mostrada(d),
+            'ninos': int(len(valores)),
+            'cuantiles': dict(zip(('p5', 'p25', 'p50', 'p75', 'p95'),
+                                  (float(q) for q in np.quantile(valores, [0.05, 0.25, 0.5, 0.75, 0.95])))),
+            'valor': x,
+            # porcentaje de niños con un valor menor; los empates cuentan la mitad
+            'posicion': None if x is None else float(
+                100 * (np.searchsorted(valores, x, 'left') + np.searchsorted(valores, x, 'right')) / (2 * len(valores))),
+        })
+    return {'variables': filas}

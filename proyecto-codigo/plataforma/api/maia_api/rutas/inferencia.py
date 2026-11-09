@@ -54,11 +54,10 @@ def _registros(df: pd.DataFrame) -> list[dict]:
 
 
 def _activo():
-    with E.estado.lock:
-        modelos, manifest, carpeta = E.estado.modelos, E.estado.manifest, E.estado.carpeta
-    if modelos is None or carpeta is None:
+    activo = E.activo()
+    if activo is None:
         raise HTTPException(status.HTTP_409_CONFLICT, 'No hay un paquete de modelos activo.')
-    return modelos, manifest, carpeta
+    return activo
 
 
 def _pesos(modelos, esquema: pd.DataFrame) -> dict[str, float]:

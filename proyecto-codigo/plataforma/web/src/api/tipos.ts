@@ -139,6 +139,42 @@ export interface RiesgoNino {
   percentil: number
   motivos: string[]
   fecha_visita: string | null
+  /** Riesgo promedio de ese desenlace entre los niños de la corrida. */
+  riesgo_medio: number
+}
+
+/** Riesgo de cada desenlace en cada visita, calculado a demanda con el paquete activo. */
+export interface PuntoHistoria {
+  clave: string
+  desenlace: string
+  momento: string
+  momento_nombre: string
+  orden: number
+  riesgo: number
+  percentil: number
+  fecha_visita: string | null
+}
+
+export interface HistoriaRiesgo {
+  paquete: string
+  /** Paquete con que se calculó la corrida; si difiere de ``paquete``, la historia no es comparable 1:1. */
+  paquete_corrida: string | null
+  puntos: PuntoHistoria[]
+}
+
+export interface VariablePerfil {
+  variable: string
+  etiqueta: string
+  unidad: string | null
+  ninos: number
+  cuantiles: { p5: number; p25: number; p50: number; p75: number; p95: number }
+  valor: number | null
+  /** 0 a 100: cuántos niños de la cohorte tienen un valor menor. */
+  posicion: number | null
+}
+
+export interface PerfilNino {
+  variables: VariablePerfil[]
 }
 
 export interface PuntoCrecimiento {

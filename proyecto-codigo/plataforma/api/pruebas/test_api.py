@@ -288,6 +288,42 @@ def test_ninos_y_linea_temporal(cliente, admin, corrida):
     assert cliente.get('/api/ninos', headers=admin, params={'orden': 'columna_inexistente'}).status_code == 422
 
 
+def test_ficha_riesgo_medio_historia_y_perfil(cliente, admin, corrida):
+    r = cliente.get('/api/ninos', headers=admin, params={'orden': 'percentil_max', 'tamano': 1}).json()
+    sujeto = r['items'][0]['sujeto']
+    assert r['items'][0]['percentil_max'] is not None
+    lt = cliente.get(f'/api/ninos/{sujeto}/linea-temporal', headers=admin).json()
+    guardados = [x for v in lt['visitas'] for x in v['riesgos']]
+    # el riesgo promedio de cada desenlace es el mismo del tablero
+    medio = {d['clave']: d['riesgo_medio'] for d in cliente.get('/api/tablero/resumen', headers=admin).json()['riesgos_por_desenlace']}
+    assert guardados and all(x['riesgo_medio'] == pytest.approx(medio[x['clave']]) for x in guardados)
+
+    h = cliente.get(f'/api/ninos/{sujeto}/historia-riesgo', headers=admin)
+    assert h.status_code == 200, h.text
+    h = h.json()
+    assert h['paquete'] == h['paquete_corrida'] and h['puntos']
+    assert [p['orden'] for p in h['puntos']] == sorted(p['orden'] for p in h['puntos'])
+    assert all(0 <= p['riesgo'] <= 1 and 0 <= p['percentil'] <= 100 and 'motivos' not in p for p in h['puntos'])
+    # la última visita, calculada de nuevo con el mismo paquete, da lo mismo que guardó la corrida
+    for x in guardados:
+        mismo = [p for p in h['puntos'] if p['clave'] == x['clave'] and p['momento'] == x['momento']]
+        assert len(mismo) == 1 and mismo[0]['riesgo'] == pytest.approx(x['riesgo'], abs=1e-6), x['clave']
+    assert cliente.get('/api/ninos/no-existe/historia-riesgo', headers=admin).status_code == 404
+
+    pf = cliente.get(f'/api/ninos/{sujeto}/perfil', headers=admin)
+    assert pf.status_code == 200, pf.text
+    filas = pf.json()['variables']
+    assert filas[0]['variable'] == 'eg_semanas' and filas[0]['unidad'] == 'semanas'
+    assert any(f['variable'] != 'eg_semanas' for f in filas)   # el peso al nacer del simulado tiene concepto
+    for f in filas:
+        q = f['cuantiles']
+        assert q['p5'] <= q['p25'] <= q['p50'] <= q['p75'] <= q['p95'] and f['ninos'] >= 20
+        assert f['posicion'] is None or 0 <= f['posicion'] <= 100
+        # de la cohorte solo salen agregados
+        assert set(f) == {'variable', 'etiqueta', 'unidad', 'ninos', 'cuantiles', 'valor', 'posicion'}
+    assert cliente.get('/api/ninos/no-existe/perfil', headers=admin).status_code == 404
+
+
 def test_revision(cliente, admin, corrida):
     experta = _login(cliente, 'experta@maia.prueba', 'clave-larga-123')
     cola = cliente.get('/api/revision/datos', headers=experta).json()

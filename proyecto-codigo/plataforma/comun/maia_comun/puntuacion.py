@@ -292,3 +292,11 @@ def inferir(sev: Sevarti, modelos: Modelos) -> dict[str, pd.DataFrame]:
     return {'alertas_dato': tabla_alertas(cola, 0).drop(columns='corrida_id'),
             'riesgos': tabla_riesgos(riesgos, 0, False).drop(columns=['corrida_id', 'silencio']),
             'crecimiento': tabla_crecimiento(crec, p, 0).drop(columns='corrida_id')}
+
+
+def historia_riesgo(sev: Sevarti, modelos: Modelos) -> pd.DataFrame:
+    """El riesgo de cada desenlace en cada visita a la que fue el niño, cada uno con lo medido hasta su visita: la
+    trayectoria de la ficha. La corrida guarda solo la última visita; esto no se guarda. Sin motivos (lo caro)."""
+    p = modelos.clinico.preparar(sev)
+    riesgos = modelos.clinico.riesgos(p, solo_ultima_visita=False, con_motivos=False, solo_pendientes=False)
+    return tabla_riesgos(riesgos, 0, False).drop(columns=['corrida_id', 'silencio', 'motivos'])

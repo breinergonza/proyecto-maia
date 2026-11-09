@@ -89,6 +89,7 @@ export function motivo(texto: string | null | undefined): string {
 export function peso(texto: string): string {
   const [nombre, ...resto] = texto.split(' = ')
   const valor = resto.join(' = ')
+  if (esFalta(valor)) return nombreDato(nombre)
   const quiebre = nombre.match(/^quiebre_(.+)$/)
   if (quiebre) {
     const cambio = quiebre[1].replaceAll('_', ' ')
@@ -99,10 +100,58 @@ export function peso(texto: string): string {
     const numero = Number(valor.replace(',', '.'))
     return `${indicador(z[1])} a ${z[2].replaceAll('_', ' ')}: ${Number.isFinite(numero) ? frenteOms(numero).toLowerCase() : valor}`
   }
-  const limpio = nombre.replace(/\s*\([a-z0-9_]+\)\s*$/, '')
+  const limpio = nombreDato(nombre)
   return valor ? `${limpio}: ${valor}` : limpio
 }
 const INDICADOR_Z = new Set(['peso', 'talla', 'perimetro_cefalico', 'peso_para_talla'])
+
+/** El nombre de un dato del modelo sin su código interno: «Peso al nacer (peso_rn)» → «Peso al nacer»;
+ * «z_talla_3m» → «Talla para la edad a 3m». */
+function nombreDato(nombre: string): string {
+  const z = nombre.match(/^z_([a-z]+(?:_[a-z]+)*?)_(.+)$/)
+  if (z && INDICADOR_Z.has(z[1])) return `${indicador(z[1])} a ${z[2].replaceAll('_', ' ')}`
+  return nombre.replace(/\s*\([a-z0-9_]+\)\s*$/, '')
+}
+
+/** El modelo escribe «sin dato» (o la etiqueta «No hay dato» de un código) cuando falta el valor. */
+const esFalta = (valor: string) => /^(sin dato|no hay dato)$/i.test(valor.trim())
+
+/** Lo que más pesó en un riesgo, separado en lo que sube el riesgo por su valor y los datos que faltan (que también
+ * lo suben: el modelo aprendió que la falta de ese dato acompaña a más casos). */
+export function motivosRiesgo(motivos: string[]): { suben: string[]; faltan: string[] } {
+  const suben: string[] = []
+  const faltan: string[] = []
+  for (const m of motivos) {
+    const [, ...resto] = m.split(' = ')
+    ;(esFalta(resto.join(' = ')) ? faltan : suben).push(peso(m))
+  }
+  return { suben, faltan }
+}
+
+/** La frase que separa las dos cifras del riesgo: la probabilidad y la comparación con los demás niños. */
+export const AYUDA_DOS_CIFRAS = 'El porcentaje es la probabilidad estimada de que pase. «N de 10» compara a este niño con ' +
+  'los demás niños del programa para ese mismo desenlace: un porcentaje bajo puede ser alto frente a los demás si el ' +
+  'desenlace es poco frecuente.'
+
+// ------------------------------------------------------------------ familias de desenlaces (trayectoria de riesgo)
+
+/** Desenlaces que son el mismo evento visto desde distintas visitas: «readm_3m» y «readm_6m» son «readm»;
+ * «talla_baja_12m_desde_3» es «talla_baja_12m». */
+export const familia = (clave: string) => clave.replace(/_(desde_)?\d+[a-z]*$/, '')
+
+const SUELTAS = new Set(['a', 'al', 'la', 'las', 'los', 'el', 'de', 'del', 'entre', 'antes', 'desde', 'en', 'y'])
+
+/** El nombre común de una familia: lo que comparten las frases de sus desenlaces, sin la visita ni preposiciones sueltas
+ * al final («readmisión antes de las 40 semanas» y «readmisión entre los 3 y los 6 meses» → «Readmisión»). */
+export function nombreFamilia(desenlaces: string[]): string {
+  const frases = [...new Set(desenlaces.map((d) => d.replace(/\s*\([^()]*\)\s*$/, '')))]
+  if (frases.length === 1) return frase(frases[0])
+  const palabras = frases.map((f) => f.split(/\s+/))
+  const comun: string[] = []
+  for (let i = 0; palabras.every((p) => i < p.length && p[i] === palabras[0][i]); i++) comun.push(palabras[0][i])
+  while (comun.length && SUELTAS.has(comun[comun.length - 1].toLowerCase())) comun.pop()
+  return comun.length ? frase(comun.join(' ')) : frase(desenlaces[0])
+}
 
 // ------------------------------------------------------------------ cortes y corridas
 
