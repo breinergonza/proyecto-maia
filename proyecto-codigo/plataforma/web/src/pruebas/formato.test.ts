@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { aproximado, conPunto, dec, edad, fechaHora, frase, medida, meses, numero, parametro, posicion, riesgo } from '../lib/formato'
-import { escalaRedonda } from '../components/graficos'
+import { anchoEje, escalaRedonda } from '../components/graficos'
 
 describe('formatos', () => {
   it('valor medido sin ruido de coma flotante, sin esconder un dato mal registrado', () => {
@@ -53,6 +53,13 @@ describe('formatos', () => {
     expect(conPunto('2 de nov. de 2026, 21:43')).toBe('2 de nov. de 2026, 21:43.')
     expect(conPunto(fechaHora('2026-11-02T21:43:00')).endsWith('..')).toBe(false)
     expect(conPunto(fechaHora('2026-11-02T21:43:00')).endsWith('.')).toBe(true)
+  })
+})
+
+describe('ancho del eje', () => {
+  it('cabe la etiqueta más larga y nunca queda más angosto que lo mínimo', () => {
+    expect(anchoEje(['0', '5.000', '10.000'])).toBe(55)
+    expect(anchoEje(['+3', '−3'])).toBe(32)
   })
 })
 

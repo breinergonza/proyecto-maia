@@ -180,7 +180,8 @@ export function MiniSerie({ puntos, etiqueta, dominioY, ticksY, formatoY, ticksX
           <XAxis dataKey="x" type="number" domain={dominioX ?? ['dataMin', 'dataMax']} ticks={ticksX} tickFormatter={formatoX}
             stroke={COLOR.eje} fontSize={12} tickLine={false} interval="preserveStartEnd" padding={{ left: 10, right: 10 }} />
           <YAxis domain={dominioY} ticks={ticksY} tickFormatter={formatoY} allowDataOverflow interval={0}
-            stroke={COLOR.eje} fontSize={12} width={40} tickLine={false} axisLine={false} />
+            stroke={COLOR.eje} fontSize={12} width={anchoEje((ticksY ?? dominioY).map((v) => (formatoY ? formatoY(v) : String(v))))}
+            tickLine={false} axisLine={false} />
           <Tooltip content={ContenidoTooltip} cursor={{ stroke: COLOR.referencia, strokeDasharray: '3 3' }} />
           <Line dataKey="y" stroke={COLOR.serie} strokeWidth={2} isAnimationActive={false} connectNulls
             dot={PuntoMarcado} activeDot={{ r: 6, stroke: COLOR.papel, strokeWidth: 2 }} />
@@ -301,6 +302,12 @@ export function RangoEsperado({ bajo, alto, esperado, valor, etiqueta }: {
 }
 
 /** Marcas de eje enteras que siempre incluyen las líneas de referencia (p. ej. −2, 0 y 2 en un puntaje z). */
+/** El ancho del eje Y para que quepa su etiqueta más larga (a 12 px, unos 7,5 px por carácter): «10.000» no se corta
+ * en «0.000». */
+export function anchoEje(etiquetas: string[]): number {
+  return Math.max(32, Math.ceil(Math.max(0, ...etiquetas.map((e) => e.length)) * 7.5) + 10)
+}
+
 /** Un eje de valores redondos (pasos de 1, 2 o 5 por una potencia de 10) que cubre [a, b] con unas ``n`` marcas: el
  * dominio se abre hasta la marca redonda más cercana, así ninguna etiqueta queda en un valor raro ni pegada a otra. */
 export function escalaRedonda([a, b]: [number, number], n = 4): { dominio: [number, number]; ticks: number[] } {
