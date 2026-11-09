@@ -57,6 +57,14 @@ export interface CrecimientoEtapa {
   pct_bajo: number
   pct_caida: number
   z_mediano: number | null
+  orden: number
+}
+
+/** Alarmas de grupo de un trimestre con una señal (solo trimestres con alguna). */
+export interface AlarmasTrimestre {
+  periodo: string
+  senal: string
+  alarmas: number
 }
 
 export interface ResumenTablero {
@@ -105,6 +113,12 @@ export interface NinoFila {
   n_alertas: number
   n_bajo_2de: number
   n_caida_1de: number
+  /** Medidas de crecimiento con puntaje (0: no hay con qué decir si crece bien). */
+  n_crecimiento: number
+  /** El último control con medidas de crecimiento. */
+  ultima_visita: string | null
+  ultima_fecha: string | null
+  ultima_edad_corregida: number | null
 }
 
 export interface MedicionVisita {
@@ -139,6 +153,42 @@ export interface RiesgoNino {
   percentil: number
   motivos: string[]
   fecha_visita: string | null
+  /** Riesgo promedio de ese desenlace entre los niños de la corrida. */
+  riesgo_medio: number
+}
+
+/** Riesgo de cada desenlace en cada visita, calculado a demanda con el paquete activo. */
+export interface PuntoHistoria {
+  clave: string
+  desenlace: string
+  momento: string
+  momento_nombre: string
+  orden: number
+  riesgo: number
+  percentil: number
+  fecha_visita: string | null
+}
+
+export interface HistoriaRiesgo {
+  paquete: string
+  /** Paquete con que se calculó la corrida; si difiere de ``paquete``, la historia no es comparable 1:1. */
+  paquete_corrida: string | null
+  puntos: PuntoHistoria[]
+}
+
+export interface VariablePerfil {
+  variable: string
+  etiqueta: string
+  unidad: string | null
+  ninos: number
+  cuantiles: { p5: number; p25: number; p50: number; p75: number; p95: number }
+  valor: number | null
+  /** 0 a 100: cuántos niños de la cohorte tienen un valor menor. */
+  posicion: number | null
+}
+
+export interface PerfilNino {
+  variables: VariablePerfil[]
 }
 
 export interface PuntoCrecimiento {
@@ -147,6 +197,8 @@ export interface PuntoCrecimiento {
   fecha: string | null
   edad_corregida: number | null
   valor: number | null
+  /** La unidad en que se registró ``valor`` (no se convierte). */
+  unidad: string | null
   z: number | null
   bajo_2de: boolean
   caida_1de: boolean
@@ -197,6 +249,17 @@ export interface DatoRevision {
   fuerza: number | null
   es_error: Respuesta | null
   comentario: string | null
+  /** Las medidas del mismo niño y el mismo concepto en cada visita (vacía si la variable no tiene concepto). */
+  serie: PuntoSerieDato[]
+}
+
+export interface PuntoSerieDato {
+  variable: string
+  etapa_nombre: string | null
+  orden: number
+  valor: number
+  /** El dato que se está revisando. */
+  es_este: boolean
 }
 
 export interface RiesgoRevision {

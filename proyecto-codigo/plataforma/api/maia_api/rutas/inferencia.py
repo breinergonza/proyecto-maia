@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 from anomalias import modelo as MA
 from clinico import crecimiento as CR
 from maia_api import estado as E
-from maia_api.consultas import opciones
+from maia_api.consultas import opciones, unidades_crecimiento
 from maia_api.dependencias import EXPERTO, auditar, sesion
 from maia_api.esquemas import PeticionInferencia
 from maia_comun import puntuacion as PU
@@ -54,11 +54,10 @@ def _registros(df: pd.DataFrame) -> list[dict]:
 
 
 def _activo():
-    with E.estado.lock:
-        modelos, manifest, carpeta = E.estado.modelos, E.estado.manifest, E.estado.carpeta
-    if modelos is None or carpeta is None:
+    activo = E.activo()
+    if activo is None:
         raise HTTPException(status.HTTP_409_CONFLICT, 'No hay un paquete de modelos activo.')
-    return modelos, manifest, carpeta
+    return activo
 
 
 def _pesos(modelos, esquema: pd.DataFrame) -> dict[str, float]:
@@ -122,10 +121,14 @@ def inferir(p: PeticionInferencia, s: Session = Depends(sesion), u: Usuario = De
     riesgos = _registros(salida['riesgos'])
     for r in riesgos:
         r['motivos'] = json.loads(r['motivos']) if r.get('motivos') else []
+    crecimiento = _registros(salida['crecimiento'])
+    unidades = unidades_crecimiento(pd.read_parquet(base / 'esquema.parquet').set_index('variable').to_dict('index'))
+    for c in crecimiento:
+        c['unidad'] = unidades.get((c.get('indicador'), c.get('etapa')))
     auditar(s, u, 'inferencia', manifest['version'], {'sujetos': len(sujetos), 'mediciones': len(mediciones)})
     s.commit()
     return {'paquete': manifest['version'], 'fuente': manifest['fuente'], 'variables_ignoradas': ignoradas,
-            'alertas_dato': alertas, 'riesgos': riesgos, 'crecimiento': _registros(salida['crecimiento'])}
+            'alertas_dato': alertas, 'riesgos': riesgos, 'crecimiento': crecimiento}
 
 
 @ruta.get('/formulario')

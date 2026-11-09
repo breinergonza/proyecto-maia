@@ -8,11 +8,11 @@ import { pedir } from '../api/cliente'
 import type { NinoFila, Pagina, ResumenTablero } from '../api/tipos'
 import { Aviso, Boton, Cargando, Encabezado, Entrada, Insignia, Paginador, Selector, Vacio } from '../components/ui'
 import { cn } from '../lib/cn'
-import { dec, num, RIESGO_ALTO } from '../lib/formato'
+import { dec, edad, fecha, num, RIESGO_ALTO } from '../lib/formato'
 import { ayudaPosicion, AYUDA_OMS, BAJO_EDAD, CAYO, esAlto, nivelCorto, RIESGO_MUY_ALTO } from '../lib/lenguaje'
 
-const TAMANOS = [5, 10, 25, 50]
-const TAMANO = 5
+const TAMANOS = [10, 25, 50, 100]
+const TAMANO = 25
 const GUARDADO = 'maia.ninos.columnas'
 
 type Columna = {
@@ -54,9 +54,23 @@ const COLUMNAS: Columna[] = [
       <span className="flex flex-wrap gap-1">
         {n.n_bajo_2de > 0 && <span title={AYUDA_OMS}><Insignia tono="ocre">{BAJO_EDAD} ×{n.n_bajo_2de}</Insignia></span>}
         {n.n_caida_1de > 0 && <span title={`${CAYO}. ${AYUDA_OMS}`}><Insignia>Cayó ×{n.n_caida_1de}</Insignia></span>}
-        {!n.n_bajo_2de && !n.n_caida_1de && <span className="text-salvia">—</span>}
+        {!n.n_bajo_2de && !n.n_caida_1de && (n.n_crecimiento > 0
+          ? <span className="text-teal" title={`${num(n.n_crecimiento)} medidas, ninguna baja para la edad ni con caída. ${AYUDA_OMS}`}>Sin alerta</span>
+          : <span className="text-salvia" title="No hay peso, talla ni perímetro con que compararlo">Sin dato</span>)}
       </span>
     ),
+  },
+  // la última visita con algún dato (la misma que cierra la ficha) y la edad corregida de ese día; ordena por visita
+  {
+    id: 'ultimo_control', titulo: 'Último control', derecha: true, primero: 'desc',
+    celda: (n) => (n.ultima_visita == null ? <span className="text-salvia">Sin controles</span> : (
+      <span className="whitespace-nowrap">
+        {n.ultima_visita.replace(' (edad corregida)', '')}
+        <span className="block text-xs text-salvia">
+          {n.ultima_edad_corregida != null ? `${edad(n.ultima_edad_corregida)} de edad corregida` : fecha(n.ultima_fecha)}
+        </span>
+      </span>
+    )),
   },
 ]
 const POR_ID = new Map(COLUMNAS.map((c) => [c.id, c]))
@@ -65,8 +79,10 @@ const ORDEN_INICIAL = COLUMNAS.map((c) => c.id)
 function leerOrden(): string[] {
   try {
     const guardado = JSON.parse(localStorage.getItem(GUARDADO) ?? 'null') as unknown
-    if (Array.isArray(guardado) && guardado.length === ORDEN_INICIAL.length && ORDEN_INICIAL.every((id) => guardado.includes(id))) {
-      return guardado as string[]
+    if (Array.isArray(guardado)) {
+      // el orden guardado, sin columnas que ya no existen y con las nuevas al final
+      const propio = guardado.filter((id): id is string => typeof id === 'string' && POR_ID.has(id))
+      return [...new Set([...propio, ...ORDEN_INICIAL])]
     }
   } catch { /* sin almacenamiento: el orden de siempre */ }
   return ORDEN_INICIAL
@@ -163,7 +179,7 @@ export default function Ninos() {
           <div className="flex shrink-0 flex-col gap-3 border-t border-linea px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <label className="flex items-center gap-2 text-sm text-salvia">
               Filas por página
-              <Selector className="h-9 w-20 sm:h-8" value={tamano} onChange={(e) => cambiar({ tamano: e.target.value === String(TAMANO) ? '' : e.target.value })}>
+              <Selector className="h-9 w-24 sm:h-8" value={tamano} onChange={(e) => cambiar({ tamano: e.target.value === String(TAMANO) ? '' : e.target.value })}>
                 {TAMANOS.map((t) => <option key={t} value={t}>{t}</option>)}
               </Selector>
             </label>
@@ -211,7 +227,7 @@ function Grilla({ filas, columnas, reordenar, orden, dir, ordenarPor }: {
                   onDragLeave={() => setSobre((s) => (s === c.id ? null : s))}
                   onDrop={(e) => { e.preventDefault(); soltar(c.id) }}
                   onDragEnd={() => { setArrastrada(null); setSobre(null) }}
-                  className={cn('group border-b border-linea px-3 py-2.5 text-xs font-semibold uppercase tracking-wider whitespace-nowrap text-salvia transition-colors',
+                  className={cn('group border-b border-linea px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-salvia transition-colors',
                     FIJA, 'first:z-20',
                     c.derecha ? 'text-right' : 'text-left',
                     arrastrada === c.id && 'opacity-40',
@@ -219,7 +235,7 @@ function Grilla({ filas, columnas, reordenar, orden, dir, ordenarPor }: {
                   <span className={cn('inline-flex items-center gap-1', c.derecha && 'flex-row-reverse')}>
                     <GripVertical size={14} aria-hidden className="hidden cursor-grab text-salvia/40 group-hover:text-salvia sm:block" />
                     <button type="button" onClick={() => ordenarPor(c)} title={`Ordenar por ${c.titulo.toLowerCase()}`}
-                      className={cn('inline-flex items-center gap-1 rounded px-1 py-0.5 uppercase tracking-wider hover:text-tinta', activa && 'text-teal')}>
+                      className={cn('inline-flex items-center gap-1 rounded px-1 py-0.5 uppercase tracking-wider hover:text-tinta', c.derecha ? 'text-right' : 'text-left', activa && 'text-teal')}>
                       {c.titulo}
                       <Icono size={13} aria-hidden className={cn(!activa && 'opacity-40 group-hover:opacity-100')} />
                     </button>

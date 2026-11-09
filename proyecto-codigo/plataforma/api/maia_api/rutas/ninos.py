@@ -2,27 +2,36 @@
 de la OMS, alertas de dato y riesgos). Los códigos son los seudonimizados de la base; nunca hay nombres."""
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from typing import Literal
 
+import numpy as np
+import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from maia_api import estado as E
 from maia_api.consultas import (
     corrida_de,
     esquema,
     etapas,
+    medidas_numericas,
     motivo_legible,
     nombre_etapa,
     sujeto_existe,
     unidad_mostrada,
+    unidades_crecimiento,
     valor_legible,
 )
 from maia_api.dependencias import CUALQUIERA, sesion
+from maia_comun import puntuacion as PU
 from maia_comun.modelos_db import Usuario
 
 ruta = APIRouter(prefix='/ninos', tags=['niños'])
+registro = logging.getLogger(__name__)
+MINIMO_COHORTE = 20   # con menos niños, los cuantiles dirían más de cada uno que del grupo
 
 # Columnas por las que se puede ordenar la lista (lista cerrada: el nombre nunca llega al SQL sin pasar por aquí).
 ORDENES = {
@@ -32,6 +41,7 @@ ORDENES = {
     'percentil_max': 'r.percentil_max',
     'n_alertas': 'coalesce(a.n_alertas, 0)',
     'crecimiento': 'coalesce(g.n_bajo, 0) + coalesce(g.n_caida, 0)',
+    'ultimo_control': 'u.orden',
 }
 
 
@@ -39,12 +49,17 @@ ORDENES = {
 def listar(buscar: str | None = None, desenlace: str | None = None,
            percentil_min: float | None = Query(None, ge=0, le=100), pagina: int = Query(1, ge=1),
            tamano: int = Query(25, ge=1, le=200), corrida_id: int | None = None,
-           orden: Literal['sujeto', 'eg_semanas', 'desenlace_max', 'percentil_max', 'n_alertas', 'crecimiento'] | None = None,
+           orden: Literal['sujeto', 'eg_semanas', 'desenlace_max', 'percentil_max', 'n_alertas', 'crecimiento',
+                          'ultimo_control'] | None = None,
            dir: Literal['asc', 'desc'] = 'desc',
            s: Session = Depends(sesion), _: Usuario = Depends(CUALQUIERA)) -> dict:
     c = corrida_de(s, corrida_id)
     if c.corte_id is None:
         raise HTTPException(status.HTTP_409_CONFLICT, 'Los datos de esa corrida ya no están cargados.')
+    mapa = etapas(s, c.corte_id)
+    # cada variable de visita con su visita y su orden: el último control es la última visita con algún dato, como en
+    # la ficha (no solo las que tienen medidas de crecimiento)
+    de_visita = [(v, d['etapa']) for v, d in esquema(s, c.corte_id).items() if d.get('etapa') in mapa]
     filtros_r = ['corrida_id = :c', 'NOT silencio']
     if desenlace:
         filtros_r.append('clave = :d')
@@ -67,20 +82,44 @@ def listar(buscar: str | None = None, desenlace: str | None = None,
         ) r ON r.sujeto = s.sujeto
         LEFT JOIN (SELECT sujeto, count(*) AS n_alertas FROM resultados.alertas_dato WHERE corrida_id = :c GROUP BY sujeto)
             a ON a.sujeto = s.sujeto
-        LEFT JOIN (SELECT sujeto, count(*) FILTER (WHERE bajo_2de) AS n_bajo, count(*) FILTER (WHERE caida_1de) AS n_caida
+        LEFT JOIN (SELECT sujeto, count(*) FILTER (WHERE bajo_2de) AS n_bajo, count(*) FILTER (WHERE caida_1de) AS n_caida,
+                          count(*) FILTER (WHERE NOT improbable AND z IS NOT NULL) AS n_medidas
                    FROM resultados.crecimiento WHERE corrida_id = :c GROUP BY sujeto) g ON g.sujeto = s.sujeto
+        -- el último control: la última visita con algún dato, su fecha y la edad corregida de ese día (si se calculó)
+        LEFT JOIN (SELECT DISTINCT ON (sujeto) sujeto, etapa, orden, fecha FROM (
+                       SELECT m.sujeto, ve.etapa, ve.orden, max(m.fecha) AS fecha FROM sevarti.mediciones m
+                       JOIN unnest(CAST(:ve_v AS text[]), CAST(:ve_e AS text[]), CAST(:ve_o AS double precision[]))
+                           AS ve(variable, etapa, orden) ON ve.variable = m.variable
+                       WHERE m.corte_id = :corte GROUP BY m.sujeto, ve.etapa, ve.orden) x
+                   ORDER BY sujeto, orden DESC) u ON u.sujeto = s.sujeto
+        LEFT JOIN (SELECT sujeto, etapa, max(edad_corregida) AS edad_corregida FROM resultados.crecimiento
+                   WHERE corrida_id = :c GROUP BY sujeto, etapa) ue ON ue.sujeto = u.sujeto AND ue.etapa = u.etapa
         WHERE {' AND '.join(filtros)}"""
-    p = {'c': c.id, 'corte': c.corte_id, 'd': desenlace, 'b': f'%{buscar}%' if buscar else None, 'p': percentil_min}
+    p = {'c': c.id, 'corte': c.corte_id, 'd': desenlace, 'b': f'%{buscar}%' if buscar else None, 'p': percentil_min,
+         've_v': [v for v, _ in de_visita], 've_e': [e for _, e in de_visita],
+         've_o': [float(mapa[e]['orden']) for _, e in de_visita]}
     total = s.execute(text(f'SELECT count(*) {base}'), p).scalar_one()
     orden_sql = f'{ORDENES[orden]} {dir.upper()} NULLS LAST, ' if orden else ''
     filas = s.execute(text(f"""
         SELECT s.sujeto, s.eg_semanas, s.grupo, r.percentil_max, r.riesgo_max, r.desenlace_max, r.clave_max,
                coalesce(r.n_riesgos, 0) AS n_riesgos, coalesce(a.n_alertas, 0) AS n_alertas,
-               coalesce(g.n_bajo, 0) AS n_bajo_2de, coalesce(g.n_caida, 0) AS n_caida_1de
+               coalesce(g.n_bajo, 0) AS n_bajo_2de, coalesce(g.n_caida, 0) AS n_caida_1de,
+               coalesce(g.n_medidas, 0) AS n_crecimiento, u.etapa AS ultima_etapa, u.fecha AS ultima_fecha,
+               ue.edad_corregida AS ultima_edad_corregida
         {base}
         ORDER BY {orden_sql}r.percentil_max DESC NULLS LAST, a.n_alertas DESC NULLS LAST, s.sujeto
         LIMIT :lim OFFSET :off"""), {**p, 'lim': tamano, 'off': (pagina - 1) * tamano})
-    return {'total': total, 'pagina': pagina, 'tamano': tamano, 'items': [dict(f._mapping) for f in filas]}
+    items = []
+    for f in filas:
+        d = dict(f._mapping)
+        d['ultima_visita'] = nombre_etapa(mapa, d.pop('ultima_etapa'))
+        items.append(d)
+    return {'total': total, 'pagina': pagina, 'tamano': tamano, 'items': items}
+
+
+def _tabla(s: Session, sql: str, p: dict) -> pd.DataFrame:
+    r = s.execute(text(sql), p)
+    return pd.DataFrame(r.fetchall(), columns=list(r.keys()))
 
 
 def _texto_motivos(m) -> list[str]:
@@ -103,9 +142,14 @@ def linea_temporal(sujeto: str, corrida_id: int | None = None, s: Session = Depe
     alertas = s.execute(text('SELECT id, variable, etiqueta, etapa, valor, esperado, rango_bajo, rango_alto, capas, motivo, '
                              'prioridad FROM resultados.alertas_dato WHERE corrida_id = :c AND sujeto = :s ORDER BY prioridad'),
                         {'c': c.id, 's': sujeto})
-    riesgos = s.execute(text('SELECT id, clave, desenlace, momento, riesgo, percentil, motivos, fecha_visita '
-                             'FROM resultados.riesgos WHERE corrida_id = :c AND sujeto = :s AND NOT silencio '
-                             'ORDER BY percentil DESC'), {'c': c.id, 's': sujeto})
+    # con el riesgo promedio de su desenlace en la corrida: un 3 % solo se entiende al lado de lo habitual
+    riesgos = s.execute(text("""
+        SELECT r.id, r.clave, r.desenlace, r.momento, r.riesgo, r.percentil, r.motivos, r.fecha_visita, m.riesgo_medio
+        FROM resultados.riesgos r
+        JOIN (SELECT clave, avg(riesgo) AS riesgo_medio FROM resultados.riesgos
+              WHERE corrida_id = :c AND NOT silencio GROUP BY clave) m ON m.clave = r.clave
+        WHERE r.corrida_id = :c AND r.sujeto = :s AND NOT r.silencio
+        ORDER BY r.percentil DESC"""), {'c': c.id, 's': sujeto})
     crec = s.execute(text('SELECT etapa, indicador, fecha, edad_corregida, valor, z, bajo_2de, caida_1de, improbable '
                           'FROM resultados.crecimiento WHERE corrida_id = :c AND sujeto = :s ORDER BY edad_corregida'),
                      {'c': c.id, 's': sujeto})
@@ -147,8 +191,10 @@ def linea_temporal(sujeto: str, corrida_id: int | None = None, s: Session = Depe
         d['motivos'] = [motivo_legible(x, esq) for x in _texto_motivos(d['motivos'])]
         visita(r.momento)['riesgos'].append(d)
     serie = defaultdict(list)
+    unidades = unidades_crecimiento(esq)
     for g in crec:
         d = dict(g._mapping)
+        d['unidad'] = unidades.get((g.indicador, g.etapa))   # el valor se guarda tal como se midió
         serie[g.indicador].append(d)
         if g.etapa:
             v = visita(g.etapa)
@@ -165,3 +211,116 @@ def linea_temporal(sujeto: str, corrida_id: int | None = None, s: Session = Depe
         'crecimiento': {k: v for k, v in serie.items()},
         'nombre_etapa': {k: nombre_etapa(mapa, k) for k in mapa},
     }
+
+
+@ruta.get('/{sujeto}/historia-riesgo')
+def historia_riesgo(sujeto: str, corrida_id: int | None = None, s: Session = Depends(sesion),
+                    _: Usuario = Depends(CUALQUIERA)) -> dict:
+    """El riesgo de cada desenlace en cada visita del niño, calculado ahora con el paquete activo: cada punto usa solo lo
+    medido hasta su visita. La corrida guarda solo la última visita, así que esto no sale de ``resultados.riesgos``."""
+    c = corrida_de(s, corrida_id)
+    if not sujeto_existe(s, c.corte_id, sujeto):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f'No hay un niño {sujeto} en el corte de la corrida.')
+    activo = E.activo()
+    if activo is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, 'No hay un paquete de modelos activo para calcular la historia.')
+    modelos, manifest, carpeta = activo
+    base = carpeta / 'sevarti_base'
+    variables = list(pd.read_parquet(base / 'esquema.parquet', columns=['variable']).variable)
+    p = {'c': c.corte_id, 's': sujeto}
+    parcial = {
+        'sujetos': _tabla(s, 'SELECT sujeto, grupo, fecha_nacimiento, eg_semanas, anio_nacimiento FROM sevarti.sujetos '
+                             'WHERE corte_id = :c AND sujeto = :s', p),
+        'mediciones': _tabla(s, 'SELECT sujeto, variable, valor, fecha, edad_dias FROM sevarti.mediciones '
+                                'WHERE corte_id = :c AND sujeto = :s AND variable = ANY(:v)', {**p, 'v': variables}),
+        'episodios': _tabla(s, 'SELECT sujeto, tipo, edad_inicio, edad_fin FROM sevarti.episodios '
+                               'WHERE corte_id = :c AND sujeto = :s', p),
+    }
+    corte = pd.Timestamp(c.fecha_corte) if c.fecha_corte else None
+    try:
+        tabla = PU.historia_riesgo(PU.completar(parcial, base, corte), modelos)
+    except (ValueError, KeyError) as e:
+        registro.warning('No se pudo calcular la historia de riesgo de %s: %s: %s', sujeto, type(e).__name__, e,
+                         exc_info=True)
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                            'No se pudo calcular el riesgo en las visitas anteriores de este niño.') from e
+    # el orden y el nombre de cada visita salen del mismo paquete que calculó el riesgo, no del corte de la corrida
+    et = pd.read_parquet(base / 'etapas.parquet')
+    mapa = {str(e): {'nombre': n if isinstance(n, str) and n else str(e), 'orden': int(o)}
+            for e, n, o in zip(et.etapa, et.nombre if 'nombre' in et else et.etapa, et.orden)}
+    puntos = [{
+        'clave': f.clave, 'desenlace': f.desenlace, 'momento': f.momento,
+        'momento_nombre': nombre_etapa(mapa, f.momento), 'orden': mapa.get(f.momento, {}).get('orden', 99),
+        'riesgo': float(f.riesgo), 'percentil': float(f.percentil),
+        'fecha_visita': None if pd.isna(f.fecha_visita) else str(f.fecha_visita)[:10],
+    } for f in tabla.itertuples()]
+    puntos.sort(key=lambda x: (x['orden'], x['desenlace']))
+    return {'paquete': manifest['version'], 'paquete_corrida': c.paquete, 'puntos': puntos}
+
+
+# Valores de cada variable del perfil (uno por niño), por corte y ordenados. Los datos de un corte no cambian: se leen
+# una vez. Dos peticiones a la vez pueden leer lo mismo; el resultado es igual y la última escritura gana.
+_COHORTE: dict[tuple[int, str], np.ndarray] = {}
+def _valores_cohorte(s: Session, corte_id: int, variables: list[str], esq: dict) -> dict[str, np.ndarray]:
+    faltan = [v for v in variables if (corte_id, v) not in _COHORTE]
+    if faltan:
+        leidos: dict[str, list[float]] = {v: [] for v in faltan}
+        if 'eg_semanas' in leidos:
+            leidos['eg_semanas'] = [r[0] for r in s.execute(text(
+                'SELECT eg_semanas FROM sevarti.sujetos WHERE corte_id = :c AND eg_semanas IS NOT NULL'),
+                {'c': corte_id})]
+        otras = [v for v in faltan if v != 'eg_semanas']
+        if otras:
+            for _, variable, x in medidas_numericas(s, corte_id, otras, esq):
+                leidos[variable].append(x)
+        for v, valores in leidos.items():
+            _COHORTE[(corte_id, v)] = np.sort(np.asarray(valores, dtype=float))
+    return {v: _COHORTE[(corte_id, v)] for v in variables}
+
+
+def _variables_perfil(esq: dict) -> list[str]:
+    """Edad gestacional y las medidas al nacer: los datos basales numéricos que el diccionario une a un concepto de
+    crecimiento (peso, talla, perímetro). Lo decide el diccionario, no el código."""
+    al_nacer = sorted(v for v, d in esq.items()
+                      if d.get('rol') == 'basal' and d.get('tipo') == 'numeric' and isinstance(d.get('concepto'), str)
+                      and d['concepto'])
+    return ['eg_semanas', *al_nacer]
+
+
+@ruta.get('/{sujeto}/perfil')
+def perfil(sujeto: str, corrida_id: int | None = None, s: Session = Depends(sesion),
+           _: Usuario = Depends(CUALQUIERA)) -> dict:
+    """Dónde queda el niño frente a los demás niños del corte en su edad gestacional y sus medidas al nacer. De la
+    cohorte solo salen agregados (cuantiles y cuántos niños), nunca valores de otro niño."""
+    c = corrida_de(s, corrida_id)
+    if not sujeto_existe(s, c.corte_id, sujeto):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f'No hay un niño {sujeto} en el corte de la corrida.')
+    esq = esquema(s, c.corte_id)
+    variables = _variables_perfil(esq)
+    cohorte = _valores_cohorte(s, c.corte_id, variables, esq)
+    propios: dict[str, float] = {}
+    eg = s.execute(text('SELECT eg_semanas FROM sevarti.sujetos WHERE corte_id = :c AND sujeto = :s'),
+                   {'c': c.corte_id, 's': sujeto}).scalar()
+    if eg is not None:
+        propios['eg_semanas'] = float(eg)
+    for _, variable, x in medidas_numericas(s, c.corte_id, variables[1:], esq, [sujeto]):
+        propios[variable] = x
+    filas = []
+    for v in variables:
+        valores = cohorte[v]
+        if len(valores) < MINIMO_COHORTE:
+            continue
+        x = propios.get(v)
+        d = esq.get(v, {})
+        filas.append({
+            'variable': v,
+            'etiqueta': 'Edad gestacional' if v == 'eg_semanas' else d.get('etiqueta') or v,
+            'unidad': 'semanas' if v == 'eg_semanas' else unidad_mostrada(d),
+            'ninos': int(len(valores)),
+            'cuantiles': dict(zip(('p5', 'p25', 'p50', 'p75', 'p95'),
+                                  (float(q) for q in np.quantile(valores, [0.05, 0.25, 0.5, 0.75, 0.95])))),
+            'valor': x,
+            # porcentaje de niños con un valor estrictamente menor (lo que dice la web: «N de cada 100 tienen menos»)
+            'posicion': None if x is None else float(100 * np.searchsorted(valores, x, 'left') / len(valores)),
+        })
+    return {'variables': filas}

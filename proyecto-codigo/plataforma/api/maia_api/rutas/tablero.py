@@ -65,6 +65,17 @@ def resumen(corrida_id: int | None = None, s: Session = Depends(sesion), _: Usua
     }
 
 
+@ruta.get('/alarmas-por-trimestre')
+def alarmas_por_trimestre(corrida_id: int | None = None, s: Session = Depends(sesion),
+                          _: Usuario = Depends(CUALQUIERA)) -> list[dict]:
+    """Cuántas alarmas de grupo hubo en cada trimestre y por qué señal, de todas las de la corrida (la lista de
+    ``/alarmas-grupo`` trae solo las más recientes). Solo están los trimestres con alguna alarma."""
+    c = corrida_de(s, corrida_id)
+    return _filas(s, """
+        SELECT periodo, senal, count(*) AS alarmas FROM resultados.alarmas_grupo WHERE corrida_id = :c
+        GROUP BY periodo, senal ORDER BY periodo, senal""", c=c.id)
+
+
 @ruta.get('/alarmas-grupo')
 def alarmas_grupo(variable: str | None = None, corrida_id: int | None = None, s: Session = Depends(sesion),
                   _: Usuario = Depends(CUALQUIERA)) -> list[dict]:

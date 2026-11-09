@@ -30,8 +30,10 @@ const resultado = {
     percentil: 96, motivos: ['Peso al nacer (peso_nacer) = 900'], fecha_visita: '2026-05-10' }],
   alertas_dato: [{ sujeto: 'calculo', variable: 'peso_3m', etiqueta: 'Peso a 3 m EC', etapa: '3 m EC', valor: '9999', esperado: 5000,
     rango_bajo: 4000, rango_alto: 6500, capas: ['1'], motivo: 'posible error de unidad', prioridad: 1 }],
-  crecimiento: [{ sujeto: 'calculo', etapa: '3 m EC', indicador: 'peso', fecha: '2026-05-10', edad_corregida: 60, valor: 9999, z: -2.6,
-    bajo_2de: true, caida_1de: true, improbable: false }],
+  crecimiento: [{ sujeto: 'calculo', etapa: '3 m EC', indicador: 'peso', fecha: '2026-05-10', edad_corregida: 60, valor: 9999, unidad: 'g', z: -2.6,
+    bajo_2de: true, caida_1de: true, improbable: false },
+  { sujeto: 'calculo', etapa: '3 m EC', indicador: 'talla', fecha: '2026-05-10', edad_corregida: 60, valor: 99, unidad: 'cm', z: 9.1,
+    bajo_2de: false, caida_1de: false, improbable: true }],
 }
 
 function api(rol: Usuario['rol'], enviados: unknown[] = [], extra?: { formulario?: unknown; inferencia?: { estado: number; cuerpo: unknown }; activo?: unknown }) {
@@ -75,13 +77,15 @@ describe('calcular el riesgo de un niño', () => {
       ],
     })
 
-    const riesgo = (await screen.findByText('desarrollo psicomotor bajo a los 6 meses', { selector: 'p' })).closest('li')!
+    const riesgo = (await screen.findByText('desarrollo psicomotor bajo a los 6 meses', { selector: 'h2' })).closest('article')!
     expect(within(riesgo).getByText('Riesgo muy alto')).toBeInTheDocument()
     expect(within(riesgo).getByText('9 de 10')).toBeInTheDocument()
     expect(within(riesgo).getByText('Peso al nacer: 900')).toBeInTheDocument()
     expect(screen.getByText('Parece anotado en otra unidad (por ejemplo, kilos en lugar de gramos).')).toBeInTheDocument()
     expect(screen.getByText('Bajo para la edad')).toBeInTheDocument()
     expect(screen.getByText('Cayó desde el último control')).toBeInTheDocument()
+    // una medida que solo tiene datos improbables no desaparece: se nombra para revisarla
+    expect(screen.getByText('1 medida improbable (revisar) no se grafica')).toBeInTheDocument()
     expect(document.querySelector('main')?.textContent).not.toMatch(/posici[oó]n|puntaje z|capa \d|[−-]2 DE|\(peso_nacer\)/i)
     expect(screen.queryByRole('button', { name: 'Modo avanzado (JSON)' })).not.toBeInTheDocument()
   })
