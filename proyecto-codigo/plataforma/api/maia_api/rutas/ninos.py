@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from maia_api import estado as E
 from maia_api.consultas import (
     corrida_de,
     esquema,
@@ -20,12 +21,13 @@ from maia_api.consultas import (
     nombre_etapa,
     sujeto_existe,
     unidad_mostrada,
+    unidades_crecimiento,
     valor_legible,
 )
-from maia_api import estado as E
 from maia_api.dependencias import CUALQUIERA, sesion
 from maia_comun import puntuacion as PU
 from maia_comun.modelos_db import Usuario
+from sevarti import contrato as SV
 
 ruta = APIRouter(prefix='/ninos', tags=['niños'])
 registro = logging.getLogger(__name__)
@@ -164,8 +166,10 @@ def linea_temporal(sujeto: str, corrida_id: int | None = None, s: Session = Depe
         d['motivos'] = [motivo_legible(x, esq) for x in _texto_motivos(d['motivos'])]
         visita(r.momento)['riesgos'].append(d)
     serie = defaultdict(list)
+    unidades = unidades_crecimiento(esq)
     for g in crec:
         d = dict(g._mapping)
+        d['unidad'] = unidades.get((g.indicador, g.etapa))   # el valor se guarda tal como se midió
         serie[g.indicador].append(d)
         if g.etapa:
             v = visita(g.etapa)
@@ -215,7 +219,10 @@ def historia_riesgo(sujeto: str, corrida_id: int | None = None, s: Session = Dep
                          exc_info=True)
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
                             'No se pudo calcular el riesgo en las visitas anteriores de este niño.') from e
-    mapa = etapas(s, c.corte_id)
+    # el orden y el nombre de cada visita salen del mismo paquete que calculó el riesgo, no del corte de la corrida
+    et = pd.read_parquet(base / 'etapas.parquet')
+    mapa = {str(e): {'nombre': n if isinstance(n, str) and n else str(e), 'orden': int(o)}
+            for e, n, o in zip(et.etapa, et.nombre if 'nombre' in et else et.etapa, et.orden)}
     puntos = [{
         'clave': f.clave, 'desenlace': f.desenlace, 'momento': f.momento,
         'momento_nombre': nombre_etapa(mapa, f.momento), 'orden': mapa.get(f.momento, {}).get('orden', 99),
@@ -226,12 +233,28 @@ def historia_riesgo(sujeto: str, corrida_id: int | None = None, s: Session = Dep
     return {'paquete': manifest['version'], 'paquete_corrida': c.paquete, 'puntos': puntos}
 
 
-# Valores de cada variable del perfil, por corte y ordenados. Los datos de un corte no cambian: se leen una vez.
+# Valores de cada variable del perfil (uno por niño), por corte y ordenados. Los datos de un corte no cambian: se leen
+# una vez. Dos peticiones a la vez pueden leer lo mismo; el resultado es igual y la última escritura gana.
 _COHORTE: dict[tuple[int, str], np.ndarray] = {}
 _NUMERO_SQL = "valor ~ '^-?[0-9]+([.][0-9]+)?$'"
 
 
-def _valores_cohorte(s: Session, corte_id: int, variables: list[str]) -> dict[str, np.ndarray]:
+def _medidas(s: Session, corte_id: int, variables: list[str], esq: dict, sujeto: str | None = None):
+    """(sujeto, variable, valor): el primer valor numérico de cada niño en cada variable, sin los códigos de «no se
+    hizo» que declara el diccionario (un −1 no es un peso)."""
+    filtro = ' AND sujeto = :s' if sujeto is not None else ''
+    codigos = {v: SV.codigos_declarados(esq.get(v, {}).get('codigos_especiales')) for v in variables}
+    vistos: set[tuple[str, str]] = set()
+    for suj, variable, valor in s.execute(text(
+            f'SELECT sujeto, variable, valor FROM sevarti.mediciones WHERE corte_id = :c AND variable = ANY(:v) '
+            f'AND {_NUMERO_SQL}{filtro} ORDER BY sujeto, variable, id'), {'c': corte_id, 'v': variables, 's': sujeto}):
+        x = float(valor)
+        if (suj, variable) not in vistos and x not in codigos[variable]:
+            vistos.add((suj, variable))
+            yield suj, variable, x
+
+
+def _valores_cohorte(s: Session, corte_id: int, variables: list[str], esq: dict) -> dict[str, np.ndarray]:
     faltan = [v for v in variables if (corte_id, v) not in _COHORTE]
     if faltan:
         leidos: dict[str, list[float]] = {v: [] for v in faltan}
@@ -241,10 +264,8 @@ def _valores_cohorte(s: Session, corte_id: int, variables: list[str]) -> dict[st
                 {'c': corte_id})]
         otras = [v for v in faltan if v != 'eg_semanas']
         if otras:
-            for variable, valor in s.execute(text(
-                    f'SELECT variable, valor FROM sevarti.mediciones WHERE corte_id = :c AND variable = ANY(:v) '
-                    f'AND {_NUMERO_SQL}'), {'c': corte_id, 'v': otras}):
-                leidos[variable].append(float(valor))
+            for _, variable, x in _medidas(s, corte_id, otras, esq):
+                leidos[variable].append(x)
         for v, valores in leidos.items():
             _COHORTE[(corte_id, v)] = np.sort(np.asarray(valores, dtype=float))
     return {v: _COHORTE[(corte_id, v)] for v in variables}
@@ -269,16 +290,14 @@ def perfil(sujeto: str, corrida_id: int | None = None, s: Session = Depends(sesi
         raise HTTPException(status.HTTP_404_NOT_FOUND, f'No hay un niño {sujeto} en el corte de la corrida.')
     esq = esquema(s, c.corte_id)
     variables = _variables_perfil(esq)
-    cohorte = _valores_cohorte(s, c.corte_id, variables)
+    cohorte = _valores_cohorte(s, c.corte_id, variables, esq)
     propios: dict[str, float] = {}
     eg = s.execute(text('SELECT eg_semanas FROM sevarti.sujetos WHERE corte_id = :c AND sujeto = :s'),
                    {'c': c.corte_id, 's': sujeto}).scalar()
     if eg is not None:
         propios['eg_semanas'] = float(eg)
-    for variable, valor in s.execute(text(
-            f'SELECT variable, valor FROM sevarti.mediciones WHERE corte_id = :c AND sujeto = :s AND variable = ANY(:v) '
-            f'AND {_NUMERO_SQL} ORDER BY id'), {'c': c.corte_id, 's': sujeto, 'v': variables[1:]}):
-        propios.setdefault(variable, float(valor))
+    for _, variable, x in _medidas(s, c.corte_id, variables[1:], esq, sujeto):
+        propios[variable] = x
     filas = []
     for v in variables:
         valores = cohorte[v]
@@ -294,8 +313,7 @@ def perfil(sujeto: str, corrida_id: int | None = None, s: Session = Depends(sesi
             'cuantiles': dict(zip(('p5', 'p25', 'p50', 'p75', 'p95'),
                                   (float(q) for q in np.quantile(valores, [0.05, 0.25, 0.5, 0.75, 0.95])))),
             'valor': x,
-            # porcentaje de niños con un valor menor; los empates cuentan la mitad
-            'posicion': None if x is None else float(
-                100 * (np.searchsorted(valores, x, 'left') + np.searchsorted(valores, x, 'right')) / (2 * len(valores))),
+            # porcentaje de niños con un valor estrictamente menor (lo que dice la web: «N de cada 100 tienen menos»)
+            'posicion': None if x is None else float(100 * np.searchsorted(valores, x, 'left') / len(valores)),
         })
     return {'variables': filas}

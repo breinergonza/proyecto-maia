@@ -58,7 +58,7 @@ export default function Nino() {
         </section>
       )}
 
-      {riesgos.length > 0 && <TrayectoriaRiesgo sujeto={n.sujeto} />}
+      <TrayectoriaRiesgo sujeto={n.sujeto} />
       <CrecimientoOms crecimiento={n.crecimiento} />
       <PerfilCohorte sujeto={n.sujeto} />
       </div>

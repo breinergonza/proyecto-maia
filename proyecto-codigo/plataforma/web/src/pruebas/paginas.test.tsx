@@ -77,6 +77,10 @@ describe('revisión de datos', () => {
       id: 7, prioridad: 1, sujeto: 's1', variable: 'peso_40', etiqueta: 'Peso a 40 sem', unidad: 'g', etapa: 's40',
       etapa_nombre: '40 semanas', fecha: '2026-01-01', valor: '9999', esperado: 2800, rango_bajo: 2000, rango_alto: 3500,
       capas: ['1', '2'], motivo: 'valor atípico', fuerza: 9, es_error: null, comentario: null,
+      serie: [
+        { variable: 'peso_nacer', etapa_nombre: 'Nacimiento', orden: 0, valor: 1500, es_este: false },
+        { variable: 'peso_40', etapa_nombre: '40 semanas', orden: 2, valor: 9999, es_este: true },
+      ],
     }
     const enviados: unknown[] = []
     simularApi((url, init) => {
@@ -90,6 +94,10 @@ describe('revisión de datos', () => {
     })
     montar('/revision/datos')
     expect(await screen.findByText(/Para este niño se esperaba entre/)).toBeInTheDocument()
+    // la serie del niño para ese concepto, y sin el motivo que solo repite la etiqueta «Valor fuera de lo esperado»
+    expect(screen.getByRole('figure', { name: 'Peso a 40 sem de este niño en cada visita: Nacimiento, 1.500 g; 40 semanas, 9.999 g' }))
+      .toBeInTheDocument()
+    expect(screen.queryByText(/Valor muy distinto/)).not.toBeInTheDocument()
     await userEvent.type(screen.getByLabelText('Comentario'), 'La báscula estaba dañada')
     await userEvent.click(screen.getByRole('button', { name: 'Sí' }))
     await waitFor(() => expect(enviados).toEqual([{ es_error: 'si', comentario: 'La báscula estaba dañada' }]))

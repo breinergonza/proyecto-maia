@@ -2,7 +2,7 @@
 // en el texto visible de esas pantallas vuelve a aparecer un término técnico. El término técnico puede seguir en title.
 import { screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { alerta, ayudaMinimo, cuantosMenos, familia, frenteOms, motivo, motivosRiesgo, nivelAlto, nivelCorto, nombreFamilia, peso } from '../lib/lenguaje'
+import { alerta, ayudaMinimo, cuantosMenos, desviaciones, familia, frenteDemas, frenteOms, motivo, motivoExtra, motivosRiesgo, nivelAlto, nivelCorto, nombreFamilia, peso, senal, trimestresSeguidos } from '../lib/lenguaje'
 import { montar, simularApi, usuario } from './util'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -44,12 +44,34 @@ describe('glosario clínico', () => {
     expect(peso('Sexo = Femenino')).toBe('Sexo: Femenino')
   })
 
+  it('los trimestres de las alarmas, seguidos y con los que no tuvieron alarma', () => {
+    expect(trimestresSeguidos(['2021 T3', '2022 T1', '2021 T3'])).toEqual(['2021 T3', '2021 T4', '2022 T1'])
+    expect(trimestresSeguidos(['2024 T4'])).toEqual(['2024 T4'])
+    expect(trimestresSeguidos(['2026Q2', '2026Q1'])).toEqual(['2026Q1', '2026Q2'])   // otra forma: tal cual, en orden
+    expect(senal('datos faltantes')).toBe('Más datos faltantes')
+    expect(senal('cusum')).toBe('Cusum')
+  })
+
+  it('del motivo de un dato raro deja solo lo que no dice ya la etiqueta del tipo de alerta', () => {
+    expect(motivoExtra('valor atípico; posible error de unidad'))
+      .toBe('Parece anotado en otra unidad (por ejemplo, kilos en lugar de gramos)')
+    expect(motivoExtra('lejos de lo esperado para este caso; cambio atípico para el tiempo transcurrido')).toBe('')
+    expect(motivoExtra(null)).toBe('')
+  })
+
   it('separa lo que sube el riesgo de los datos que faltan', () => {
     expect(motivosRiesgo(['Días en UCI (dias_uci) = 20', 'Talla a 40 sem (talla_40) = sin dato', 'z_peso_3m = sin dato',
-      'Vacunas (vac) = No hay dato'])).toEqual({
+      'Vacunas (vac) = No hay dato', 'Talla (talla) = sin dato cm'])).toEqual({
       suben: ['Días en UCI: 20'],
-      faltan: ['Talla a 40 sem', 'Peso para la edad a 3m', 'Vacunas'],
+      faltan: ['Talla a 40 sem', 'Peso para la edad a 3m', 'Vacunas', 'Talla'],   // la API puede agregar la unidad
     })
+  })
+
+  it('dice el puntaje z y la comparación con los demás sin palabras técnicas', () => {
+    expect(desviaciones(-1.24)).toBe('1,2 desviaciones por debajo')
+    expect(desviaciones(1)).toBe('1 desviación por encima')
+    expect(desviaciones(0.01)).toBe('justo en lo esperado')
+    expect(frenteDemas(93)).toBe('Más riesgo que 9 de cada 10 niños')
   })
 
   it('agrupa los desenlaces que son el mismo evento visto desde distintas visitas', () => {
@@ -103,7 +125,7 @@ const fila = { sujeto: 's1', eg_semanas: 31, grupo: null, percentil_max: 93, rie
 const notificaciones = [{ desenlace: 'readm', nombre: 'readmisión a los 3 meses', percentil_minimo: 95, destinatarios: ['a@maia.prueba'], activo: true }]
 const aviso = { id: 1, destinatario: 'a@maia.prueba', estado: 'enviado', error: null, enviado_en: '2026-07-01T10:00:00Z', sujeto: 's1',
   desenlace: 'readmisión a los 3 meses', percentil: 93, corrida_id: 3 }
-const datoRevision = { ...alertaDato, sujeto: 's1', unidad: 'g', etapa_nombre: '3 meses', fecha: '2026-03-01', fuerza: 9, es_error: null, comentario: null }
+const datoRevision = { ...alertaDato, sujeto: 's1', unidad: 'g', etapa_nombre: '3 meses', fecha: '2026-03-01', fuerza: 9, es_error: null, comentario: null, serie: [] }
 
 function api(rol: 'admin' | 'experto' = 'experto') {
   simularApi((url) => {
@@ -168,7 +190,7 @@ describe('pantallas del equipo clínico sin términos técnicos', () => {
     expect(visible()).toMatch(/Probabilidad estimada: 41,0 % · promedio de los niños: 12,0 %/)
     expect(visible()).toMatch(/Nació a las 31 semanas de gestación/)   // sin «31,0»
     expect(await screen.findByText('Readmisión', { selector: 'h3' })).toBeInTheDocument()   // riesgo en cada visita, por familia
-    expect(await screen.findByText(/más que 40 de cada 100 niños/)).toBeInTheDocument()   // perfil al nacer
+    expect(await screen.findByText(/40 de cada 100 niños tienen menos/)).toBeInTheDocument()   // perfil al nacer
     expect(screen.getByText('31 semanas', { selector: 'strong' })).toBeInTheDocument()
     expect(screen.getByText('Sin dato')).toBeInTheDocument()
     expect(visible()).not.toMatch(PROHIBIDO)
@@ -179,6 +201,10 @@ describe('pantallas del equipo clínico sin términos técnicos', () => {
     api()
     montar('/revision/datos')
     expect(await screen.findByText(/Para este niño se esperaba entre/)).toBeInTheDocument()
+    // sin serie (la variable no tiene concepto): el valor frente a su rango; del motivo queda solo lo que agrega
+    expect(screen.getByRole('img', { name: 'Peso a los 3 meses: 9.999 g; se esperaba entre 4.000 y 6.500' })).toBeInTheDocument()
+    expect(screen.getByText('La fecha no corresponde a esta visita.')).toBeInTheDocument()
+    expect(visible()).not.toMatch(/Valor muy distinto/)
     expect(visible()).not.toMatch(PROHIBIDO)
   })
 

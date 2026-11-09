@@ -88,8 +88,6 @@ export const INDICADORES: Record<string, string> = {
   perimetro_cefalico: 'Perímetro cefálico',
 }
 export const indicador = (k: string) => INDICADORES[k] ?? k.replaceAll('_', ' ')
-/** Unidad en que se guarda cada medida de crecimiento (peso en gramos; talla y perímetro en centímetros). */
-export const UNIDADES_CRECIMIENTO: Record<string, string> = { peso: 'g', talla: 'cm', perimetro_cefalico: 'cm' }
 export const ESTADOS_CORRIDA: Record<string, string> = { en_curso: 'En curso', ok: 'Terminada', error: 'Con error' }
 
 /** Primera letra en mayúscula (los motivos del modelo vienen en minúscula). */

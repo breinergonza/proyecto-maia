@@ -5,9 +5,9 @@ import { useMemo, useState } from 'react'
 import { pedir } from '../api/cliente'
 import type { HistoriaRiesgo, PerfilNino, PuntoCrecimiento, PuntoHistoria } from '../api/tipos'
 import { cn } from '../lib/cn'
-import { aproximado, dec, edad, indicador, meses, posicion, riesgo, RIESGO_ALTO, UNIDADES_CRECIMIENTO } from '../lib/formato'
-import { AYUDA_DOS_CIFRAS, AYUDA_OMS, ayudaPosicion, BAJO_EDAD, CAYO, cuantosMenos, familia, frenteOms, motivosRiesgo,
-  nivelAlto, nombreFamilia, RIESGO_MUY_ALTO } from '../lib/lenguaje'
+import { aproximado, dec, edad, indicador, meses, posicion, riesgo, RIESGO_ALTO } from '../lib/formato'
+import { AYUDA_DOS_CIFRAS, AYUDA_OMS, ayudaPosicion, BAJO_EDAD, CAYO, cuantosMenos, desviaciones, familia, frenteDemas, frenteOms,
+  motivosRiesgo, nivelAlto, nombreFamilia, RIESGO_MUY_ALTO } from '../lib/lenguaje'
 import { Distribucion, MiniSerie, Muestra, ticksEnteros, type PuntoSerie } from './graficos'
 import { Aviso, Boton, Cargando, Insignia, Panel } from './ui'
 
@@ -133,7 +133,7 @@ export function TrayectoriaRiesgo({ sujeto }: { sujeto: string }) {
               puntos={f.puntos.map((p): PuntoSerie => ({
                 x: p.orden, y: p.percentil, marcado: p.percentil >= RIESGO_ALTO,
                 titulo: `${p.momento_nombre}: ${p.desenlace}`,
-                detalle: [`Probabilidad estimada: ${riesgo(p.riesgo)}`, ayudaPosicion(p.percentil)],
+                detalle: [`Probabilidad estimada: ${riesgo(p.riesgo)}`, frenteDemas(p.percentil)],
               }))}
               dominioY={[0, 100]} ticksY={[0, 50, RIESGO_ALTO, 100]} formatoY={(v) => posicion(v)}
               franjas={[{ desde: RIESGO_ALTO, hasta: 100, tono: 'alerta' }]} guias={[{ y: RIESGO_MUY_ALTO, punteada: true }]}
@@ -191,7 +191,6 @@ export function CrecimientoOms({ crecimiento }: { crecimiento: Record<string, Pu
         {series.map(({ k, puntos, improbables }) => {
           const zs = puntos.map((p) => p.z as number)
           const dominioY: [number, number] = [Math.min(-3, Math.floor(Math.min(...zs))), Math.max(3, Math.ceil(Math.max(...zs)))]
-          const unidad = UNIDADES_CRECIMIENTO[k]
           const ultimo = puntos[puntos.length - 1]
           return (
             <li key={k}>
@@ -207,8 +206,8 @@ export function CrecimientoOms({ crecimiento }: { crecimiento: Record<string, Pu
                   x: p.edad_corregida as number, y: p.z as number, marcado: p.bajo_2de || p.caida_1de,
                   titulo: `${edad(p.edad_corregida)} de edad corregida`,
                   detalle: [
-                    `${indicador(k)}: ${p.valor == null ? '—' : `${aproximado(p.valor)}${unidad ? ` ${unidad}` : ''}`}`,
-                    `Puntaje z: ${dec(p.z)} (${frenteOms(p.z).toLowerCase()})`,
+                    `${indicador(k)}: ${p.valor == null ? '—' : `${aproximado(p.valor)}${p.unidad ? ` ${p.unidad}` : ''}`}`,
+                    `${frenteOms(p.z)}: ${desviaciones(p.z as number)} frente a la OMS`,
                     ...(p.bajo_2de ? [BAJO_EDAD] : []), ...(p.caida_1de ? [CAYO] : []),
                   ],
                 }))}
@@ -231,12 +230,9 @@ export function CrecimientoOms({ crecimiento }: { crecimiento: Record<string, Pu
 
 // ------------------------------------------------------------------ perfil frente a la cohorte
 
-/** «más que 40 de cada 100 niños» o, en los extremos, «entre el 5 % más bajo / más alto». */
-export function frentePerfil(p: number): string {
-  if (p < 5) return 'entre el 5 % más bajo'
-  if (p >= 95) return 'entre el 5 % más alto'
-  return `más que ${Math.round(p)} de cada 100 niños`
-}
+/** «40 de cada 100 niños tienen menos»: la API cuenta solo a los que tienen un valor estrictamente menor, así que con
+ * empates la frase sigue siendo cierta. */
+export const frentePerfil = (p: number) => `${Math.round(p)} de cada 100 niños tienen menos`
 
 export function PerfilCohorte({ sujeto }: { sujeto: string }) {
   const q = useQuery({

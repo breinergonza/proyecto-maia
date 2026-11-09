@@ -4,13 +4,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { ErrorApi, pedir } from '../api/cliente'
-import type { AlarmaGrupo, CrecimientoEtapa, ResumenTablero } from '../api/tipos'
+import type { AlarmaGrupo, AlarmasTrimestre, CrecimientoEtapa, ResumenTablero } from '../api/tipos'
 import { puede, useSesion } from '../auth/sesion'
+import { BarrasApiladas, LeyendaSeries, LineasSeries, type FilaSeries, type Serie } from '../components/graficos'
 import { Aviso, Cargando, Encabezado, Insignia, Panel, Tabla, Vacio } from '../components/ui'
 import { cn } from '../lib/cn'
 import { usePorClasificar } from '../lib/diccionario'
-import { dec, dec2, fecha, indicador, num, pct, riesgo } from '../lib/formato'
-import { alerta, AYUDA_OMS, AYUDA_RIESGO_ALTO, ayudaAlerta, datosAl } from '../lib/lenguaje'
+import { dec, dec2, fecha, indicador, INDICADORES, num, pct, riesgo } from '../lib/formato'
+import { alerta, AYUDA_OMS, AYUDA_RIESGO_ALTO, ayudaAlerta, datosAl, senal, trimestre, trimestresSeguidos } from '../lib/lenguaje'
 
 export default function Tablero() {
   const { usuario } = useSesion()
@@ -100,7 +101,7 @@ export default function Tablero() {
 
         <Panel llenar className="lg:col-span-7"
           titulo={<h2 className="text-base">Crecimiento frente a la OMS</h2>}
-          accion={<span className="text-xs text-salvia" title={AYUDA_OMS}>% bajo para la edad · ↓ % que cayó desde el control anterior · EC: edad corregida</span>}>
+          accion={<span className="text-xs text-salvia" title={AYUDA_OMS}>% de niños bajo para la edad en cada visita · EC: edad corregida</span>}>
           <Crecimiento filas={r.crecimiento_por_etapa} />
         </Panel>
 
@@ -145,12 +146,46 @@ function Capas({ r }: { r: ResumenTablero }) {
   )
 }
 
-/** Visitas en filas y medidas en columnas: las 12 filas de antes caben en una matriz de 4 × 3. */
+const nombreVisita = (f: { etapa: string; etapa_nombre: string | null }) => (f.etapa_nombre ?? f.etapa).replace(' (edad corregida)', ' EC')
+
+/** Una línea por medida con el % de niños bajo para la edad en cada visita; la tabla con la caída y los datos queda
+ * debajo, plegada. Cada medida conserva su color aunque falte en alguna visita. */
 function Crecimiento({ filas }: { filas: CrecimientoEtapa[] }) {
   if (filas.length === 0) return <p className="text-sm text-salvia">Sin datos de crecimiento.</p>
-  const etapas = [...new Map(filas.map((f) => [f.etapa, f.etapa_nombre])).entries()]
+  const etapas = [...new Map([...filas].sort((a, b) => a.orden - b.orden).map((f) => [f.etapa, nombreVisita(f)])).entries()]
   const medidas = [...new Set(filas.map((f) => f.indicador))]
   const celda = new Map(filas.map((f) => [`${f.etapa}|${f.indicador}`, f]))
+  // el color sale del orden fijo de las medidas (peso, talla, perímetro), no de cuáles vinieron
+  const series: Serie[] = Object.keys(INDICADORES).flatMap((m, i) =>
+    medidas.includes(m) && (i === 0 || i === 1 || i === 2) ? [{ clave: m, nombre: indicador(m), color: i }] : [])
+  const datos: FilaSeries[] = etapas.map(([etapa, nombre]) => {
+    const fila: FilaSeries = { x: nombre }
+    for (const m of medidas) {
+      const c = celda.get(`${etapa}|${m}`)
+      fila[m] = c ? c.pct_bajo : null
+      fila[`${m}:caida`] = c ? c.pct_caida : null
+      fila[`${m}:datos`] = c ? c.datos : null
+    }
+    return fila
+  })
+  return (
+    <>
+      <LeyendaSeries series={series} />
+      <LineasSeries filas={datos} series={series} alto={200} formatoY={(v) => `${num(v)} %`}
+        etiqueta={`Porcentaje de niños bajo para la edad en cada visita: ${series.map((s) =>
+          `${s.nombre}, ${datos.map((f) => `${f.x} ${typeof f[s.clave] === 'number' ? pct(f[s.clave] as number) : 'sin dato'}`).join(', ')}`).join('; ')}`}
+        formatoTooltip={(v, f, s) => `${pct(v)} bajo · ${pct(Number(f[`${s.clave}:caida`]))} cayó · ${num(Number(f[`${s.clave}:datos`]))} datos`} />
+      <details className="mt-2 text-sm">
+        <summary className="cursor-pointer font-semibold text-teal">Ver la tabla</summary>
+        <TablaCrecimiento etapas={etapas} medidas={medidas} celda={celda} />
+      </details>
+    </>
+  )
+}
+
+function TablaCrecimiento({ etapas, medidas, celda }: {
+  etapas: [string, string][]; medidas: string[]; celda: Map<string, CrecimientoEtapa>
+}) {
   return (
     <Tabla densa>
       <thead>
@@ -159,7 +194,7 @@ function Crecimiento({ filas }: { filas: CrecimientoEtapa[] }) {
       <tbody>
         {etapas.map(([etapa, nombre]) => (
           <tr key={etapa}>
-            <td className="font-semibold whitespace-nowrap">{(nombre ?? etapa).replace(' (edad corregida)', ' EC')}</td>
+            <td className="font-semibold whitespace-nowrap">{nombre}</td>
             {medidas.map((m) => {
               const c = celda.get(`${etapa}|${m}`)
               return (
@@ -199,6 +234,8 @@ function AlarmasGrupo({ total, className }: { total: number | null; className?: 
       ) : (
         <>
           <p className="mb-3 text-xs text-salvia">Cambios de un trimestre a otro en todo un grupo: suelen venir de un cambio en la forma de medir.</p>
+          <AlarmasPorTrimestre />
+          <h3 className="mb-1 mt-4 text-sm">Las más recientes</h3>
           <ul className="divide-y divide-linea/70 text-sm">
             {q.data.map((a, i) => (
               <li key={i} className="py-2 first:pt-0">
@@ -214,6 +251,35 @@ function AlarmasGrupo({ total, className }: { total: number | null; className?: 
         </>
       )}
     </Panel>
+  )
+}
+
+/** Todas las alarmas de la corrida por trimestre, apiladas por señal; los trimestres sin alarma también ocupan su lugar. */
+function AlarmasPorTrimestre() {
+  const q = useQuery({ queryKey: ['tablero', 'alarmas-trimestre'], queryFn: () => pedir<AlarmasTrimestre[]>('/tablero/alarmas-por-trimestre') })
+  if (!q.data?.length) return null
+  // hasta tres señales con color propio; si el motor sumara más, van juntas en «Otras señales»
+  const nombres = [...new Set(q.data.map((a) => a.senal))].sort()
+  const propias = nombres.slice(0, nombres.length > 3 ? 2 : 3)
+  const clave = (s: string) => (propias.includes(s) ? s : 'otras')
+  const series: Serie[] = [...propias, ...(nombres.length > 3 ? ['otras'] : [])]
+    .map((s, i) => ({ clave: s, nombre: s === 'otras' ? 'Otras señales' : senal(s), color: i === 0 ? 0 : i === 1 ? 1 : 2 }))
+  const filas = new Map<string, FilaSeries>(trimestresSeguidos(q.data.map((a) => a.periodo))
+    .map((p) => [p, Object.fromEntries([['x', p], ...series.map((s) => [s.clave, 0])]) as FilaSeries]))
+  for (const a of q.data) {
+    const f = filas.get(a.periodo)
+    if (f) f[clave(a.senal)] = Number(f[clave(a.senal)] ?? 0) + a.alarmas
+  }
+  const datos = [...filas.values()]
+  const total = q.data.reduce((n, a) => n + a.alarmas, 0)
+  return (
+    <>
+      <LeyendaSeries series={series} marca="barra" />
+      <BarrasApiladas filas={datos} series={series}
+        formatoX={(x) => (trimestre(x)?.t === 1 || datos.length <= 8 ? (datos.length <= 8 ? x : x.slice(0, 4)) : '')}
+        etiqueta={`${num(total)} alarmas de grupo entre ${datos[0].x} y ${datos[datos.length - 1].x}: ${q.data.map((a) =>
+          `${a.periodo}, ${num(a.alarmas)} por ${senal(a.senal).toLowerCase()}`).join('; ')}`} />
+    </>
   )
 }
 

@@ -57,6 +57,14 @@ export interface CrecimientoEtapa {
   pct_bajo: number
   pct_caida: number
   z_mediano: number | null
+  orden: number
+}
+
+/** Alarmas de grupo de un trimestre con una señal (solo trimestres con alguna). */
+export interface AlarmasTrimestre {
+  periodo: string
+  senal: string
+  alarmas: number
 }
 
 export interface ResumenTablero {
@@ -183,6 +191,8 @@ export interface PuntoCrecimiento {
   fecha: string | null
   edad_corregida: number | null
   valor: number | null
+  /** La unidad en que se registró ``valor`` (no se convierte). */
+  unidad: string | null
   z: number | null
   bajo_2de: boolean
   caida_1de: boolean
@@ -233,6 +243,17 @@ export interface DatoRevision {
   fuerza: number | null
   es_error: Respuesta | null
   comentario: string | null
+  /** Las medidas del mismo niño y el mismo concepto en cada visita (vacía si la variable no tiene concepto). */
+  serie: PuntoSerieDato[]
+}
+
+export interface PuntoSerieDato {
+  variable: string
+  etapa_nombre: string | null
+  orden: number
+  valor: number
+  /** El dato que se está revisando. */
+  es_este: boolean
 }
 
 export interface RiesgoRevision {

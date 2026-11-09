@@ -54,6 +54,17 @@ export function frenteOms(z: number | null | undefined): string {
 
 export const ayudaZ = (z: number | null | undefined) => (z == null ? '' : `Puntaje z frente a la OMS: ${dec2(z)}`)
 
+/** Un puntaje z dicho sin la palabra técnica: «1,2 desviaciones por debajo», «0,4 por encima», «justo en lo esperado». */
+export function desviaciones(z: number): string {
+  const a = Math.abs(z)
+  if (a < 0.05) return 'justo en lo esperado'
+  const n = `${dec2(Math.round(a * 10) / 10)} ${a >= 0.95 && a < 1.05 ? 'desviación' : 'desviaciones'}`
+  return `${n} ${z < 0 ? 'por debajo' : 'por encima'}`
+}
+
+/** La comparación con los demás niños para un texto visible (sin «posición»): «Más riesgo que 9 de cada 10 niños». */
+export const frenteDemas = (p: number) => `Más riesgo que ${cuantosMenos(p)} de cada 10 niños`
+
 // ------------------------------------------------------------------ alertas de datos (capas del modelo de anomalías)
 
 export const ALERTAS: Record<string, string> = {
@@ -82,6 +93,36 @@ export function motivo(texto: string | null | undefined): string {
   if (!texto) return ''
   return frase(texto.split(';').map((m) => m.trim()).filter(Boolean).map((m) => MOTIVOS[m] ?? m).join('; '))
 }
+
+// las señales de las alarmas de grupo (nucleo/anomalias), dichas para el equipo clínico
+const SENALES: Record<string, string> = {
+  redondeo: 'Más valores redondeados',
+  'datos faltantes': 'Más datos faltantes',
+  'residuo del contexto': 'Valores que no cuadran con el resto',
+}
+export const senal = (s: string) => SENALES[s] ?? frase(s)
+
+/** «2021 T3» → año y trimestre; null si el periodo tiene otra forma. */
+export function trimestre(periodo: string): { anio: number; t: number } | null {
+  const m = periodo.match(/^(\d{4}) T([1-4])$/)
+  return m ? { anio: Number(m[1]), t: Number(m[2]) } : null
+}
+
+/** Todos los trimestres entre el primero y el último dados (los que no tuvieron alarma también cuentan en el eje). */
+export function trimestresSeguidos(periodos: string[]): string[] {
+  const ts = periodos.map(trimestre).filter((t): t is { anio: number; t: number } => t != null)
+  if (ts.length !== periodos.length || !ts.length) return [...new Set(periodos)].sort()
+  const indice = (t: { anio: number; t: number }) => t.anio * 4 + t.t - 1
+  const [desde, hasta] = [Math.min(...ts.map(indice)), Math.max(...ts.map(indice))]
+  return Array.from({ length: hasta - desde + 1 }, (_, i) => `${Math.floor((desde + i) / 4)} T${((desde + i) % 4) + 1}`)
+}
+
+// los motivos que solo repiten el tipo de alerta (la etiqueta ya lo dice)
+const REPITEN_ALERTA = new Set(['valor atípico', 'lejos de lo esperado para este caso', 'cambio atípico para el tiempo transcurrido'])
+
+/** Lo que el motivo agrega a las etiquetas del tipo de alerta (unidad, código especial, fecha), o '' si solo las repite. */
+export const motivoExtra = (texto: string | null | undefined) =>
+  motivo((texto ?? '').split(';').map((m) => m.trim()).filter((m) => m && !REPITEN_ALERTA.has(m)).join('; '))
 
 /** Lo que más pesó en un riesgo (lo escribe el modelo clínico: «etiqueta (código) = valor»), sin códigos internos:
  * se quita el código entre paréntesis, «quiebre_X = 1» es nacer después de ese cambio y «z_peso_… = −2,3» se dice
@@ -114,7 +155,7 @@ function nombreDato(nombre: string): string {
 }
 
 /** El modelo escribe «sin dato» (o la etiqueta «No hay dato» de un código) cuando falta el valor. */
-const esFalta = (valor: string) => /^(sin dato|no hay dato)$/i.test(valor.trim())
+const esFalta = (valor: string) => /^(sin dato|no hay dato)\b/i.test(valor.trim())   // la API puede agregar la unidad: «sin dato cm»
 
 /** Lo que más pesó en un riesgo, separado en lo que sube el riesgo por su valor y los datos que faltan (que también
  * lo suben: el modelo aprendió que la falta de ese dato acompaña a más casos). */

@@ -53,7 +53,44 @@ def datos(estado: str = Query('pendiente', pattern='^(pendiente|revisado|todos)$
         d['capas'] = list(d['capas'] or [])
         d['etapa_nombre'] = nombre_etapa(mapa, d['etapa'])
         items.append(d)
+    series = _series(s, c.corte_id, items, esquema(s, c.corte_id), mapa)
+    for d in items:
+        d['serie'] = series.get((d['sujeto'], d['variable']), [])
     return {'total': total, 'pagina': pagina, 'tamano': tamano, 'items': items}
+
+
+def _series(s: Session, corte_id: int, items: list[dict], esq: dict, mapa: dict) -> dict[tuple[str, str], list[dict]]:
+    """Para cada dato de la página, las medidas numéricas del mismo niño y el mismo concepto del diccionario (p. ej. el
+    peso en cada visita), en orden de visita. Una sola consulta para toda la página; sin concepto, no hay serie."""
+    def concepto(v: str) -> str | None:
+        c = esq.get(v, {}).get('concepto')
+        return c if isinstance(c, str) and c else None
+
+    por_concepto: dict[str, list[str]] = defaultdict(list)
+    for v, d in esq.items():
+        if concepto(v) and d.get('tipo') == 'numeric':
+            por_concepto[concepto(v)].append(v)
+    pedidos = {(d['sujeto'], d['variable']) for d in items if concepto(d['variable'])}
+    if not pedidos:
+        return {}
+    variables = sorted({v for _, var in pedidos for v in por_concepto[concepto(var)]})
+    valores: dict[tuple[str, str], float] = {}
+    for sujeto, variable, valor in s.execute(text(
+            "SELECT sujeto, variable, valor FROM sevarti.mediciones WHERE corte_id = :c AND sujeto = ANY(:s) "
+            "AND variable = ANY(:v) AND valor ~ '^-?[0-9]+([.][0-9]+)?$' ORDER BY id"),
+            {'c': corte_id, 's': sorted({x for x, _ in pedidos}), 'v': variables}):
+        valores.setdefault((sujeto, variable), float(valor))
+    salida = {}
+    for sujeto, variable in pedidos:
+        puntos = []
+        for v in por_concepto[concepto(variable)]:
+            etapa = esq[v].get('etapa')
+            if (sujeto, v) not in valores or etapa not in mapa:
+                continue
+            puntos.append({'variable': v, 'etapa_nombre': nombre_etapa(mapa, etapa), 'orden': mapa[etapa]['orden'],
+                           'valor': valores[(sujeto, v)], 'es_este': v == variable})
+        salida[(sujeto, variable)] = sorted(puntos, key=lambda p: p['orden'])
+    return salida
 
 
 @ruta.post('/datos/{alerta_id}', status_code=status.HTTP_204_NO_CONTENT)

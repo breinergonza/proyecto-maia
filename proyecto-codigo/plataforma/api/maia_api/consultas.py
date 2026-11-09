@@ -91,6 +91,13 @@ def _sin_tildes(texto: str) -> str:
     return ''.join(c for c in unicodedata.normalize('NFD', texto.lower()) if unicodedata.category(c) != 'Mn')
 
 
+def unidades_crecimiento(esq: dict) -> dict[tuple[str, str | None], str | None]:
+    """(concepto, etapa) → la unidad en que se registró esa medida de crecimiento. El crecimiento guarda el valor tal
+    como se midió (p. ej. en kilos si el diccionario dice kg), así que su unidad sale de aquí y no de una tabla fija."""
+    return {(d['concepto'], d.get('etapa')): (str(d.get('unidad') or '').strip() or None)
+            for d in esq.values() if isinstance(d.get('concepto'), str) and d['concepto']}
+
+
 def unidad_mostrada(d: dict) -> str | None:
     """La unidad que acompaña a un valor: ninguna para una categoría o un sí/no (su etiqueta ya lo dice), ni cuando la
     etiqueta de la variable ya la nombra ("Número de controles: 1", no "1 controles")."""
