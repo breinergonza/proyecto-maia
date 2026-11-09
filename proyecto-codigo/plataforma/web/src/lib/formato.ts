@@ -86,6 +86,7 @@ export const INDICADORES: Record<string, string> = {
   peso: 'Peso para la edad',
   talla: 'Talla para la edad',
   perimetro_cefalico: 'Perímetro cefálico',
+  peso_para_talla: 'Peso para la talla',
 }
 export const indicador = (k: string) => INDICADORES[k] ?? k.replaceAll('_', ' ')
 export const ESTADOS_CORRIDA: Record<string, string> = { en_curso: 'En curso', ok: 'Terminada', error: 'Con error' }

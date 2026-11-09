@@ -7,13 +7,14 @@ import { Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceArea, Reference
 import { cn } from '../../lib/cn'
 
 /** Los colores de serie en su orden fijo: el color sigue a la serie, no a su posición en una lista filtrada. */
-export const SERIES_COLOR = ['var(--color-serie-1)', 'var(--color-serie-2)', 'var(--color-serie-3)'] as const
+export const SERIES_COLOR = ['var(--color-serie-1)', 'var(--color-serie-2)', 'var(--color-serie-3)', 'var(--color-serie-4)'] as const
+export type ColorSerie = 0 | 1 | 2 | 3
 
 export interface Serie {
   clave: string
   nombre: string
-  /** 0, 1 o 2: el color fijo de la serie. */
-  color: 0 | 1 | 2
+  /** El color fijo de la serie (su posición en SERIES_COLOR). */
+  color: ColorSerie
 }
 
 /** Fila de una gráfica de varias series: la categoría del eje X y un valor por clave de serie. */
@@ -44,7 +45,7 @@ function TooltipSeries({ active, payload, label, series, formato }: {
   const fila = payload?.[0]?.payload
   if (!active || !fila) return null
   return (
-    <div className="max-w-72 rounded-control border border-linea bg-papel px-3 py-2 text-sm shadow-elevada">
+    <div role="status" aria-live="polite" className="max-w-72 rounded-control border border-linea bg-papel px-3 py-2 text-sm shadow-elevada">
       <p className="font-semibold">{String(label ?? fila.x)}</p>
       {series.map((s) => {
         const v = fila[s.clave]
@@ -203,7 +204,7 @@ function ContenidoTooltip({ active, payload }: { active?: boolean; payload?: Rea
   const p = payload?.[0]?.payload
   if (!active || !p) return null
   return (
-    <div className="max-w-64 rounded-control border border-linea bg-papel px-3 py-2 text-sm shadow-elevada">
+    <div role="status" aria-live="polite" className="max-w-64 rounded-control border border-linea bg-papel px-3 py-2 text-sm shadow-elevada">
       <p className="font-semibold">{p.titulo}</p>
       {p.detalle?.map((d) => <p key={d}>{d}</p>)}
     </div>

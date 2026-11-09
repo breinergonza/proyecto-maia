@@ -17,6 +17,7 @@ from maia_api.consultas import (
     corrida_de,
     esquema,
     etapas,
+    medidas_numericas,
     motivo_legible,
     nombre_etapa,
     sujeto_existe,
@@ -27,7 +28,6 @@ from maia_api.consultas import (
 from maia_api.dependencias import CUALQUIERA, sesion
 from maia_comun import puntuacion as PU
 from maia_comun.modelos_db import Usuario
-from sevarti import contrato as SV
 
 ruta = APIRouter(prefix='/ninos', tags=['niños'])
 registro = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ ORDENES = {
     'percentil_max': 'r.percentil_max',
     'n_alertas': 'coalesce(a.n_alertas, 0)',
     'crecimiento': 'coalesce(g.n_bajo, 0) + coalesce(g.n_caida, 0)',
-    'edad_corregida': 'u.edad_corregida',
+    'ultimo_control': 'u.orden',
 }
 
 
@@ -50,12 +50,16 @@ def listar(buscar: str | None = None, desenlace: str | None = None,
            percentil_min: float | None = Query(None, ge=0, le=100), pagina: int = Query(1, ge=1),
            tamano: int = Query(25, ge=1, le=200), corrida_id: int | None = None,
            orden: Literal['sujeto', 'eg_semanas', 'desenlace_max', 'percentil_max', 'n_alertas', 'crecimiento',
-                          'edad_corregida'] | None = None,
+                          'ultimo_control'] | None = None,
            dir: Literal['asc', 'desc'] = 'desc',
            s: Session = Depends(sesion), _: Usuario = Depends(CUALQUIERA)) -> dict:
     c = corrida_de(s, corrida_id)
     if c.corte_id is None:
         raise HTTPException(status.HTTP_409_CONFLICT, 'Los datos de esa corrida ya no están cargados.')
+    mapa = etapas(s, c.corte_id)
+    # cada variable de visita con su visita y su orden: el último control es la última visita con algún dato, como en
+    # la ficha (no solo las que tienen medidas de crecimiento)
+    de_visita = [(v, d['etapa']) for v, d in esquema(s, c.corte_id).items() if d.get('etapa') in mapa]
     filtros_r = ['corrida_id = :c', 'NOT silencio']
     if desenlace:
         filtros_r.append('clave = :d')
@@ -81,12 +85,19 @@ def listar(buscar: str | None = None, desenlace: str | None = None,
         LEFT JOIN (SELECT sujeto, count(*) FILTER (WHERE bajo_2de) AS n_bajo, count(*) FILTER (WHERE caida_1de) AS n_caida,
                           count(*) FILTER (WHERE NOT improbable AND z IS NOT NULL) AS n_medidas
                    FROM resultados.crecimiento WHERE corrida_id = :c GROUP BY sujeto) g ON g.sujeto = s.sujeto
-        -- el último control con medidas de crecimiento: su visita, su fecha y la edad corregida de ese día
-        LEFT JOIN (SELECT DISTINCT ON (sujeto) sujeto, etapa, fecha, edad_corregida FROM resultados.crecimiento
-                   WHERE corrida_id = :c AND edad_corregida IS NOT NULL ORDER BY sujeto, edad_corregida DESC) u
-            ON u.sujeto = s.sujeto
+        -- el último control: la última visita con algún dato, su fecha y la edad corregida de ese día (si se calculó)
+        LEFT JOIN (SELECT DISTINCT ON (sujeto) sujeto, etapa, orden, fecha FROM (
+                       SELECT m.sujeto, ve.etapa, ve.orden, max(m.fecha) AS fecha FROM sevarti.mediciones m
+                       JOIN unnest(CAST(:ve_v AS text[]), CAST(:ve_e AS text[]), CAST(:ve_o AS double precision[]))
+                           AS ve(variable, etapa, orden) ON ve.variable = m.variable
+                       WHERE m.corte_id = :corte GROUP BY m.sujeto, ve.etapa, ve.orden) x
+                   ORDER BY sujeto, orden DESC) u ON u.sujeto = s.sujeto
+        LEFT JOIN (SELECT sujeto, etapa, max(edad_corregida) AS edad_corregida FROM resultados.crecimiento
+                   WHERE corrida_id = :c GROUP BY sujeto, etapa) ue ON ue.sujeto = u.sujeto AND ue.etapa = u.etapa
         WHERE {' AND '.join(filtros)}"""
-    p = {'c': c.id, 'corte': c.corte_id, 'd': desenlace, 'b': f'%{buscar}%' if buscar else None, 'p': percentil_min}
+    p = {'c': c.id, 'corte': c.corte_id, 'd': desenlace, 'b': f'%{buscar}%' if buscar else None, 'p': percentil_min,
+         've_v': [v for v, _ in de_visita], 've_e': [e for _, e in de_visita],
+         've_o': [float(mapa[e]['orden']) for _, e in de_visita]}
     total = s.execute(text(f'SELECT count(*) {base}'), p).scalar_one()
     orden_sql = f'{ORDENES[orden]} {dir.upper()} NULLS LAST, ' if orden else ''
     filas = s.execute(text(f"""
@@ -94,11 +105,10 @@ def listar(buscar: str | None = None, desenlace: str | None = None,
                coalesce(r.n_riesgos, 0) AS n_riesgos, coalesce(a.n_alertas, 0) AS n_alertas,
                coalesce(g.n_bajo, 0) AS n_bajo_2de, coalesce(g.n_caida, 0) AS n_caida_1de,
                coalesce(g.n_medidas, 0) AS n_crecimiento, u.etapa AS ultima_etapa, u.fecha AS ultima_fecha,
-               u.edad_corregida AS ultima_edad_corregida
+               ue.edad_corregida AS ultima_edad_corregida
         {base}
         ORDER BY {orden_sql}r.percentil_max DESC NULLS LAST, a.n_alertas DESC NULLS LAST, s.sujeto
         LIMIT :lim OFFSET :off"""), {**p, 'lim': tamano, 'off': (pagina - 1) * tamano})
-    mapa = etapas(s, c.corte_id)
     items = []
     for f in filas:
         d = dict(f._mapping)
@@ -251,24 +261,6 @@ def historia_riesgo(sujeto: str, corrida_id: int | None = None, s: Session = Dep
 # Valores de cada variable del perfil (uno por niño), por corte y ordenados. Los datos de un corte no cambian: se leen
 # una vez. Dos peticiones a la vez pueden leer lo mismo; el resultado es igual y la última escritura gana.
 _COHORTE: dict[tuple[int, str], np.ndarray] = {}
-_NUMERO_SQL = "valor ~ '^-?[0-9]+([.][0-9]+)?$'"
-
-
-def _medidas(s: Session, corte_id: int, variables: list[str], esq: dict, sujeto: str | None = None):
-    """(sujeto, variable, valor): el primer valor numérico de cada niño en cada variable, sin los códigos de «no se
-    hizo» que declara el diccionario (un −1 no es un peso)."""
-    filtro = ' AND sujeto = :s' if sujeto is not None else ''
-    codigos = {v: SV.codigos_declarados(esq.get(v, {}).get('codigos_especiales')) for v in variables}
-    vistos: set[tuple[str, str]] = set()
-    for suj, variable, valor in s.execute(text(
-            f'SELECT sujeto, variable, valor FROM sevarti.mediciones WHERE corte_id = :c AND variable = ANY(:v) '
-            f'AND {_NUMERO_SQL}{filtro} ORDER BY sujeto, variable, id'), {'c': corte_id, 'v': variables, 's': sujeto}):
-        x = float(valor)
-        if (suj, variable) not in vistos and x not in codigos[variable]:
-            vistos.add((suj, variable))
-            yield suj, variable, x
-
-
 def _valores_cohorte(s: Session, corte_id: int, variables: list[str], esq: dict) -> dict[str, np.ndarray]:
     faltan = [v for v in variables if (corte_id, v) not in _COHORTE]
     if faltan:
@@ -279,7 +271,7 @@ def _valores_cohorte(s: Session, corte_id: int, variables: list[str], esq: dict)
                 {'c': corte_id})]
         otras = [v for v in faltan if v != 'eg_semanas']
         if otras:
-            for _, variable, x in _medidas(s, corte_id, otras, esq):
+            for _, variable, x in medidas_numericas(s, corte_id, otras, esq):
                 leidos[variable].append(x)
         for v, valores in leidos.items():
             _COHORTE[(corte_id, v)] = np.sort(np.asarray(valores, dtype=float))
@@ -311,7 +303,7 @@ def perfil(sujeto: str, corrida_id: int | None = None, s: Session = Depends(sesi
                    {'c': c.corte_id, 's': sujeto}).scalar()
     if eg is not None:
         propios['eg_semanas'] = float(eg)
-    for _, variable, x in _medidas(s, c.corte_id, variables[1:], esq, sujeto):
+    for _, variable, x in medidas_numericas(s, c.corte_id, variables[1:], esq, [sujeto]):
         propios[variable] = x
     filas = []
     for v in variables:

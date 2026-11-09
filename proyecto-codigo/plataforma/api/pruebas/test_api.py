@@ -292,19 +292,19 @@ def test_ninos_y_linea_temporal(cliente, admin, corrida):
     codigos = [i['sujeto'] for i in desc['items']]
     assert codigos == sorted(codigos, reverse=True)
     assert cliente.get('/api/ninos', headers=admin, params={'orden': 'columna_inexistente'}).status_code == 422
-    # el último control: la visita (con nombre), su fecha y la edad corregida; y cuántas medidas de crecimiento hay
-    ultimo = cliente.get('/api/ninos', headers=admin, params={'orden': 'edad_corregida', 'dir': 'desc', 'tamano': 50}).json()
-    edades = [i['ultima_edad_corregida'] for i in ultimo['items'] if i['ultima_edad_corregida'] is not None]
-    assert edades and edades == sorted(edades, reverse=True)
+    # el último control es la última visita con algún dato, la misma que cierra la ficha; ordena por visita
+    ultimo = cliente.get('/api/ninos', headers=admin, params={'orden': 'ultimo_control', 'dir': 'desc', 'tamano': 50}).json()
     for i in ultimo['items']:
         assert i['n_crecimiento'] >= i['n_bajo_2de']
-        assert (i['ultima_visita'] is None) == (i['ultima_edad_corregida'] is None)
-    con = next(i for i in ultimo['items'] if i['ultima_visita'] is not None)
-    ficha = cliente.get(f'/api/ninos/{con["sujeto"]}/linea-temporal', headers=admin).json()
-    medidas = [p for serie in ficha['crecimiento'].values() for p in serie if p['edad_corregida'] is not None]
-    ultima = max(medidas, key=lambda p: p['edad_corregida'])
-    assert con['ultima_edad_corregida'] == ultima['edad_corregida']
-    assert con['ultima_visita'] == ficha['nombre_etapa'].get(ultima['etapa'], ultima['etapa'])
+    con = [i for i in ultimo['items'] if i['ultima_visita'] is not None]
+    assert con
+    for i in con[:3]:
+        ficha = cliente.get(f'/api/ninos/{i["sujeto"]}/linea-temporal', headers=admin).json()
+        final = ficha['visitas'][-1]
+        assert i['ultima_visita'] == final['nombre'] and i['ultima_edad_corregida'] == final['edad_corregida']
+    rango = list(ficha['nombre_etapa'].values())
+    posiciones = [rango.index(i['ultima_visita']) for i in con]
+    assert posiciones == sorted(posiciones, reverse=True)
 
 
 def test_ficha_riesgo_medio_historia_y_perfil(cliente, admin, corrida):
@@ -433,6 +433,56 @@ def test_revision_datos_trae_la_serie_del_concepto(cliente, corrida):
             assert propios[0]['variable'] == d['variable'] and propios[0]['valor'] == pytest.approx(float(d['valor']))
         assert not d['serie'] or len({p['variable'] for p in d['serie']}) == len(d['serie'])
 
+
+
+def test_serie_de_revision_en_la_unidad_del_dato_y_sin_codigos(cliente, corrida, url_db_propia):
+    """El punto marcado es el valor de la alerta (no otro registro de la misma variable); las demás visitas se pasan a
+    la unidad del dato revisado, una unidad que no se sabe convertir no se dibuja, y un código de «no se hizo» no es
+    una medida."""
+    from sqlalchemy import create_engine, text
+
+    experta = _login(cliente, 'experta@maia.prueba', 'clave-larga-123')
+
+    def items():
+        return cliente.get('/api/revision/datos', headers=experta, params={'estado': 'todos', 'tamano': 200}).json()['items']
+
+    d = next(d for d in items() if len(d['serie']) >= 2 and any(p['es_este'] for p in d['serie']))
+    otro = next(p for p in d['serie'] if not p['es_este'])
+
+    def serie():
+        return {p['variable']: p for p in next(x for x in items() if x['id'] == d['id'])['serie']}
+
+    motor = create_engine(url_db_propia)
+    with motor.begin() as cx:
+        corte = cx.execute(text('SELECT corte_id FROM sevarti.sujetos WHERE sujeto = :s'), {'s': d['sujeto']}).scalar_one()
+        antes = {v: cx.execute(text('SELECT datos FROM sevarti.esquema WHERE corte_id = :c AND variable = :v'),
+                               {'c': corte, 'v': v}).scalar_one() for v in (d['variable'], otro['variable'])}
+        valor_antes = cx.execute(text('SELECT valor FROM resultados.alertas_dato WHERE id = :i'), {'i': d['id']}).scalar_one()
+
+    def cambiar(variable: str, clave: str, valor: str):
+        with motor.begin() as cx:
+            cx.execute(text('UPDATE sevarti.esquema SET datos = jsonb_set(datos, CAST(:k AS text[]), to_jsonb(CAST(:x AS text))) '
+                            'WHERE corte_id = :c AND variable = :v'), {'c': corte, 'v': variable, 'k': [clave], 'x': valor})
+    try:
+        with motor.begin() as cx:
+            cx.execute(text("UPDATE resultados.alertas_dato SET valor = '7777' WHERE id = :i"), {'i': d['id']})
+        assert serie()[d['variable']]['valor'] == 7777
+        # el dato en cm y la otra visita en mm: se divide entre 10; en g no se sabe pasar a cm y no se dibuja
+        cambiar(d['variable'], 'unidad', 'cm')
+        cambiar(otro['variable'], 'unidad', 'mm')
+        assert serie()[otro['variable']]['valor'] == pytest.approx(otro['valor'] / 10)
+        cambiar(otro['variable'], 'unidad', 'g')
+        assert otro['variable'] not in serie()
+        # el valor de la alerta es un código de «no se hizo»: no hay punto para él
+        cambiar(d['variable'], 'codigos_especiales', '7777')
+        assert d['variable'] not in serie()
+    finally:
+        with motor.begin() as cx:
+            for v, datos in antes.items():
+                cx.execute(text('UPDATE sevarti.esquema SET datos = CAST(:d AS jsonb) WHERE corte_id = :c AND variable = :v'),
+                           {'c': corte, 'v': v, 'd': json.dumps(datos)})
+            cx.execute(text('UPDATE resultados.alertas_dato SET valor = :x WHERE id = :i'), {'i': d['id'], 'x': valor_antes})
+        motor.dispose()
 
 def test_inferencia(cliente, admin, corrida):
     ej = cliente.get('/api/inferencia/ejemplo', headers=admin)

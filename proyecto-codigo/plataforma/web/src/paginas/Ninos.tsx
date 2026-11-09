@@ -55,18 +55,20 @@ const COLUMNAS: Columna[] = [
         {n.n_bajo_2de > 0 && <span title={AYUDA_OMS}><Insignia tono="ocre">{BAJO_EDAD} ×{n.n_bajo_2de}</Insignia></span>}
         {n.n_caida_1de > 0 && <span title={`${CAYO}. ${AYUDA_OMS}`}><Insignia>Cayó ×{n.n_caida_1de}</Insignia></span>}
         {!n.n_bajo_2de && !n.n_caida_1de && (n.n_crecimiento > 0
-          ? <span className="text-teal" title={`${num(n.n_crecimiento)} medidas, ninguna baja para la edad ni con caída. ${AYUDA_OMS}`}>Sin problema</span>
+          ? <span className="text-teal" title={`${num(n.n_crecimiento)} medidas, ninguna baja para la edad ni con caída. ${AYUDA_OMS}`}>Sin alerta</span>
           : <span className="text-salvia" title="No hay peso, talla ni perímetro con que compararlo">Sin dato</span>)}
       </span>
     ),
   },
-  // el último control con medidas: la visita y la edad corregida de ese día (ordena por la edad)
+  // la última visita con algún dato (la misma que cierra la ficha) y la edad corregida de ese día; ordena por visita
   {
-    id: 'edad_corregida', titulo: 'Último control', derecha: true, primero: 'desc',
+    id: 'ultimo_control', titulo: 'Último control', derecha: true, primero: 'desc',
     celda: (n) => (n.ultima_visita == null ? <span className="text-salvia">Sin controles</span> : (
-      <span className="whitespace-nowrap" title={fecha(n.ultima_fecha)}>
+      <span className="whitespace-nowrap">
         {n.ultima_visita.replace(' (edad corregida)', '')}
-        <span className="block text-xs text-salvia">{edad(n.ultima_edad_corregida)} de edad corregida</span>
+        <span className="block text-xs text-salvia">
+          {n.ultima_edad_corregida != null ? `${edad(n.ultima_edad_corregida)} de edad corregida` : fecha(n.ultima_fecha)}
+        </span>
       </span>
     )),
   },

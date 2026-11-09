@@ -171,11 +171,12 @@ export function CrecimientoOms({ crecimiento }: { crecimiento: Record<string, Pu
       puntos: ps.filter((p) => p.edad_corregida != null && p.z != null && !p.improbable),
       improbables: ps.filter((p) => p.improbable).length,
     }))
-    .filter((s) => s.puntos.length > 0), [crecimiento])
+    // una medida con solo datos improbables se lista igual: hay que revisarla aunque no se grafique
+    .filter((s) => s.puntos.length > 0 || s.improbables > 0), [crecimiento])
   if (!series.length) return null
 
   const edades = series.flatMap((s) => s.puntos.map((p) => p.edad_corregida as number))
-  const dominioX: [number, number] = [Math.min(...edades), Math.max(...edades)]
+  const dominioX: [number, number] = edades.length ? [Math.min(...edades), Math.max(...edades)] : [0, 0]
   if (dominioX[0] === dominioX[1]) { dominioX[0] -= DIA_MES; dominioX[1] += DIA_MES }
   const ticksX = ticksMeses(dominioX)
   return (
@@ -189,6 +190,12 @@ export function CrecimientoOms({ crecimiento }: { crecimiento: Record<string, Pu
       </p>
       <ul className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
         {series.map(({ k, puntos, improbables }) => {
+          const nota = improbables > 0 && (
+            <p className="text-xs font-semibold text-coral-hondo">
+              {improbables === 1 ? '1 medida improbable (revisar) no se grafica' : `${improbables} medidas improbables (revisar) no se grafican`}
+            </p>
+          )
+          if (!puntos.length) return <li key={k}><h3 className="text-sm">{indicador(k)}</h3>{nota}</li>
           const zs = puntos.map((p) => p.z as number)
           const dominioY: [number, number] = [Math.min(-3, Math.floor(Math.min(...zs))), Math.max(3, Math.ceil(Math.max(...zs)))]
           const ultimo = puntos[puntos.length - 1]
@@ -216,11 +223,7 @@ export function CrecimientoOms({ crecimiento }: { crecimiento: Record<string, Pu
                 franjas={[{ desde: -2, hasta: 2 }]} guias={[{ y: 0 }]}
                 dominioX={dominioX} ticksX={ticksX} formatoX={meses}
               />
-              {improbables > 0 && (
-                <p className="text-xs text-salvia">
-                  {improbables === 1 ? '1 medida improbable no se grafica' : `${improbables} medidas improbables no se grafican`}
-                </p>
-              )}
+              {nota}
             </li>
           )
         })}

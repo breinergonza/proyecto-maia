@@ -6,7 +6,7 @@ import { Link } from 'react-router'
 import { ErrorApi, pedir } from '../api/cliente'
 import type { AlarmaGrupo, AlarmasTrimestre, CrecimientoEtapa, ResumenTablero } from '../api/tipos'
 import { puede, useSesion } from '../auth/sesion'
-import { BarrasApiladas, LeyendaSeries, LineasSeries, type FilaSeries, type Serie } from '../components/graficos'
+import { BarrasApiladas, LeyendaSeries, LineasSeries, type ColorSerie, type FilaSeries, type Serie } from '../components/graficos'
 import { Aviso, Cargando, Encabezado, Insignia, Panel, Tabla, Vacio } from '../components/ui'
 import { cn } from '../lib/cn'
 import { usePorClasificar } from '../lib/diccionario'
@@ -101,7 +101,7 @@ export default function Tablero() {
 
         <Panel llenar className="lg:col-span-7"
           titulo={<h2 className="text-base">Crecimiento frente a la OMS</h2>}
-          accion={<span className="text-xs text-salvia" title={AYUDA_OMS}>% de niños bajo para la edad en cada visita · EC: edad corregida</span>}>
+          accion={<span className="text-xs text-salvia" title={AYUDA_OMS}>% de los niños medidos que quedan bajo para la edad · EC: edad corregida</span>}>
           <Crecimiento filas={r.crecimiento_por_etapa} />
         </Panel>
 
@@ -148,6 +148,20 @@ function Capas({ r }: { r: ResumenTablero }) {
 
 const nombreVisita = (f: { etapa: string; etapa_nombre: string | null }) => (f.etapa_nombre ?? f.etapa).replace(' (edad corregida)', ' EC')
 
+/** Una serie por medida de crecimiento. Las conocidas (peso, talla, perímetro, peso para la talla) tienen su color fijo,
+ * venga o no el resto; una medida que el diccionario llame de otro modo toma, en orden alfabético, un color que no use
+ * ninguna conocida presente. Si hay más medidas que colores, las que sobran quedan solo en la tabla. */
+export function seriesCrecimiento(medidas: string[]): Serie[] {
+  const fijas = Object.keys(INDICADORES)
+  const colores: ColorSerie[] = [0, 1, 2, 3]   // uno por color de SERIES_COLOR
+  const conocidas = fijas.flatMap((m, i) => (medidas.includes(m) && colores[i] !== undefined
+    ? [{ clave: m, nombre: indicador(m), color: colores[i] }] : []))
+  const libres = colores.filter((c) => !medidas.includes(fijas[c] ?? ''))
+  const otras = medidas.filter((m) => !fijas.includes(m)).sort().slice(0, libres.length)
+    .map((m, i) => ({ clave: m, nombre: indicador(m), color: libres[i] }))
+  return [...conocidas, ...otras]
+}
+
 /** Una línea por medida con el % de niños bajo para la edad en cada visita; la tabla con la caída y los datos queda
  * debajo, plegada. Cada medida conserva su color aunque falte en alguna visita. */
 function Crecimiento({ filas }: { filas: CrecimientoEtapa[] }) {
@@ -155,9 +169,7 @@ function Crecimiento({ filas }: { filas: CrecimientoEtapa[] }) {
   const etapas = [...new Map([...filas].sort((a, b) => a.orden - b.orden).map((f) => [f.etapa, nombreVisita(f)])).entries()]
   const medidas = [...new Set(filas.map((f) => f.indicador))]
   const celda = new Map(filas.map((f) => [`${f.etapa}|${f.indicador}`, f]))
-  // el color sale del orden fijo de las medidas (peso, talla, perímetro), no de cuáles vinieron
-  const series: Serie[] = Object.keys(INDICADORES).flatMap((m, i) =>
-    medidas.includes(m) && (i === 0 || i === 1 || i === 2) ? [{ clave: m, nombre: indicador(m), color: i }] : [])
+  const series = seriesCrecimiento(medidas)
   const datos: FilaSeries[] = etapas.map(([etapa, nombre]) => {
     const fila: FilaSeries = { x: nombre }
     for (const m of medidas) {
@@ -175,6 +187,7 @@ function Crecimiento({ filas }: { filas: CrecimientoEtapa[] }) {
         etiqueta={`Porcentaje de niños bajo para la edad en cada visita: ${series.map((s) =>
           `${s.nombre}, ${datos.map((f) => `${f.x} ${typeof f[s.clave] === 'number' ? pct(f[s.clave] as number) : 'sin dato'}`).join(', ')}`).join('; ')}`}
         formatoTooltip={(v, f, s) => `${pct(v)} bajo · ${pct(Number(f[`${s.clave}:caida`]))} cayó · ${num(Number(f[`${s.clave}:datos`]))} datos`} />
+      {series.length < medidas.length && <p className="mt-1 text-sm">Las demás medidas están en la tabla.</p>}
       <details className="mt-2 text-sm">
         <summary className="cursor-pointer font-semibold text-teal">Ver la tabla</summary>
         <TablaCrecimiento etapas={etapas} medidas={medidas} celda={celda} />

@@ -4,6 +4,7 @@ import { screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { alerta, ayudaMinimo, cuantosMenos, desviaciones, familia, frenteDemas, frenteOms, motivo, motivoExtra, motivosRiesgo, nivelAlto, nivelCorto, nombreFamilia, peso, senal, trimestresSeguidos } from '../lib/lenguaje'
 import { montar, simularApi, usuario } from './util'
+import { fecha } from '../lib/formato'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -123,8 +124,9 @@ const perfil = { variables: [
 const fila = { sujeto: 's1', eg_semanas: 31, grupo: null, percentil_max: 93, riesgo_max: 0.41, desenlace_max: 'readmisión a los 6 meses',
   clave_max: 'readm', n_riesgos: 2, n_alertas: 1, n_bajo_2de: 2, n_caida_1de: 1, n_crecimiento: 6,
   ultima_visita: '3 meses (edad corregida)', ultima_fecha: '2026-03-01', ultima_edad_corregida: 91 }
-// crece bien (tiene medidas, ninguna baja) y sin ninguna medida de crecimiento: no es lo mismo
-const sinProblema = { ...fila, sujeto: 's2', percentil_max: 40, n_bajo_2de: 0, n_caida_1de: 0, n_crecimiento: 4 }
+// sin alerta de crecimiento (tiene medidas, ninguna baja ni con caída) y sin ninguna medida: no es lo mismo
+const sinProblema = { ...fila, sujeto: 's2', percentil_max: 40, n_bajo_2de: 0, n_caida_1de: 0, n_crecimiento: 4,
+  ultima_fecha: '2026-04-15', ultima_edad_corregida: null }
 const sinDato = { ...fila, sujeto: 's3', percentil_max: 20, n_bajo_2de: 0, n_caida_1de: 0, n_crecimiento: 0, ultima_visita: null,
   ultima_fecha: null, ultima_edad_corregida: null }
 const notificaciones = [{ desenlace: 'readm', nombre: 'readmisión a los 3 meses', percentil_minimo: 95, destinatarios: ['a@maia.prueba'], activo: true }]
@@ -179,11 +181,13 @@ describe('pantallas del equipo clínico sin términos técnicos', () => {
     montar('/ninos')
     expect(await screen.findByText('Alto')).toBeInTheDocument()
     expect(screen.getByText('Bajo para la edad ×2')).toBeInTheDocument()
-    expect(screen.getByText('Sin problema')).toBeInTheDocument()
+    expect(screen.getByText('Sin alerta')).toBeInTheDocument()
     expect(screen.getByText('Sin dato')).toBeInTheDocument()
     // el último control: la visita y la edad corregida de ese día
     expect(screen.getAllByText('3 meses').length).toBe(2)
-    expect(screen.getAllByText('3 m de edad corregida').length).toBe(2)
+    expect(screen.getByText('3 m de edad corregida')).toBeInTheDocument()
+    // sin edad corregida calculada en esa visita, la fecha del control
+    expect(screen.getByText(fecha('2026-04-15'))).toBeInTheDocument()
     expect(screen.getByText('Sin controles')).toBeInTheDocument()
     expect(visible()).not.toMatch(PROHIBIDO)
   })

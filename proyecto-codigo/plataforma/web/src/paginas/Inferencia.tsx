@@ -377,7 +377,7 @@ function porIndicador(crecimiento: ResultadoInferencia['crecimiento']): Record<s
 function Resultado({ r, varios }: { r: ResultadoInferencia; varios: boolean }) {
   const quien = (s: string) => (varios ? <span className="font-normal text-salvia"> · {s}</span> : null)
   // con un solo niño, el crecimiento se dibuja como en su ficha; con varios, una tabla deja comparar
-  const grafica = !varios && r.crecimiento.some((c) => c.z != null && c.edad_corregida != null && !c.improbable)
+  const grafica = !varios && r.crecimiento.some((c) => c.improbable || (c.z != null && c.edad_corregida != null))
   return (
     <>
       {r.variables_ignoradas.length > 0 && (

@@ -13,10 +13,20 @@ from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from maia_api.consultas import corrida_de, esquema, etapas, nombre_etapa, unidad_mostrada, valor_legible
+from clinico import crecimiento as CR
+from maia_api.consultas import (
+    corrida_de,
+    esquema,
+    etapas,
+    medidas_numericas,
+    nombre_etapa,
+    unidad_mostrada,
+    valor_legible,
+)
 from maia_api.dependencias import EXPERTO, auditar, sesion
 from maia_api.esquemas import RevisionDatoEntrada, RevisionRiesgoEntrada
 from maia_comun.modelos_db import PERCENTIL_ALTO, AlertaDato, RevisionDato, RevisionRiesgo, Riesgo, Usuario
+from sevarti import contrato as SV
 
 ruta = APIRouter(prefix='/revision', tags=['revisión'])
 MUESTRA_POR_GRUPO = 20
@@ -53,44 +63,71 @@ def datos(estado: str = Query('pendiente', pattern='^(pendiente|revisado|todos)$
         d['capas'] = list(d['capas'] or [])
         d['etapa_nombre'] = nombre_etapa(mapa, d['etapa'])
         items.append(d)
-    series = _series(s, c.corte_id, items, esquema(s, c.corte_id), mapa)
-    for d in items:
-        d['serie'] = series.get((d['sujeto'], d['variable']), [])
+    for d, serie in zip(items, _series(s, c.corte_id, items, esquema(s, c.corte_id), mapa), strict=True):
+        d['serie'] = serie
     return {'total': total, 'pagina': pagina, 'tamano': tamano, 'items': items}
 
 
-def _series(s: Session, corte_id: int, items: list[dict], esq: dict, mapa: dict) -> dict[tuple[str, str], list[dict]]:
-    """Para cada dato de la página, las medidas numéricas del mismo niño y el mismo concepto del diccionario (p. ej. el
-    peso en cada visita), en orden de visita. Una sola consulta para toda la página; sin concepto, no hay serie."""
+def _factor(unidad: object) -> tuple[str, float] | None:
+    """(magnitud, factor a la unidad de referencia) de una unidad de crecimiento conocida (g, kg, cm, mm)."""
+    return CR.UNIDADES.get(_unidad(unidad))
+
+
+def _unidad(unidad: object) -> str:
+    return str(unidad or '').strip().lower()
+
+
+def _series(s: Session, corte_id: int, items: list[dict], esq: dict, mapa: dict) -> list[list[dict]]:
+    """Para cada dato de la página, las medidas del mismo niño y el mismo concepto del diccionario (p. ej. el peso en
+    cada visita), en orden de visita y en la unidad del dato revisado (un peso al nacer en gramos y uno a los 3 meses en
+    kilos no se mezclan). El punto del dato revisado es ese valor, no otro registro de la misma variable; los códigos
+    de «no se hizo» no son medidas. Una sola consulta para toda la página; sin concepto, no hay serie."""
     def concepto(v: str) -> str | None:
         c = esq.get(v, {}).get('concepto')
         return c if isinstance(c, str) and c else None
 
     por_concepto: dict[str, list[str]] = defaultdict(list)
     for v, d in esq.items():
-        if concepto(v) and d.get('tipo') == 'numeric':
+        if concepto(v) and d.get('tipo') == 'numeric' and d.get('etapa') in mapa:
             por_concepto[concepto(v)].append(v)
-    pedidos = {(d['sujeto'], d['variable']) for d in items if concepto(d['variable'])}
-    if not pedidos:
-        return {}
-    variables = sorted({v for _, var in pedidos for v in por_concepto[concepto(var)]})
-    valores: dict[tuple[str, str], float] = {}
-    for sujeto, variable, valor in s.execute(text(
-            "SELECT sujeto, variable, valor FROM sevarti.mediciones WHERE corte_id = :c AND sujeto = ANY(:s) "
-            "AND variable = ANY(:v) AND valor ~ '^-?[0-9]+([.][0-9]+)?$' ORDER BY id"),
-            {'c': corte_id, 's': sorted({x for x, _ in pedidos}), 'v': variables}):
-        valores.setdefault((sujeto, variable), float(valor))
-    salida = {}
-    for sujeto, variable in pedidos:
+    con_serie = [d for d in items if concepto(d['variable'])]
+    if not con_serie:
+        return [[] for _ in items]
+    variables = sorted({v for d in con_serie for v in por_concepto[concepto(d['variable'])]})
+    valores = {(suj, v): x for suj, v, x in
+               medidas_numericas(s, corte_id, variables, esq, sorted({d['sujeto'] for d in con_serie}))}
+
+    def serie(d: dict) -> list[dict]:
+        if not concepto(d['variable']):
+            return []
+        propia = esq.get(d['variable'], {})
+        destino = _factor(propia.get('unidad'))
+        codigos = SV.codigos_declarados(propia.get('codigos_especiales'))
+        try:
+            este = float(d['valor'])
+        except (TypeError, ValueError):
+            este = None
         puntos = []
-        for v in por_concepto[concepto(variable)]:
-            etapa = esq[v].get('etapa')
-            if (sujeto, v) not in valores or etapa not in mapa:
+        for v in por_concepto[concepto(d['variable'])]:
+            if v == d['variable']:
+                x, factor = (None if este is None or este in codigos else este), 1.0
+            else:
+                x = valores.get((d['sujeto'], v))
+                origen = _factor(esq[v].get('unidad'))
+                if origen and destino and origen[0] == destino[0]:
+                    factor = origen[1] / destino[1]
+                elif _unidad(esq[v].get('unidad')) == _unidad(propia.get('unidad')):
+                    factor = 1.0
+                else:
+                    continue   # otra unidad que no se sabe convertir: mejor no dibujarla que dibujarla mal
+            if x is None:
                 continue
+            etapa = esq[v]['etapa']
             puntos.append({'variable': v, 'etapa_nombre': nombre_etapa(mapa, etapa), 'orden': mapa[etapa]['orden'],
-                           'valor': valores[(sujeto, v)], 'es_este': v == variable})
-        salida[(sujeto, variable)] = sorted(puntos, key=lambda p: p['orden'])
-    return salida
+                           'valor': x * factor, 'es_este': v == d['variable']})
+        return sorted(puntos, key=lambda p: p['orden'])
+
+    return [serie(d) for d in items]
 
 
 @ruta.post('/datos/{alerta_id}', status_code=status.HTTP_204_NO_CONTENT)

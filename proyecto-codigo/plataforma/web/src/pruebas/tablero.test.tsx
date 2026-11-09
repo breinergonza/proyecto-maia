@@ -3,6 +3,7 @@
 import { screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Usuario } from '../api/tipos'
+import { seriesCrecimiento } from '../paginas/Tablero'
 import { montar, simularApi, usuario } from './util'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -93,5 +94,18 @@ describe('tablero', () => {
     expect(await screen.findByRole('figure', { name: '3 alarmas de grupo entre 2025 T2 y 2025 T4: '
       + '2025 T2, 2 por más valores redondeados; 2025 T4, 1 por más datos faltantes' })).toBeInTheDocument()
     expect(screen.getByText('Más valores redondeados')).toBeInTheDocument()
+  })
+})
+
+describe('series de crecimiento del tablero', () => {
+  it('cada medida conocida conserva su color y ninguna se pierde de la gráfica', () => {
+    expect(seriesCrecimiento(['talla', 'peso_para_talla'])).toEqual([
+      { clave: 'talla', nombre: 'Talla para la edad', color: 1 },
+      { clave: 'peso_para_talla', nombre: 'Peso para la talla', color: 3 },
+    ])
+    // una medida con otro nombre toma un color libre, sin repetir el de una conocida presente
+    expect(seriesCrecimiento(['peso', 'circunferencia_brazo']).map((s) => [s.clave, s.color])).toEqual([['peso', 0], ['circunferencia_brazo', 1]])
+    // más medidas que colores: las que sobran quedan solo en la tabla
+    expect(seriesCrecimiento(['peso', 'talla', 'perimetro_cefalico', 'peso_para_talla', 'otra'])).toHaveLength(4)
   })
 })
