@@ -3,12 +3,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { pedir } from '../api/cliente'
-import type { HistoriaRiesgo, PerfilNino, PuntoCrecimiento, PuntoHistoria } from '../api/tipos'
+import type { HistoriaRiesgo, PerfilNino, PerfilProvisional, PrimeraAlerta, PuntoCrecimiento, PuntoHistoria } from '../api/tipos'
 import { cn } from '../lib/cn'
 import { aproximado, dec, edad, indicador, meses, posicion, riesgo, RIESGO_ALTO } from '../lib/formato'
 import { AYUDA_DOS_CIFRAS, AYUDA_OMS, ayudaPosicion, BAJO_EDAD, CAYO, cuantosMenos, desviaciones, familia, frenteDemas, frenteOms,
   motivosRiesgo, nivelAlto, nombreFamilia, RIESGO_MUY_ALTO } from '../lib/lenguaje'
 import { Distribucion, MiniSerie, Muestra, ticksEnteros, type PuntoSerie } from './graficos'
+import { descripcionDe } from '../lib/descripciones'
+import { Grafica } from './grafica'
 import { Aviso, Boton, Cargando, Insignia, Panel } from './ui'
 
 // ------------------------------------------------------------------ tarjeta de riesgo
@@ -82,6 +84,27 @@ export function familiasDeRiesgo(puntos: PuntoHistoria[]): Familia[] {
 
 const VISIBLES = 4
 
+/** Orden de la primera visita con alerta de una familia de desenlaces (la más temprana entre sus claves), o null. */
+export function ordenPrimeraAlerta(f: { puntos: PuntoHistoria[] }, primera?: Record<string, PrimeraAlerta | null>): number | null {
+  const ordenes = f.puntos.map((p) => primera?.[p.clave]?.orden).filter((o): o is number => o != null)
+  return ordenes.length ? Math.min(...ordenes) : null
+}
+
+/** Tarjeta «Perfil del niño»: chips con categorías (edad gestacional, Lubchenco) y la visita actual; sin cifras (D10). */
+export function PerfilDelNino({ perfil }: { perfil?: PerfilProvisional }) {
+  if (!perfil) return null
+  const d = descripcionDe('perfil_nino')
+  return (
+    <Panel titulo={d.titulo} descripcion={d.descripcion}>
+      <ul className="flex flex-wrap gap-2" aria-label={d.titulo}>
+        <li><Insignia tono="neutro">{perfil.eg_etiqueta ?? 'Edad gestacional sin clasificar'}</Insignia></li>
+        <li><Insignia tono="neutro">{perfil.lubchenco_etiqueta ?? 'Lubchenco sin clasificar'}</Insignia></li>
+        {perfil.visita && <li><Insignia tono="neutro">Visita actual: {perfil.visita}</Insignia></li>}
+      </ul>
+    </Panel>
+  )
+}
+
 export function TrayectoriaRiesgo({ sujeto }: { sujeto: string }) {
   const q = useQuery({
     queryKey: ['nino', sujeto, 'historia-riesgo'],
@@ -96,9 +119,9 @@ export function TrayectoriaRiesgo({ sujeto }: { sujeto: string }) {
     return m
   }, [q.data])
 
-  const ayuda = 'Cada punto es el riesgo calculado con lo medido hasta esa visita, frente a los demás niños (0 a 100).'
-  if (q.isPending) return <Panel titulo="Riesgo en cada visita"><Cargando /></Panel>
-  if (q.error) return <Panel titulo="Riesgo en cada visita"><Aviso>{q.error.message}</Aviso></Panel>
+  const d = descripcionDe('riesgo_visita')
+  if (q.isPending) return <Panel titulo={descripcionDe('riesgo_visita').titulo}><Cargando /></Panel>
+  if (q.error) return <Panel titulo={descripcionDe('riesgo_visita').titulo}><Aviso>{q.error.message}</Aviso></Panel>
   if (!familias.length) return null
 
   const ordenes = [...visitas.keys()].sort((a, b) => a - b)
@@ -106,19 +129,21 @@ export function TrayectoriaRiesgo({ sujeto }: { sujeto: string }) {
     : [ordenes[0] - 0.5, ordenes[0] + 0.5]
   const mostradas = todas ? familias : familias.slice(0, VISIBLES)
   return (
-    <Panel titulo="Riesgo en cada visita"
+    <Grafica titulo={d.titulo} descripcion={d.descripcion} exportar={{ nombre: 'riesgo-por-visita' }}
       accion={<span className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
         <Muestra tipo="alerta">10 % con más riesgo</Muestra>
         <Muestra tipo="marcado">riesgo alto</Muestra>
+        <Muestra tipo="estrella">primera alerta</Muestra>
       </span>}>
-      <p className="mb-3 text-sm">{ayuda}</p>
       {q.data.paquete_corrida && q.data.paquete !== q.data.paquete_corrida && (
         <p className="mb-3 text-sm text-ocre" title={`Modelos vigentes: ${q.data.paquete}; tarjetas: ${q.data.paquete_corrida}`}>
           Calculado con los modelos vigentes; las tarjetas de arriba se calcularon con modelos anteriores y pueden no coincidir.
         </p>
       )}
       <ul className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-        {mostradas.map((f) => (
+        {mostradas.map((f) => {
+          const primera = ordenPrimeraAlerta(f, q.data.primera_alerta)
+          return (
           <li key={f.clave}>
             <div className="flex items-baseline justify-between gap-3">
               <h3 className="text-sm">{f.nombre}</h3>
@@ -132,6 +157,7 @@ export function TrayectoriaRiesgo({ sujeto }: { sujeto: string }) {
               etiqueta={`${f.nombre}: ${f.puntos.map((p) => `${p.momento_nombre}, ${cuantosMenos(p.percentil)} de 10`).join('; ')}`}
               puntos={f.puntos.map((p): PuntoSerie => ({
                 x: p.orden, y: p.percentil, marcado: p.percentil >= RIESGO_ALTO,
+                estrella: p.orden === primera,
                 titulo: `${p.momento_nombre}: ${p.desenlace}`,
                 detalle: [`Probabilidad estimada: ${riesgo(p.riesgo)}`, frenteDemas(p.percentil)],
               }))}
@@ -140,14 +166,15 @@ export function TrayectoriaRiesgo({ sujeto }: { sujeto: string }) {
               dominioX={dominioX} ticksX={ordenes} formatoX={(v) => visitas.get(v) ?? ''}
             />
           </li>
-        ))}
+          )
+        })}
       </ul>
       {familias.length > VISIBLES && (
         <Boton variante="fantasma" chico className="mt-3" onClick={() => setTodas(!todas)} aria-expanded={todas}>
           {todas ? 'Ver menos' : `Ver los ${familias.length} desenlaces`}
         </Boton>
       )}
-    </Panel>
+    </Grafica>
   )
 }
 
@@ -179,8 +206,9 @@ export function CrecimientoOms({ crecimiento }: { crecimiento: Record<string, Pu
   const dominioX: [number, number] = edades.length ? [Math.min(...edades), Math.max(...edades)] : [0, 0]
   if (dominioX[0] === dominioX[1]) { dominioX[0] -= DIA_MES; dominioX[1] += DIA_MES }
   const ticksX = ticksMeses(dominioX)
+  const dc = descripcionDe('crecimiento_ficha')
   return (
-    <Panel titulo="Crecimiento frente a la OMS"
+    <Grafica titulo={dc.titulo} descripcion={dc.descripcion} exportar={{ nombre: 'crecimiento-oms' }}
       accion={<span className="flex flex-wrap gap-x-3 gap-y-1 text-xs" title={AYUDA_OMS}>
         <Muestra tipo="franja">rango esperado (−2 a +2)</Muestra>
         <Muestra tipo="marcado">bajo para la edad o caída</Muestra>
@@ -228,7 +256,7 @@ export function CrecimientoOms({ crecimiento }: { crecimiento: Record<string, Pu
           )
         })}
       </ul>
-    </Panel>
+    </Grafica>
   )
 }
 
@@ -244,11 +272,12 @@ export function PerfilCohorte({ sujeto }: { sujeto: string }) {
     queryFn: () => pedir<PerfilNino>(`/ninos/${encodeURIComponent(sujeto)}/perfil`),
     staleTime: 5 * 60_000,
   })
-  if (q.isPending) return <Panel titulo="Al nacer, frente a los demás niños"><Cargando /></Panel>
-  if (q.error) return <Panel titulo="Al nacer, frente a los demás niños"><Aviso>{q.error.message}</Aviso></Panel>
+  if (q.isPending) return <Panel titulo={descripcionDe('al_nacer').titulo}><Cargando /></Panel>
+  if (q.error) return <Panel titulo={descripcionDe('al_nacer').titulo}><Aviso>{q.error.message}</Aviso></Panel>
   if (!q.data.variables.length) return null
+  const dn = descripcionDe('al_nacer')
   return (
-    <Panel titulo="Al nacer, frente a los demás niños"
+    <Grafica titulo={dn.titulo} descripcion={dn.descripcion} exportar={{ nombre: 'al-nacer' }}
       accion={<span className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
         <Muestra tipo="franja">la mitad de los niños</Muestra>
         <Muestra tipo="marcado">este niño</Muestra>
@@ -270,6 +299,6 @@ export function PerfilCohorte({ sujeto }: { sujeto: string }) {
           )
         })}
       </ul>
-    </Panel>
+    </Grafica>
   )
 }

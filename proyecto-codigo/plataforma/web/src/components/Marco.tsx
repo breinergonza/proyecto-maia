@@ -3,7 +3,7 @@
 import {
   Baby, Bell, BookOpen, BrainCircuit, CalendarClock, Calculator, ClipboardCheck, HeartPulse, LayoutDashboard, LogOut, Menu, Package,
   Play, Settings, Users, X,
-  type LucideIcon,
+  Activity, Compass, LineChart, type LucideIcon,
 } from 'lucide-react'
 import { Suspense, useEffect, useState, type ReactNode } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router'
@@ -13,28 +13,38 @@ import { cn } from '../lib/cn'
 import { esDemo } from '../lib/config'
 import { usePorClasificar } from '../lib/diccionario'
 import { ROLES } from '../lib/formato'
+import { SUBMODULOS } from '../paginas/analitica/submodulos'
 import { enMarcha, useEntrenamientos } from './EntrenarAhora'
+import { GrupoNav } from './GrupoNav'
 import { Cargando, Insignia } from './ui'
 
-type Enlace = { a: string; texto: string; icono: LucideIcon; roles?: Rol[] }
+type Enlace = { a: string; texto: string; icono: LucideIcon; roles?: Rol[]; hijos?: { a: string; texto: string }[] }
+
+const ANALITICA: Enlace = {
+  a: '/analitica', texto: 'Analítica', icono: Activity, roles: ['admin', 'experto', 'visualizador'],
+  hijos: SUBMODULOS.map((s) => ({ a: `/analitica/${s.id}`, texto: s.texto })),
+}
 
 const SECCIONES: { titulo: string; enlaces: Enlace[] }[] = [
   {
     titulo: 'Seguimiento',
-    enlaces: [{ a: '/', texto: 'Tablero', icono: LayoutDashboard }, { a: '/ninos', texto: 'Niños', icono: Baby }],
+    enlaces: [{ a: '/', texto: 'Tablero', icono: LayoutDashboard },
+      { a: '/explorar', texto: 'Explorar', icono: Compass, roles: ['admin', 'experto', 'visualizador'] }, { a: '/ninos', texto: 'Niños', icono: Baby }, ANALITICA],
   },
   {
     titulo: 'Revisión clínica',
     enlaces: [
-      { a: '/revision/datos', texto: 'Datos por revisar', icono: ClipboardCheck, roles: ['admin', 'experto'] },
       { a: '/revision/riesgos', texto: 'Revisión de riesgos', icono: HeartPulse, roles: ['admin', 'experto'] },
       { a: '/inferencia', texto: 'Calcular el riesgo de un niño', icono: Calculator, roles: ['admin', 'experto'] },
+      { a: '/prediccion', texto: 'Predicción', icono: LineChart, roles: ['admin', 'experto'] },
+      { a: '/mis-modelos', texto: 'Mis modelos', icono: BrainCircuit, roles: ['admin', 'experto'] },
       { a: '/diccionario', texto: 'Diccionario', icono: BookOpen, roles: ['admin', 'experto'] },
     ],
   },
   {
     titulo: 'Administración',
     enlaces: [
+      { a: '/admin/calidad-datos', texto: 'Calidad de datos', icono: ClipboardCheck, roles: ['admin'] },
       { a: '/admin/configuracion', texto: 'Configuración', icono: Settings, roles: ['admin'] },
       { a: '/admin/programacion', texto: 'Programación', icono: CalendarClock, roles: ['admin'] },
       { a: '/admin/entrenamientos', texto: 'Entrenamientos', icono: BrainCircuit, roles: ['admin'] },
@@ -59,7 +69,7 @@ function Navegacion({ alElegir }: { alElegir?: () => void }) {
           <div key={s.titulo}>
             <p className="mb-1.5 px-3 text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-salvia/80">{s.titulo}</p>
             <ul className="flex flex-col gap-0.5">
-              {visibles.map((e) => (
+              {visibles.map((e) => e.hijos ? <GrupoNav key={e.a} {...e} hijos={e.hijos} alElegir={alElegir} /> : (
                 <li key={e.a}>
                   <NavLink
                     to={e.a}

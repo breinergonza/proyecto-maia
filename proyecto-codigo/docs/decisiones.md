@@ -255,3 +255,65 @@ riesgo, suba `MAIA_DEMO_SUJETOS`.
 | CLI de entrenamiento | flujo completo | simular → entrenar → registrar → promover → exportar → corrida → silencio |
 | API | 11 + 3 + 6 | paquete firmado real, Postgres real, SMTP de prueba; riesgo alto por niño y sin métricas de la regla simple; errores de validación en español y 500 sin traza; diccionario |
 | Frontend | 33 | Vitest + Testing Library (5 de las páginas de administración, incluido entrenar ahora; 8 del glosario clínico y la guardia de términos técnicos; 2 del formulario de cálculo; 5 del diccionario) |
+
+
+## Decisiones D1 a D54 del plan de implementación
+
+Copiadas del plan «Plan de implementación» (Notion), sección 3 «Decisiones tomadas». Se conserva el resultado tal como lo registra el plan.
+
+| # | Decisión | Resultado |
+| --- | --- | --- |
+| D1 | Qué significa filtrar por una variable que se mide muchas veces | ✅ Sin valor por defecto: al agregar la variable se elige la regla (primera, última, en alguna visita o en la etapa X) y el chip la muestra siempre |
+| D2 | ¿Un filtro guardado se congela o se re-evalúa? | ✅ Se guarda la definición y la huella (la lista exacta de niños) del entrenamiento; al reutilizar el filtro en Predicción o Explorar se vuelve a evaluar con los datos actuales |
+| D3 | ¿Se edita un filtro ya ligado a un modelo? | ✅ No; se duplica para cambiarlo |
+| D4 | Privacidad en agregados | ✅ Se ocultan o agrupan las celdas con menos de 5 niños |
+| D5 | Roles | ✅ Entrenar y muestras: admin y experto con cuota. Analítica, Tablero y Explorar: admin, experto y visualizador (agregados). Predicción y Mis modelos: admin y experto. Calidad de datos: solo admin |
+| D6 | Predicción con qué modelos | ✅ Cualquier versión del registro, empaquetando también los candidatos |
+| D7 | Qué se guarda de la evaluación | ✅ Solo agregados; no se guardan predicciones por niño |
+| D8 | Entrenar bajo demanda | ✅ Admin y experto con cuota; no aprueban a producción ni envían correos |
+| D9 | Revisión de datos | ✅ Administración › Calidad de datos, solo admin |
+| D10 | Contenido del correo de alerta | ✅ Código, desenlace, posición, etiqueta de perfil y visita; nunca valores clínicos |
+| D11 | Clusters | ✅ No existen: es trabajo pendiente (sección 9) |
+| D12 | Qué es detectar temprano | ✅ Avisar al menos una visita antes del desenlace |
+| D13 | Alarmas de grupo | ✅ Se quedan en el Tablero (que se conserva) |
+| D14 | Revisión de riesgos (la ciega) | ✅ Se queda en lo clínico, simplificada |
+| D15 | Perfil mientras no haya clusters | ✅ Dos etiquetas que ya existen en los datos: categoría por edad gestacional (extremo menos de 28 semanas, muy prematuro 28 a menos de 32, moderado a tardío 32 a menos de 37, a término 37 o más) y clasificación de Lubchenco (adecuado, pequeño o grande para su edad gestacional), más la visita actual; los cortes se confirman con los médicos |
+| D16 | Visibilidad del banco de modelos | ✅ Visible para todos los expertos, con dueño y etiqueta Personal u Oficial |
+| D17 | Cuotas | ✅ 3 modelos guardados y 1 entrenamiento en cola por persona; se borran a los 90 días sin uso |
+| D18 | Datos del entrenamiento bajo demanda | ✅ Solo el corte vigente ya cargado; sin nuevas extracciones desde KMC |
+| D19 | Cómo se decide que hay alerta | ✅ Por percentil: por defecto el 10 % con más riesgo es riesgo alto y el 5 %, muy alto. Rendimiento muestra qué pasa con el top 5, 10, 20, 30 y 40 % |
+| D20 | Para qué desenlaces se calcula la anticipación | ✅ Tres familias "En uso": readmisión (5 intervalos), oxigenodependencia (3 y 12 meses) y desarrollo psicomotor bajo (6 y 12 meses). "No vuelve a la visita" queda fuera por ser seguimiento y no un evento clínico |
+| D21 | Dónde corre todo y qué pasa con Railway | ✅ Todo corre en una máquina local con GPU RTX 5060. La demo pública en Railway sale del alcance |
+| D22 | Cuántas personas usarán Mis modelos | ✅ De 1 a 3: la cola es simple y la espera corta; se muestra la posición igual |
+| D23 | Qué distingue un perfil | ✅ Dos perfiles por separado: al nacer (historia clínica) y de trayectoria (cómo crece); los expertos eligen cuál usar |
+| D24 | Quién atiende Calidad de datos | ✅ El equipo técnico del proyecto (admin) |
+| D25 | Formato de la descripción | ✅ Una frase fija, siempre visible bajo el título, en lenguaje clínico (qué muestra y cómo leerla); también visible en teléfono |
+| D26 | A qué se le exige la descripción | ✅ A toda gráfica y tabla de datos (incluidas las tarjetas de cifras); los paneles de formularios y de administración no la exigen |
+| D27 | Qué se puede sacar de la pantalla | ✅ PNG de cada gráfica y CSV de cada tabla de agregados; el PNG incluye título, descripción, muestra y fecha |
+| D28 | Dispositivos | ✅ Computador, tableta y también teléfono: cada submódulo se diseña y prueba en pantalla de teléfono |
+| D29 | Bandeja de alertas en la app | ✅ No: el correo y la lista de Niños (filtro por percentil) bastan |
+| D30 | Regla de alerta por modelo | ✅ El admin puede fijar el porcentaje al aprobar un modelo (por defecto 10 %); la pantalla muestra siempre la regla vigente |
+| D31 | Quién redacta y aprueba los textos | ✅ Propone el equipo el catálogo completo y los médicos lo revisan por lote, una sesión por tanda |
+| D32 | Entrenamientos anteriores sin artefactos de analítica | ✅ Estado vacío con la opción de reentrenar; no se recalcula en silencio |
+| D33 | Desenlaces "En prueba" en la Analítica | ✅ Se ven con la etiqueta **En prueba**, sin entrar al tablero oficial ni a los correos |
+| D34 | Sede y fecha de parto (decisión abierta b) | ✅ Diseño adaptativo: si el corte trae sede y fecha de parto, las pantallas las usan; si no, se oculta la faceta y la equidad por sede, y el tiempo se filtra por año de nacimiento. Se comprueba en el corte real en la Fase 0 |
+| D35 | Variables que ofrece el buscador de filtros | ✅ Un conjunto curado: los expertos marcan en el Diccionario las variables "usar como filtro"; un interruptor permite ver las demás |
+| D36 | CSV con una fila por niño desde Predicción | ✅ Solo el admin, con auditoría de quién lo descargó y sin guardarlo en el servidor |
+| D37 | Cuánto tarda un entrenamiento completo | ✅ Menos de 30 minutos con los datos reales: la cola de Mis modelos pesa poco y la anticipación (varios modelos por visita) cabe en una sola GPU; se confirma midiendo en la Fase 0 |
+| D38 | Modelos personales al cargar un corte nuevo (cada semestre) | ✅ Se conservan marcados "corte anterior"; siguen usables en Predicción con un aviso y se borran por la regla de 90 días sin uso |
+| D39 | Cómo se prueban facetas, perfiles y anticipación | ✅ Se extiende el simulador de pruebas con las variables reales clave (sexo al nacer, edad gestacional, Lubchenco, sede opcional, las visitas reales con la entrada PMC y los desenlaces de readmisión, oxigenodependencia y desarrollo bajo), sin usar datos reales |
+| D40 | Hiperparámetros en Mis modelos | ✅ Los expertos no los cambian: usan los vigentes, así los modelos personales son comparables con el oficial; solo el admin los ajusta |
+| D41 | Qué pasa con el Tablero (pedido del 2026-11-08) | ✅ Se conserva como está; el tablero con filtros es un módulo nuevo, Explorar (sección 5). Los únicos ajustes al Tablero son los tres de D42 |
+| D42 | Ajustes mínimos al Tablero (confirmados el 2026-11-08) | ✅ Se aceptan los tres: (1) ocultar a los expertos los dos enlaces del Tablero a la revisión de datos cuando esa página sea solo del admin (D9); (2) que el Tablero lea la regla de alerta vigente (D30); (3) frase bajo el título y botón PNG en sus paneles (D25 y D27). Nada más del Tablero cambia: ni su ruta, ni su enlace del menú, ni sus datos, ni su diseño |
+| D43 | Quién sube cambios a git (pedido del 2026-11-08) | ✅ Nada se sube a git desde el trabajo del plan: todo se hace en archivos locales, sin commit, push, rama, pull request ni comentario. Solo el dueño del repositorio sube los cambios y publica |
+| D44 | Entrega con comentario de antes y después | ✅ Al final se prepara, en un archivo local, un comentario como el de la revisión anterior: "Qué cambia" y "Antes y después", con capturas a 1440 px y datos simulados. Las capturas se toman en local antes de subir y viven en la rama `capturas/graficas`; el dueño las sube y pega el comentario (sección 21) |
+| D45 | Cambios al núcleo (confirmado el 2026-11-09) | ✅ El código nuevo vive en `plataforma/comun`; lo que cambie archivos de `nucleo/` va como parche numerado en `nucleo/parches` para que `make sincronizar-nucleo` no lo borre |
+| D46 | Privacidad en Explorar (confirmado el 2026-11-09) | ✅ Sin cifras si el grupo filtrado tiene menos de 20 niños, conteos menores de 100 redondeados a múltiplos de 5 para el visualizador y auditoría de cada filtro consultado |
+| D47 | Contrato de la API (confirmado el 2026-11-09) | ✅ `infra/openapi.json` se regenera con `make tipos-web` cada vez que cambia un endpoint, una prueba lo compara con la API y los tipos nuevos de la web salen de `esquema.d.ts` |
+| D48 | Quién implementa (2026-11-09) | ✅ Una sola persona, el dueño del repositorio; Santiago no implementa partes del plan. Las fases van una tras otra |
+| D49 | Rama de trabajo (2026-11-09) | ✅ Se trabaja en la rama actual, `feature/avances-1`, sin subir nada a git; solo el dueño sube cambios y decide cuándo integrar a `main` |
+| D50 | Con qué arranca la Anticipación (2026-11-09) | ✅ Primero las 16 familias "En prueba" de crecimiento que ya existen en el Diccionario (sin filas nuevas); después readmisión, oxigenodependencia y desarrollo bajo (D20) con sus filas nuevas |
+| D51 | Nombre y lugar del módulo nuevo (2026-11-09) | ✅ Explorar, en Seguimiento debajo de Tablero, ruta `explorar`, para admin, experto y visualizador |
+| D52 | Privacidad en distribuciones (2026-11-09) | ✅ Los conteos y porcentajes con menos de 5 niños se ocultan (D4); las distribuciones y cuantiles exigen al menos 20 niños, el valor que el código ya usa (`MINIMO_COHORTE`) |
+| D53 | Textos de las pantallas (2026-11-09) | ✅ Un solo catálogo, `lib/descripciones.ts`; las frases que hoy están sueltas en la ficha y el Tablero se mueven ahí |
+| D54 | Librerías de gráficas (2026-11-09) | ✅ La base sigue siendo `components/graficos` sobre recharts, pero se permite sumar otra librería para las gráficas que recharts no resuelva bien (mapa de calor, bosque de intervalos, embudo). Condiciones: una sola librería adicional, versión fija y sin dependencias remotas, los tokens de color del proyecto (el coral nunca como serie), accesible (`role=figure` y texto alternativo), envuelta en `components/graficos` para que las pantallas no la usen directo, y compatible con el PNG de D27 |

@@ -390,16 +390,17 @@ def test_perfil_un_valor_por_nino_y_sin_codigos_de_no_se_hizo(cliente, admin, co
 
 def test_revision(cliente, admin, corrida):
     experta = _login(cliente, 'experta@maia.prueba', 'clave-larga-123')
-    cola = cliente.get('/api/revision/datos', headers=experta).json()
+    assert cliente.get('/api/revision/datos', headers=experta).status_code == 403   # la calidad de datos es de la administración
+    cola = cliente.get('/api/revision/datos', headers=admin).json()
     if cola['items']:
         a = cola['items'][0]
-        assert cliente.post(f'/api/revision/datos/{a["id"]}', headers=experta, json={'es_error': 'si'}).status_code == 204
-        assert cliente.post(f'/api/revision/datos/{a["id"]}', headers=experta,
+        assert cliente.post(f'/api/revision/datos/{a["id"]}', headers=admin, json={'es_error': 'si'}).status_code == 204
+        assert cliente.post(f'/api/revision/datos/{a["id"]}', headers=admin,
                             json={'es_error': 'no', 'comentario': 'Lo confirmé'}).status_code == 204
-        revisados = cliente.get('/api/revision/datos', headers=experta, params={'estado': 'revisado'}).json()
+        revisados = cliente.get('/api/revision/datos', headers=admin, params={'estado': 'revisado'}).json()
         assert revisados['total'] == 1 and revisados['items'][0]['es_error'] == 'no'
-        assert cola['total'] - 1 == cliente.get('/api/revision/datos', headers=experta).json()['total']
-    assert cliente.post('/api/revision/datos/999999999', headers=experta, json={'es_error': 'si'}).status_code == 404
+        assert cola['total'] - 1 == cliente.get('/api/revision/datos', headers=admin).json()['total']
+    assert cliente.post('/api/revision/datos/999999999', headers=admin, json={'es_error': 'si'}).status_code == 404
     muestra = cliente.get('/api/revision/riesgos', headers=experta).json()['items']
     assert len(muestra) <= 40
     # lo que ve el médico: sin ".0" y con la etiqueta de cada categoría, no su código
@@ -417,11 +418,10 @@ def test_revision(cliente, admin, corrida):
         assert sum(g['respuestas'] for g in res['riesgos_por_grupo']) == 1
 
 
-def test_revision_datos_trae_la_serie_del_concepto(cliente, corrida):
+def test_revision_datos_trae_la_serie_del_concepto(cliente, admin, corrida):
     """Cada dato por revisar trae las medidas del mismo niño y el mismo concepto (p. ej. su peso en cada visita), en orden
     de visita, con el dato marcado; un dato sin concepto en el diccionario no trae serie."""
-    experta = _login(cliente, 'experta@maia.prueba', 'clave-larga-123')
-    items = cliente.get('/api/revision/datos', headers=experta, params={'estado': 'todos', 'tamano': 200}).json()['items']
+    items = cliente.get('/api/revision/datos', headers=admin, params={'estado': 'todos', 'tamano': 200}).json()['items']
     assert [d for d in items if len(d['serie']) >= 2], 'algún dato de crecimiento trae su serie'
     for d in items:
         ordenes = [p['orden'] for p in d['serie']]
@@ -435,16 +435,15 @@ def test_revision_datos_trae_la_serie_del_concepto(cliente, corrida):
 
 
 
-def test_serie_de_revision_en_la_unidad_del_dato_y_sin_codigos(cliente, corrida, url_db_propia):
+def test_serie_de_revision_en_la_unidad_del_dato_y_sin_codigos(cliente, admin, corrida, url_db_propia):
     """El punto marcado es el valor de la alerta (no otro registro de la misma variable); las demás visitas se pasan a
     la unidad del dato revisado, una unidad que no se sabe convertir no se dibuja, y un código de «no se hizo» no es
     una medida."""
     from sqlalchemy import create_engine, text
 
-    experta = _login(cliente, 'experta@maia.prueba', 'clave-larga-123')
 
     def items():
-        return cliente.get('/api/revision/datos', headers=experta, params={'estado': 'todos', 'tamano': 200}).json()['items']
+        return cliente.get('/api/revision/datos', headers=admin, params={'estado': 'todos', 'tamano': 200}).json()['items']
 
     d = next(d for d in items() if len(d['serie']) >= 2 and any(p['es_este'] for p in d['serie']))
     otro = next(p for p in d['serie'] if not p['es_este'])
@@ -601,3 +600,25 @@ def test_entrenamientos_sin_la_comparacion_con_la_regla_simple(cliente, admin, m
     assert r.status_code == 200, r.text
     for e in r.json()['clinico'] + r.json()['anomalias']:
         assert e['metricas'] == {'auc__muerte': 0.81, 'top10__muerte': 0.4}
+
+
+def test_ficha_lleva_perfil_sin_numeros(cliente, admin, corrida):
+    sujeto = cliente.get('/api/ninos', headers=admin, params={'tamano': 1}).json()['items'][0]['sujeto']
+    lt = cliente.get(f'/api/ninos/{sujeto}/linea-temporal', headers=admin).json()
+    p = lt['perfil']
+    assert set(p) == {'eg', 'eg_etiqueta', 'lubchenco', 'lubchenco_etiqueta', 'visita', 'etiqueta_corta'}
+    assert p['etiqueta_corta'] and not any(ch.isdigit() for ch in p['etiqueta_corta'])
+
+
+def test_primera_alerta_es_la_primera_visita_en_riesgo_alto(cliente, admin, corrida):
+    sujeto = cliente.get('/api/ninos', headers=admin, params={'orden': 'percentil_max', 'tamano': 1}).json()['items'][0]['sujeto']
+    h = cliente.get(f'/api/ninos/{sujeto}/historia-riesgo', headers=admin).json()
+    claves = {p['clave'] for p in h['puntos']}
+    assert set(h['primera_alerta']) == claves
+    for clave, primera in h['primera_alerta'].items():
+        altos = [p for p in h['puntos'] if p['clave'] == clave and p['percentil'] >= 90]
+        if altos:
+            assert primera['orden'] == min(p['orden'] for p in altos)
+            assert primera['momento'] in {p['momento'] for p in altos}
+        else:
+            assert primera is None

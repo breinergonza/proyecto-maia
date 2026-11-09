@@ -134,6 +134,8 @@ export interface PuntoSerie {
   y: number
   /** Punto que hay que mirar: se pinta en coral y más grande. */
   marcado?: boolean
+  /** Primera visita con alerta: se pinta como estrella. */
+  estrella?: boolean
   /** Primera línea del tooltip (p. ej. la visita o la edad). */
   titulo: string
   detalle?: string[]
@@ -194,6 +196,14 @@ export function MiniSerie({ puntos, etiqueta, dominioY, ticksY, formatoY, ticksX
 function PuntoMarcado({ cx, cy, payload, index }: { cx?: number; cy?: number; payload?: PuntoSerie; index?: number }) {
   if (cx == null || cy == null) return <g key={index} />
   const marcado = payload?.marcado
+  if (payload?.estrella) {
+    const pts = Array.from({ length: 10 }, (_, i) => {
+      const r = i % 2 === 0 ? 8 : 3.4
+      const a = (Math.PI / 5) * i - Math.PI / 2
+      return `${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`
+    }).join(' ')
+    return <polygon key={index} points={pts} fill={COLOR.marca} stroke={COLOR.papel} strokeWidth={1.5} data-testid="estrella" />
+  }
   return (
     <circle key={index} cx={cx} cy={cy} r={marcado ? 5.5 : 4} fill={marcado ? COLOR.marca : COLOR.papel}
       stroke={marcado ? COLOR.papel : COLOR.serie} strokeWidth={2} />
@@ -213,14 +223,15 @@ function ContenidoTooltip({ active, payload }: { active?: boolean; payload?: Rea
 }
 
 /** Muestra de color para una leyenda escrita aparte de la gráfica. */
-export function Muestra({ tipo, children }: { tipo: 'franja' | 'alerta' | 'punto' | 'marcado'; children: ReactNode }) {
+export function Muestra({ tipo, children }: { tipo: 'franja' | 'alerta' | 'punto' | 'marcado' | 'estrella'; children: ReactNode }) {
   return (
     <span className="inline-flex items-center gap-1.5">
       <span aria-hidden className={cn('inline-block shrink-0',
         tipo === 'franja' && 'h-3 w-4 rounded-sm bg-teal-tinte ring-1 ring-teal/20',
         tipo === 'alerta' && 'h-3 w-4 rounded-sm bg-coral-tinte ring-1 ring-coral/30',
         tipo === 'punto' && 'size-2.5 rounded-full border-2 border-teal-medio bg-papel',
-        tipo === 'marcado' && 'size-3 rounded-full bg-coral-hondo')} />
+        tipo === 'marcado' && 'size-3 rounded-full bg-coral-hondo',
+        tipo === 'estrella' && 'size-3.5 bg-coral-hondo [clip-path:polygon(50%_0,62%_36%,100%_38%,69%_60%,80%_96%,50%_75%,20%_96%,31%_60%,0_38%,38%_36%)]')} />
       {children}
     </span>
   )

@@ -1,5 +1,5 @@
 // Piezas de interfaz al estilo shadcn/ui: el código vive en el repositorio y usa los tokens de estilos.css.
-import { forwardRef, useLayoutEffect, useRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes,
+import { forwardRef, useId, useLayoutEffect, useRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes,
   type TextareaHTMLAttributes } from 'react'
 import { cn } from '../../lib/cn'
 
@@ -63,18 +63,21 @@ export function Campo({ etiqueta, error, aviso, ayuda, children, id }: {
 }
 
 /** Panel con título opcional. `llenar`: ocupa el alto que le da su contenedor y desplaza su contenido por dentro. */
-export function Panel({ titulo, accion, children, className, llenar }: {
-  titulo?: ReactNode; accion?: ReactNode; children: ReactNode; className?: string; llenar?: boolean
+export function Panel({ titulo, descripcion, accion, children, className, llenar }: {
+  titulo?: ReactNode; descripcion?: ReactNode; accion?: ReactNode; children: ReactNode; className?: string; llenar?: boolean
 }) {
+  const idDescripcion = useId()
   return (
-    <section className={cn('animate-aparecer rounded-panel border border-linea/80 bg-papel shadow-suave',
-      llenar && 'flex min-h-0 flex-col', className)}>
+    <section aria-describedby={descripcion ? idDescripcion : undefined}
+      className={cn('animate-aparecer rounded-panel border border-linea/80 bg-papel shadow-suave',
+        llenar && 'flex min-h-0 flex-col', className)}>
       {(titulo || accion) && (
         <header className={cn('flex flex-wrap items-center justify-between gap-2 px-4 pt-4', llenar ? 'shrink-0 sm:px-5' : 'sm:px-6 sm:pt-5')}>
           {typeof titulo === 'string' ? <h2 className="text-base">{titulo}</h2> : titulo}
           {accion}
         </header>
       )}
+      {descripcion && <p id={idDescripcion} className={cn('px-4 pt-1 text-sm text-salvia', llenar ? 'shrink-0 sm:px-5' : 'sm:px-6')}>{descripcion}</p>}
       <div className={llenar ? 'min-h-0 flex-1 overflow-auto p-4 sm:px-5' : 'p-4 sm:p-6'}>{children}</div>
     </section>
   )

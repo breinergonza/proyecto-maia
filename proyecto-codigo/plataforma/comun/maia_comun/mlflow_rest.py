@@ -13,7 +13,7 @@ import httpx
 EXPERIMENTOS = {'anomalias': 'maia-anomalias', 'clinico': 'maia-clinico'}
 SUFIJO = {'kmc': '', 'simulado': '-demo'}
 ETIQUETAS = ('fuente', 'corte', 'version_modelo', 'n_sujetos', 'dispositivo', 'git_sha', 'consulta_sha',
-             'hiperparametros', 'ejecucion', 'programacion', 'mlflow.runName')
+             'hiperparametros', 'ejecucion', 'programacion', 'propietario', 'visibilidad', 'mlflow.runName')
 
 
 class MlflowNoDisponible(RuntimeError):

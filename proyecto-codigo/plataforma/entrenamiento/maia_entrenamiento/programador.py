@@ -236,6 +236,10 @@ class Programador:
         env.update({'MAIA_EJECUCION_ID': str(e.id), 'PYTHONUNBUFFERED': '1'})
         if e.programacion_id:
             env['MAIA_PROGRAMACION_ID'] = str(e.programacion_id)
+        if e.tipo == 'entrenamiento':       # dueño y etiqueta Personal/Oficial: quedan como tags en MLflow
+            env['MAIA_VISIBILIDAD'] = (e.parametros or {}).get('visibilidad') or 'oficial'
+            if e.solicitada_por:
+                env['MAIA_PROPIETARIO'] = str(e.solicitada_por)
         extrae = e.tipo == 'corrida' or (e.tipo == 'entrenamiento' and (e.parametros or {}).get('extraer'))
         if e.fuente == 'kmc' and extrae:
             with Session(self.motor) as s:
@@ -322,6 +326,8 @@ class Programador:
             args = ['entrenar', tipo, '--fuente', e.fuente]
             if fecha:
                 args += ['--fecha', fecha]
+            if p.get('muestra_id'):
+                args += ['--muestra', str(p['muestra_id'])]
             hp = (p.get('hiperparametros') or {}).get(tipo)
             if hp:
                 args += ['--hiperparametros', json.dumps(hp, sort_keys=True)]

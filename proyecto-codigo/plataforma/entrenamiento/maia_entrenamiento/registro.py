@@ -21,7 +21,7 @@ from maia_comun.config import obtener
 from maia_comun.metricas import metricas_anomalias, metricas_clinicas, nombre_metrica  # noqa: F401
 
 EXPERIMENTOS = {'anomalias': 'maia-anomalias', 'clinico': 'maia-clinico', 'experimentos': 'maia-experimentos-desenlaces'}
-ALIAS_CANDIDATO, ALIAS_PRODUCCION = 'candidato', 'produccion'
+ALIAS_CANDIDATO, ALIAS_PRODUCCION, ALIAS_PERSONAL = 'candidato', 'produccion', 'personal'
 REQUISITOS = ['pandas>=3.0', 'numpy>=2.5', 'lightgbm==4.7.0', 'scipy>=1.15', 'pyarrow>=20', 'openpyxl>=3.1']
 
 
@@ -69,7 +69,15 @@ def params_extraccion(parametros: dict | None, consulta_sha: str | None) -> dict
 def _etiquetas_ejecucion() -> dict[str, str]:
     """Si el programador lanzó el entrenamiento: qué ejecución (y qué programación) de ``app.ejecuciones``."""
     return {k: v for k, v in (('ejecucion', os.environ.get('MAIA_EJECUCION_ID')),
-                               ('programacion', os.environ.get('MAIA_PROGRAMACION_ID'))) if v}
+                               ('programacion', os.environ.get('MAIA_PROGRAMACION_ID')),
+                               ('propietario', os.environ.get('MAIA_PROPIETARIO')),
+                               ('visibilidad', os.environ.get('MAIA_VISIBILIDAD'))) if v}
+
+
+def _alias_inicial() -> str:
+    """Un modelo personal nunca queda como ``candidato`` (que el administrador aprueba a ``produccion``): lleva el
+    alias ``personal``."""
+    return ALIAS_PERSONAL if os.environ.get('MAIA_VISIBILIDAD') == 'personal' else ALIAS_CANDIDATO
 
 
 def _codigo() -> list[str]:
@@ -114,7 +122,7 @@ def registrar(tipo: str, fuente: str, carpeta_modelo: Path, cfg, metricas: dict[
                                        registered_model_name=nombre_registro)
         cliente = MlflowClient()
         version = _version_de_run(cliente, nombre_registro, run.info.run_id, info)
-        cliente.set_registered_model_alias(nombre_registro, ALIAS_CANDIDATO, version.version)
+        cliente.set_registered_model_alias(nombre_registro, _alias_inicial(), version.version)
         cliente.set_model_version_tag(nombre_registro, version.version, 'version_modelo', ficha['version'])
         cliente.set_model_version_tag(nombre_registro, version.version, 'fuente', fuente)
         return cliente.get_model_version(nombre_registro, version.version)

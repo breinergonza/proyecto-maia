@@ -146,6 +146,8 @@ function api(rol: 'admin' | 'experto' = 'experto') {
     if (url === '/api/ninos/s1/historia-riesgo') return { cuerpo: historia }
     if (url === '/api/ninos/s1/perfil') return { cuerpo: perfil }
     if (url.startsWith('/api/revision/datos?')) return { cuerpo: { total: 1, pagina: 1, tamano: 10, items: [datoRevision] } }
+    if (url === '/api/revision/datos/aciertos') return { cuerpo: { corrida_id: 3, serie: [], respondidas: 0, confirmadas_error_pct: null } }
+    if (url === '/api/revision/datos/concentracion') return { cuerpo: { corrida_id: 3, hay_sede: false, minimo_celda: 5, por_variable: [], otras_variables: 0, celdas: [], otras_celdas: 0 } }
     if (url === '/api/revision/riesgos') return { cuerpo: { corrida_id: 3, items: [] } }
     if (url === '/api/revision/resumen') return { cuerpo: { datos_por_capa: [{ capa: '2', respuestas: 4, si: 3, no: 1, no_se: 0, precision_pct: 75 }], riesgos_por_grupo: [] } }
     return { cuerpo: {} }
@@ -212,9 +214,9 @@ describe('pantallas del equipo clínico sin términos técnicos', () => {
     expect(visible()).not.toMatch(/\([a-z]+_[a-z0-9_]+\)|quiebre_/)
   })
 
-  it('revisión de datos', async () => {
-    api()
-    montar('/revision/datos')
+  it('calidad de datos', async () => {
+    api('admin')
+    montar('/admin/calidad-datos')
     expect(await screen.findByText(/Para este niño se esperaba entre/)).toBeInTheDocument()
     // sin serie (la variable no tiene concepto): el valor frente a su rango; del motivo queda solo lo que agrega
     expect(screen.getByRole('img', { name: 'Peso a los 3 meses: 9.999 g; se esperaba entre 4.000 y 6.500' })).toBeInTheDocument()

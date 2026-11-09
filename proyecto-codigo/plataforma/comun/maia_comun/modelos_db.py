@@ -380,6 +380,7 @@ class Crecimiento(Base):
     sujeto: Mapped[str] = mapped_column(Text)
     etapa: Mapped[str | None] = mapped_column(Text)
     indicador: Mapped[str] = mapped_column(Text)
+    variable: Mapped[str | None] = mapped_column(Text)       # variable de origen: de ella sale la unidad del valor
     fecha: Mapped[date | None] = mapped_column(Date)
     edad_corregida: Mapped[float | None] = mapped_column(Float)
     valor: Mapped[float | None] = mapped_column(Float)
@@ -439,3 +440,5 @@ class Notificacion(Base):
 
 
 ESQUEMAS = ('sevarti', 'resultados', 'app')
+import maia_comun.modelos_analitica  # noqa: E402,F401  (registra la tabla de analítica en la metadata)
+import maia_comun.modelos_muestras  # noqa: E402,F401  (registra las tablas de muestras en la metadata)

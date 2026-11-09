@@ -9,6 +9,7 @@ import { Link } from 'react-router'
 import { ErrorApi, pedir } from '../api/cliente'
 import type { CampoFormulario, FormularioCalculo, PeticionInferencia, PuntoCrecimiento, ResultadoInferencia, VisitaFormulario } from '../api/tipos'
 import { puede, useSesion } from '../auth/sesion'
+import { descripcionDe } from '../lib/descripciones'
 import { Aviso, Boton, Cargando, Encabezado, Entrada, Insignia, Panel, Selector, Tabla, Texto, Vacio } from '../components/ui'
 import { cn } from '../lib/cn'
 import { usePaqueteActivo } from '../lib/consultas'
@@ -384,7 +385,7 @@ function Resultado({ r, varios }: { r: ResultadoInferencia; varios: boolean }) {
         <Aviso tono="teal">No se usaron estos datos porque el modelo no los conoce: {r.variables_ignoradas.join(', ')}.</Aviso>
       )}
       {r.riesgos.length === 0 ? (
-        <Panel titulo="Riesgo">
+        <Panel titulo={descripcionDe('riesgo').titulo} descripcion={descripcionDe('riesgo').descripcion}>
           <p className="text-sm text-salvia">
             No se calculó ningún riesgo. El riesgo se calcula en la <strong>última visita con datos</strong>: para verlo, esa
             visita debe ser una de las que dicen «Aquí se calcula» (deje vacías las posteriores).
@@ -399,7 +400,7 @@ function Resultado({ r, varios }: { r: ResultadoInferencia; varios: boolean }) {
           </div>
         </section>
       )}
-      <Panel titulo="Datos que parecen raros">
+      <Panel titulo={descripcionDe('datos_raros').titulo} descripcion={descripcionDe('datos_raros').descripcion}>
         {r.alertas_dato.length === 0 ? <p className="text-sm text-salvia">Ningún dato quedó marcado.</p> : (
           <ul className="divide-y divide-linea/70 text-sm">
             {r.alertas_dato.map((a, i) => {
@@ -432,7 +433,7 @@ function Resultado({ r, varios }: { r: ResultadoInferencia; varios: boolean }) {
         )}
       </Panel>
       {grafica ? <CrecimientoOms crecimiento={porIndicador(r.crecimiento)} /> : (
-        <Panel titulo="Crecimiento frente a la OMS" accion={<span className="text-xs text-salvia" title={AYUDA_OMS}>para la edad corregida</span>}>
+        <Panel titulo={descripcionDe('crecimiento_ficha').titulo} descripcion={descripcionDe('crecimiento_ficha').descripcion} accion={<span className="text-xs text-salvia" title={AYUDA_OMS}>para la edad corregida</span>}>
           {r.crecimiento.length === 0 ? <p className="text-sm text-salvia">Sin medidas de crecimiento.</p> : (
             <Tabla densa>
               <thead><tr><th>Medida</th><th className="text-right">Edad corregida</th><th>Frente a la OMS</th></tr></thead>

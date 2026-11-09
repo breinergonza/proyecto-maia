@@ -57,6 +57,13 @@ def test_flujo_completo_con_datos_simulados(entorno, url_db):
     salida = _maia('entrenar', 'clinico')
     assert 'maia-clinico-demo v1 (alias candidato)' in salida
     assert 'auc__' in salida
+    # la analítica agregada de la validación quedó guardada (sin nada por niño)
+    with create_engine(url_db).connect() as cx:
+        tipos = set(cx.execute(text("SELECT tipo FROM resultados.analitica WHERE desenlace IS NOT NULL")).scalars())
+        meta = cx.execute(text("SELECT datos FROM resultados.analitica WHERE tipo = 'meta' ORDER BY id DESC LIMIT 1")).scalar()
+        roc = cx.execute(text("SELECT datos->'roc'->'puntos' FROM resultados.analitica WHERE tipo = 'rendimiento' LIMIT 1")).scalar()
+    assert {'rendimiento', 'calibracion', 'equidad', 'poblacion', 'chequeos'} <= tipos
+    assert meta['desenlaces'] and meta['version_registro'] == '1' and 0 < len(roc) <= 100
 
     salida = _maia('modelos')
     assert 'maia-anomalias-demo' in salida and 'maia-clinico-demo' in salida and 'candidato' in salida
@@ -114,3 +121,57 @@ def test_config_de_archivo_se_valida_como_en_la_web(tmp_path):
         with pytest.raises(ValueError, match=texto):
             E.config_anomalias(str(f))
 
+
+
+def _muestra_en_db(url_db, definicion, corte='vigente'):
+    """Guarda una muestra sobre el corte vigente (o sin corte) y devuelve su id."""
+    from sqlalchemy import create_engine, text
+    with create_engine(url_db).begin() as cx:
+        cid = cx.execute(text("SELECT id FROM sevarti.cortes WHERE fuente = 'simulado' AND vigente")).scalar()
+        if corte == 'otro':
+            cid = cx.execute(text("INSERT INTO sevarti.cortes (fuente, fecha_corte, filas, vigente) "
+                                  "VALUES ('simulado', '2019-01-01', '{}', false) RETURNING id")).scalar()
+        return cx.execute(
+            text("INSERT INTO app.muestras (titulo, fuente, corte_id, definicion, n_ninos, n_base, huella) "
+                 "VALUES ('Prueba', 'simulado', :c, CAST(:d AS jsonb), 1, 1, 'x') RETURNING id"),
+            {'c': cid, 'd': json.dumps(definicion)}).scalar()
+
+
+def test_entrenar_con_una_muestra_deja_su_rastro_en_mlflow(entorno, url_db):
+    """La muestra recorta el corte antes de entrenar; MLflow guarda sus tags, la definición y el embudo."""
+    import mlflow
+    from mlflow.tracking import MlflowClient
+    definicion = {'version': 2, 'y': [], 'muestreo': {'modo': 'estratificado', 'por': 'sede',
+                                                      'maximo_por_categoria': 25, 'semilla': 1}}
+    mid = _muestra_en_db(url_db, definicion)
+    salida = _maia('entrenar', 'anomalias', '--config', str(entorno / 'rapido.json'), '--sin-validacion',
+                   '--muestra', str(mid))
+    assert 'Muestra «Prueba»' in salida and 'Aviso' in salida          # pocos niños: avisa, no falla
+    cliente = MlflowClient(mlflow.get_tracking_uri())
+    exp = cliente.get_experiment_by_name([e.name for e in cliente.search_experiments() if 'anomal' in e.name][0])
+    run = max(cliente.search_runs([exp.experiment_id]), key=lambda r: r.info.start_time)
+    t = run.data.tags
+    assert t['muestra_id'] == str(mid) and t['muestra_titulo'] == 'Prueba' and 0 < int(t['muestra_n']) <= int(t['muestra_n_base'])
+    assert int(t['muestra_n']) < int(t['muestra_n_base'])
+    archivos = {a.path for a in cliente.list_artifacts(run.info.run_id, 'muestra')}
+    assert {'muestra/definicion.json', 'muestra/embudo.json'} <= archivos
+
+
+def test_muestra_vacia_o_de_otro_corte_no_entrena(entorno, url_db):
+    from maia_entrenamiento.cli import app
+    vacia = _muestra_en_db(url_db, {'version': 2, 'y': [], 'tiempo': {'fecha': 'fecha_nacimiento', 'modo': 'periodo',
+                                                                      'desde': '1900', 'hasta': '1901'}})
+    otro = _muestra_en_db(url_db, {'version': 2, 'y': []}, corte='otro')
+    for mid, texto in ((vacia, 'ningún niño'), (otro, 'se armó con el corte 2019-01-01'), (99999, 'no existe')):
+        r = CliRunner().invoke(app, ['entrenar', 'anomalias', '--sin-validacion', '--sin-registro', '--muestra', str(mid)])
+        assert r.exit_code != 0 and texto in r.output.replace('\n', ' '), r.output
+
+
+def test_sin_muestra_no_deja_tags_de_muestra(entorno):
+    import mlflow
+    from mlflow.tracking import MlflowClient
+    _maia('entrenar', 'anomalias', '--config', str(entorno / 'rapido.json'), '--sin-validacion')
+    cliente = MlflowClient(mlflow.get_tracking_uri())
+    exp = [e for e in cliente.search_experiments() if 'anomal' in e.name][0]
+    run = max(cliente.search_runs([exp.experiment_id]), key=lambda r: r.info.start_time)
+    assert not any(k.startswith('muestra_') for k in run.data.tags)

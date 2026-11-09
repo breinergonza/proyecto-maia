@@ -7,8 +7,10 @@ import { ErrorApi, pedir } from '../api/cliente'
 import type { AlarmaGrupo, AlarmasTrimestre, CrecimientoEtapa, ResumenTablero } from '../api/tipos'
 import { puede, useSesion } from '../auth/sesion'
 import { BarrasApiladas, LeyendaSeries, LineasSeries, type ColorSerie, type FilaSeries, type Serie } from '../components/graficos'
+import { Grafica } from '../components/grafica'
 import { Aviso, Cargando, Encabezado, Insignia, Panel, Tabla, Vacio } from '../components/ui'
 import { cn } from '../lib/cn'
+import { descripcionDe } from '../lib/descripciones'
 import { usePorClasificar } from '../lib/diccionario'
 import { dec, dec2, fecha, indicador, INDICADORES, num, pct, riesgo } from '../lib/formato'
 import { alerta, AYUDA_OMS, AYUDA_RIESGO_ALTO, ayudaAlerta, datosAl, senal, trimestre, trimestresSeguidos } from '../lib/lenguaje'
@@ -51,7 +53,7 @@ export default function Tablero() {
         <Indicador valor={num(r.ninos)} texto="niños con datos" />
         <Indicador valor={num(r.datos)} texto="datos leídos" />
         <Indicador valor={num(r.datos_revisar)} texto={`datos por revisar · ${dec(r.alertas_por_1000)} por mil`} tono="coral"
-          a={puede(usuario, ['admin', 'experto']) ? '/revision/datos' : undefined} />
+          a={puede(usuario, ['admin']) ? '/revision/datos' : undefined} />
         <Indicador valor={num(r.datos_revisados)} texto="datos ya respondidos por expertos" />
         <Indicador valor={num(r.ninos_riesgo_alto)} texto="niños con algún riesgo alto" tono="coral" a={verAltos}
           ayuda={`${AYUDA_RIESGO_ALTO} Un niño puede tenerlo en varios desenlaces: son ${num(r.riesgos_altos)} riesgos altos en total.`} />
@@ -59,7 +61,8 @@ export default function Tablero() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-12 lg:grid-rows-2">
-        <Panel llenar titulo="Riesgo por desenlace" className="lg:col-span-7"
+        <Grafica llenar titulo={descripcionDe('riesgo_por_desenlace').titulo} descripcion={descripcionDe('riesgo_por_desenlace').descripcion}
+          exportar={{ nombre: 'riesgo-por-desenlace' }} className="lg:col-span-7"
           accion={<Link className="text-sm font-semibold text-teal hover:underline" to={verAltos}>Ver riesgo alto</Link>}>
           {r.riesgos_por_desenlace.length === 0 ? (
             <p className="text-sm text-salvia">
@@ -90,20 +93,20 @@ export default function Tablero() {
               </tbody>
             </Tabla>
           )}
-        </Panel>
+        </Grafica>
 
         <Panel llenar className="lg:col-span-5"
           titulo={<h2 className="text-base" title="Un dato puede tener varias alertas; la cola pone primero los que tienen más.">Datos por revisar, por tipo de alerta</h2>}
-          accion={puede(usuario, ['admin', 'experto']) && pendientes > 0 &&
+          accion={puede(usuario, ['admin']) && pendientes > 0 &&
             <Link to="/revision/datos" className="text-sm font-semibold text-teal hover:underline">Revisar</Link>}>
           <Capas r={r} />
         </Panel>
 
-        <Panel llenar className="lg:col-span-7"
-          titulo={<h2 className="text-base">Crecimiento frente a la OMS</h2>}
+        <Grafica llenar className="lg:col-span-7" titulo={descripcionDe('crecimiento_oms').titulo}
+          descripcion={descripcionDe('crecimiento_oms').descripcion} exportar={{ nombre: 'crecimiento-oms' }}
           accion={<span className="text-xs text-salvia" title={AYUDA_OMS}>% de los niños medidos con crecimiento bajo frente a la OMS · EC: edad corregida</span>}>
           <Crecimiento filas={r.crecimiento_por_etapa} />
-        </Panel>
+        </Grafica>
 
         <AlarmasGrupo total={r.alarmas_grupo} className="lg:col-span-5" />
       </div>
@@ -233,8 +236,9 @@ function TablaCrecimiento({ etapas, medidas, celda }: {
 function AlarmasGrupo({ total, className }: { total: number | null; className?: string }) {
   const q = useQuery({ queryKey: ['tablero', 'alarmas'], queryFn: () => pedir<AlarmaGrupo[]>('/tablero/alarmas-grupo') })
   return (
-    <Panel llenar className={cn('max-lg:[&>div]:max-h-[26rem]', className)}
-      titulo={<h2 className="text-base" title="Cambios de un trimestre a otro en todo un grupo: suelen venir de un cambio en la forma de medir.">Alarmas de grupo</h2>}
+    <Grafica llenar className={cn('max-lg:[&>div]:max-h-[26rem]', className)}
+      titulo={descripcionDe('alarmas_grupo').titulo} descripcion={descripcionDe('alarmas_grupo').descripcion}
+      exportar={{ nombre: 'alarmas-de-grupo' }}
       accion={q.data && q.data.length > 0 && (
         <span className="text-xs text-salvia">
           {total != null && total > q.data.length
@@ -263,7 +267,7 @@ function AlarmasGrupo({ total, className }: { total: number | null; className?: 
           </ul>
         </>
       )}
-    </Panel>
+    </Grafica>
   )
 }
 

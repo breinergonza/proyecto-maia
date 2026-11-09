@@ -19,7 +19,7 @@ No hace falta saber de programación. Los nombres en **negrita** son los mismos 
 Trabaja con los datos del Programa Madre Canguro y usa dos modelos:
 
 * **Anomalías.** Busca datos raros en la historia de cada niño (un peso que no cuadra con su edad, una talla que
-  baja de una visita a otra, etc.). Esos datos forman la lista **Datos por revisar**, que responden los expertos.
+  baja de una visita a otra, etc.). Esos datos forman la lista de **Calidad de datos**, que responde la administración.
 * **Alertas clínicas.** Calcula el riesgo de desenlaces que se pueden prevenir, ordena a los niños de mayor a menor
   riesgo y dice qué fue lo que más pesó en cada caso. También compara el crecimiento con el estándar de la OMS.
 
@@ -31,8 +31,8 @@ la base de la Fundación).
 | Perfil (como aparece en pantalla) | Qué puede hacer |
 |---|---|
 | **Consulta** | Ver el **Tablero**, la lista de **Niños** y la historia de cada niño |
-| **Experto clínico** | Todo lo de Consulta, más **Datos por revisar**, **Revisión de riesgos**, **Calcular el riesgo de un niño** y **Diccionario** |
-| **Administración** | Todo lo anterior, más **Modelos**, **Corridas**, **Usuarios** y **Notificaciones** |
+| **Experto clínico** | Todo lo de Consulta, más **Revisión de riesgos**, **Calcular el riesgo de un niño** y **Diccionario** |
+| **Administración** | Todo lo anterior, más **Calidad de datos**, **Modelos**, **Corridas**, **Usuarios** y **Notificaciones** |
 
 Si una opción del menú no aparece, su perfil no la incluye. Pida el cambio a la administración.
 
@@ -72,9 +72,9 @@ termina la sesión. Ciérrela siempre en computadores compartidos. Aunque no la 
 
 * **Menú lateral** (en el teléfono se abre con el botón de las tres rayas, arriba a la derecha) con tres secciones:
   * **Seguimiento:** **Tablero** y **Niños**.
-  * **Revisión clínica:** **Datos por revisar**, **Revisión de riesgos**, **Calcular el riesgo de un niño** y
+  * **Revisión clínica:** **Revisión de riesgos**, **Calcular el riesgo de un niño** y
     **Diccionario**.
-  * **Administración:** **Modelos**, **Corridas**, **Usuarios** y **Notificaciones**.
+  * **Administración:** **Calidad de datos**, **Modelos**, **Corridas**, **Usuarios** y **Notificaciones**.
 * **Contenido** en el centro.
 * **Pie de página:** «Apoyo a la decisión, no diagnóstico. El riesgo ordena a los niños; la decisión es del equipo
   clínico.»
@@ -98,8 +98,8 @@ Si aparece «Todavía no hay resultados», la administración aún no ha hecho l
 |---|---|
 | **niños con datos** | Niños con datos en la base en esa fecha |
 | **datos leídos** | Total de mediciones revisadas por el modelo de anomalías |
-| **datos por revisar · N por mil** | Datos que el modelo encontró raros y cuántos son por cada mil datos leídos. Para expertos y administración es un enlace a **Datos por revisar** |
-| **datos ya respondidos por expertos** | Datos por revisar que ya tienen respuesta de un experto |
+| **datos por revisar · N por mil** | Datos que el modelo encontró raros y cuántos son por cada mil datos leídos. Para la administración es un enlace a **Calidad de datos** |
+| **datos ya respondidos** | Datos por revisar que ya tienen respuesta de la administración |
 | **niños con algún riesgo alto** | Niños distintos con al menos un desenlace en riesgo alto (posición 90 o más: entre el 10 % de niños con más riesgo para ese desenlace). Un niño con riesgo alto en tres desenlaces cuenta una vez; al pasar el mouse se ve el total de riesgos altos. Lleva a la lista de **Niños** ya filtrada, que muestra la misma cifra |
 | **alarmas de grupo** | Cambios bruscos en todo un grupo de niños de un trimestre a otro (ver abajo) |
 
@@ -175,6 +175,54 @@ niños** vuelve a la lista.
     **Alto para la edad**. Al pasar el mouse se ve el puntaje z.
   * **Por qué se marcó:** cada dato raro con sus tipos de alerta.
 
+### Explorar
+
+Está en **Seguimiento**, justo debajo de **Tablero**, y lo ven todos los perfiles. Muestra las mismas cifras del
+Tablero, pero para el grupo de niños que usted elija; el Tablero no cambia y sigue mostrando a todos.
+
+* **Filtros (panel de la izquierda):** casillas por variable (por ejemplo sexo o categoría al nacer), con cuántos niños
+  tendría cada opción. Lo elegido aparece como fichas que se quitan con la **x**. Con **+ Agregar variable** suma otras.
+  Si una variable se mide muchas veces, elija si cuenta la primera, la última, en alguna visita o en una etapa.
+* **Guardar este filtro:** queda en la lista de filtros guardados para volver a usarlo (por ejemplo en Predicción).
+* **Qué se ve:** niños en el grupo, datos leídos, niños con algún riesgo alto, crecimiento bajo frente a la OMS, y
+  tres gráficas: riesgo del grupo, crecimiento del grupo y quiénes son los niños.
+* **Privacidad:** con menos de 20 niños no se muestran cifras; basta quitar algún filtro. Quien solo consulta ve las
+  cifras menores de 100 aproximadas de 5 en 5. Los grupos de menos de 5 niños se ocultan.
+
+### Analítica de los modelos
+
+Responde: ¿qué tan bien ordena el modelo a los niños, es fiable su riesgo y funciona igual para todos? Tiene once
+submódulos, como fichas arriba (en el teléfono se deslizan): **Resumen**, **Rendimiento**, **Anticipación**,
+**Calibración**, **Qué datos pesan**, **Población**, **Equidad**, **Estabilidad**, **Trayectorias**, **Perfiles** y
+**Comparar**.
+
+* **Contexto de análisis:** arriba se elige el **Entrenamiento**, el **Desenlace** y se ve el modelo, su versión y la
+  fecha de los datos. Queda en la dirección, así que un enlace copiado abre la misma vista. En el teléfono se pliega.
+* **Guía de lectura:** cada submódulo explica en pocas líneas cómo leerlo. Su interruptor **Modo técnico** agrega los
+  términos y cifras de detalle (se recuerda en el navegador).
+* **En prueba:** un desenlace marcado así se ve, pero aún no es oficial ni genera correos.
+* **Sin analítica / «Este análisis estará disponible pronto»:** si el entrenamiento es anterior y no guardó los
+  resultados de analítica, aparece **Sin analítica** y la opción de reentrenar (no se recalcula en silencio). Una ficha con
+  «pronto» o un análisis **pendiente** todavía no se calcula para ese modelo (por ejemplo Anticipación, si no hay
+  desenlaces entrenados desde varias visitas).
+* Un grupo con menos de 5 niños dice «n menor que 5» y no muestra cifras.
+* **Perfiles** son provisionales: edad gestacional y clasificación de Lubchenco; ningún experto los ha aprobado todavía.
+* **Comparar** pone dos entrenamientos (A y B) lado a lado; por ahora no permite aprobar B desde allí.
+
+### Descripciones, PNG y CSV
+
+Cada gráfica y tabla de datos lleva bajo el título una frase fija que dice qué muestra y cómo leerla (también en el
+teléfono). Sus botones permiten llevarse el dato: **PNG** de la gráfica (con título, descripción, muestra y fecha) y
+**CSV** de las tablas de agregados. Esto vale también para las gráficas del Tablero.
+
+### Perfil del niño y primera alerta
+
+En la ficha de un niño, la tarjeta **Perfil del niño** muestra fichas con su categoría por edad gestacional
+(prematuro extremo, muy prematuro, moderado a tardío, a término), su clasificación de Lubchenco (peso adecuado, pequeño
+o grande para la edad) y la visita actual; no muestra cifras clínicas. En **Riesgo en cada visita**, una estrella marca
+la **primera alerta**: la primera visita en que el riesgo cruzó la línea de alerta. Sigue **Al nacer, frente a los demás
+niños**, que ubica al niño frente al resto del programa.
+
 ---
 
 ## Perfil Experto clínico
@@ -182,9 +230,22 @@ niños** vuelve a la lista.
 Además de lo de Consulta, el experto clínico tiene la sección **Revisión clínica**. Sus respuestas son las que dicen
 si los modelos sirven: tómese el tiempo necesario y use **No sé** cuando no esté seguro.
 
-### Datos por revisar
+### Calidad de datos (Administración, solo administración)
 
-Datos que el modelo de anomalías encontró raros. Para cada uno, la pregunta es si cree que es un **error de registro**.
+Se abre en **Administración › Calidad de datos**; los perfiles Consulta y Experto clínico no ven esta opción. La
+dirección antigua `/revision/datos` lleva a esta página.
+
+Arriba hay cuatro cifras (**datos por revisar**, **alertas por cada mil datos**, **de los respondidos, confirmados
+como error** y **alarmas de grupo**) y tres paneles:
+
+* **Alertas por tipo.** Cuántos datos raros encontró cada revisión.
+* **Aciertos frente a la revisión.** Cuántas alertas confirmó el equipo al revisar las primeras: de las 50, 100, 200…
+  primeras alertas de la cola que ya tienen respuesta, qué porcentaje se marcó como error.
+* **Dónde se concentran.** Sede y dato con más alertas. Si el corte no trae sedes, solo se muestra por dato. Los
+  grupos con menos de 5 alertas no se muestran solos: se suman en «Otras».
+
+Debajo está la lista de **Datos por revisar**: datos que el modelo de anomalías encontró raros. Para cada uno, la
+pregunta es si cree que es un **error de registro**.
 
 * **Filtros (arriba a la derecha):** **Sin responder** (por defecto), **Ya respondidos** o **Todos**. Y **Todas las
   alertas**, o un solo tipo: **Valor fuera de lo esperado**, **No cuadra con el resto de sus datos** o **Cambio raro
@@ -202,7 +263,7 @@ Cada tarjeta muestra:
 * **Comentario (opcional):** escríbalo **antes** de pulsar la respuesta, porque se guarda junto con ella. Si lo
   escribe después, vuelva a pulsar la misma respuesta.
 
-Debajo aparece «Respuesta guardada.» y después «Puede cambiar su respuesta.». Cada experto responde por su cuenta
+Debajo aparece «Respuesta guardada.» y después «Puede cambiar su respuesta.». Cada administrador responde por su cuenta
 («Sin responder» y «Ya respondidos» se refieren a sus propias respuestas) y puede cambiar su respuesta las veces que
 quiera.
 
@@ -219,7 +280,7 @@ con lo que vería en consulta: edad gestacional, datos al nacer y lo medido en e
 porque podría traer nombres.
 
 * **¿Le preocupa este niño?** **Sí**, **No** o **No sé**, según su criterio clínico para ese desenlace.
-* **Comentario (opcional):** igual que en Datos por revisar, escríbalo antes de responder.
+* **Comentario (opcional):** igual que en Calidad de datos, escríbalo antes de responder.
 * Arriba a la derecha, la barra **Respondidos** muestra cuántos lleva de cuántos.
 
 **Por qué es ciega.** Si el modelo ordena bien, los niños de riesgo alto deberían preocupar más que el resto. Para
@@ -290,6 +351,31 @@ con los datos escritos, dice «No se pudo calcular el riesgo con estos datos. Re
 de nuevo.»; el detalle técnico queda en el registro de la API.
 
 Recuerde: si escribe datos de un niño real, no ponga su nombre ni su documento; el formulario no los pide.
+
+### Predicción (Experto y Administración)
+
+Calcula el riesgo con un modelo ya entrenado, sin guardar nada por niño.
+
+* **Modelo:** cualquier versión del registro. Un modelo de un corte anterior se puede usar, con un aviso en coral.
+* **Muestra o todo el universo:** use una muestra guardada (hecha en Explorar) o todo el universo de niños. Los niños con
+  que se entrenó el modelo se dejan fuera, y la pantalla lo avisa.
+* **Resultado:** cómo se reparte el riesgo, riesgo por desenlace y los niños con más riesgo (los de riesgo alto o muy alto
+  llevan etiqueta).
+* **Niño nuevo:** elija una visita y un perfil, parta de un niño de ejemplo con valores típicos, cambie solo lo que sea
+  distinto y calcule. Con menos de 20 niños en el perfil no se da un ejemplo.
+* **Exportar CSV por niño:** solo lo ve y lo puede usar la administración; queda registrado quién lo descargó.
+
+### Mis modelos (Experto y Administración)
+
+Permite entrenar un modelo propio con los hiperparámetros vigentes (solo administración los cambia).
+
+* **Sus límites:** 3 modelos personales guardados y 1 entrenamiento en cola por persona. La administración no tiene límite.
+* **Entrenar modelo nuevo:** nombre, descripción, datos y **Muestra de niños** (o **Armar una muestra** con filtros,
+  fecha y tope por grupo). Con menos de 200 niños el aviso dice que el modelo puede salir poco confiable. El
+  entrenamiento entra a la **cola**, que muestra posición, dueño y tiempo estimado; puede cancelar el suyo.
+* **Banco de modelos:** lo ven todos los expertos, con dueño, muestra, corte y AUC. La etiqueta **Personal** significa que
+  no cambia el tablero ni envía correos; **Oficial** solo lo da la administración. **Corte anterior** marca un modelo de
+  un corte de datos previo: sigue usable en Predicción con aviso. Los modelos personales sin uso se borran a los 90 días.
 
 ---
 
@@ -424,6 +510,8 @@ La corrida con la base de la Fundación (extraer y calcular con los modelos apro
 
 ### Notificaciones
 
+En el correo de aviso, cada niño lleva su etiqueta de perfil (por ejemplo «Muy prematuro · Peso adecuado») y la visita; nunca valores clínicos.
+
 Después de cada corrida que no es en silencio, se envía un correo por cada desenlace activo con los niños cuya posición
 es igual o mayor que el riesgo mínimo. El correo lo leen clínicos, así que no dice «posición» sino, con la misma escala
 de la pantalla, «más riesgo que 9 de cada 10 niños». Lleva solo el código del niño, el desenlace, esa comparación y
@@ -554,8 +642,11 @@ Es a propósito (revisión ciega): así se puede saber si el modelo coincide con
 **¿Mis respuestas las ven los demás expertos?**
 No. Cada experto ve solo las suyas. La administración ve el resumen agregado de todos.
 
-**¿Por qué no veo Datos por revisar, Revisión de riesgos o Calcular el riesgo de un niño?**
+**¿Por qué no veo Revisión de riesgos o Calcular el riesgo de un niño?**
 Su perfil es Consulta. Si necesita esas opciones, pídale a la administración el perfil de Experto clínico.
+
+**¿Por qué no veo Calidad de datos?**
+Es una opción de Administración y solo la ve el perfil de administración.
 
 **Cambié el orden de las columnas en Niños y en otro computador no aparece.**
 El orden se guarda solo en el navegador donde lo cambió. **Columnas → Restablecer** vuelve al orden original.

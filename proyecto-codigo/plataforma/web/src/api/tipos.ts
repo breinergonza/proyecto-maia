@@ -174,6 +174,8 @@ export interface HistoriaRiesgo {
   /** Paquete con que se calculó la corrida; si difiere de ``paquete``, la historia no es comparable 1:1. */
   paquete_corrida: string | null
   puntos: PuntoHistoria[]
+  /** Por clave de desenlace: primera visita en riesgo alto, o null. */
+  primera_alerta?: Record<string, PrimeraAlerta | null>
 }
 
 export interface VariablePerfil {
@@ -221,6 +223,7 @@ export interface LineaTemporal {
   sujeto: string
   grupo: string | null
   eg_semanas: number | null
+  perfil?: PerfilProvisional
   anio_nacimiento: number | null
   corte: string | null
   corrida_id: number
@@ -281,6 +284,27 @@ export interface ResumenRevision {
   riesgos_por_grupo: { grupo: string; respuestas: number; si: number; no: number; preocupa_pct: number }[]
 }
 
+/** GET /revision/datos/aciertos: de las k primeras alertas de la cola, qué porcentaje de las ya respondidas se marcó «error». */
+export interface AciertosRevision {
+  corrida_id: number
+  serie: { k: number; respondidas: number; precision: number | null }[]
+  respondidas: number
+  /** % de todas las alertas respondidas que se confirmaron como error (null si nadie ha respondido) */
+  confirmadas_error_pct: number | null
+}
+
+/** GET /revision/datos/concentracion: alertas por variable y, con más de un grupo o sede, por grupo y variable.
+ * Lo que tiene menos de `minimo_celda` alertas viene sumado en `otras_*`. */
+export interface ConcentracionAlertas {
+  corrida_id: number
+  hay_sede: boolean
+  minimo_celda: number
+  por_variable: { variable: string; etiqueta: string | null; alertas: number }[]
+  otras_variables: number
+  celdas: { grupo: string; variable: string; etiqueta: string | null; alertas: number }[]
+  otras_celdas: number
+}
+
 /** GET /inferencia/formulario: los campos del formulario de cálculo, armados con el esquema del paquete activo. */
 export interface CampoFormulario {
   variable: string
@@ -339,4 +363,270 @@ export interface Notificacion {
 
 export type ConfigNotificacionSalida = Required<Pick<ConfigNotificacion, 'desenlace' | 'percentil_minimo' | 'destinatarios' | 'activo'>> & {
   nombre: string | null
+}
+
+/** Perfil provisional al nacer (D12): categorías, nunca valores numéricos. */
+export interface PerfilProvisional {
+  eg: string | null
+  eg_etiqueta: string | null
+  lubchenco: string | null
+  lubchenco_etiqueta: string | null
+  visita: string | null
+  etiqueta_corta: string
+}
+
+/** Primera visita en que el riesgo de un desenlace llegó a alto (D29). */
+export interface PrimeraAlerta { momento: string; momento_nombre: string; orden: number }
+
+// ---- Mis modelos (cola de entrenamiento y banco compartido)
+
+export interface ItemCola {
+  id: number
+  estado: 'pendiente' | 'en_curso'
+  posicion: number
+  estimado_min: number | null
+  propietario: string | null
+  visibilidad: 'personal' | 'oficial'
+  nombre: string | null
+  muestra_id: number | null
+  creada_en: string | null
+  propia: boolean
+  cancelable: boolean
+}
+
+export interface LimitesPersona {
+  sin_limite: boolean
+  cola_max: number
+  cola_usada: number
+  modelos_max: number
+  modelos_usados: number
+}
+
+export interface ColaEntrenamientos {
+  items: ItemCola[]
+  limites: LimitesPersona
+  promedio_min: number | null
+}
+
+export interface ItemBanco {
+  id: number
+  propietario: string | null
+  visibilidad: 'personal' | 'oficial'
+  nombre: string | null
+  descripcion: string | null
+  fuente: string
+  modelos: string[]
+  muestra_id: number | null
+  muestra: string | null
+  corte: string | null
+  corte_anterior: boolean
+  auc: number | null
+  terminada: string | null
+  propia: boolean
+  descartado: boolean
+}
+
+// ------------------------------------------------------------------ Analítica de los modelos (a mano; contrato de rutas/analitica.py)
+export interface AnaliticaSubmodulo { id: string; estado: 'ok' | 'pendiente' }
+export interface AnaliticaDesenlace { clave: string; nombre?: string; momento?: string; etiqueta?: string }
+export interface AnaliticaMeta {
+  entrenamiento: number; ejecucion?: number | null; modelo: string | null; fuente?: string | null; registro?: string | null
+  version_registro?: string | number | null; version_modelo?: string | number | null; corte?: string | null; creada?: string | null
+  desenlaces: AnaliticaDesenlace[]; submodulos: AnaliticaSubmodulo[]
+}
+export interface AnaliticaEntrenamientos { entrenamientos: AnaliticaMeta[] }
+export interface AnaliticaContexto {
+  estado: 'ok' | 'sin_artefactos'; entrenamiento: number | null
+  modelos: { modelo: string | null; registro?: string | null; version_registro?: string | number | null; version_modelo?: string | number | null; fuente?: string | null; corte?: string | null }[]
+  desenlaces: AnaliticaDesenlace[]; submodulos: AnaliticaSubmodulo[]
+  entrenamientos: { entrenamiento: number; creada?: string | null; version_registro?: string | number | null }[]
+}
+export interface RespuestaAnalitica<T = Record<string, unknown>> {
+  estado: 'ok' | 'pendiente' | 'sin_artefactos'; entrenamiento: number; submodulo: string
+  meta?: AnaliticaMeta; desenlaces?: Record<string, T>
+}
+export interface AucIc { auc: number | null; ic_bajo: number | null; ic_alto: number | null; n: number; casos: number | null }
+export interface FilaTop {
+  k: number; alertas: number; casos_detectados_pct: number | null; alertas_acertadas_pct: number | null
+  sin_falsa_alarma_pct: number | null; alertas_por_1000: number | null
+}
+export interface DatosRendimiento {
+  estado?: 'insuficiente'; n?: number
+  auc_desenlace: AucIc; roc: { puntos: [number, number][] }; pr: { puntos: [number, number][]; prevalencia: number | null }; pr_auc?: number | null
+  metricas_por_top: (FilaTop & { top_pct: number })[]; metricas_por_percentil: (FilaTop & { percentil: number })[]
+  confusion_por_top: { top_pct: number; tp: number | null; fp: number | null; fn: number | null; tn: number | null }[]
+  lift: { tasa_general: number | null; deciles: { decil: number; niños: number; tasa: number | null; lift: number | null }[]; acumulado: { top_pct: number; lift: number | null }[] }
+  top_k: { k: number; casos: number | null; acertadas_pct: number | null; detectados_pct: number | null }[]
+}
+export interface DatosCalibracion {
+  estado?: 'insuficiente'; n: number; brier: number | null; ece?: number | null; riesgo_medio: number | null; observado: number | null
+  razon_riesgo_observado: number | null
+  bins: { bin: number; n: number; riesgo_medio: number | null; observado: number | null }[]
+  histograma: { desde: number | null; hasta: number | null; n: number | null }[]
+  decision?: { prevalencia: number | null; lectura?: string; puntos: { umbral: number; modelo: number | null; todos: number | null; ninguno: number; alertas_pct: number | null }[] }
+}
+export interface FilaSubgrupo extends AucIc {
+  grupo: string; riesgo_medio: number | null; observado: number | null; tasa_alerta_top10: number | null; sensibilidad_top10: number | null
+}
+export interface DatosEquidad { subgrupos: Record<string, FilaSubgrupo[]> }
+export interface DatosEstabilidad {
+  umbral_riesgo?: number | null
+  metricas_trimestre?: (AucIc & { trimestre: string })[]
+  alertas_trimestre?: { trimestre: string; n: number; alertas: number | null; alertas_por_1000: number | null; casos: number | null }[]
+  psi?: { referencia?: string; trimestres?: string[]; variables?: Record<string, Record<string, number | null>> }
+}
+export interface DatosPoblacion {
+  embudo: Record<string, string | number | null>[]
+  eventos: { niños: number; casos: number | null; tasa: number | null }
+  nulos: { variable: string; nulos_pct: number | null }[]
+}
+export interface DatosInterpretabilidad { importancia: { variable: string; importancia_pct: number }[]; shap?: unknown; avisos: string[] }
+export interface Semaforo { id: string; nombre: string; estado: 'verde' | 'ambar' | 'rojo' | 'gris'; valor: number | null; detalle: string; umbral: string }
+export interface DatosResumen extends Partial<AucIc> { umbrales?: Record<string, string>; semaforos?: Semaforo[]; estado?: string }
+
+// ---- Explorar y muestras (filtros de niños), a mano hasta regenerar esquema.d.ts
+export type ValorFiltro = string | number | boolean | null
+export interface EntradaFiltro {
+  variable: string
+  tipo: 'lista' | 'si_no' | 'numero'
+  op: 'en' | 'es' | 'entre'
+  valores: ValorFiltro[]
+  cuando?: string
+}
+export interface MuestraJson { version: 2; y: EntradaFiltro[] }
+export interface OpcionFaceta { valor: string | number | boolean; etiqueta: string; n: number | null; texto: string; rango?: [number | null, number | null] }
+export interface BinFaceta { desde: number; hasta: number; n: number | null; texto: string }
+export interface Faceta {
+  etiqueta: string
+  tipo: 'lista' | 'si_no' | 'numero'
+  cuando: string | null
+  opciones?: OpcionFaceta[]
+  min?: number | null
+  max?: number | null
+  bins?: BinFaceta[]
+}
+export interface RespuestaFacetas { n: number | null; facetas: Record<string, Faceta>; insuficiente?: boolean; minimo: number; n_base?: number }
+export interface MuestraGuardada {
+  id: number; titulo: string; descripcion: string | null; fuente: string; corte: string | null; definicion: MuestraJson
+  n_ninos: number; n_base: number; huella: string; resumen: Record<string, Record<string, number | null>> | null
+  propietario: string | null; creada: string; inmutable: boolean
+}
+export interface DistribucionGrupo {
+  etiqueta: string
+  categorias: { categoria: string; etiqueta: string; grupo: number | null; todos: number }[]
+}
+export interface ExplorarInsuficiente { insuficiente: true; ninos: null; minimo: number }
+export interface ExplorarResumen {
+  insuficiente: false
+  minimo: number
+  corrida: Corrida
+  corte: string | null
+  filtrado: boolean
+  ninos: number
+  ninos_total: number
+  datos: number
+  ninos_riesgo_alto: number
+  riesgos_altos: number
+  percentil_alto: number
+  riesgos_por_desenlace: RiesgoDesenlace[]
+  crecimiento_por_etapa: CrecimientoEtapa[]
+  pct_crecimiento_bajo: number | null
+  distribuciones: Record<string, DistribucionGrupo>
+}
+export type RespuestaExplorar = ExplorarInsuficiente | ExplorarResumen
+export type CuerpoExplorar = { muestra: MuestraJson; muestra_id?: undefined } | { muestra_id: number; muestra?: undefined }
+
+// ---- Predicción (muestra, universo y niño nuevo), a mano hasta regenerar esquema.d.ts
+export interface ModeloPrediccion {
+  version: string; origen: 'oficial' | 'personal'; dueno: string | null; activo: boolean; fuente: string; corte: string | null
+  creado: string | null; corte_anterior: boolean; aviso: string | null
+}
+export interface ModelosPrediccion { corte_vigente: string | null; activo: string | null; modelos: ModeloPrediccion[] }
+export interface ResumenModeloPrediccion { version: string; corte: string | null; corte_anterior: boolean; corte_vigente: string | null }
+export interface FilaPrediccion {
+  sujeto: string; clave: string; desenlace: string; momento: string; momento_nombre: string; riesgo: number; percentil: number
+  nivel: 'muy_alto' | 'alto' | 'resto'; perfil: string | null; primera_alerta: string | null; motivos: string[]
+}
+export interface DesenlacePrediccion {
+  clave: string; desenlace: string; momento: string; momento_nombre: string; n: number; riesgo_mediano: number; altos: number; muy_altos: number
+}
+export interface AgregadosPrediccion {
+  n_puntuados: number
+  deciles: number[]
+  histograma: { desde: number; hasta: number; n: number }[]
+  niveles: { muy_alto: number; alto: number; resto: number; percentil_alto: number; percentil_muy_alto: number }
+  por_desenlace: DesenlacePrediccion[]
+}
+export interface PrediccionBase {
+  modelo: ResumenModeloPrediccion; visita: string | null; visita_nombre: string | null; n_filtro: number
+  fuga_no_verificable: boolean; en_entrenamiento: number | null; excluidos: number; aviso_corte: string | null
+}
+export interface PrediccionInsuficiente extends PrediccionBase { insuficiente: true; minimo: number; mensaje: string }
+export interface PrediccionMuestra extends PrediccionBase {
+  insuficiente: false; guardado: false; agregados: AgregadosPrediccion
+  tabla: { total: number; pagina: number; limite: number; filas: FilaPrediccion[] }
+}
+export type RespuestaPrediccionMuestra = PrediccionInsuficiente | PrediccionMuestra
+export interface CuerpoPrediccionMuestra {
+  modelo?: string | null; muestra?: MuestraJson | null; muestra_id?: number | null; excluir_entrenamiento: boolean
+  visita?: string | null; pagina?: number
+}
+export interface PerfilEjemplo { perfil: string; etiqueta: string; grupo: 'eg' | 'lubchenco'; n: number; insuficiente: boolean }
+export interface VisitaEjemplo { etapa: string; nombre: string; orden: number }
+export interface BibliotecaEjemplos { modelo: ResumenModeloPrediccion; visitas: VisitaEjemplo[]; perfiles: PerfilEjemplo[] }
+export interface CampoEjemplo {
+  variable: string; etiqueta: string; tipo: 'numero' | 'lista' | 'si_no' | 'fecha' | 'texto'; unidad: string | null
+  opciones: { valor: string | number; etiqueta: string }[]; minimo: number | null; maximo: number | null
+  principal: boolean; peso: number; etapa: string | null; valor: string | number; n: number; tipico: true
+}
+export type EjemploPrediccion = { modelo: ResumenModeloPrediccion; visita: string; visita_nombre: string; perfil: string | null; perfil_etiqueta: string; n: number } & (
+  | { insuficiente: true; minimo: number }
+  | { insuficiente: false; eg_semanas: number; campos: CampoEjemplo[]; visitas: VisitaEjemplo[] })
+export interface RiesgoNinoNuevo {
+  clave: string; desenlace: string; momento: string; momento_nombre: string; riesgo: number; percentil: number
+  nivel: 'muy_alto' | 'alto' | 'resto'; motivos: string[]
+}
+export interface PuntoTrayectoria { clave: string; desenlace: string; momento: string; momento_nombre: string; orden: number; riesgo: number; percentil: number }
+export type PrediccionNino = { modelo: ResumenModeloPrediccion; visita: string; guardado: false; nota: string } & (
+  | { insuficiente: true; minimo: number; n: number; mensaje: string }
+  | { insuficiente: false; n: number; perfil_ejemplo: string; eg_semanas: number; perfil: PerfilProvisional; riesgos: RiesgoNinoNuevo[]
+      trayectoria: PuntoTrayectoria[]; linea_alerta: number; cambiados: string[] })
+
+// ---- analítica: trayectorias, perfiles y anticipación
+export type IndicadorTrayectoria = 'peso' | 'talla' | 'perimetro_cefalico' | 'peso_para_talla'
+export type AgruparTrayectoria = 'riesgo' | 'sexo' | 'perfil' | 'sede'
+export type EjeTrayectoria = 'edad_corregida' | 'cronologica'
+export interface EtapaTrayectoria {
+  etapa: string; nombre: string; orden: number; n: number; edad_media_meses: number | null
+  z_media: number | null; z_desvio: number | null; diferencia_oms: number | null
+  valor_medio: number | null; valor_desvio: number | null; unidad: string | null
+}
+export interface GrupoTrayectoria { grupo: string; ninos: number; etapas: EtapaTrayectoria[] }
+export interface NinoTrayectoria {
+  codigo: string; grupo: string
+  serie: { etapa: string; nombre: string; orden: number; edad_meses: number | null; z: number | null }[]
+}
+export interface RespuestaTrayectorias {
+  estado: 'ok' | 'pendiente' | 'sin_artefactos'; entrenamiento: number; mensaje?: string
+  indicador?: IndicadorTrayectoria; etiqueta_indicador?: string; etiqueta?: string; agrupar?: AgruparTrayectoria; eje?: EjeTrayectoria
+  minimo_ninos?: number; grupos?: GrupoTrayectoria[]; celdas_omitidas?: number; grupos_omitidos?: number
+  individuales_visibles?: boolean; individuales?: NinoTrayectoria[]
+}
+export interface FilaPerfil {
+  categoria: string; etiqueta: string; n: number | null; tasa: number | null; oculto: boolean
+  eg_media?: number | null; peso_medio?: number | null
+}
+export interface RespuestaPerfiles {
+  estado: 'ok' | 'pendiente' | 'sin_artefactos'; entrenamiento: number; mensaje?: string
+  confianza?: { minimo_ninos: number; aprobacion: 'pendiente' | string; texto?: string }
+  tasa_significa?: string; ninos?: number; categorias_ocultas?: number; unidad_peso?: string | null
+  eg?: FilaPerfil[]; lubchenco?: FilaPerfil[]
+}
+export interface VisitaAnticipacion {
+  clave?: string; desde: string; etapa: string; ventaja_visitas: number; n?: number | null; casos: number | null; alertas: number
+  casos_detectados_pct: number | null; alertas_acertadas_pct: number | null
+}
+export interface DatosAnticipacion {
+  familia?: string; nombre?: string; top_pct?: number; etiqueta?: string; visitas: VisitaAnticipacion[]
+  avisados_antes?: { casos: number | null; avisados: number | null; pct: number | null; meta: string }
 }

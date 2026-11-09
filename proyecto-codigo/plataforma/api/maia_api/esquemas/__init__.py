@@ -302,6 +302,7 @@ class EjecucionSalida(Base):
     resultado: dict[str, Any] | None = None
     registro: str | None = None
     mensaje: str | None = None
+    solicitada_por: uuid.UUID | None = None
     creada_en: datetime | None = None
     iniciada: datetime | None = None
     terminada: datetime | None = None
@@ -358,3 +359,53 @@ class EntrenarAhora(Base):
     filtros: ParametrosProgramacion = Field(default_factory=ParametrosProgramacion)
     sujetos: int | None = Field(default=None, ge=500, le=50000)   # solo datos simulados
     guardar: bool = False                    # guardar también estos hiperparámetros para las ejecuciones programadas
+    visibilidad: Literal['personal', 'oficial'] | None = None     # experto: siempre personal; admin: oficial
+    nombre: str | None = Field(default=None, max_length=120)
+    descripcion: str | None = Field(default=None, max_length=500)
+    muestra_id: int | None = Field(default=None, ge=1)             # muestra de niños con la que entrenar (opcional)
+
+
+class ItemCola(Base):
+    id: int
+    estado: Literal['pendiente', 'en_curso']
+    posicion: int                            # 0 corre ahora, 1 es la próxima
+    estimado_min: float | None = None        # espera + duración, según los últimos entrenamientos terminados
+    propietario: str | None = None
+    visibilidad: Literal['personal', 'oficial'] = 'oficial'
+    nombre: str | None = None
+    muestra_id: int | None = None
+    creada_en: datetime | None = None
+    propia: bool = False
+    cancelable: bool = False
+
+
+class LimitesPersona(Base):
+    sin_limite: bool
+    cola_max: int
+    cola_usada: int
+    modelos_max: int
+    modelos_usados: int
+
+
+class ColaEntrenamientos(Base):
+    items: list[ItemCola]
+    limites: LimitesPersona
+    promedio_min: float | None = None
+
+
+class ItemBanco(Base):
+    id: int
+    propietario: str | None = None
+    visibilidad: Literal['personal', 'oficial']
+    nombre: str | None = None
+    descripcion: str | None = None
+    fuente: str
+    modelos: list[str] = Field(default_factory=list)
+    muestra_id: int | None = None
+    muestra: str | None = None
+    corte: str | None = None
+    corte_anterior: bool = False             # el corte del entrenamiento ya no es el vigente (D38)
+    auc: float | None = None
+    terminada: datetime | None = None
+    propia: bool = False
+    descartado: bool = False

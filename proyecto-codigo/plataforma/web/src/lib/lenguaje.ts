@@ -199,3 +199,28 @@ export function nombreFamilia(desenlaces: string[]): string {
 
 /** «Datos al 30 de jun de 2026»: el corte, dicho sin la palabra técnica. */
 export const datosAl = (corte: string | null | undefined) => `Datos al ${fecha(corte)}`
+
+// ------------------------------------------------------------------ analítica de los modelos (entradas nuevas)
+
+/** Término técnico → cómo se dice en la pantalla clínica. El modo técnico muestra la jerga. */
+export const GLOSARIO_ANALITICA: Record<string, string> = {
+  AUC: 'Qué tan bien ordena a los niños',
+  ROC: 'Aciertos frente a falsas alarmas',
+  PR: 'Alertas acertadas frente a casos detectados',
+  sensibilidad: 'Casos detectados',
+  VPP: 'Alertas acertadas',
+  especificidad: 'Niños sin falsa alarma',
+  umbral: 'A cuántos niños se alerta',
+  calibración: 'Si el porcentaje de riesgo es el real',
+  Brier: 'Error del porcentaje de riesgo',
+  PSI: 'Cambio frente al entrenamiento',
+  lift: 'Qué tanto ayuda revisar a los primeros',
+}
+
+/** Jerga o palabra clínica según el modo técnico. */
+export const jerga = (tecnico: boolean, clinico: string, tecnicoTexto: string) => (tecnico ? tecnicoTexto : clinico)
+
+export const N_MENOR_QUE_5 = 'n menor que 5'
+
+/** El nombre clínico del estado de un semáforo. */
+export const SEMAFORO: Record<string, string> = { verde: 'Confiable', ambar: 'Mirar con cuidado', rojo: 'No confiable', gris: 'Sin datos para decidir' }

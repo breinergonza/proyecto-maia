@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { pedir } from '../api/cliente'
 import type { AlertaDato, LineaTemporal, Visita } from '../api/tipos'
-import { CrecimientoOms, PerfilCohorte, TarjetaRiesgo, TrayectoriaRiesgo } from '../components/ficha'
+import { CrecimientoOms, PerfilCohorte, PerfilDelNino, TarjetaRiesgo, TrayectoriaRiesgo } from '../components/ficha'
 import { Aviso, Cargando, Insignia, Panel, Tabla, Vacio } from '../components/ui'
 import { cn } from '../lib/cn'
 import { aproximado, dec, edad, fecha, indicador, RIESGO_ALTO } from '../lib/formato'
@@ -58,6 +58,7 @@ export default function Nino() {
         </section>
       )}
 
+      <PerfilDelNino perfil={n.perfil} />
       <TrayectoriaRiesgo sujeto={n.sujeto} />
       <CrecimientoOms crecimiento={n.crecimiento} />
       <PerfilCohorte sujeto={n.sujeto} />

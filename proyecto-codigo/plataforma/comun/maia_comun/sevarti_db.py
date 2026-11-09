@@ -24,6 +24,7 @@ from sqlalchemy import Engine, delete, select, text, update
 from sqlalchemy.orm import Session
 
 from maia_comun.almacen import BUCKET_SEVARTI, Almacen
+from maia_comun.atributos import cargar_atributos
 from maia_comun.modelos_db import Corte, Esquema, Etapa, Quiebre
 from sevarti import contrato as SV
 from sevarti.contrato import Sevarti
@@ -208,6 +209,7 @@ def guardar_en_db(motor: Engine, sev: Sevarti, fuente: str, ruta_minio: str | No
         if viejos:
             s.execute(delete(Corte).where(Corte.id.in_(viejos)))
         s.execute(update(Corte).where(Corte.id == cid).values(vigente=True))
+    cargar_atributos(motor, cid, sev.esquema)   # lo que usan las muestras para filtrar rápido
     return cid
 
 
