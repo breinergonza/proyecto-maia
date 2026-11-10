@@ -42,6 +42,7 @@ def activar(s: Session, cfg: Configuracion, version: str) -> dict:
                              solo_simulado=cfg.maia_solo_simulado)
     modelos = PQ.cargar(contenido)
     with estado.lock:
+        PQ.importar_analitica(s, contenido)   # la analítica viaja con el paquete (el entrenamiento fue en otro equipo)
         s.execute(update(Paquete).values(activo=False))
         s.execute(update(Paquete).where(Paquete.version == version).values(activo=True))
         s.commit()

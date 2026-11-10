@@ -349,7 +349,8 @@ def categorias_por_nino(s: Session, corte_id: int) -> pd.DataFrame:
     etiquetas = SV.etiquetas_categoria(esq).get(sexo_v or '', {})
     lub = primera(PF.VARIABLE_LUBCHENCO if PF.VARIABLE_LUBCHENCO in nombres else None)
     out = pd.DataFrame(index=base.index)
-    out['sexo'] = [None if pd.isna(n) and v is None else etiquetas.get(n, M.canonico(v, n))
+    # sin fila de atributo, reindex deja NaN (no None): ese niño no tiene el dato, no la opción «nan»
+    out['sexo'] = [None if pd.isna(n) and (v is None or pd.isna(v)) else etiquetas.get(n, M.canonico(v, n))
                    for v, n in zip(sexo.valor.reindex(base.index), sexo.valor_num.reindex(base.index))]
     out['eg'] = base.eg_semanas.map(PF.categoria_eg)
     out['lubchenco'] = lub.valor.reindex(base.index).map(PF.categoria_lubchenco)

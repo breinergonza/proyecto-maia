@@ -102,3 +102,15 @@ Sigue pendiente: casos reales frente a riesgo esperado por trimestre (el artefac
   existen (Trayectorias por riesgo con edad corregida; Perfiles) y si no, calcula en vivo con la corrida y explica la
   falta. Pruebas: `entrenamiento/pruebas/test_analitica_vivos.py` y `test_usa_lo_guardado_por_el_entrenamiento`.
   Los entrenamientos anteriores no traen estos artefactos: hay que reentrenar para verlos.
+
+## Revisión de producción (maia.canbby.com, 2026-11-09)
+
+| Síntoma | Causa | Arreglo |
+| --- | --- | --- |
+| Explorar: «Sexo al nacer» sin opciones y «Quiénes son» con «nan» al 100 %; tampoco Lubchenco ni ninguna variable numérica o de lista | `sevarti.atributos_sujeto` vacía para el corte vigente: solo se llena al cargar un corte (`guardar_en_db`) y este se cargó antes de la migración 0008 | `atributos.rellenar_faltantes`: la API la corre al arrancar, en segundo plano y con candado; rellena los cortes vigentes sin atributos. Prueba en `test_filtros_sql.py` |
+| «nan» como categoría | En `categorias_por_nino`, un niño sin fila de atributo trae `NaN` (no `None`) y `canonico(NaN)` da «nan» | Se trata `NaN` como dato faltante (`poblacion.py`) |
+| Analítica entera vacía (`/analitica/contexto` = `sin_artefactos`) y Trayectorias/Perfiles sin datos | La analítica se calcula al entrenar y queda en el Postgres del equipo donde se entrenó; el paquete firmado no la llevaba | El paquete trae `analitica.json` (solo agregados, firmado): `maia exportar` la incluye y la API la importa al activar el paquete. Prueba en `test_api.py::test_paquetes` |
+
+Para verlo en producción: (1) desplegar este código (al arrancar rellena los atributos; Explorar, muestras y Predicción
+vuelven a filtrar); (2) reentrenar el modelo clínico con la base real en el equipo con GPU (calcula la analítica con
+los niños de validación), `maia exportar --fuente kmc`, publicar y activar el paquete (importa la analítica).

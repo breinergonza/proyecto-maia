@@ -8,8 +8,12 @@
 * ``sevarti.resumen_sujeto``: cuántos datos tiene cada niño (los códigos especiales no cuentan).
 
 Se hace con ``INSERT ... SELECT`` dentro de Postgres (no baja las mediciones), y se puede repetir: borra y recarga.
+``rellenar_faltantes`` lo hace para los cortes vigentes que se cargaron antes de que existiera la tabla (la API lo
+corre al arrancar).
 """
 from __future__ import annotations
+
+import json
 
 import pandas as pd
 from sqlalchemy import Engine, text
@@ -79,3 +83,39 @@ def cargar_atributos(motor: Engine, corte_id: int, esquema: pd.DataFrame) -> dic
         ultimas = cx.execute(text(_INSERTAR.format(orden='DESC')), {**p, 'sufijo': SUFIJO_ULTIMA}).rowcount
         resumen = cx.execute(text(_RESUMEN), {k: p[k] for k in ('c', 'cvars', 'ccodigos')}).rowcount
     return {'atributos': primeras + ultimas, 'resumen': resumen}
+
+
+# candado de Postgres para que dos procesos de la API no rellenen a la vez (número fijo de este módulo)
+_CANDADO = 734_118_001
+
+
+def _esquema(cx, corte_id: int) -> pd.DataFrame:
+    filas = cx.execute(text('SELECT variable, datos FROM sevarti.esquema WHERE corte_id = :c ORDER BY variable'),
+                       {'c': corte_id}).all()
+    return SV.normalizar_esquema(pd.DataFrame([{'variable': v, **(d if isinstance(d, dict) else json.loads(d))}
+                                               for v, d in filas]))
+
+
+def cortes_sin_atributos(motor: Engine) -> list[int]:
+    """Cortes vigentes con niños pero sin ``atributos_sujeto``: los que se cargaron antes de la migración 0008."""
+    with motor.connect() as cx:
+        return [int(c) for (c,) in cx.execute(text(
+            'SELECT c.id FROM sevarti.cortes c WHERE c.vigente '
+            'AND EXISTS (SELECT 1 FROM sevarti.sujetos s WHERE s.corte_id = c.id) '
+            'AND NOT EXISTS (SELECT 1 FROM sevarti.atributos_sujeto a WHERE a.corte_id = c.id) ORDER BY c.id'))]
+
+
+def rellenar_faltantes(motor: Engine) -> dict[int, dict[str, int]]:
+    """Llena ``atributos_sujeto`` y ``resumen_sujeto`` de los cortes vigentes que no los tienen. Sin ellos, Explorar,
+    las muestras y Predicción no pueden filtrar por ninguna variable (las facetas salen vacías). Se puede repetir: si
+    otro proceso ya está rellenando, no hace nada."""
+    hechos: dict[int, dict[str, int]] = {}
+    with motor.connect() as cx:
+        if not cx.execute(text('SELECT pg_try_advisory_lock(:k)'), {'k': _CANDADO}).scalar():
+            return hechos
+        try:
+            for corte in cortes_sin_atributos(motor):
+                hechos[corte] = cargar_atributos(motor, corte, _esquema(cx, corte))
+        finally:
+            cx.execute(text('SELECT pg_advisory_unlock(:k)'), {'k': _CANDADO})
+    return hechos
