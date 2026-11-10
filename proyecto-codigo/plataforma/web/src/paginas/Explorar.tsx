@@ -11,7 +11,7 @@ import { QuienesSon } from '../components/explorar/QuienesSon'
 import { RiesgoGrupo } from '../components/explorar/RiesgoGrupo'
 import { Grafica } from '../components/grafica'
 import { PanelFacetas } from '../components/PanelFacetas'
-import { Aviso, Cargando, Encabezado, Vacio } from '../components/ui'
+import { Aviso, Boton, Cargando, Encabezado, Vacio } from '../components/ui'
 import { descripcionDe } from '../lib/descripciones'
 import { datosAl } from '../lib/lenguaje'
 import { num, pct } from '../lib/formato'
@@ -24,7 +24,8 @@ export default function Explorar() {
   // una muestra guardada sin cambios se pide por su número: conserva el tiempo y el muestreo que tenga
   const cuerpo: CuerpoExplorar = filtros.guardada ? { muestra_id: filtros.guardada } : { muestra: filtros.muestra }
   const resumen = useResumenExplorar(cuerpo)
-  const facetas = useFacetasExplorar(cuerpo)
+  // las variables agregadas al panel solo afectan a las opciones, no a las cifras del grupo
+  const facetas = useFacetasExplorar(filtros.extras.length ? { ...cuerpo, variables: filtros.extras } : cuerpo)
   const r = resumen.data
 
   return (
@@ -35,16 +36,21 @@ export default function Explorar() {
       </Encabezado>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <aside className="lg:col-span-4 xl:col-span-3">
-          <PanelFacetas facetas={facetas.data} cargando={facetas.isPending} filtros={filtros} esExperto={esExperto} />
+          <PanelFacetas facetas={facetas.data} cargando={facetas.isPending} filtros={filtros} esExperto={esExperto} conTiempo />
         </aside>
         <div className="flex min-w-0 flex-col gap-4 lg:col-span-8 xl:col-span-9">
           {resumen.isPending ? <Cargando />
             : resumen.error ? <Error error={resumen.error} />
-              : r?.insuficiente ? (
+              : r?.insuficiente && r.vacio ? (
+                <Vacio titulo="Ningún niño cumple estos filtros">
+                  Son 0 niños de este corte. Quite algún filtro o cambie el tiempo para ver un grupo.
+                  <div className="mt-3"><Boton variante="secundario" chico onClick={filtros.limpiar}>Quitar todos los filtros</Boton></div>
+                </Vacio>
+              ) : r?.insuficiente ? (
                 <Aviso tono="teal">
                   <strong>Con menos de {r.minimo} niños no se muestran cifras.</strong> Quite algún filtro para ver el grupo.
                 </Aviso>
-              ) : r ? <Cifras r={r} aproximado={usuario?.rol === 'visualizador'} filtros={filtros.entradas.length} /> : null}
+              ) : r ? <Cifras r={r} aproximado={usuario?.rol === 'visualizador'} filtros={filtros.entradas.length + (filtros.tiempo ? 1 : 0)} /> : null}
         </div>
       </div>
     </div>
@@ -69,15 +75,23 @@ function Cifras({ r, aproximado, filtros }: { r: ExplorarResumen; aproximado: bo
           ayuda={`Un niño puede tenerlo en varios desenlaces: son ${num(r.riesgos_altos)} riesgos altos en total.`} />
         <Indicador valor={pct(r.pct_crecimiento_bajo)} texto="de los datos de crecimiento, bajos frente a la OMS" />
       </div>
+      {r.muestreo && (
+        <p className="text-xs text-salvia">
+          Estas cifras son las del grupo completo. Al entrenar con el tope de {num(r.muestreo.maximo_por_categoria)} niños por categoría
+          {r.muestreo.ninos == null ? ' quedarían menos de 20 niños.' : ` quedarían ${num(r.muestreo.ninos)} niños.`}
+        </p>
+      )}
       {aproximado && <p className="text-xs text-salvia">Para proteger a los niños, las cifras menores de 100 se aproximan de 5 en 5.</p>}
-      <Grafica titulo={descripcionDe('explorar_riesgo').titulo} descripcion={descripcionDe('explorar_riesgo').descripcion}
-        exportar={{ nombre: 'explorar-riesgo', muestra }}>
-        <RiesgoGrupo filas={r.riesgos_por_desenlace} />
-      </Grafica>
-      <Grafica titulo={descripcionDe('explorar_crecimiento').titulo} descripcion={descripcionDe('explorar_crecimiento').descripcion}
-        exportar={{ nombre: 'explorar-crecimiento', muestra }}>
-        <CrecimientoGrupo filas={r.crecimiento_por_etapa} />
-      </Grafica>
+      <div className="grid gap-4 2xl:grid-cols-2 [&>*]:min-w-0">
+        <Grafica titulo={descripcionDe('explorar_riesgo').titulo} descripcion={descripcionDe('explorar_riesgo').descripcion}
+          exportar={{ nombre: 'explorar-riesgo', muestra }}>
+          <RiesgoGrupo filas={r.riesgos_por_desenlace} />
+        </Grafica>
+        <Grafica titulo={descripcionDe('explorar_crecimiento').titulo} descripcion={descripcionDe('explorar_crecimiento').descripcion}
+          exportar={{ nombre: 'explorar-crecimiento', muestra }}>
+          <CrecimientoGrupo filas={r.crecimiento_por_etapa} />
+        </Grafica>
+      </div>
       <Grafica titulo={descripcionDe('explorar_quienes').titulo} descripcion={descripcionDe('explorar_quienes').descripcion}
         exportar={{ nombre: 'explorar-quienes', muestra }}>
         <QuienesSon distribuciones={r.distribuciones} />

@@ -1,6 +1,7 @@
 // Calibración: si el porcentaje de riesgo que da el modelo es el que ocurre en realidad, y el beneficio de alertar.
 import { useSubmodulo } from '../../api/analitica'
 import type { DatosCalibracion } from '../../api/tipos'
+import { HistogramaDosGrupos } from '../../components/graficos/distribuciones'
 import { CurvaXY, Histograma } from '../../components/graficos/xy'
 import { Grafica, TablaDatos } from '../../components/grafica'
 import { Cifra, Panel, Tabla } from '../../components/ui'
@@ -15,7 +16,7 @@ export default function Calibracion() {
   const consulta = useSubmodulo<DatosCalibracion>(entrenamiento, 'calibracion', desenlace)
   const { tecnico } = useTecnico()
   const dCal = descripcionDe('calibracion'), dErr = descripcionDe('calibracion_error'), dHist = descripcionDe('histograma_riesgo')
-  const dBen = descripcionDe('beneficio_alertar')
+  const dBen = descripcionDe('beneficio_alertar'), dHr = descripcionDe('hist_riesgo_desenlace')
   return (
     <div className="space-y-4">
       <Guia>
@@ -47,6 +48,21 @@ export default function Calibracion() {
                   formatoX={(v) => `${Math.round(v * 100)} %`} formatoY={(v) => `${Math.round(v * 100)} %`}
                   series={[{ clave: 'obs', nombre: 'Grupos de niños', color: 0, puntos: puntos.map((p) => [p.riesgo_medio as number, p.observado]) }]} />
               </Grafica>
+              {d.hist_riesgo?.estado === 'ok' && (
+                <Grafica titulo={dHr.titulo} descripcion={dHr.descripcion}
+                  exportar={{ nombre: 'calibracion-riesgo-por-desenlace', muestra,
+                    filas: d.hist_riesgo.tramos.map((t) => ({ desde: t.desde, hasta: t.hasta, con_el_desenlace: t.con, sin_el_desenlace: t.sin })) }}>
+                  {d.hist_riesgo.casos != null ? (
+                    <HistogramaDosGrupos etiqueta="Riesgo de los niños con y sin el desenlace" tramos={d.hist_riesgo.tramos} casos={d.hist_riesgo.casos}
+                      total={d.hist_riesgo.n} nombres={['Con el desenlace', 'Sin el desenlace']} formatoX={(v) => `${Math.round(v * 100)} %`} />
+                  ) : <p className="text-sm text-salvia">Hay menos de 5 niños con el desenlace: no se dibuja la comparación.</p>}
+                  <p className="mt-2 text-sm text-salvia">
+                    Riesgo típico (mediana): con el desenlace {d.hist_riesgo.mediana_con != null ? fracPct(d.hist_riesgo.mediana_con) : 'n menor que 20'};
+                    sin el desenlace {d.hist_riesgo.mediana_sin != null ? fracPct(d.hist_riesgo.mediana_sin) : 'n menor que 20'}.
+                    Los tramos con menos de 5 niños quedan sin barra.
+                  </p>
+                </Grafica>
+              )}
               <div className="grid gap-4 xl:grid-cols-2">
                 <Grafica titulo={dHist.titulo} descripcion={dHist.descripcion}
                   exportar={{ nombre: 'calibracion-histograma', filas: d.histograma.map((h) => ({ desde: h.desde, hasta: h.hasta, ninos: h.n })), muestra }}>

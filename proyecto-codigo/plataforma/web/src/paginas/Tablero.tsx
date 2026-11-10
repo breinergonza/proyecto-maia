@@ -218,7 +218,7 @@ function TablaCrecimiento({ etapas, medidas, celda }: {
                   title={c ? `Bajo para la edad: ${pct(c.pct_bajo)} · cayó desde el control anterior: ${pct(c.pct_caida)} · ${num(c.datos)} datos (puntaje z mediano: ${dec2(c.z_mediano)})` : undefined}>
                   {c ? (
                     <>
-                      <span className={cn('font-semibold', (c.pct_bajo ?? 0) >= 10 && 'text-ocre')}>{pct(c.pct_bajo)}</span>
+                      <span className={cn('font-semibold', (c.pct_bajo ?? 0) >= 10 && 'text-ocre-hondo')}>{pct(c.pct_bajo)}</span>
                       <span className="ml-1.5 text-xs text-salvia">↓{pct(c.pct_caida)}</span>
                     </>
                   ) : '—'}

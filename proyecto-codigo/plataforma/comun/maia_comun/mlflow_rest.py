@@ -62,14 +62,27 @@ class Lector:
                                'alias': sorted(alias_de.get(str(mv['version']), []))}
                 for mv in d.get('model_versions') or [] if mv.get('run_id')}
 
-    def entrenamientos(self, tipo: str, fuente: str | None = None, limite: int = 50) -> list[dict[str, Any]]:
+    def version(self, registro: str, numero: str) -> dict[str, Any]:
+        """Una versión registrada: sus alias y etiquetas (``propietario``, ``visibilidad``). Vacío si no existe."""
+        mv = self._pedir('GET', '/model-versions/get', params={'name': registro, 'version': numero}).get('model_version')
+        if not mv:
+            return {}
+        rm = self._pedir('GET', '/registered-models/get', params={'name': registro}).get('registered_model') or {}
+        alias = sorted(a['alias'] for a in rm.get('aliases') or [] if str(a['version']) == str(numero))
+        return {'registro': registro, 'version': str(numero), 'alias': alias,
+                'etiquetas': {t['key']: t['value'] for t in mv.get('tags') or []}}
+
+    def entrenamientos(self, tipo: str, fuente: str | None = None, limite: int = 50,
+                       propietario: str | None = None, visibilidad: str | None = None) -> list[dict[str, Any]]:
         eid = self.experimento(EXPERIMENTOS[tipo])
         if eid is None:
             return []
         cuerpo: dict[str, Any] = {'experiment_ids': [eid], 'max_results': limite,
                                   'order_by': ['attributes.start_time DESC']}
-        if fuente:
-            cuerpo['filter'] = f"tags.fuente = '{fuente}'"
+        filtros = [f"tags.{k} = '{v}'" for k, v in (('fuente', fuente), ('propietario', propietario),
+                                                    ('visibilidad', visibilidad)) if v]
+        if filtros:
+            cuerpo['filter'] = ' and '.join(filtros)
         runs = self._pedir('POST', '/runs/search', json=cuerpo).get('runs') or []
         versiones: dict[str, dict] = {}
         for f in ([fuente] if fuente else list(SUFIJO)):

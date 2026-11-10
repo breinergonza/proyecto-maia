@@ -13,19 +13,27 @@ from sqlalchemy.orm import Session
 
 from maia_api.consultas import corrida_de, esquema, etapas, medidas_numericas
 from maia_api.dependencias import CUALQUIERA, sesion
+from maia_api.rutas import analitica_anticipacion as anticipacion
+from maia_api.rutas import analitica_comparar as comparar
 from maia_api.rutas.ninos import _variables_perfil, unidad_crecimiento
 from maia_comun import analitica as AN
+from maia_comun import analitica_interpretabilidad as AI
 from maia_comun import perfiles as PF
 from maia_comun.modelos_analitica import Analitica
 from maia_comun.modelos_db import PERCENTIL_ALTO, Usuario
 
 ruta = APIRouter(prefix='/analitica', tags=['analitica'])
+ruta.include_router(comparar.ruta)   # /analitica/comparar (entrenamientos y grupos de niños)
+ruta.include_router(anticipacion.ruta)   # /analitica/riesgo-por-visita (niños de ejemplo; Anticipación y Predicción)
 
 # submódulo -> fila que lo alimenta; ``None`` = pendiente (aún no se calcula)
 TIPOS = {'rendimiento': 'rendimiento', 'calibracion': 'calibracion', 'poblacion': 'poblacion', 'equidad': 'equidad',
          'estabilidad': 'estabilidad', 'interpretabilidad': 'interpretabilidad', 'resumen': 'chequeos',
          'anticipacion': 'anticipacion', 'trayectorias': None, 'perfiles': None}
 ORDEN = tuple(TIPOS)
+# artefactos que acompañan al principal de un submódulo (otras filas de ``resultados.analitica`` del mismo desenlace)
+EXTRAS = {'calibracion': ('hist_riesgo',), 'poblacion': ('distribuciones_muestra_universo',),
+          'anticipacion': ('metricas_por_visita', 'primera_alerta')}
 EN_VIVO = ('trayectorias', 'perfiles')   # se calculan al pedirlos (de crecimiento y riesgos), no son artefactos guardados
 INDICADORES = {'peso': 'Peso para la edad', 'talla': 'Talla para la edad',
                'perimetro_cefalico': 'Perímetro cefálico para la edad', 'peso_para_talla': 'Peso para la talla'}
@@ -235,18 +243,24 @@ def submodulo(entrenamiento: int, submodulo: str, desenlace: str | None = Query(
     if tipo is None or (metas[0].datos.get('submodulos') or {}).get(submodulo) != 'ok':
         msg = {'mensaje': MSG_SIN_ANTICIPACION} if submodulo == 'anticipacion' else {}
         return {'estado': 'pendiente', **base, **msg, 'desenlaces': {}}
-    tipos = [tipo, 'rendimiento'] if submodulo == 'resumen' else [tipo]
+    tipos = [tipo, 'rendimiento'] if submodulo == 'resumen' else [tipo, *EXTRAS.get(submodulo, ())]
     q = select(Analitica).where(Analitica.entrenamiento_id == entrenamiento, Analitica.tipo.in_(tipos),
                                 Analitica.desenlace.is_not(None))
     if desenlace:
         q = q.where(Analitica.desenlace == desenlace)
     filas: dict[str, dict] = {}
     auc: dict[str, dict] = {}
+    extras: dict[str, dict] = {}
     for a in s.scalars(q.order_by(Analitica.id)):
-        if submodulo == 'resumen' and a.tipo == 'rendimiento':
+        if a.tipo in EXTRAS.get(submodulo, ()):
+            extras.setdefault(a.desenlace, {})[a.tipo] = a.datos
+        elif submodulo == 'resumen' and a.tipo == 'rendimiento':
             auc[a.desenlace] = (a.datos or {}).get('auc_desenlace') or {}
         else:
-            filas[a.desenlace] = a.datos
+            filas[a.desenlace] = AI.sanear(a.datos) if submodulo == 'interpretabilidad' else a.datos
+    for c, ex in extras.items():      # entrenamientos anteriores no los traen: la pantalla lo avisa
+        if c in filas:
+            filas[c] = {**filas[c], **ex}
     if submodulo == 'resumen':
         # semáforos + AUC con IC y tamaño de cada desenlace (lo que muestra la portada de la analítica)
         filas = {c: {'auc': auc.get(c, {}).get('auc'), 'ic_bajo': auc.get(c, {}).get('ic_bajo'),

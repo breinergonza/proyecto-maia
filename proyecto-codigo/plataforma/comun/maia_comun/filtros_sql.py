@@ -65,6 +65,13 @@ def _cond_filtro(e: dict, i: int, p: str, params: dict) -> str:
         return f's.grupo = ANY({_ARR_TXT.format(q + "_s")})'
     if v == 'eg_semanas':
         return _cond_valor(e, 's', 's.eg_semanas', q, params)
+    if v == 'eg_categoria':   # cada categoría es un tramo propio: las elegidas se suman con «o», no se unen en un rango
+        tramos = []
+        for nombre, lo, hi in M.CATEGORIAS_EG:
+            if nombre in e['valores']:
+                tramos.append(' AND '.join(([f's.eg_semanas >= {lo!r}'] if lo is not None else [])
+                                           + ([f's.eg_semanas < {hi!r}'] if hi is not None else [])) or 'TRUE')
+        return '(' + ' OR '.join(f'({t})' for t in tramos) + ')' if tramos else 'FALSE'
     nombre = v + (M.SUFIJO_ULTIMA if e.get('cuando') == 'ultima' else '')
     params[f'{q}_v'] = nombre
     return (f'EXISTS (SELECT 1 FROM sevarti.atributos_sujeto a WHERE a.corte_id = s.corte_id AND a.sujeto = s.sujeto '
@@ -149,7 +156,7 @@ def ids_muestra(s: Session | Connection, corte_id: int, muestra: dict, muestreo:
     ids = sorted(r[0] for r in s.execute(text(f.sql), f.params))
     pendientes = [e for e in m['y'] if not entrada_en_sql(e)]
     if pendientes and ids:   # alguna / etapa:<x>: se lee solo a esos niños y se resuelve en memoria
-        sev = leer_de_db(_motor_de(s), corte_id, ids)
+        sev = leer_de_db(_motor_de(s), corte_id, ids, variables=sorted({e['variable'] for e in pendientes}))
         ids = M.ids(sev, {'version': M.VERSION, 'y': pendientes}, muestreo=False)
     mu = m['muestreo']
     if muestreo and mu.get('modo') == 'estratificado' and ids:
@@ -159,7 +166,11 @@ def ids_muestra(s: Session | Connection, corte_id: int, muestra: dict, muestreo:
 
 
 def _categorias(s: Session | Connection, corte_id: int, por: str, ids: list[str]) -> pd.Series:
-    if por == 'sede':
+    if por == 'eg_categoria':
+        filas = s.execute(text('SELECT sujeto, eg_semanas FROM sevarti.sujetos WHERE corte_id = :c '
+                               'AND sujeto = ANY(:i)'), {'c': corte_id, 'i': ids}).all()
+        cats = {suj: M.categoria_eg(eg) for suj, eg in filas if M.categoria_eg(eg)}
+    elif por == 'sede':
         filas = s.execute(text('SELECT sujeto, grupo FROM sevarti.sujetos WHERE corte_id = :c '
                                'AND sujeto = ANY(:i)'), {'c': corte_id, 'i': ids}).all()
         cats = {suj: M.canonico(g) for suj, g in filas if g is not None}
@@ -168,3 +179,18 @@ def _categorias(s: Session | Connection, corte_id: int, por: str, ids: list[str]
                                'AND variable = :v AND sujeto = ANY(:i)'), {'c': corte_id, 'v': por, 'i': ids}).all()
         cats = {suj: M.canonico(valor, num) for suj, valor, num in filas}
     return pd.Series({suj: cats.get(suj, M.SIN_DATO) for suj in sorted(ids)}, dtype=object)
+
+
+def lecturas(s: Session | Connection, corte_id: int, variable: str, cuando: str, ids: list[str]) -> pd.DataFrame:
+    """Lo que dice ``variable`` de cada niño de ``ids`` con la regla ``alguna`` (todas sus mediciones válidas) o
+    ``etapa:<x>`` (la primera dentro de esa etapa): columnas ``sujeto``, ``txt`` y ``num``. Lee solo esa variable.
+    Lanza ``MuestraInvalida`` si la etapa no existe."""
+    if not ids:
+        return pd.DataFrame(columns=['sujeto', 'txt', 'num'])
+    sev = leer_de_db(_motor_de(s), corte_id, ids, variables=[variable])
+    motor = M._Motor(sev)
+    if cuando == 'alguna':
+        df = motor.validas(variable)
+        return df[['sujeto', 'txt', 'num']].reset_index(drop=True)
+    t = motor.tabla(variable, cuando)
+    return t.reset_index(names='sujeto')[['sujeto', 'txt', 'num']]

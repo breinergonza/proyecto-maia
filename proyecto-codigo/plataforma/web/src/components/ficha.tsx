@@ -136,7 +136,7 @@ export function TrayectoriaRiesgo({ sujeto }: { sujeto: string }) {
         <Muestra tipo="estrella">primera alerta</Muestra>
       </span>}>
       {q.data.paquete_corrida && q.data.paquete !== q.data.paquete_corrida && (
-        <p className="mb-3 text-sm text-ocre" title={`Modelos vigentes: ${q.data.paquete}; tarjetas: ${q.data.paquete_corrida}`}>
+        <p className="mb-3 text-sm text-ocre-hondo" title={`Modelos vigentes: ${q.data.paquete}; tarjetas: ${q.data.paquete_corrida}`}>
           Calculado con los modelos vigentes; las tarjetas de arriba se calcularon con modelos anteriores y pueden no coincidir.
         </p>
       )}

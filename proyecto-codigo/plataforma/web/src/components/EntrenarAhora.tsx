@@ -147,7 +147,7 @@ export function EstadoEntrenamiento({ e }: { e: Ejecucion }) {
           const Icono = fallo ? XCircle : enCurso ? LoaderCircle : hecho ? CheckCircle2 : Circle
           return (
             <li key={paso} className={cn('flex items-center gap-1.5', !hecho && !enCurso && !fallo && 'text-salvia')}>
-              <Icono size={16} aria-hidden className={cn(fallo ? 'text-coral-hondo' : hecho ? 'text-teal' : enCurso ? 'animate-spin text-ocre' : '')} />
+              <Icono size={16} aria-hidden className={cn(fallo ? 'text-coral-hondo' : hecho ? 'text-teal' : enCurso ? 'animate-spin text-ocre-hondo' : '')} />
               <span className={cn(enCurso && 'font-semibold')}>{NOMBRE_PASO[paso] ?? paso}</span>
             </li>
           )

@@ -1,83 +1,129 @@
-// Revisión ciega: el experto ve lo que vería en consulta, sin el riesgo ni la posición, y dice si el niño le
-// preocupa. Al comparar con el modelo se sabe si los niños de riesgo alto preocupan más que el resto.
-// En escritorio los casos van en grilla con desplazamiento propio y el resumen (administración) en una columna fija.
+// Revisión ciega y simple (D14): un niño por pantalla, una sola pregunta (¿le preocupa?), tres respuestas, un motivo
+// opcional y el avance. No muestra el riesgo ni la posición, para que la opinión sea independiente; al comparar con el
+// modelo se sabe si los niños de riesgo alto preocupan más que el resto. La administración ve además el resumen.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { pedir } from '../api/cliente'
 import type { Respuesta, ResumenRevision, RiesgoRevision } from '../api/tipos'
 import { useSesion, puede } from '../auth/sesion'
+import { CrecimientoOms } from '../components/ficha'
 import { Aviso, Boton, Cargando, Encabezado, Panel, Tabla, Texto, Vacio } from '../components/ui'
 import { cn } from '../lib/cn'
-import { fecha, num, pct, RESPUESTAS } from '../lib/formato'
+import { fecha, num, pct } from '../lib/formato'
 import { alerta, ayudaAlerta } from '../lib/lenguaje'
+
+const OPCIONES: { valor: Respuesta; texto: string }[] = [
+  { valor: 'si', texto: 'Sí, me preocupa' },
+  { valor: 'no', texto: 'No me preocupa' },
+  { valor: 'no_se', texto: 'No lo sé' },
+]
 
 export default function RevisionRiesgos() {
   const { usuario } = useSesion()
   const admin = puede(usuario, ['admin'])
   const q = useQuery({ queryKey: ['revision', 'riesgos'], queryFn: () => pedir<{ corrida_id: number; items: RiesgoRevision[] }>('/revision/riesgos') })
-  const total = q.data?.items.length ?? 0
-  const respondidas = q.data?.items.filter((i) => i.preocupa).length ?? 0
+  const [elegido, setElegido] = useState<number | null>(null)
+  const items = q.data?.items ?? []
+  const total = items.length
+  const respondidas = items.filter((i) => i.preocupa).length
+  const primeroPendiente = items.findIndex((i) => !i.preocupa)
+  const actual = Math.min(elegido ?? Math.max(primeroPendiente, 0), Math.max(total - 1, 0))
+  const terminado = total > 0 && respondidas === total
+
+  // tras responder, pasa al siguiente niño sin responder (o al siguiente, si ya respondió todos)
+  const siguiente = () => {
+    const despues = items.findIndex((i, k) => k > actual && !i.preocupa)
+    setElegido(despues >= 0 ? despues : Math.min(actual + 1, total - 1))
+  }
 
   return (
-    <div className="flex flex-col lg:h-full">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 lg:max-w-none">
       <Encabezado titulo="Revisión de riesgos"
         accion={total > 0 && (
           <div className="w-full sm:w-56">
             <div className="flex justify-between text-xs text-salvia"><span>Respondidos</span><span>{respondidas} de {total}</span></div>
-            <div className="mt-1 h-1.5 rounded-full bg-linea">
+            <div className="mt-1 h-1.5 rounded-full bg-linea" role="progressbar" aria-label="Avance de la revisión"
+              aria-valuemin={0} aria-valuemax={total} aria-valuenow={respondidas}>
               <div className="h-full rounded-full bg-teal transition-[width] duration-500" style={{ width: `${(respondidas / total) * 100}%` }} />
             </div>
           </div>
         )}>
-        Una muestra de niños, en orden fijo. No se muestra el riesgo calculado, a propósito: responda con su criterio
-        clínico si el niño le preocupa para el desenlace indicado.
+        Diga si el niño le preocupa, con su criterio clínico. No se muestra el riesgo calculado, a propósito, para que su
+        opinión sea independiente.
       </Encabezado>
-      <div className={cn('grid gap-4 lg:min-h-0 lg:flex-1', admin && 'xl:grid-cols-[minmax(0,1fr)_22rem]')}>
-        <div className="lg:min-h-0 lg:overflow-y-auto lg:pr-1">
-          {q.isPending ? <Cargando /> : q.error ? <Aviso>{q.error.message}</Aviso> : total === 0 ? (
-            <Vacio titulo="No hay niños con riesgo calculado con los datos más recientes" />
-          ) : (
-            <ol className="grid grid-cols-1 content-start gap-3 2xl:grid-cols-2">{q.data.items.map((r, i) => <Caso key={r.id} caso={r} numero={i + 1} />)}</ol>
-          )}
-        </div>
-        {admin && <Resultados />}
-      </div>
+      {q.isPending ? <Cargando /> : q.error ? <Aviso>{q.error.message}</Aviso> : total === 0 ? (
+        <Vacio titulo="No hay niños con riesgo calculado con los datos más recientes" />
+      ) : (
+        <>
+          {terminado && <Aviso tono="teal">Respondió a todos los niños. Gracias; puede volver a cualquiera para cambiar su respuesta.</Aviso>}
+          <Caso key={items[actual].id} caso={items[actual]} numero={actual + 1} total={total} alResponder={siguiente} />
+          <nav className="flex justify-between" aria-label="Moverse entre niños">
+            <Boton chico variante="secundario" disabled={actual === 0} onClick={() => setElegido(actual - 1)}>Anterior</Boton>
+            <Boton chico variante="secundario" disabled={actual >= total - 1} onClick={() => setElegido(actual + 1)}>Siguiente</Boton>
+          </nav>
+        </>
+      )}
+      {admin && <Resultados />}
     </div>
   )
 }
 
-function Caso({ caso, numero }: { caso: RiesgoRevision; numero: number }) {
+// El motivo a medio escribir se guarda en la pestaña (clave por id del riesgo, nunca el código del niño) para no
+// perderlo si la sesión vence o se cambia de caso; se borra al responder.
+const claveBorrador = (id: number) => `maia.revision.motivo.${id}`
+function leerBorrador(id: number): string | null {
+  try {
+    return window.sessionStorage.getItem(claveBorrador(id))
+  } catch {
+    return null
+  }
+}
+function guardarBorrador(id: number, texto: string) {
+  try {
+    if (texto) window.sessionStorage.setItem(claveBorrador(id), texto)
+    else window.sessionStorage.removeItem(claveBorrador(id))
+  } catch {
+    /* sin almacenamiento: no hay borrador */
+  }
+}
+
+function Caso({ caso, numero, total, alResponder }: { caso: RiesgoRevision; numero: number; total: number; alResponder: () => void }) {
   const cliente = useQueryClient()
-  const [comentario, setComentario] = useState(caso.comentario ?? '')
+  const [motivo, setMotivo] = useState(() => leerBorrador(caso.id) ?? caso.comentario ?? '')
   const m = useMutation({
     mutationFn: (preocupa: Respuesta) =>
-      pedir(`/revision/riesgos/${caso.id}`, { cuerpo: { preocupa, comentario: comentario.trim() || null } }),
-    onSuccess: () => void cliente.invalidateQueries({ queryKey: ['revision'] }),
+      pedir(`/revision/riesgos/${caso.id}`, { cuerpo: { preocupa, comentario: motivo.trim() || null } }),
+    onSuccess: async () => {
+      guardarBorrador(caso.id, '')
+      await cliente.invalidateQueries({ queryKey: ['revision'] })
+      alResponder()
+    },
   })
   return (
-    <li className={cn('flex animate-aparecer flex-col gap-3 rounded-panel border bg-papel p-4 shadow-suave',
-      caso.preocupa ? 'border-teal/30' : 'border-linea/80')}>
-      <div className="min-w-0">
-        <p className="text-xs text-salvia">Caso {numero} · niño {caso.sujeto} · {caso.momento_nombre} ({fecha(caso.fecha_visita)})</p>
-        <h2 className="mt-1 text-base">{caso.desenlace}</h2>
-        <ul className="mt-1.5 grid grid-cols-1 gap-x-5 gap-y-0.5 text-sm sm:grid-cols-2 2xl:grid-cols-3">{caso.resumen.map((l) => <li key={l}>{l}</li>)}</ul>
-      </div>
-      <fieldset className="mt-auto border-t border-linea/70 pt-3">
-        <legend className="float-left pt-1.5 text-sm font-semibold">¿Le preocupa este niño?</legend>
-        <div className="flex justify-end">
-          <div className="grid grid-cols-3 gap-1.5">
-            {(['si', 'no', 'no_se'] as Respuesta[]).map((r) => (
-              <Boton key={r} chico variante={caso.preocupa === r ? 'primario' : 'secundario'} aria-pressed={caso.preocupa === r}
-                disabled={m.isPending} onClick={() => m.mutate(r)}>{RESPUESTAS[r]}</Boton>
-            ))}
-          </div>
+    <section className={cn('grid grid-cols-1 gap-4 rounded-panel border bg-papel p-5 shadow-suave lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] lg:gap-x-6 lg:p-4', caso.preocupa ? 'border-teal/30' : 'border-linea/80')}
+      aria-label={`Niño ${numero} de ${total}`}>
+      <div className="flex min-w-0 flex-col gap-4">
+        <div className="min-w-0">
+          <p className="text-xs text-salvia">Niño {numero} de {total} · {caso.sujeto} · {caso.momento_nombre} ({fecha(caso.fecha_visita)})</p>
+          <h2 className="mt-1 text-base">{caso.desenlace}</h2>
+          <ul className="mt-2 grid grid-cols-1 gap-x-5 gap-y-0.5 text-sm sm:grid-cols-2">{caso.resumen.map((l) => <li key={l}>{l}</li>)}</ul>
         </div>
-        <label className="sr-only" htmlFor={`cr-${caso.id}`}>Comentario</label>
-        <Texto id={`cr-${caso.id}`} rows={1} maxLength={2000} className="clear-both mt-2 min-h-9 resize-y text-sm" placeholder="Comentario (opcional)"
-          value={comentario} onChange={(e) => setComentario(e.target.value)} />
+        <CrecimientoOms crecimiento={caso.crecimiento ?? {}} />
+      </div>
+      <fieldset className="min-w-0 self-start border-t border-linea/70 pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+        <legend className="pb-2 text-sm font-semibold">¿Le preocupa este niño?</legend>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-1 2xl:grid-cols-3">
+          {OPCIONES.map((o) => (
+            <Boton key={o.valor} variante={caso.preocupa === o.valor ? 'primario' : 'secundario'} aria-pressed={caso.preocupa === o.valor}
+              disabled={m.isPending} onClick={() => m.mutate(o.valor)}>{o.texto}</Boton>
+          ))}
+        </div>
+        <label className="mt-3 block text-xs text-salvia" htmlFor={`cr-${caso.id}`}>Motivo (opcional, escríbalo antes de responder)</label>
+        <Texto id={`cr-${caso.id}`} rows={2} maxLength={2000} className="mt-1 resize-y text-sm"
+          value={motivo} onChange={(e) => { setMotivo(e.target.value); guardarBorrador(caso.id, e.target.value) }} />
         {m.error && <p className="mt-1 text-xs text-coral-hondo" role="alert">{m.error.message}</p>}
       </fieldset>
-    </li>
+    </section>
   )
 }
 

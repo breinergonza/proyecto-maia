@@ -100,7 +100,8 @@ def test_variables_ofrecidas(cliente, tokens, corte):
     assert {'sede', 'eg_semanas', 'sexo', 'peso_nacer'} <= set(por_nombre)
     assert por_nombre['sede']['tipo'] == 'lista' and por_nombre['sede']['cuando'] is None
     assert por_nombre['peso_nacer']['tipo'] == 'numero' and por_nombre['peso_nacer']['cuando'] == 'primera'
-    assert [o['valor'] for o in por_nombre['eg_semanas']['opciones']] == ['extremo', 'muy_prematuro', 'moderado_tardio', 'a_termino']
+    assert [o['valor'] for o in por_nombre['eg_categoria']['opciones']] == ['extremo', 'muy_prematuro', 'moderado_tardio', 'a_termino']
+    assert por_nombre['eg_semanas']['tipo'] == 'numero' and por_nombre['eg_semanas']['opciones'] == []
     assert 'hematocrito' not in por_nombre   # se mide en cada visita: no es un filtro rápido
 
 

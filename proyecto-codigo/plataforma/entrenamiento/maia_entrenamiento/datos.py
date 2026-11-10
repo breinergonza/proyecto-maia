@@ -17,6 +17,7 @@ from pathlib import Path
 from archivos import carpetas as CA
 from clinico import configuracion as CF
 from clinico import modelo as AC
+from maia_comun import anticipacion as ANT
 from maia_comun import sevarti_db as SDB
 from maia_comun import simulados
 from maia_comun.almacen import Almacen
@@ -67,9 +68,15 @@ def corte_local(almacen: Almacen, fuente: str, fecha: str | None = None) -> tupl
     return SV.leer(carpeta), info, carpeta
 
 
-def config_clinica(fuente: str, prueba: bool = False) -> AC.ConfigClinica:
+def config_clinica(fuente: str, prueba: bool = False, anticipacion: bool | None = None) -> AC.ConfigClinica:
+    """La configuración clínica de la fuente. Con ``anticipacion`` (o ``MAIA_ANTICIPACION=1``) suma los desenlaces
+    desde otras visitas (D20): en el simulador, las variantes de ``maia_comun.anticipacion``; en la base real, las
+    filas ``_desde_`` «En prueba» del Diccionario. Sin pedirla, nada cambia."""
+    anticipar = ANT.activa() if anticipacion is None else anticipacion
     if fuente == 'simulado':
-        return simulados.CONFIG_CLINICA_DEMO
+        return ANT.con_anticipacion(simulados.CONFIG_CLINICA_DEMO) if anticipar else simulados.CONFIG_CLINICA_DEMO
+    if anticipar and not prueba:
+        return ANT.con_anticipacion_del_diccionario(CF.cargar(), CF.cargar(prueba=True))
     return CF.cargar(prueba=prueba)
 
 

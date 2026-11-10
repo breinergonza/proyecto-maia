@@ -8,10 +8,13 @@ memoria de la petición y el CSV por niño (D36) se arma al vuelo, solo para adm
 * ``GET  /prediccion/muestra/csv``    el mismo cálculo, un renglón por niño y desenlace (solo administración).
 * ``GET  /prediccion/ejemplos``       biblioteca de niños de ejemplo con los valores típicos del subgrupo.
 * ``POST /prediccion/nino``           un niño nuevo (ejemplo + cambios): riesgo, perfil provisional y visita por visita.
+* ``POST /prediccion/trabajos``      lo mismo que ``/muestra`` pero asíncrono (hilo de la API): estado y progreso.
+* ``GET  /prediccion/trabajos/{id}``         estado, progreso y, al terminar, los agregados (incluido el riesgo por visita).
+* ``GET  /prediccion/trabajos/{id}/tabla``   una página (200 niños) de la tabla por niño, ordenada por riesgo.
+* ``/prediccion/ninos-nuevos``       niños inventados y plantillas guardadas desde un perfil (``app.ninos_nuevos``).
 
-Universos grandes: se procesan por lotes de ``LOTE`` niños y el resultado completo sale en la misma petición. No hay
-infraestructura de tareas asíncronas dentro de la API (las ``Ejecucion`` las toma el programador, que no puntúa), así
-que el tiempo crece con el número de niños; para cortes de decenas de miles use el CSV o la corrida semestral.
+Los agregados de un trabajo quedan en ``resultados.predicciones`` (solo cifras de grupo); la tabla por niño vive en la
+memoria de la API una hora (``prediccion_trabajos.RESULTADOS``) y no se escribe en la base.
 """
 from __future__ import annotations
 
@@ -20,18 +23,19 @@ import io
 import json
 import logging
 import threading
+import traceback
 from collections import Counter
 from collections.abc import Iterator
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select, text
+from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.orm import Session
 
 from maia_api import estado as E
@@ -41,13 +45,16 @@ from maia_api.dependencias import ADMIN, EXPERTO, auditar, configuracion, sesion
 from maia_api.poblacion import MIN_NINOS, corte_actual, ids_de
 from maia_api.rutas import inferencia as INF
 from maia_comun import db
+from maia_comun import ejecuciones as EJ
 from maia_comun import muestra as M
 from maia_comun import paquete as PQ
 from maia_comun import perfiles as PF
+from maia_comun import prediccion_trabajos as PT
 from maia_comun import puntuacion as PU
 from maia_comun.config import Configuracion
 from maia_comun.modelos_db import PERCENTIL_ALTO, PERCENTIL_MUY_ALTO, Ejecucion, Paquete, Usuario
 from maia_comun.modelos_muestras import Muestra
+from maia_comun.prediccion_modelos import NinoNuevo, Prediccion
 from sevarti import contrato as SV
 
 ruta = APIRouter(prefix='/prediccion', tags=['predicción'])
@@ -158,11 +165,21 @@ def _parcial(corte_id: int, ids: list[str], variables: list[str]) -> dict[str, p
                                    'WHERE corte_id = :c AND sujeto = ANY(:s)', p)}
 
 
+def _marcar_uso(s: Session, version: str) -> None:
+    """Si el modelo es el de un entrenamiento personal, anota que se usó ahora (reinicia sus 90 días, D17)."""
+    e = s.scalars(select(Ejecucion).where(Ejecucion.tipo == 'entrenamiento', Ejecucion.estado == 'ok',
+                                          Ejecucion.resultado['paquete'].astext == version)).first()
+    if e is not None and (e.parametros or {}).get('visibilidad') == 'personal':
+        EJ.marcar_uso(s, e.id)
+        s.commit()
+
+
 class Contexto:
     """El modelo elegido y el corte sobre el que se puntúa."""
 
     def __init__(self, s: Session, cfg: Configuracion, version: str | None):
         self.modelos, self.manifest, self.carpeta = cargar_modelo(s, cfg, version)
+        _marcar_uso(s, self.manifest['version'])
         self.base = self.carpeta / 'sevarti_base'
         self.version = self.manifest['version']
         self.variables = list(pd.read_parquet(self.base / 'esquema.parquet', columns=['variable']).variable)
@@ -177,6 +194,16 @@ class Contexto:
         self.corte_modelo = corte_modelo
         self.corte_anterior = bool(self.corte_texto and corte_modelo and corte_modelo != self.corte_texto)
 
+    def entrenados(self) -> set[str] | None:
+        """Los niños con que se entrenó el modelo (``sevarti_base/ninos_entrenamiento.parquet``), o la lista del manifiesto
+        de paquetes antiguos; ``None`` si el paquete no trae ninguna (la fuga no se puede verificar)."""
+        if not hasattr(self, '_entrenados'):
+            lista = PT.leer_entrenados(self.base)
+            if lista is None and self.manifest.get('ninos_entrenamiento') is not None:
+                lista = set(map(str, self.manifest['ninos_entrenamiento']))
+            self._entrenados = lista
+        return self._entrenados
+
     def sevarti(self, ids: list[str]) -> SV.Sevarti:
         return PU.completar(_parcial(self.corte_id, ids, self.variables), self.base, self.corte)
 
@@ -190,6 +217,19 @@ class Contexto:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
                                 'No se pudo calcular el riesgo de estos niños con el modelo elegido.') from e
         return r.drop(columns=['fecha_visita']), sev
+
+
+    def ultima_e_historia(self, ids: list[str]) -> tuple[pd.DataFrame, pd.DataFrame]:
+        """(riesgo en la última visita de cada niño, riesgo en todas sus visitas), con una sola lectura de los datos."""
+        try:
+            p = self.modelos.clinico.preparar(self.sevarti(ids))
+            ultima = self.modelos.clinico.riesgos(p, solo_ultima_visita=True, con_motivos=False, solo_pendientes=False)
+            historia = self.modelos.clinico.riesgos(p, solo_ultima_visita=False, con_motivos=False, solo_pendientes=False)
+        except (ValueError, KeyError) as e:
+            registro.warning('No se pudo calcular el riesgo: %s: %s', type(e).__name__, e, exc_info=True)
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                                'No se pudo calcular el riesgo de estos niños con el modelo elegido.') from e
+        return ultima.drop(columns=['fecha_visita']), historia.drop(columns=['fecha_visita'])
 
 
 def _lotes(ids: list[str]) -> Iterator[list[str]]:
@@ -263,16 +303,8 @@ def _definicion(s: Session, muestra: dict | None, muestra_id: int | None) -> dic
 def _ninos(s: Session, ctx: Contexto, muestra: dict | None, excluir: bool) -> tuple[list[str], dict]:
     """Los niños del filtro (sin los del entrenamiento, si se pide y el paquete trae esa lista) y lo que se sabe de la
     fuga: cuántos estaban en el entrenamiento, o ``fuga_no_verificable`` si el paquete no trae la lista."""
-    ids = ids_de(s, ctx.corte_id, muestra)
-    lista = ctx.manifest.get('ninos_entrenamiento')
-    fuga: dict[str, Any] = {'fuga_no_verificable': lista is None, 'en_entrenamiento': None, 'excluidos': 0,
-                            'aviso_corte': None}
-    if lista is not None:
-        entrenados = set(map(str, lista))
-        fuga['en_entrenamiento'] = sum(1 for i in ids if i in entrenados)
-        if excluir:
-            ids = [i for i in ids if i not in entrenados]
-            fuga['excluidos'] = fuga['en_entrenamiento']
+    ids, fuga = PT.fuga_entrenamiento(ids_de(s, ctx.corte_id, muestra), ctx.entrenados(), excluir)
+    fuga['aviso_corte'] = None
     if ctx.corte_anterior:
         fuga['aviso_corte'] = (f'Corte anterior: el modelo se entrenó con el corte del {ctx.corte_modelo} y los niños son '
                                f'los del {ctx.corte_texto}.')
@@ -280,6 +312,9 @@ def _ninos(s: Session, ctx: Contexto, muestra: dict | None, excluir: bool) -> tu
         fuga['aviso_corte'] = ('El modelo se entrenó con este mismo corte y no trae la lista de niños con que se entrenó: '
                                'parte de estos niños pudo estar en el entrenamiento y el riesgo se vería mejor de lo que '
                                'será con niños nuevos.')
+    elif fuga['en_entrenamiento']:
+        fuga['aviso_corte'] = (f'{fuga["en_entrenamiento"]} de estos niños estaban en el entrenamiento del modelo: su riesgo se '
+                               'vería mejor de lo que será con niños nuevos.' if not excluir else None)
     return ids, fuga
 
 
@@ -311,6 +346,24 @@ def _filas_nino(r: pd.DataFrame) -> pd.DataFrame:
     return r.sort_values(['percentil', 'sujeto'], ascending=[False, True]).drop_duplicates('sujeto')
 
 
+def _filas_pagina(s: Session, ctx: Contexto, tabla: pd.DataFrame, pagina: int, limite: int) -> list[dict]:
+    """Una página de la tabla por niño (ya ordenada por riesgo), con perfil provisional, primera alerta y motivos."""
+    trozo = tabla.iloc[(pagina - 1) * limite: pagina * limite]
+    if trozo.empty:
+        return []
+    d = _detalle(ctx, list(dict.fromkeys(trozo.sujeto)), trozo, esquema_db(s, ctx.corte_id)).set_index(['sujeto', 'clave'])
+    filas = []
+    for f in trozo.itertuples():
+        x = d.loc[(f.sujeto, f.clave)] if (f.sujeto, f.clave) in d.index else None
+        filas.append({'sujeto': f.sujeto, 'clave': f.clave, 'desenlace': f.desenlace, 'momento': f.momento,
+                      'momento_nombre': ctx.nombres.get(f.momento, f.momento), 'riesgo': float(f.riesgo),
+                      'percentil': float(f.percentil), 'nivel': _nivel(float(f.percentil)),
+                      'perfil': None if x is None else x['perfil'],
+                      'primera_alerta': None if x is None else x['primera_alerta'],
+                      'motivos': [] if x is None else list(x['motivos'])})
+    return filas
+
+
 def _resumen_modelo(ctx: Contexto) -> dict:
     return {'version': ctx.version, 'corte': ctx.corte_modelo, 'corte_anterior': ctx.corte_anterior,
             'corte_vigente': ctx.corte_texto}
@@ -335,18 +388,7 @@ def predecir_muestra(p: PeticionMuestra, s: Session = Depends(sesion), cfg: Conf
         return base | {'insuficiente': True, 'minimo': MIN_NINOS,
                        'mensaje': f'Menos de {MIN_NINOS} niños tienen riesgo calculado en esa visita.'}
     tabla = _filas_nino(r)
-    pagina = tabla.iloc[(p.pagina - 1) * p.limite: p.pagina * p.limite]
-    d = _detalle(ctx, list(pagina.sujeto), pagina, esquema_db(s, ctx.corte_id))
-    d = d.set_index(['sujeto', 'clave'])
-    filas = []
-    for f in pagina.itertuples():
-        x = d.loc[(f.sujeto, f.clave)] if (f.sujeto, f.clave) in d.index else None
-        filas.append({'sujeto': f.sujeto, 'clave': f.clave, 'desenlace': f.desenlace, 'momento': f.momento,
-                      'momento_nombre': ctx.nombres.get(f.momento, f.momento), 'riesgo': float(f.riesgo),
-                      'percentil': float(f.percentil), 'nivel': _nivel(float(f.percentil)),
-                      'perfil': None if x is None else x['perfil'],
-                      'primera_alerta': None if x is None else x['primera_alerta'],
-                      'motivos': [] if x is None else list(x['motivos'])})
+    filas = _filas_pagina(s, ctx, tabla, p.pagina, p.limite)
     auditar(s, u, 'prediccion.muestra', ctx.version,
             {'n': len(ids), 'huella': M.huella(ids), 'visita': p.visita, 'excluir': p.excluir_entrenamiento})
     s.commit()
@@ -569,20 +611,17 @@ def _peticion(ej: dict, cambios: dict[str, Any], ctx: Contexto, u: Usuario) -> t
             'mediciones': [{'sujeto': 'nuevo-1', 'variable': k, 'valor': v,
                             'fecha': (nacimiento + timedelta(days=round(vida))).isoformat(), 'edad_dias': round(vida)}
                            for k, (vida, v) in datos.items() if k in ctx.variables],
-            'episodios': []}, cambiados
+            'episodios': [], 'valores': dict(valores)}, cambiados
 
 
-@ruta.post('/nino')
-def predecir_nino(p: PeticionNino, s: Session = Depends(sesion), cfg: Configuracion = Depends(configuracion),
-                  u: Usuario = Depends(EXPERTO)) -> dict:
-    """Un niño nuevo: el ejemplo típico del subgrupo con los campos que el usuario cambió. Devuelve el riesgo por
-    desenlace con sus motivos, el perfil provisional y el riesgo visita por visita con la línea de alerta. No se guarda."""
-    ctx = Contexto(s, cfg, p.modelo)
+def _calcular_nino(s: Session, ctx: Contexto, u: Usuario, p: PeticionNino) -> tuple[dict, dict, dict | None]:
+    """(respuesta, valores del niño, ejemplo): el ejemplo típico del subgrupo con los campos que el usuario cambió.
+    Los valores son el niño completo (típicos y cambios); vacíos si el subgrupo es muy chico."""
     ej = _ejemplo(s, ctx, u, p.visita, p.perfil, p.eg_semanas)
     base = {'modelo': _resumen_modelo(ctx), 'visita': p.visita, 'guardado': False, 'nota': NOTA_NO_GUARDA}
     if ej['insuficiente']:
         return base | {'insuficiente': True, 'minimo': MIN_NINOS, 'n': ej['n'],
-                       'mensaje': f'Con menos de {MIN_NINOS} niños en ese subgrupo no hay un ejemplo típico.'}
+                       'mensaje': f'Con menos de {MIN_NINOS} niños en ese subgrupo no hay un ejemplo típico.'}, {}, None
     peticion, cambiados = _peticion(ej, p.cambios, ctx, u)
     parcial = {'sujetos': pd.DataFrame(peticion['sujetos']), 'mediciones': pd.DataFrame(peticion['mediciones']),
                'episodios': pd.DataFrame(peticion['episodios'])}
@@ -610,9 +649,295 @@ def predecir_nino(p: PeticionNino, s: Session = Depends(sesion), cfg: Configurac
                            'riesgo': float(r.riesgo), 'percentil': float(r.percentil)} for r in hist.itertuples()),
                          key=lambda x: (x['orden'], x['desenlace']))
     lub = next((m['valor'] for m in peticion['mediciones'] if m['variable'] == PF.VARIABLE_LUBCHENCO), None)
-    auditar(s, u, 'prediccion.nino', ctx.version, {'visita': p.visita, 'perfil': ej['perfil'], 'cambios': len(cambiados)})
+    respuesta = base | {'insuficiente': False, 'n': ej['n'], 'perfil_ejemplo': ej['perfil_etiqueta'],
+                        'eg_semanas': ej['eg_semanas'], 'perfil': PF.perfil_provisional(ej['eg_semanas'], lub, p.visita),
+                        'riesgos': riesgos, 'trayectoria': trayectoria, 'linea_alerta': PERCENTIL_ALTO,
+                        'cambiados': cambiados}
+    return respuesta, peticion['valores'], ej
+
+
+@ruta.post('/nino')
+def predecir_nino(p: PeticionNino, s: Session = Depends(sesion), cfg: Configuracion = Depends(configuracion),
+                  u: Usuario = Depends(EXPERTO)) -> dict:
+    """Un niño nuevo: el ejemplo típico del subgrupo con los campos que el usuario cambió. Devuelve el riesgo por
+    desenlace con sus motivos, el perfil provisional y el riesgo visita por visita con la línea de alerta. No se guarda
+    (para guardarlo: ``POST /prediccion/ninos-nuevos``)."""
+    ctx = Contexto(s, cfg, p.modelo)
+    respuesta, _, ej = _calcular_nino(s, ctx, u, p)
+    if ej is not None:
+        auditar(s, u, 'prediccion.nino', ctx.version,
+                {'visita': p.visita, 'perfil': ej['perfil'], 'cambios': len(respuesta['cambiados'])})
+        s.commit()
+    return respuesta
+
+
+# ================================================================ cálculo asíncrono (muestra y universo)
+
+HORAS_VIGENCIA = 1          # cuánto se puede consultar un cálculo (la tabla por niño vive en memoria ese tiempo)
+DIAS_HISTORIAL = 7          # las cifras de un cálculo se borran a los 7 días
+_OCUPADO = threading.Lock()  # un cálculo a la vez en esta API
+_VIVOS: set[int] = set()     # cálculos que corren en este proceso (los demás «en curso» murieron con un reinicio)
+COLUMNAS_TABLA = ['sujeto', 'clave', 'desenlace', 'momento', 'riesgo', 'percentil']
+
+
+def _ahora() -> datetime:
+    return datetime.now(UTC)
+
+
+class PeticionTrabajo(BaseModel):
+    modelo: str | None = None
+    muestra: dict | None = None
+    muestra_id: int | None = None
+    excluir_entrenamiento: bool = False
+    visita: str | None = None
+
+
+def _avance(pid: int, progreso: int, paso: str) -> None:
+    with db.motor().begin() as cx:
+        cx.execute(update(Prediccion).where(Prediccion.id == pid).values(progreso=progreso, paso=paso))
+
+
+def _calcular_trabajo(s: Session, pid: int, cfg: Configuracion) -> None:
+    p = s.get(Prediccion, pid)
+    p.estado, p.iniciada, p.paso, p.progreso = 'en_curso', _ahora(), 'Preparando el modelo', 2
     s.commit()
-    return base | {'insuficiente': False, 'n': ej['n'], 'perfil_ejemplo': ej['perfil_etiqueta'],
-                   'eg_semanas': ej['eg_semanas'], 'perfil': PF.perfil_provisional(ej['eg_semanas'], lub, p.visita),
-                   'riesgos': riesgos, 'trayectoria': trayectoria, 'linea_alerta': PERCENTIL_ALTO,
-                   'cambiados': cambiados}
+    par = p.parametros
+    visita = par.get('visita')
+    ctx = Contexto(s, cfg, par.get('modelo'))
+    ids, fuga = _ninos(s, ctx, _definicion(s, par.get('muestra'), par.get('muestra_id')),
+                       bool(par.get('excluir_entrenamiento')))
+    base = {'modelo': _resumen_modelo(ctx), 'visita': visita, 'visita_nombre': ctx.nombres.get(visita) if visita else None,
+            'n_filtro': len(ids), 'guardado': False, **fuga}
+    p.n_filtro = len(ids)
+    s.commit()
+    insuficiente = None
+    partes, historias = [], []
+    if len(ids) < MIN_NINOS:
+        insuficiente = f'Con menos de {MIN_NINOS} niños no se muestran cifras.'
+    else:
+        lotes = list(_lotes(ids))
+        for i, lote in enumerate(lotes):
+            ultima, historia = ctx.ultima_e_historia(lote)
+            partes.append(ultima if visita is None else historia[historia.momento == visita])
+            historias.append(historia[['clave', 'desenlace', 'momento', 'riesgo', 'percentil']]
+                             .astype({'riesgo': 'float32', 'percentil': 'float32'}))
+            _avance(pid, 5 + int(90 * (i + 1) / len(lotes)),
+                    f'Calculando el riesgo: {min((i + 1) * LOTE, len(ids))} de {len(ids)} niños')
+        r = pd.concat(partes, ignore_index=True)
+        if r.empty or r.sujeto.nunique() < MIN_NINOS:
+            insuficiente = f'Menos de {MIN_NINOS} niños tienen riesgo calculado en esa visita.'
+    if insuficiente:
+        p.agregados = {'base': base, 'insuficiente': True, 'minimo': MIN_NINOS, 'mensaje': insuficiente}
+    else:
+        tabla = _filas_nino(r)[COLUMNAS_TABLA].reset_index(drop=True)
+        PT.RESULTADOS.poner(pid, tabla)
+        p.n_puntuados = int(len(tabla))
+        p.agregados = {'base': base, 'insuficiente': False, 'agregados': _agregados(r, ctx),
+                       'por_visita': PT.por_visita(pd.concat(historias, ignore_index=True), ctx.orden, ctx.nombres,
+                                                   PERCENTIL_ALTO),
+                       'tabla_total': int(len(tabla))}
+    dueno = s.get(Usuario, p.usuario_id) if p.usuario_id else None
+    auditar(s, dueno, 'prediccion.trabajo', ctx.version,
+            {'id': pid, 'n': len(ids), 'huella': M.huella(ids), 'visita': visita, 'excluir': par.get('excluir_entrenamiento')})
+    p.estado, p.progreso, p.paso = 'ok', 100, 'Listo'
+    p.terminada = _ahora()
+    p.vence = p.terminada + timedelta(hours=HORAS_VIGENCIA)
+    s.commit()
+
+
+def _fallo(pid: int, mensaje: str) -> None:
+    with db.motor().begin() as cx:
+        cx.execute(update(Prediccion).where(Prediccion.id == pid)
+                   .values(estado='error', mensaje=mensaje, terminada=_ahora(), paso='Con error'))
+
+
+def _correr_trabajo(pid: int, cfg: Configuracion) -> None:
+    try:
+        with db.fabrica()() as s:
+            _calcular_trabajo(s, pid, cfg)
+    except Exception as e:   # el error queda en el cálculo; el hilo no debe morir en silencio
+        traceback.print_exc()
+        _fallo(pid, str(e.detail) if isinstance(e, HTTPException) else 'El cálculo falló. Intente de nuevo; si sigue, avise a administración.')
+    finally:
+        _VIVOS.discard(pid)
+        _OCUPADO.release()
+
+
+def _propio(s: Session, pid: int, u: Usuario) -> Prediccion:
+    """El cálculo, si es de quien pregunta (administración ve todos); si no, como si no existiera."""
+    f = s.get(Prediccion, pid)
+    if f is None or (u.rol != 'admin' and f.usuario_id != u.id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, 'No existe ese cálculo.')
+    if f.estado in ('pendiente', 'en_curso') and pid not in _VIVOS:
+        f.estado, f.terminada, f.paso = 'error', _ahora(), 'Con error'
+        f.mensaje = 'Interrumpido: la API se reinició durante el cálculo. Vuelva a calcular.'
+        s.commit()
+    return f
+
+
+def _vista_trabajo(f: Prediccion, completo: bool = True) -> dict:
+    salida = {'id': f.id, 'tipo': f.tipo, 'estado': f.estado, 'progreso': f.progreso, 'paso': f.paso, 'modelo': f.modelo,
+              'n_filtro': f.n_filtro, 'n_puntuados': f.n_puntuados, 'mensaje': f.mensaje,
+              'creada': f.creada.isoformat() if f.creada else None,
+              'terminada': f.terminada.isoformat() if f.terminada else None,
+              'vence': f.vence.isoformat() if f.vence else None}
+    if not completo:
+        return salida
+    vigente = f.estado == 'ok' and (f.vence is None or f.vence > _ahora())
+    a = f.agregados or {}
+    resultado = None
+    if vigente and a:
+        resultado = a['base'] | {k: v for k, v in a.items() if k != 'base'}
+    salida |= {'parametros': f.parametros, 'resultado': resultado,
+               'tabla_disponible': bool(vigente and PT.RESULTADOS.obtener(f.id) is not None)}
+    return salida
+
+
+@ruta.post('/trabajos', status_code=status.HTTP_202_ACCEPTED)
+def lanzar_trabajo(p: PeticionTrabajo, s: Session = Depends(sesion), cfg: Configuracion = Depends(configuracion),
+                   u: Usuario = Depends(EXPERTO)) -> dict:
+    """Lanza el cálculo de una muestra o de todo el universo en un hilo de la API y devuelve su número; el avance se
+    consulta en ``GET /prediccion/trabajos/{id}``. Uno a la vez."""
+    ctx = Contexto(s, cfg, p.modelo)       # valida el modelo
+    if p.visita is not None and p.visita not in ctx.orden:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f'No existe la visita {p.visita} en ese modelo.')
+    if p.muestra_id is not None:
+        _definicion(s, None, p.muestra_id)  # 404 si no existe
+    if not _OCUPADO.acquire(blocking=False):
+        raise HTTPException(status.HTTP_409_CONFLICT, 'Ya hay un cálculo en curso. Espere a que termine.')
+    try:
+        s.execute(delete(Prediccion).where(Prediccion.creada < _ahora() - timedelta(days=DIAS_HISTORIAL)))
+        f = None
+        universo = not p.muestra and p.muestra_id is None
+        f = Prediccion(usuario_id=u.id, tipo='universo' if universo else 'muestra', estado='pendiente', modelo=ctx.version,
+                       paso='En cola', progreso=0,
+                       parametros={'modelo': p.modelo, 'muestra': None if universo else p.muestra, 'muestra_id': p.muestra_id,
+                                   'excluir_entrenamiento': p.excluir_entrenamiento, 'visita': p.visita})
+        s.add(f)
+        s.flush()
+        _VIVOS.add(f.id)
+        s.commit()
+    except Exception:
+        _VIVOS.discard(getattr(f, 'id', None))
+        _OCUPADO.release()
+        raise
+    threading.Thread(target=_correr_trabajo, args=(f.id, cfg), daemon=True, name=f'prediccion-{f.id}').start()
+    return _vista_trabajo(f, completo=False)
+
+
+@ruta.get('/trabajos')
+def mis_trabajos(s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> list[dict]:
+    """Los últimos cálculos de quien pregunta."""
+    filas = s.scalars(select(Prediccion).where(Prediccion.usuario_id == u.id).order_by(Prediccion.id.desc()).limit(10)).all()
+    return [_vista_trabajo(_propio(s, f.id, u), completo=False) for f in filas]
+
+
+@ruta.get('/trabajos/{pid}')
+def estado_trabajo(pid: int, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> dict:
+    """Estado y progreso; al terminar, los agregados (distribución, niveles, por desenlace, por visita y fuga)."""
+    return _vista_trabajo(_propio(s, pid, u))
+
+
+@ruta.get('/trabajos/{pid}/tabla')
+def tabla_trabajo(pid: int, pagina: int = Query(1, ge=1), limite: int = Query(LIMITE_TABLA, ge=1, le=LIMITE_TABLA),
+                  s: Session = Depends(sesion), cfg: Configuracion = Depends(configuracion),
+                  u: Usuario = Depends(EXPERTO)) -> dict:
+    """Una página de la tabla por niño, de mayor a menor riesgo. Vive en memoria una hora: después hay que recalcular."""
+    f = _propio(s, pid, u)
+    if f.estado != 'ok':
+        raise HTTPException(status.HTTP_409_CONFLICT, 'El cálculo todavía no termina.')
+    tabla = PT.RESULTADOS.obtener(pid)
+    if tabla is None:
+        raise HTTPException(status.HTTP_410_GONE, 'La tabla por niño ya no está disponible (se conserva una hora). Vuelva a calcular.')
+    ctx = Contexto(s, cfg, f.modelo)
+    return {'total': int(len(tabla)), 'pagina': pagina, 'limite': limite, 'paginas': max(1, -(-len(tabla) // limite)),
+            'filas': _filas_pagina(s, ctx, tabla, pagina, limite)}
+
+
+# ================================================================ niños nuevos guardados (app.ninos_nuevos)
+
+MAX_NINOS_POR_PERSONA = 100
+
+
+class PeticionGuardarNino(PeticionNino):
+    titulo: str = Field(min_length=1, max_length=120)
+    descripcion: str | None = Field(None, max_length=500)
+    tipo: Literal['nino', 'plantilla'] = 'nino'
+
+
+def _vista_nino(f: NinoNuevo, u: Usuario, duenos: dict, completo: bool = False) -> dict:
+    salida = {'id': f.id, 'tipo': f.tipo, 'titulo': f.titulo, 'descripcion': f.descripcion, 'modelo': f.modelo,
+              'visita': f.visita, 'perfil': f.perfil, 'eg_semanas': f.eg_semanas, 'cambios': f.cambios,
+              'dueno': duenos.get(f.propietario_id), 'propio': f.propietario_id == u.id,
+              'creada': f.creada.isoformat() if f.creada else None}
+    if completo:
+        salida |= {'valores': f.valores, 'resultado': f.resultado}
+    return salida
+
+
+def _visible(f: NinoNuevo | None, u: Usuario) -> NinoNuevo:
+    """Las plantillas las ven todos los expertos; un niño guardado, su dueño y administración."""
+    if f is None or not (f.tipo == 'plantilla' or u.rol == 'admin' or f.propietario_id == u.id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, 'No existe ese niño guardado.')
+    return f
+
+
+def _duenos(s: Session, filas: list[NinoNuevo]) -> dict:
+    ids = {f.propietario_id for f in filas if f.propietario_id}
+    return {x.id: x.nombre for x in s.scalars(select(Usuario).where(Usuario.id.in_(ids)))} if ids else {}
+
+
+@ruta.post('/ninos-nuevos', status_code=status.HTTP_201_CREATED)
+def guardar_nino(p: PeticionGuardarNino, s: Session = Depends(sesion), cfg: Configuracion = Depends(configuracion),
+                 u: Usuario = Depends(EXPERTO)) -> dict:
+    """Guarda un niño inventado (o una plantilla de un perfil) en ``app.ninos_nuevos``: aparte del corte oficial. Se
+    guardan la visita, el perfil, lo que se cambió, el niño completo y su riesgo de ese momento."""
+    propios = s.scalar(select(func.count()).select_from(NinoNuevo).where(NinoNuevo.propietario_id == u.id))
+    if propios >= MAX_NINOS_POR_PERSONA:
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            f'Ya tiene {MAX_NINOS_POR_PERSONA} niños y plantillas guardados. Borre alguno para guardar otro.')
+    ctx = Contexto(s, cfg, p.modelo)
+    respuesta, valores, ej = _calcular_nino(s, ctx, u, p)
+    if ej is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, respuesta['mensaje'])
+    resultado = {'riesgos': [{k: r[k] for k in ('clave', 'desenlace', 'momento', 'momento_nombre', 'riesgo', 'percentil', 'nivel')}
+                             for r in respuesta['riesgos']], 'perfil': respuesta['perfil']}
+    f = NinoNuevo(tipo=p.tipo, titulo=p.titulo.strip(), descripcion=(p.descripcion or '').strip() or None, propietario_id=u.id,
+                  modelo=ctx.version, visita=p.visita, perfil=ej['perfil'], eg_semanas=float(ej['eg_semanas']),
+                  cambios={k: v for k, v in p.cambios.items() if k in respuesta['cambiados']}, valores=valores,
+                  resultado=resultado)
+    s.add(f)
+    s.flush()
+    auditar(s, u, 'prediccion.nino_nuevo', str(f.id), {'tipo': f.tipo, 'visita': f.visita, 'perfil': f.perfil})
+    s.commit()
+    return _vista_nino(f, u, {u.id: u.nombre}, completo=True)
+
+
+@ruta.get('/ninos-nuevos')
+def listar_ninos(tipo: Literal['nino', 'plantilla'] | None = None, s: Session = Depends(sesion),
+                 u: Usuario = Depends(EXPERTO)) -> list[dict]:
+    """Las plantillas (de todos los expertos) y los niños guardados propios (administración ve todos)."""
+    q = select(NinoNuevo).order_by(NinoNuevo.id.desc())
+    if u.rol != 'admin':
+        q = q.where((NinoNuevo.tipo == 'plantilla') | (NinoNuevo.propietario_id == u.id))
+    if tipo:
+        q = q.where(NinoNuevo.tipo == tipo)
+    filas = list(s.scalars(q))
+    duenos = _duenos(s, filas)
+    return [_vista_nino(f, u, duenos) for f in filas]
+
+
+@ruta.get('/ninos-nuevos/{nid}')
+def ver_nino(nid: int, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> dict:
+    f = _visible(s.get(NinoNuevo, nid), u)
+    return _vista_nino(f, u, _duenos(s, [f]), completo=True)
+
+
+@ruta.delete('/ninos-nuevos/{nid}', status_code=status.HTTP_204_NO_CONTENT)
+def borrar_nino(nid: int, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> None:
+    f = _visible(s.get(NinoNuevo, nid), u)
+    if u.rol != 'admin' and f.propietario_id != u.id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, 'Solo quien lo guardó, o administración, puede borrarlo.')
+    auditar(s, u, 'prediccion.nino_nuevo.borrar', str(f.id), {'tipo': f.tipo})
+    s.delete(f)
+    s.commit()

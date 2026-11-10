@@ -268,3 +268,141 @@ def test_banco_con_corte_anterior(cliente, admin, personas):
     assert banco[viejo]['corte_anterior'] is True and banco[viejo]['auc'] == 0.81 and banco[viejo]['propia'] is False
     assert banco[nuevo]['visibilidad'] == 'oficial' and banco[nuevo]['corte_anterior'] is False
     assert banco[nuevo]['auc'] is None
+
+
+# ------------------------------------------------------------------ cuotas administrables, banco y aprobación
+
+def _terminar(eid: int, **resultado):
+    from maia_comun import db
+    from maia_comun import ejecuciones as EJ
+    with db.fabrica()() as s:
+        EJ.terminar(s, eid, True, resultado=resultado)
+        s.commit()
+
+
+@pytest.fixture
+def cuotas_de_fabrica(cliente):
+    yield
+    from maia_comun import db
+    from maia_comun.cuotas import CuotaConfig
+    with db.fabrica()() as s:
+        s.query(CuotaConfig).delete()
+        s.commit()
+
+
+def test_cuotas_valen_los_de_fabrica_y_el_admin_las_cambia(cliente, admin, personas, cuotas_de_fabrica):
+    assert cliente.get('/api/entrenamientos/cuotas', headers=personas['v']).status_code == 403
+    r = cliente.get('/api/entrenamientos/cuotas', headers=personas['a'])
+    assert r.json() == {'cola_max': 1, 'modelos_max': 3, 'dias_sin_uso': 90, 'dias_aviso': 14}
+    assert cliente.put('/api/entrenamientos/cuotas', headers=personas['a'], json={'cola_max': 5}).status_code == 403
+    assert cliente.put('/api/entrenamientos/cuotas', headers=admin, json={'cola_max': -1}).status_code == 422
+    assert cliente.put('/api/entrenamientos/cuotas', headers=admin, json={'dias_sin_uso': 0}).status_code == 422
+    r = cliente.put('/api/entrenamientos/cuotas', headers=admin, json={'cola_max': 2, 'dias_sin_uso': 60})
+    assert r.status_code == 200 and r.json() == {'cola_max': 2, 'modelos_max': 3, 'dias_sin_uso': 60, 'dias_aviso': 14}
+    # la cuota nueva rige: dos en cola para la misma persona, la tercera no
+    assert _entrenar(cliente, personas['a']).status_code == 202
+    assert _entrenar(cliente, personas['a']).status_code == 202
+    assert _entrenar(cliente, personas['a']).status_code == 409
+    lim = cliente.get('/api/entrenamientos/cola', headers=personas['a']).json()['limites']
+    assert lim['cola_max'] == 2 and lim['dias_sin_uso'] == 60
+
+
+def test_cuota_de_modelos_cambiada_por_el_admin(cliente, admin, personas, cuotas_de_fabrica):
+    cliente.put('/api/entrenamientos/cuotas', headers=admin, json={'modelos_max': 1})
+    primero = _entrenar(cliente, personas['a']).json()['id']
+    _terminar(primero, corte='2026-06-30')
+    r = _entrenar(cliente, personas['a'])
+    assert r.status_code == 409 and '1 modelos personales' in r.json()['detail']
+
+
+def test_banco_con_auc_metricas_y_filtros_por_dueno(cliente, admin, personas):
+    a = _entrenar(cliente, personas['a'], nombre='De A').json()['id']
+    b = _entrenar(cliente, personas['b'], nombre='De B').json()['id']
+    o = _entrenar(cliente, admin, nombre='Oficial').json()['id']
+    _terminar(a, corte='2026-06-30', metricas={'clinico': {'auc': 0.83, 'pr_auc': 0.4}}, auc=0.83)
+    _terminar(b, corte='2026-06-30', metricas={'clinico': {'auc': 0.77}})
+    _terminar(o, corte='2026-06-30')
+    h = personas['b']
+    todos = {x['id']: x for x in cliente.get('/api/entrenamientos/banco', headers=h).json()}
+    assert todos[a]['auc'] == 0.83 and todos[a]['metricas']['clinico']['pr_auc'] == 0.4
+    assert todos[b]['auc'] == 0.77            # sin `auc` suelto, sale de las métricas principales del clínico
+    assert todos[o]['auc'] is None and todos[o]['metricas'] == {}
+    assert {x['id'] for x in cliente.get('/api/entrenamientos/banco?mios=true', headers=h).json()} == {b}
+    assert {x['id'] for x in cliente.get('/api/entrenamientos/banco?visibilidad=oficial', headers=h).json()} == {o}
+    assert {x['id'] for x in cliente.get('/api/entrenamientos/banco?visibilidad=personal', headers=h).json()} == {a, b}
+    dueno_a = todos[a]['propietario_id']
+    assert dueno_a and {x['id'] for x in cliente.get(f'/api/entrenamientos/banco?propietario_id={dueno_a}',
+                                                     headers=h).json()} == {a}
+
+
+def test_banco_avisa_cuando_se_acerca_el_borrado(cliente, personas):
+    from maia_comun import db
+    from maia_comun import ejecuciones as EJ
+    from maia_comun.modelos_db import Ejecucion
+    viejo = _entrenar(cliente, personas['a']).json()['id']
+    _terminar(viejo, corte='2026-06-30')
+    with db.fabrica()() as s:
+        s.execute(update(Ejecucion).where(Ejecucion.id == viejo).values(terminada=EJ.ahora() - timedelta(days=85)))
+        s.commit()
+    item = next(x for x in cliente.get('/api/entrenamientos/banco', headers=personas['a']).json() if x['id'] == viejo)
+    assert item['vence_en_dias'] == 5
+
+
+def _con_modelo(cliente, h, tipo: str, version: str, visibilidad: str = 'personal'):
+    from maia_comun import db
+    from maia_comun.modelos_db import Ejecucion
+    eid = _entrenar(cliente, h, nombre='Con versión').json()['id']
+    with db.fabrica()() as s:
+        e = s.get(Ejecucion, eid)
+        e.parametros = {**e.parametros, 'visibilidad': visibilidad}
+        s.commit()
+    _terminar(eid, corte='2026-06-30', modelos={tipo: {'registro': f'maia-{tipo}-demo', 'version': version}})
+    return eid
+
+
+def test_aprobar_rechaza_versiones_personales(cliente, admin, personas):
+    _con_modelo(cliente, personas['a'], 'clinico', '41')
+    r = cliente.post('/api/entrenamientos/aprobar', headers=admin,
+                     json={'fuente': 'simulado', 'anomalias': '40', 'clinico': '41'})
+    assert r.status_code == 409 and 'modelo personal' in r.json()['detail'] and 'clínico' in r.json()['detail']
+    assert cliente.post('/api/entrenamientos/aprobar', headers=personas['a'],
+                        json={'fuente': 'simulado', 'anomalias': '40', 'clinico': '41'}).status_code == 403
+    # una versión oficial sí se aprueba
+    _con_modelo(cliente, admin, 'clinico', '42', visibilidad='oficial')
+    r = cliente.post('/api/entrenamientos/aprobar', headers=admin,
+                     json={'fuente': 'simulado', 'anomalias': '40', 'clinico': '42'})
+    assert r.status_code == 202, r.text
+
+
+def test_aprobar_rechaza_alias_personal_de_mlflow(cliente, admin, monkeypatch):
+    from maia_api.rutas import entrenamientos as RE
+
+    class Lector:
+        def __init__(self, *a, **k): ...
+
+        def version(self, registro, numero):
+            return {'alias': ['personal'] if numero == '51' else ['candidato'], 'etiquetas': {}}
+
+    monkeypatch.setattr(RE.ML, 'Lector', Lector)
+    assert cliente.post('/api/entrenamientos/aprobar', headers=admin,
+                        json={'fuente': 'simulado', 'anomalias': '50', 'clinico': '51'}).status_code == 409
+    assert cliente.post('/api/entrenamientos/aprobar', headers=admin,
+                        json={'fuente': 'simulado', 'anomalias': '50', 'clinico': '52'}).status_code == 202
+
+
+def test_listar_de_mlflow_filtra_por_dueno_y_visibilidad(cliente, admin, monkeypatch):
+    from maia_api.rutas import entrenamientos as RE
+    vistos = []
+
+    class Lector:
+        def __init__(self, *a, **k): ...
+
+        def entrenamientos(self, tipo, fuente=None, limite=50, propietario=None, visibilidad=None):
+            vistos.append((tipo, propietario, visibilidad))
+            return []
+
+    monkeypatch.setattr(RE.ML, 'Lector', Lector)
+    uid = '00000000-0000-0000-0000-000000000001'
+    assert cliente.get(f'/api/entrenamientos?propietario={uid}&visibilidad=personal', headers=admin).status_code == 200
+    assert ('clinico', uid, 'personal') in vistos
+    assert cliente.get('/api/entrenamientos?propietario=x', headers=admin).status_code == 422

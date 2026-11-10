@@ -225,10 +225,13 @@ def _leer_sql(conexion, sql: str, params: dict) -> pd.DataFrame:
     return pd.read_sql_query(text(sql), conexion, params=params)
 
 
-def leer_de_db(motor: Engine, corte_id: int, sujetos: list[str] | None = None) -> Sevarti:
-    """El ``Sevarti`` de un corte guardado; con ``sujetos``, solo esos niños (el esquema y las etapas completos)."""
+def leer_de_db(motor: Engine, corte_id: int, sujetos: list[str] | None = None,
+               variables: list[str] | None = None) -> Sevarti:
+    """El ``Sevarti`` de un corte guardado; con ``sujetos``, solo esos niños (el esquema y las etapas completos) y con
+    ``variables``, solo las mediciones de esas variables (sin episodios): lo que necesita un filtro, no el niño entero."""
     filtro = ' AND sujeto = ANY(:sujetos)' if sujetos is not None else ''
-    p = {'c': corte_id, 'sujetos': list(sujetos) if sujetos is not None else None}
+    p = {'c': corte_id, 'sujetos': list(sujetos) if sujetos is not None else None, 'variables': variables}
+    solo = ' AND variable = ANY(:variables)' if variables is not None else ''
     with motor.connect() as cx:
         corte = cx.execute(text('SELECT fecha_corte FROM sevarti.cortes WHERE id = :c'), {'c': corte_id}).scalar_one()
         esq = _leer_sql(cx, 'SELECT variable, datos FROM sevarti.esquema WHERE corte_id = :c ORDER BY variable', p)
@@ -237,9 +240,9 @@ def leer_de_db(motor: Engine, corte_id: int, sujetos: list[str] | None = None) -
         sujetos_df = _leer_sql(cx, 'SELECT sujeto, grupo, fecha_nacimiento, anio_nacimiento, eg_semanas '
                                    f'FROM sevarti.sujetos WHERE corte_id = :c{filtro} ORDER BY sujeto', p)
         med = _leer_sql(cx, 'SELECT sujeto, variable, valor, fecha, edad_dias FROM sevarti.mediciones '
-                            f'WHERE corte_id = :c{filtro} ORDER BY id', p)
+                            f'WHERE corte_id = :c{filtro}{solo} ORDER BY id', p)
         epi = _leer_sql(cx, 'SELECT sujeto, tipo, edad_inicio, edad_fin FROM sevarti.episodios '
-                            f'WHERE corte_id = :c{filtro} ORDER BY id', p)
+                            f'WHERE corte_id = :c{filtro}{" AND FALSE" if variables is not None else ""} ORDER BY id', p)
         qui = _leer_sql(cx, 'SELECT quiebre, fecha FROM sevarti.quiebres WHERE corte_id = :c ORDER BY fecha', p)
     esquema = pd.DataFrame([{'variable': v, **(d if isinstance(d, dict) else json.loads(d))}
                             for v, d in zip(esq.variable, esq.datos)])

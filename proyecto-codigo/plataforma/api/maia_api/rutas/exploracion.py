@@ -22,10 +22,17 @@ from maia_comun.modelos_muestras import Muestra
 ruta = APIRouter(prefix='/exploracion', tags=['exploracion'])
 
 
+class VariableExtra(BaseModel):
+    """Una variable que se agregó al panel de filtros y la regla con que se lee (D1)."""
+    variable: str
+    cuando: str | None = None
+
+
 class Consulta(BaseModel):
     muestra: dict | None = None
     muestra_id: int | None = None
     corrida_id: int | None = None
+    variables: list[VariableExtra] | None = None   # solo para /facetas: variables agregadas sin filtro todavía
 
 
 def _definicion(s: Session, c: Consulta) -> dict:
@@ -41,6 +48,27 @@ def _filas(s: Session, sql: str, **p) -> list[dict]:
     return [dict(r._mapping) for r in s.execute(text(sql), p)]
 
 
+def _muestreo(s: Session, corte_id: int, defn: dict, redondear: bool) -> dict | None:
+    """Si la muestra trae tope por categoría: con cuántos niños se entrenaría. Las cifras de Explorar son las del
+    grupo completo; el tope se aplica al entrenar."""
+    mu = M.normalizar(defn)['muestreo']
+    if mu.get('modo') != 'estratificado':
+        return None
+    con = len(P.ids_de(s, corte_id, defn, muestreo=True))
+    return {'modo': 'estratificado', 'por': mu.get('por'), 'maximo_por_categoria': mu.get('maximo_por_categoria'),
+            'ninos': P.proteger(con, redondear) if con >= P.MIN_NINOS else None}
+
+
+def _datos(s: Session, corrida, ids: list[str] | None) -> int:
+    """«Datos leídos» con la misma definición que el Tablero (todas las filas de mediciones del corte, ``len(sev.
+    mediciones)``): sin filtro es la cifra de la corrida; con filtro, las filas de esos niños."""
+    if ids is None and (corrida.resumen or {}).get('datos') is not None:
+        return int(corrida.resumen['datos'])
+    return int(s.execute(text('SELECT count(*) FROM sevarti.mediciones WHERE corte_id = :k'
+                              + (' AND sujeto = ANY(:ids)' if ids is not None else '')),
+                         {'k': corrida.corte_id, **({'ids': ids} if ids is not None else {})}).scalar_one())
+
+
 @ruta.post('/resumen')
 def resumen(consulta: Consulta, s: Session = Depends(sesion), u: Usuario = Depends(CUALQUIERA)) -> dict:
     corrida = corrida_de(s, consulta.corrida_id)
@@ -50,8 +78,10 @@ def resumen(consulta: Consulta, s: Session = Depends(sesion), u: Usuario = Depen
     ids = P.ids_de(s, corrida.corte_id, defn, muestreo=False)
     auditar(s, u, 'exploracion.consultar', f'corrida:{corrida.id}', {'huella': M.huella(ids), 'n': len(ids)})
     s.commit()
+    if not ids:   # un cero es un cero: ningún niño cumple, y la pantalla lo dice con esas palabras
+        return {'insuficiente': True, 'vacio': True, 'ninos': 0, 'minimo': P.MIN_NINOS}
     if len(ids) < P.MIN_NINOS:
-        return {'insuficiente': True, 'ninos': None, 'minimo': P.MIN_NINOS}
+        return {'insuficiente': True, 'vacio': False, 'ninos': None, 'minimo': P.MIN_NINOS}
     red = u.rol == 'visualizador'
     filtrado = not P.sin_filtros(defn)
     de = ' AND sujeto = ANY(:ids)' if filtrado else ''
@@ -76,9 +106,7 @@ def resumen(consulta: Consulta, s: Session = Depends(sesion), u: Usuario = Depen
     pct_bajo = s.execute(text(f"""
         SELECT 100.0 * avg(CASE WHEN bajo_2de THEN 1 ELSE 0 END) FROM resultados.crecimiento
         WHERE corrida_id = :c AND NOT improbable{de}"""), p).scalar_one()
-    datos = s.execute(text('SELECT coalesce(sum(n_datos), 0) FROM sevarti.resumen_sujeto WHERE corte_id = :k'
-                           + (' AND sujeto = ANY(:ids)' if filtrado else '')),
-                      {'k': corrida.corte_id, **({'ids': ids} if filtrado else {})}).scalar_one()
+    datos = _datos(s, corrida, ids if filtrado else None)
 
     if filtrado:   # D4: ningún desenlace ni visita con menos de 5 niños o datos
         riesgos = [f for f in riesgos if f['ninos'] >= P.MIN_OPCION]
@@ -105,13 +133,14 @@ def resumen(consulta: Consulta, s: Session = Depends(sesion), u: Usuario = Depen
         'riesgos_por_desenlace': riesgos, 'crecimiento_por_etapa': crec,
         'pct_crecimiento_bajo': float(pct_bajo) if pct_bajo is not None else None,
         'distribuciones': P.distribuciones(cat, ids),
+        'muestreo': _muestreo(s, corrida.corte_id, defn, red),
     }
 
 
 @ruta.post('/facetas')
 def facetas(consulta: Consulta, s: Session = Depends(sesion), u: Usuario = Depends(CUALQUIERA)) -> dict:
     """Las opciones de filtro con cuántos niños tendría cada una (los demás filtros puestos). Con menos de 20 niños en
-    el grupo no se dan cifras: quedan las opciones para poder quitar o cambiar filtros."""
+    el grupo no se dan cifras: quedan las opciones para poder quitar o cambiar filtros. Con 0 niños se dice (``vacio``)."""
     try:
         corte = corrida_de(s, consulta.corrida_id).corte_id
     except HTTPException:
@@ -120,9 +149,11 @@ def facetas(consulta: Consulta, s: Session = Depends(sesion), u: Usuario = Depen
         corte = P.corte_actual(s).id
     red = u.rol == 'visualizador'
     try:
-        r = P.facetas(s, corte, _definicion(s, consulta), redondear=red)
+        r = P.facetas(s, corte, _definicion(s, consulta), redondear=red,
+                      extra=[v.model_dump() for v in consulta.variables or []])
     except M.MuestraInvalida as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, ' '.join(e.errores)) from None
+    vacio = r['n'] == 0
     insuficiente = r['n'] < P.MIN_NINOS
     if insuficiente:
         for f in r['facetas'].values():
@@ -130,7 +161,7 @@ def facetas(consulta: Consulta, s: Session = Depends(sesion), u: Usuario = Depen
                 o['n'], o['texto'] = None, '—'
             f.pop('bins', None)
             f.pop('cifra', None)
-        r['n'] = None
+        r['n'] = 0 if vacio else None
     else:
         r['n'] = P.proteger(r['n'], red)
-    return {**r, 'insuficiente': insuficiente, 'minimo': P.MIN_NINOS}
+    return {**r, 'insuficiente': insuficiente, 'vacio': vacio, 'minimo': P.MIN_NINOS}

@@ -102,3 +102,51 @@ describe('Mis modelos', () => {
     expect(JSON.parse(String(llamadas.find((l) => l.url === '/api/entrenamientos/entrenar')?.init?.body))).toMatchObject({ muestra_id: 11 })
   })
 })
+
+describe('Mis modelos: banco con medidas, filtros por dueño y límites del admin', () => {
+  const banco2 = [
+    { ...banco[0], id: 9, propietario: 'Ana', propietario_id: 'ana', propia: false, metricas: { clinico: { auc: 0.81, pr_auc: 0.32 } }, vence_en_dias: 5 },
+    { ...banco[0], id: 10, propietario: 'Persona experto', propietario_id: 'yo', propia: true, nombre: 'El mío', auc: null, corte_anterior: false },
+    { ...banco[0], id: 11, propietario: 'Admin', propietario_id: 'adm', visibilidad: 'oficial', nombre: 'Oficial base', auc: 0.9, corte_anterior: false, propia: false },
+  ]
+  const conBanco = (rol: 'admin' | 'experto') => (url: string, init?: { method?: string; body?: unknown }) =>
+    url === '/api/entrenamientos/banco' ? { cuerpo: banco2 }
+      : url === '/api/entrenamientos/cuotas' ? (init?.method === 'PUT' ? { cuerpo: JSON.parse(String(init.body)) } : { cuerpo: { cola_max: 1, modelos_max: 3, dias_sin_uso: 90, dias_aviso: 14 } })
+        : api(rol)(url)
+
+  it('muestra otras medidas, el aviso de borrado y filtra por etiqueta y por dueño', async () => {
+    simularApi(conBanco('experto'))
+    montar('/mis-modelos')
+    expect(await screen.findByText('Precisión promedio: 0.32')).toBeInTheDocument()
+    expect(screen.getByText('Se borra en 5 días si no se usa')).toBeInTheDocument()
+    expect(screen.getByText('Oficial base')).toBeInTheDocument()
+    await userEvent.selectOptions(screen.getByLabelText('Mostrar'), 'mios')
+    expect(screen.getByText('El mío')).toBeInTheDocument()
+    expect(screen.queryByText('Oficial base')).toBeNull()
+    await userEvent.selectOptions(screen.getByLabelText('Mostrar'), 'oficial')
+    expect(screen.getByText('Oficial base')).toBeInTheDocument()
+    expect(screen.queryByText('El mío')).toBeNull()
+    await userEvent.selectOptions(screen.getByLabelText('Mostrar'), 'todos')
+    await userEvent.selectOptions(screen.getByLabelText('Dueño'), 'ana')
+    expect(screen.queryByText('Oficial base')).toBeNull()
+    expect(screen.queryByText('El mío')).toBeNull()
+  })
+
+  it('el experto no ve los límites editables; el admin los cambia', async () => {
+    simularApi(conBanco('experto'))
+    montar('/mis-modelos')
+    await screen.findByText('Mi prueba')
+    expect(screen.queryByRole('button', { name: 'Guardar límites' })).toBeNull()
+  })
+
+  it('el admin guarda los límites', async () => {
+    const llamadas = simularApi(conBanco('admin'))
+    montar('/mis-modelos')
+    const dias = await screen.findByLabelText('Días sin uso antes de borrar')
+    await userEvent.clear(dias)
+    await userEvent.type(dias, '60')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar límites' }))
+    await waitFor(() => expect(llamadas.some((l) => l.url === '/api/entrenamientos/cuotas' && l.init?.method === 'PUT')).toBe(true))
+    expect(JSON.parse(String(llamadas.find((l) => l.init?.method === 'PUT')?.init?.body))).toMatchObject({ dias_sin_uso: 60, cola_max: 1 })
+  })
+})

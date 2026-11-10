@@ -51,6 +51,9 @@ def _sevarti_base(sev: Sevarti, destino: Path) -> Path:
     destino.mkdir(parents=True, exist_ok=True)
     for t in ('esquema', 'etapas', 'quiebres'):
         getattr(sev, t).to_parquet(destino / f'{t}.parquet', index=False)
+    # los niños con que se entrena: Predicción compara su muestra con esta lista para avisar de la fuga (solo códigos)
+    pd.DataFrame({'sujeto': sorted(sev.sujetos.sujeto.astype(str).unique())}).to_parquet(
+        destino / 'ninos_entrenamiento.parquet', index=False)
     (destino / 'corte.json').write_text(json.dumps({'corte': None if sev.corte is None else str(sev.corte.date())}),
                                         encoding='utf-8')
     return destino

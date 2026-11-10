@@ -124,6 +124,26 @@ def test_el_filtro_de_sede_y_el_de_eg_semanas_usan_los_datos_del_niño(sev):
     assert n_eg == int((sev.sujetos.eg_semanas <= 30).sum())
 
 
+def test_categorias_de_edad_gestacional_son_tramos_propios(sev):
+    eg = sev.sujetos.set_index('sujeto').eg_semanas
+    cat = eg.map(M.categoria_eg)
+    assert set(cat.dropna()) == set(M.NOMBRES_EG)
+    dos = M.ids(sev, _muestra(_y('eg_categoria', 'lista', ['muy_prematuro', 'a_termino'])))
+    assert sorted(dos) == sorted(cat.index[cat.isin(['muy_prematuro', 'a_termino'])])
+    assert not set(dos) & set(cat.index[cat == 'moderado_tardio'])
+    # los cortes: 28, 32 y 37 semanas empiezan la categoría siguiente
+    assert [M.categoria_eg(x) for x in (27.99, 28, 31.999, 32, 36.999, 37, 41)] == [
+        'extremo', 'muy_prematuro', 'muy_prematuro', 'moderado_tardio', 'moderado_tardio', 'a_termino', 'a_termino']
+    assert M.categoria_eg(None) is None and M.categoria_eg(float('nan')) is None and M.categoria_eg('x') is None
+    assert any('casi' in e for e in M.validar(_muestra(_y('eg_categoria', 'lista', ['casi'])), sev.esquema))
+    assert any('lista' in e for e in M.validar(_muestra(_y('eg_categoria', 'numero', [28, 32])), sev.esquema))
+    # y se puede estratificar por ella
+    est = _muestra(muestreo={'modo': 'estratificado', 'por': 'eg_categoria', 'maximo_por_categoria': 25, 'semilla': 1})
+    assert M.validar(est, sev.esquema) == []
+    elegidos = M.ids(sev, est)
+    assert max(cat.reindex(elegidos).value_counts().max(), 0) <= 25
+
+
 def test_codigo_especial_no_cuenta_como_dato(sev):
     h = sev.mediciones[sev.mediciones.variable == 'hematocrito']
     sin_hecho = h[h.valor.astype(float) == -1]

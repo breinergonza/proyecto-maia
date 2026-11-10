@@ -125,6 +125,9 @@ def registrar(tipo: str, fuente: str, carpeta_modelo: Path, cfg, metricas: dict[
         cliente.set_registered_model_alias(nombre_registro, _alias_inicial(), version.version)
         cliente.set_model_version_tag(nombre_registro, version.version, 'version_modelo', ficha['version'])
         cliente.set_model_version_tag(nombre_registro, version.version, 'fuente', fuente)
+        for k, v in _etiquetas_ejecucion().items():     # propietario y visibilidad también en la versión registrada
+            if k in ('propietario', 'visibilidad'):
+                cliente.set_model_version_tag(nombre_registro, version.version, k, v)
         return cliente.get_model_version(nombre_registro, version.version)
 
 
@@ -143,6 +146,33 @@ def version(nombre_registro: str, alias_o_numero: str) -> ModelVersion:
     if alias_o_numero.isdigit():
         return cliente.get_model_version(nombre_registro, alias_o_numero)
     return cliente.get_model_version_by_alias(nombre_registro, alias_o_numero)
+
+
+def metricas_de(nombre_registro: str, numero: str) -> dict[str, float]:
+    """Las métricas del run que produjo la versión (para mostrar AUC y demás en el banco de modelos)."""
+    cliente = MlflowClient()
+    mv = cliente.get_model_version(nombre_registro, str(numero))
+    return dict(cliente.get_run(mv.run_id).data.metrics)
+
+
+def borrar_version(nombre_registro: str, numero: str) -> bool:
+    """Borra una versión del Model Registry y su run. No toca una versión con alias ``produccion`` ni ``candidato``
+    (aprobada o por aprobar): devuelve ``False``. Una versión que ya no existe cuenta como borrada."""
+    cliente = MlflowClient()
+    try:
+        mv = cliente.get_model_version(nombre_registro, str(numero))
+        rm = cliente.get_registered_model(nombre_registro)
+    except mlflow.exceptions.MlflowException:
+        return True
+    alias = {a for a, v in (rm.aliases or {}).items() if str(v) == str(mv.version)}
+    if alias & {ALIAS_PRODUCCION, ALIAS_CANDIDATO}:
+        return False
+    cliente.delete_model_version(nombre_registro, str(numero))
+    try:
+        cliente.delete_run(mv.run_id)
+    except mlflow.exceptions.MlflowException:
+        pass
+    return True
 
 
 def promover(nombre_registro: str, numero: str, alias: str = ALIAS_PRODUCCION) -> ModelVersion:

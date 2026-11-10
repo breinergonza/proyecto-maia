@@ -60,7 +60,7 @@ export default function Perfiles() {
                 filas: filas.map((f) => ({ perfil: f.etiqueta, ninos: f.oculto ? N_MENOR_QUE_5 : f.n, con_riesgo_alto_pct: f.oculto || f.tasa == null ? null : Math.round(1000 * f.tasa) / 10,
                   eg_media_semanas: f.eg_media ?? null, peso_medio: f.peso_medio ?? null })),
               }}>
-                <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{filas.map((f) => <Tarjeta key={f.categoria} f={f} unidadPeso={unidad} />)}</ul>
+                <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{filas.map((f) => <Tarjeta key={f.categoria} f={f} unidadPeso={unidad} />)}</ul>
                 <p className="mt-3 text-xs text-salvia">Con riesgo alto: {r.tasa_significa ?? 'proporción de niños con riesgo alto del desenlace elegido'}. {dDist.descripcion}</p>
                 {(r.categorias_ocultas ?? 0) > 0 && <p className="mt-1 text-xs text-salvia">{r.categorias_ocultas} categoría(s): {N_MENOR_QUE_5}.</p>}
               </Grafica>

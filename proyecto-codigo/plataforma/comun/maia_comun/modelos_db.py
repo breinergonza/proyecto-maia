@@ -442,3 +442,4 @@ class Notificacion(Base):
 ESQUEMAS = ('sevarti', 'resultados', 'app')
 import maia_comun.modelos_analitica  # noqa: E402,F401  (registra la tabla de analítica en la metadata)
 import maia_comun.modelos_muestras  # noqa: E402,F401  (registra las tablas de muestras en la metadata)
+import maia_comun.prediccion_modelos  # noqa: E402,F401  (registra las tablas de Predicción en la metadata)

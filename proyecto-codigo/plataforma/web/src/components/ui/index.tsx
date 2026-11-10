@@ -30,7 +30,7 @@ export const Boton = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButt
 )
 
 const control =
-  'w-full rounded-control border border-linea bg-papel px-3.5 text-base text-tinta shadow-suave transition-[border-color,box-shadow] duration-200 placeholder:text-salvia/60 hover:border-teal/30 focus:border-teal focus:outline-none focus-visible:outline-none focus:ring-4 focus:ring-teal/10 aria-[invalid=true]:border-coral-hondo aria-[invalid=true]:focus:ring-coral/15'
+  'w-full rounded-control border border-linea bg-papel px-3.5 text-base text-tinta shadow-suave transition-[border-color,box-shadow] duration-200 placeholder:text-salvia hover:border-teal/30 focus:border-teal focus:outline-none focus-visible:outline-none focus:ring-4 focus:ring-teal/10 aria-[invalid=true]:border-coral-hondo aria-[invalid=true]:focus:ring-coral/15'
 
 export const Entrada = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Entrada(
   { className, ...p }, ref) {
@@ -55,7 +55,7 @@ export function Campo({ etiqueta, error, aviso, ayuda, children, id }: {
       <label htmlFor={id} className="text-sm font-semibold text-tinta/90">{etiqueta}</label>
       {children}
       {/* aviso: el valor se puede guardar, pero conviene revisarlo */}
-      {!error && aviso && <p className="text-sm font-semibold text-ocre">{aviso}</p>}
+      {!error && aviso && <p className="text-sm font-semibold text-ocre-hondo">{aviso}</p>}
       {error ? <p className="text-sm text-coral-hondo" role="alert">{error}</p>
         : ayuda ? <p className="text-sm text-salvia">{ayuda}</p> : null}
     </div>
@@ -72,13 +72,13 @@ export function Panel({ titulo, descripcion, accion, children, className, llenar
       className={cn('animate-aparecer rounded-panel border border-linea/80 bg-papel shadow-suave',
         llenar && 'flex min-h-0 flex-col', className)}>
       {(titulo || accion) && (
-        <header className={cn('flex flex-wrap items-center justify-between gap-2 px-4 pt-4', llenar ? 'shrink-0 sm:px-5' : 'sm:px-6 sm:pt-5')}>
+        <header className={cn('flex flex-wrap items-center justify-between gap-2 px-4 pt-4', llenar ? 'shrink-0 sm:px-5' : 'sm:px-5')}>
           {typeof titulo === 'string' ? <h2 className="text-base">{titulo}</h2> : titulo}
           {accion}
         </header>
       )}
-      {descripcion && <p id={idDescripcion} className={cn('px-4 pt-1 text-sm text-salvia', llenar ? 'shrink-0 sm:px-5' : 'sm:px-6')}>{descripcion}</p>}
-      <div className={llenar ? 'min-h-0 flex-1 overflow-auto p-4 sm:px-5' : 'p-4 sm:p-6'}>{children}</div>
+      {descripcion && <p id={idDescripcion} className={cn('px-4 pt-1 text-sm text-salvia sm:px-5', llenar && 'shrink-0')}>{descripcion}</p>}
+      <div className={llenar ? 'min-h-0 flex-1 overflow-auto p-4 sm:px-5' : 'p-4 sm:p-5'}>{children}</div>
     </section>
   )
 }
@@ -132,7 +132,7 @@ export function Tabla({ children, className, densa, apilar }: { children: ReactN
   }, [apilar])
   return (
     <div className={cn('-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0', apilar && 'tabla-apilada', className)}>
-      <table ref={ref} className={cn(densa ? '[&_td]:px-2.5 [&_td]:py-1.5 [&_td]:leading-snug [&_th]:px-2.5' : '[&_td]:px-3 [&_td]:py-3 [&_th]:px-3',
+      <table ref={ref} className={cn(densa ? '[&_td]:px-2.5 [&_td]:py-1.5 [&_td]:leading-snug [&_th]:px-2.5' : '[&_td]:px-3 [&_td]:py-3 lg:[&_td]:py-2 [&_th]:px-3',
         'w-full border-collapse text-sm [&_td]:border-b [&_td]:border-linea/70 [&_th]:border-b [&_th]:border-linea [&_th]:pb-2.5 [&_th]:pt-1 [&_th:not(.text-right)]:text-left [&_th]:text-xs [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-salvia [&_th]:whitespace-nowrap [&_tbody_tr]:transition-colors [&_tbody_tr:hover]:bg-teal-tinte/40 [&_tbody_tr:last-child_td]:border-b-0')}>
         {children}
       </table>
@@ -199,8 +199,8 @@ export function Paginador({ pagina, tamano, total, cambiar }: {
 
 export function Encabezado({ titulo, children, accion }: { titulo: string; children?: ReactNode; accion?: ReactNode }) {
   return (
-    <div className="mb-4 flex animate-aparecer flex-wrap items-end justify-between gap-3 lg:mb-5">
-      <div className="max-w-[90ch]">
+    <div className="mb-4 flex animate-aparecer flex-wrap items-end justify-between gap-3 lg:mb-3">
+      <div className="max-w-[110ch]">
         <h1>{titulo}</h1>
         {children && <p className="mt-1 text-sm text-salvia">{children}</p>}
       </div>

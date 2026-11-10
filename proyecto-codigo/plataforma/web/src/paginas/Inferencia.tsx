@@ -135,14 +135,14 @@ export default function Inferencia() {
   if (activo.data === null) {
     return (
       <>
-        <Encabezado titulo="Calcular el riesgo de un niño" />
+        <Encabezado titulo="Predicción: un niño" />
         <Vacio titulo="No hay un paquete de modelos activo"><ActivarModelo admin={puede(usuario, ['admin'])} /></Vacio>
       </>
     )
   }
   return (
     <>
-      <Encabezado titulo="Calcular el riesgo de un niño"
+      <Encabezado titulo="Predicción: un niño"
         accion={puede(usuario, ['admin']) && (
           <Boton chico variante="fantasma" onClick={() => { setAvanzado((a) => !a); calcular.reset() }} aria-pressed={avanzado}>
             {avanzado ? 'Volver al formulario' : 'Modo avanzado (JSON)'}

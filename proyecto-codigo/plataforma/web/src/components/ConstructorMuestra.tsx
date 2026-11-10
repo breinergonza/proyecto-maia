@@ -136,7 +136,7 @@ export function ConstructorMuestra({ fuente, nombre, bloqueado, alTerminar, alCe
                 : n !== undefined && (
                   <div className="mt-1 flex flex-wrap items-end gap-6">
                     <Cifra valor={num(n)} texto={`de ${num(conteo.data!.n_base)} niños`} />
-                    <ul className="flex-1 space-y-1 text-sm text-ocre">{avisos.map((a) => <li key={a}>{a}</li>)}</ul>
+                    <ul className="flex-1 space-y-1 text-sm text-ocre-hondo">{avisos.map((a) => <li key={a}>{a}</li>)}</ul>
                   </div>
                 )}
           </section>

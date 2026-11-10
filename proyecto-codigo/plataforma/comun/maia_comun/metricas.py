@@ -104,3 +104,18 @@ def filas_metricas(ficha_anomalias: dict | None, ficha_clinica: dict | None,
             filas.append(dict(modelo='clinico', version=ficha_clinica['version'], clave=clave or '-',
                               metrica=metrica, valor=v))
     return filas
+
+
+PRINCIPALES = {'clinico': ('auc', 'pr_auc', 'top10'), 'anomalias': ('detectados_pct', 'falsas_por_1000')}
+
+
+def principales(tipo: str, metricas: dict[str, float]) -> dict[str, float]:
+    """Las métricas que se muestran en el banco de modelos: el promedio por desenlace de AUC, precisión promedio y
+    casos en el riesgo más alto (clínico), o detectados y falsas por 1000 (anomalías). Nunca la regla simple."""
+    salida: dict[str, float] = {}
+    for base in PRINCIPALES.get(tipo, ()):
+        valores = [v for k, v in metricas.items() if k.partition('__')[0] == base and isinstance(v, (int, float))
+                   and v == v]
+        if valores:
+            salida[base] = round(sum(valores) / len(valores), 4)
+    return salida

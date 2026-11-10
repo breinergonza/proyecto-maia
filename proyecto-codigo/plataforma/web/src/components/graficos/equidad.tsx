@@ -2,6 +2,7 @@
 // dice «n menor que 5» en vez de una cifra (D4).
 import { cn } from '../../lib/cn'
 import { N_MENOR_QUE_5 } from '../../lib/lenguaje'
+import { GraficaNavegable, resumenDe } from './navegacion'
 
 export interface CeldaMapa { valor: number | null; texto: string; pequena?: boolean }
 export interface FilaMapa { etiqueta: string; celdas: CeldaMapa[] }
@@ -48,13 +49,16 @@ export function Bosque({ puntos, referencia, dominio = [0.4, 1], etiqueta, nombr
   const alto = arriba + fila * puntos.length + abajo
   const x = (v: number) => izq + ((Math.max(dominio[0], Math.min(dominio[1], v)) - dominio[0]) / (dominio[1] - dominio[0])) * (ancho - izq - der)
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => dominio[0] + t * (dominio[1] - dominio[0]))
+  const fmt = (v: number) => v.toFixed(2).replace('.', ',')
+  const items = puntos.map((p) => `${p.etiqueta}. ` + (p.pequena ? N_MENOR_QUE_5 : p.valor == null ? (p.nota ?? 'Muy pocos niños para calcularlo')
+    : `${nombreValor} ${fmt(p.valor)}` + (p.bajo != null && p.alto != null ? `, entre ${fmt(p.bajo)} y ${fmt(p.alto)}` : '')))
   return (
-    <div className="overflow-x-auto">
-      <svg viewBox={`0 0 ${ancho} ${alto}`} role="figure" aria-label={etiqueta} className="h-auto w-full min-w-[34rem]">
+    <GraficaNavegable etiqueta={etiqueta} resumen={resumenDe('Bosque', puntos.length, ['grupo', 'grupos'])} items={items} className="overflow-x-auto">
+      <svg viewBox={`0 0 ${ancho} ${alto}`} aria-hidden className="h-auto w-full min-w-[34rem]">
         {ticks.map((t) => (
           <g key={t}>
             <line x1={x(t)} x2={x(t)} y1={arriba} y2={alto - abajo} stroke="var(--color-linea)" />
-            <text x={x(t)} y={alto - 8} textAnchor="middle" fontSize="11" fill="var(--color-salvia)">{t.toFixed(2).replace('.', ',')}</text>
+            <text x={x(t)} y={alto - 8} textAnchor="middle" fontSize="12" fill="var(--color-salvia)">{t.toFixed(2).replace('.', ',')}</text>
           </g>
         ))}
         {referencia != null && <line x1={x(referencia)} x2={x(referencia)} y1={arriba} y2={alto - abajo} stroke="var(--color-referencia)" strokeDasharray="4 3" strokeWidth="1.5" />}
@@ -62,9 +66,9 @@ export function Bosque({ puntos, referencia, dominio = [0.4, 1], etiqueta, nombr
           const y = arriba + fila * i + fila / 2
           return (
             <g key={p.etiqueta}>
-              <text x={izq - 8} y={y + 4} textAnchor="end" fontSize="12" fill="var(--color-tinta)">{p.etiqueta}</text>
-              {p.pequena ? <text x={izq + 8} y={y + 4} fontSize="11" fill="var(--color-salvia)">{N_MENOR_QUE_5}</text>
-                : p.valor == null ? <text x={izq + 8} y={y + 4} fontSize="11" fill="var(--color-salvia)">{p.nota ?? 'Muy pocos niños para calcularlo'}</text>
+              <text x={izq - 8} y={y + 4} textAnchor="end" fontSize="12.8" fill="var(--color-tinta)">{p.etiqueta}</text>
+              {p.pequena ? <text x={izq + 8} y={y + 4} fontSize="12" fill="var(--color-salvia)">{N_MENOR_QUE_5}</text>
+                : p.valor == null ? <text x={izq + 8} y={y + 4} fontSize="12" fill="var(--color-salvia)">{p.nota ?? 'Muy pocos niños para calcularlo'}</text>
                 : (
                   <>
                     {p.bajo != null && p.alto != null && <line x1={x(p.bajo)} x2={x(p.alto)} y1={y} y2={y} stroke="var(--color-serie-1)" strokeWidth="2" />}
@@ -77,6 +81,6 @@ export function Bosque({ puntos, referencia, dominio = [0.4, 1], etiqueta, nombr
           )
         })}
       </svg>
-    </div>
+    </GraficaNavegable>
   )
 }

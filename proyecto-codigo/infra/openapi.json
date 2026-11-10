@@ -2553,6 +2553,45 @@
        "default": 30,
        "title": "Limite"
       }
+     },
+     {
+      "name": "propietario",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Solo lo entrenado por esta persona.",
+       "title": "Propietario"
+      },
+      "description": "Solo lo entrenado por esta persona."
+     },
+     {
+      "name": "visibilidad",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "enum": [
+          "personal",
+          "oficial"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Visibilidad"
+      }
      }
     ],
     "responses": {
@@ -2651,6 +2690,78 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/EjecucionSalida"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/entrenamientos/cuotas": {
+   "get": {
+    "tags": [
+     "entrenamientos"
+    ],
+    "summary": "Ver Cuotas",
+    "description": "Los límites vigentes de Mis modelos (los cambia administración).",
+    "operationId": "ver_cuotas_api_entrenamientos_cuotas_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CuotasConfig"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   },
+   "put": {
+    "tags": [
+     "entrenamientos"
+    ],
+    "summary": "Cambiar Cuotas",
+    "description": "Administración cambia los límites de cola, modelos guardados y días sin uso; queda en la auditoría.",
+    "operationId": "cambiar_cuotas_api_entrenamientos_cuotas_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CuotasCambio"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CuotasConfig"
         }
        }
       }
@@ -2802,7 +2913,7 @@
      "entrenamientos"
     ],
     "summary": "Banco",
-    "description": "El banco compartido: entrenamientos terminados (oficiales y personales) con dueño, muestra y si su corte ya\nno es el vigente (D38). Lo ven administración y expertos.",
+    "description": "El banco compartido: entrenamientos terminados (oficiales y personales) con dueño, muestra, métricas\nprincipales y si su corte ya no es el vigente (D38). Filtros por dueño y por Personal u Oficial. Lo ven\nadministración y expertos.",
     "operationId": "banco_api_entrenamientos_banco_get",
     "security": [
      {
@@ -2820,6 +2931,57 @@
        "minimum": 1,
        "default": 100,
        "title": "Limite"
+      }
+     },
+     {
+      "name": "propietario_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Solo los de esta persona.",
+       "title": "Propietario Id"
+      },
+      "description": "Solo los de esta persona."
+     },
+     {
+      "name": "mios",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "description": "Solo los míos.",
+       "default": false,
+       "title": "Mios"
+      },
+      "description": "Solo los míos."
+     },
+     {
+      "name": "visibilidad",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "enum": [
+          "personal",
+          "oficial"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Visibilidad"
       }
      }
     ],
@@ -3402,6 +3564,226 @@
       "HTTPBearer": []
      }
     ]
+   }
+  },
+  "/api/analitica/comparar": {
+   "get": {
+    "tags": [
+     "analitica",
+     "analitica"
+    ],
+    "summary": "Entrenamientos",
+    "description": "Las medidas de A y B para un desenlace, con la diferencia de B frente a A y su intervalo del 95 % por réplicas;\nel rendimiento por subgrupo (sexo, edad gestacional, sede) con su diferencia; y las diferencias de la muestra.",
+    "operationId": "entrenamientos_api_analitica_comparar_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "a",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "title": "A"
+      }
+     },
+     {
+      "name": "b",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "title": "B"
+      }
+     },
+     {
+      "name": "desenlace",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "title": "Desenlace"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Entrenamientos Api Analitica Comparar Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/analitica/comparar/grupos": {
+   "post": {
+    "tags": [
+     "analitica",
+     "analitica"
+    ],
+    "summary": "Grupos",
+    "operationId": "grupos_api_analitica_comparar_grupos_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ComparaGrupos"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Grupos Api Analitica Comparar Grupos Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/analitica/riesgo-por-visita": {
+   "get": {
+    "tags": [
+     "analitica",
+     "analitica"
+    ],
+    "summary": "Riesgo Por Visita",
+    "description": "Por niño, sus puntos de riesgo en cada visita para el desenlace pedido y la primera visita con alerta\n(``percentil >= umbral``). Un niño que no está en el corte sale con ``error`` y los demás se calculan.",
+    "operationId": "riesgo_por_visita_api_analitica_riesgo_por_visita_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "desenlace",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 80,
+       "title": "Desenlace"
+      }
+     },
+     {
+      "name": "sujetos",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "códigos separados por coma; sin pedir, los de más riesgo",
+       "title": "Sujetos"
+      },
+      "description": "códigos separados por coma; sin pedir, los de más riesgo"
+     },
+     {
+      "name": "n",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 30,
+       "minimum": 1,
+       "default": 3,
+       "title": "N"
+      }
+     },
+     {
+      "name": "corrida_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Corrida Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Riesgo Por Visita Api Analitica Riesgo Por Visita Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
    }
   },
   "/api/analitica/entrenamientos": {
@@ -4176,7 +4558,7 @@
      "exploracion"
     ],
     "summary": "Facetas",
-    "description": "Las opciones de filtro con cuántos niños tendría cada una (los demás filtros puestos). Con menos de 20 niños en\nel grupo no se dan cifras: quedan las opciones para poder quitar o cambiar filtros.",
+    "description": "Las opciones de filtro con cuántos niños tendría cada una (los demás filtros puestos). Con menos de 20 niños en\nel grupo no se dan cifras: quedan las opciones para poder quitar o cambiar filtros. Con 0 niños se dice (``vacio``).",
     "operationId": "facetas_api_exploracion_facetas_post",
     "requestBody": {
      "content": {
@@ -4523,7 +4905,7 @@
      "predicción"
     ],
     "summary": "Predecir Nino",
-    "description": "Un niño nuevo: el ejemplo típico del subgrupo con los campos que el usuario cambió. Devuelve el riesgo por\ndesenlace con sus motivos, el perfil provisional y el riesgo visita por visita con la línea de alerta. No se guarda.",
+    "description": "Un niño nuevo: el ejemplo típico del subgrupo con los campos que el usuario cambió. Devuelve el riesgo por\ndesenlace con sus motivos, el perfil provisional y el riesgo visita por visita con la línea de alerta. No se guarda\n(para guardarlo: ``POST /prediccion/ninos-nuevos``).",
     "operationId": "predecir_nino_api_prediccion_nino_post",
     "requestBody": {
      "content": {
@@ -4564,6 +4946,406 @@
       "HTTPBearer": []
      }
     ]
+   }
+  },
+  "/api/prediccion/trabajos": {
+   "get": {
+    "tags": [
+     "predicción"
+    ],
+    "summary": "Mis Trabajos",
+    "description": "Los últimos cálculos de quien pregunta.",
+    "operationId": "mis_trabajos_api_prediccion_trabajos_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "additionalProperties": true,
+          "type": "object"
+         },
+         "type": "array",
+         "title": "Response Mis Trabajos Api Prediccion Trabajos Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   },
+   "post": {
+    "tags": [
+     "predicción"
+    ],
+    "summary": "Lanzar Trabajo",
+    "description": "Lanza el cálculo de una muestra o de todo el universo en un hilo de la API y devuelve su número; el avance se\nconsulta en ``GET /prediccion/trabajos/{id}``. Uno a la vez.",
+    "operationId": "lanzar_trabajo_api_prediccion_trabajos_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PeticionTrabajo"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "202": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Lanzar Trabajo Api Prediccion Trabajos Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/prediccion/trabajos/{pid}": {
+   "get": {
+    "tags": [
+     "predicción"
+    ],
+    "summary": "Estado Trabajo",
+    "description": "Estado y progreso; al terminar, los agregados (distribución, niveles, por desenlace, por visita y fuga).",
+    "operationId": "estado_trabajo_api_prediccion_trabajos__pid__get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "pid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Pid"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Estado Trabajo Api Prediccion Trabajos  Pid  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/prediccion/trabajos/{pid}/tabla": {
+   "get": {
+    "tags": [
+     "predicción"
+    ],
+    "summary": "Tabla Trabajo",
+    "description": "Una página de la tabla por niño, de mayor a menor riesgo. Vive en memoria una hora: después hay que recalcular.",
+    "operationId": "tabla_trabajo_api_prediccion_trabajos__pid__tabla_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "pid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Pid"
+      }
+     },
+     {
+      "name": "pagina",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "default": 1,
+       "title": "Pagina"
+      }
+     },
+     {
+      "name": "limite",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 200,
+       "minimum": 1,
+       "default": 200,
+       "title": "Limite"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Tabla Trabajo Api Prediccion Trabajos  Pid  Tabla Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/prediccion/ninos-nuevos": {
+   "post": {
+    "tags": [
+     "predicción"
+    ],
+    "summary": "Guardar Nino",
+    "description": "Guarda un niño inventado (o una plantilla de un perfil) en ``app.ninos_nuevos``: aparte del corte oficial. Se\nguardan la visita, el perfil, lo que se cambió, el niño completo y su riesgo de ese momento.",
+    "operationId": "guardar_nino_api_prediccion_ninos_nuevos_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PeticionGuardarNino"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Guardar Nino Api Prediccion Ninos Nuevos Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "predicción"
+    ],
+    "summary": "Listar Ninos",
+    "description": "Las plantillas (de todos los expertos) y los niños guardados propios (administración ve todos).",
+    "operationId": "listar_ninos_api_prediccion_ninos_nuevos_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "tipo",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "enum": [
+          "nino",
+          "plantilla"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Tipo"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "additionalProperties": true
+         },
+         "title": "Response Listar Ninos Api Prediccion Ninos Nuevos Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/prediccion/ninos-nuevos/{nid}": {
+   "get": {
+    "tags": [
+     "predicción"
+    ],
+    "summary": "Ver Nino",
+    "operationId": "ver_nino_api_prediccion_ninos_nuevos__nid__get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "nid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Nid"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Ver Nino Api Prediccion Ninos Nuevos  Nid  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "predicción"
+    ],
+    "summary": "Borrar Nino",
+    "operationId": "borrar_nino_api_prediccion_ninos_nuevos__nid__delete",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "nid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Nid"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
    }
   }
  },
@@ -5109,6 +5891,44 @@
     ],
     "title": "ColumnaVista"
    },
+   "ComparaGrupos": {
+    "properties": {
+     "a": {
+      "$ref": "#/components/schemas/LadoGrupo"
+     },
+     "b": {
+      "$ref": "#/components/schemas/LadoGrupo"
+     },
+     "corrida_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Corrida Id"
+     },
+     "desenlace": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Desenlace"
+     }
+    },
+    "type": "object",
+    "required": [
+     "a",
+     "b"
+    ],
+    "title": "ComparaGrupos"
+   },
    "ConexionEntrada": {
     "properties": {
      "host": {
@@ -5344,6 +6164,20 @@
        }
       ],
       "title": "Corrida Id"
+     },
+     "variables": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/VariableExtra"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Variables"
      }
     },
     "type": "object",
@@ -5507,6 +6341,93 @@
      "silencio"
     ],
     "title": "CorridaSalida"
+   },
+   "CuotasCambio": {
+    "properties": {
+     "cola_max": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "maximum": 50.0,
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cola Max"
+     },
+     "modelos_max": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "maximum": 200.0,
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Modelos Max"
+     },
+     "dias_sin_uso": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "maximum": 3650.0,
+        "minimum": 1.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Dias Sin Uso"
+     },
+     "dias_aviso": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "maximum": 365.0,
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Dias Aviso"
+     }
+    },
+    "type": "object",
+    "title": "CuotasCambio"
+   },
+   "CuotasConfig": {
+    "properties": {
+     "cola_max": {
+      "type": "integer",
+      "title": "Cola Max"
+     },
+     "modelos_max": {
+      "type": "integer",
+      "title": "Modelos Max"
+     },
+     "dias_sin_uso": {
+      "type": "integer",
+      "title": "Dias Sin Uso"
+     },
+     "dias_aviso": {
+      "type": "integer",
+      "title": "Dias Aviso"
+     }
+    },
+    "type": "object",
+    "required": [
+     "cola_max",
+     "modelos_max",
+     "dias_sin_uso",
+     "dias_aviso"
+    ],
+    "title": "CuotasConfig",
+    "description": "Los límites de Mis modelos que administra el admin (tabla ``app.cuotas_config``)."
    },
    "DiferenciasDiccionario": {
     "properties": {
@@ -6391,6 +7312,39 @@
       "type": "boolean",
       "title": "Descartado",
       "default": false
+     },
+     "propietario_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Propietario Id"
+     },
+     "metricas": {
+      "additionalProperties": {
+       "additionalProperties": {
+        "type": "number"
+       },
+       "type": "object"
+      },
+      "type": "object",
+      "title": "Metricas"
+     },
+     "vence_en_dias": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Vence En Dias"
      }
     },
     "type": "object",
@@ -6503,6 +7457,47 @@
     ],
     "title": "ItemCola"
    },
+   "LadoGrupo": {
+    "properties": {
+     "muestra": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Muestra"
+     },
+     "muestra_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Muestra Id"
+     },
+     "nombre": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Nombre"
+     }
+    },
+    "type": "object",
+    "title": "LadoGrupo",
+    "description": "Un grupo de niños: un filtro guardado (``muestra_id``) o una combinación de facetas (``muestra``)."
+   },
    "LimitesPersona": {
     "properties": {
      "sin_limite": {
@@ -6524,6 +7519,11 @@
      "modelos_usados": {
       "type": "integer",
       "title": "Modelos Usados"
+     },
+     "dias_sin_uso": {
+      "type": "integer",
+      "title": "Dias Sin Uso",
+      "default": 90
      }
     },
     "type": "object",
@@ -6830,6 +7830,88 @@
     "type": "object",
     "title": "ParametrosProgramacion"
    },
+   "PeticionGuardarNino": {
+    "properties": {
+     "modelo": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Modelo"
+     },
+     "visita": {
+      "type": "string",
+      "title": "Visita"
+     },
+     "perfil": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Perfil"
+     },
+     "eg_semanas": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 45.0,
+        "minimum": 22.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Eg Semanas"
+     },
+     "cambios": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Cambios",
+      "description": "variable → valor nuevo (null la quita)"
+     },
+     "titulo": {
+      "type": "string",
+      "maxLength": 120,
+      "minLength": 1,
+      "title": "Titulo"
+     },
+     "descripcion": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 500
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Descripcion"
+     },
+     "tipo": {
+      "type": "string",
+      "enum": [
+       "nino",
+       "plantilla"
+      ],
+      "title": "Tipo",
+      "default": "nino"
+     }
+    },
+    "type": "object",
+    "required": [
+     "visita",
+     "titulo"
+    ],
+    "title": "PeticionGuardarNino"
+   },
    "PeticionInferencia": {
     "properties": {
      "corte": {
@@ -7000,6 +8082,62 @@
      "visita"
     ],
     "title": "PeticionNino"
+   },
+   "PeticionTrabajo": {
+    "properties": {
+     "modelo": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Modelo"
+     },
+     "muestra": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Muestra"
+     },
+     "muestra_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Muestra Id"
+     },
+     "excluir_entrenamiento": {
+      "type": "boolean",
+      "title": "Excluir Entrenamiento",
+      "default": false
+     },
+     "visita": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Visita"
+     }
+    },
+    "type": "object",
+    "title": "PeticionTrabajo"
    },
    "PorClasificar": {
     "properties": {
@@ -7756,6 +8894,31 @@
      "variable"
     ],
     "title": "VariableDiccionario"
+   },
+   "VariableExtra": {
+    "properties": {
+     "variable": {
+      "type": "string",
+      "title": "Variable"
+     },
+     "cuando": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cuando"
+     }
+    },
+    "type": "object",
+    "required": [
+     "variable"
+    ],
+    "title": "VariableExtra",
+    "description": "Una variable que se agregó al panel de filtros y la regla con que se lee (D1)."
    },
    "VersionDiccionarioSalida": {
     "properties": {

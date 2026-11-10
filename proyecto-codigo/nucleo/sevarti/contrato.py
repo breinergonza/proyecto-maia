@@ -36,6 +36,7 @@ ESQUEMA_DEFECTOS: dict[str, object] = dict(
     codigos_especiales='', # declared placeholder codes, separated by ';'
     categorias='',         # labels of categorical codes: 'code=label', separated by ';'
     rango_min=np.nan, rango_max=np.nan,  # declared range: informative only, never a filter
+    usar_como_filtro=False,  # the experts offer it as a filter when a sample is built (dictionary column)
 )
 COLUMNAS = dict(
     esquema=('variable', 'tipo', *ESQUEMA_DEFECTOS),
@@ -111,6 +112,7 @@ def normalizar_esquema(esquema: pd.DataFrame) -> pd.DataFrame:
         raise ValueError('El esquema no cumple el contrato SEVARTI: ' + '; '.join(problemas))
     out['ventana'] = out.ventana.astype(bool)
     out['no_decreciente'] = out.no_decreciente.astype(bool)
+    out['usar_como_filtro'] = out.usar_como_filtro.astype(bool)
     return out[list(COLUMNAS['esquema'])].reset_index(drop=True)
 
 

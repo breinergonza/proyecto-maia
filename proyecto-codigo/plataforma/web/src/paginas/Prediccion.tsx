@@ -1,24 +1,32 @@
-// Predicción: el riesgo de una muestra, de todo el universo o de un niño nuevo, con el modelo que se elija. Nada se guarda por
-// niño: lo que se ve existe solo en esta pantalla. Los filtros de la muestra son las muestras guardadas en Explorar; el CSV por
-// niño es solo de administración.
+// Predicción: el riesgo de una muestra, de todo el universo o de un niño nuevo, con el modelo que se elija. Muestra y universo se
+// calculan en segundo plano (estado y avance) y la tabla por niño se pide por páginas; del riesgo por niño no se guarda nada. La
+// muestra se arma con las mismas facetas de Explorar (PanelFacetas); el CSV por niño es solo de administración. Solo el «niño
+// nuevo» y las plantillas se guardan, y solo si la persona lo pide.
 import { Download } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
-import { useMuestras } from '../api/exploracion'
-import { pedirCsvPrediccion, useBibliotecaEjemplos, useEjemplo, useModelosPrediccion, usePredecirMuestra, usePredecirNino } from '../api/prediccion'
+import { useFacetasExplorar } from '../api/exploracion'
+import {
+  EN_CURSO, pedirCsvPrediccion, useBibliotecaEjemplos, useBorrarNinoGuardado, useEjemplo, useGuardarNino, useLanzarPrediccion,
+  useModelosPrediccion, useNinosGuardados, usePredecirNino, useTablaPrediccion, useTrabajoPrediccion,
+} from '../api/prediccion'
 import type {
-  CampoEjemplo, CuerpoPrediccionMuestra, FilaPrediccion, PrediccionMuestra, PrediccionNino, RespuestaPrediccionMuestra,
+  CampoEjemplo, CeldaVisitaPrediccion, CuerpoExplorar, CuerpoPrediccionMuestra, FilaPrediccion, MuestraJson, NinoGuardado,
+  PrediccionNino, ResultadoTrabajoPrediccion, TrabajoPrediccion,
 } from '../api/tipos'
 import { puede, useSesion } from '../auth/sesion'
 import { TarjetaRiesgo } from '../components/ficha'
 import { Grafica, TablaDatos } from '../components/grafica'
+import { Termino } from '../components/Termino'
+import { PanelFacetas } from '../components/PanelFacetas'
 import { LeyendaSeries, LineasSeries, type FilaSeries, type Serie } from '../components/graficos'
-import { Aviso, Boton, Campo, Cargando, Cifra, Encabezado, Entrada, Insignia, Panel, Selector, Tabla, Vacio } from '../components/ui'
+import { Aviso, Boton, Campo, Cargando, Cifra, Encabezado, Entrada, Insignia, Paginador, Panel, Selector, Tabla, Vacio } from '../components/ui'
 import { cn } from '../lib/cn'
 import { descripcionDe } from '../lib/descripciones'
 import { descargar, nombreArchivo } from '../lib/exportar'
 import { num, riesgo as formatoRiesgo } from '../lib/formato'
 import { cuantosMenos, nivelAlto } from '../lib/lenguaje'
+import { useFiltros } from '../lib/useFiltros'
 
 type Modo = 'muestra' | 'universo' | 'nino'
 const MODOS: { id: Modo; texto: string }[] = [
@@ -45,7 +53,8 @@ export default function Prediccion() {
         ))}
       </div>
       <div className="mb-4 max-w-xl"><SelectorModelo valor={modelo} cambiar={setModelo} /></div>
-      {modo === 'nino' ? <NinoNuevo modelo={modelo} key={`n${modelo}`} /> : <Grupo universo={modo === 'universo'} modelo={modelo} key={`${modo}${modelo}`} />}
+      {modo === 'nino' ? <NinoNuevo modelo={modelo} key={`n${modelo}`} />
+        : modo === 'universo' ? <Universo modelo={modelo} key={`u${modelo}`} /> : <Muestra modelo={modelo} key={`m${modelo}`} />}
     </div>
   )
 }
@@ -76,59 +85,88 @@ function SelectorModelo({ valor, cambiar }: { valor: string; cambiar: (v: string
 
 // ------------------------------------------------------------------ muestra y universo
 
-function Grupo({ universo, modelo }: { universo: boolean; modelo: string }) {
+/** Muestra: el grupo se arma con las facetas (o un filtro guardado) de Explorar. */
+function Muestra({ modelo }: { modelo: string }) {
+  const filtros = useFiltros()
+  const { usuario } = useSesion()
+  const grupo: CuerpoExplorar = filtros.guardada ? { muestra_id: filtros.guardada } : { muestra: filtros.muestra }
+  const facetas = useFacetasExplorar(grupo)
+  return (
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+      <aside className="lg:col-span-4 xl:col-span-3">
+        <PanelFacetas facetas={facetas.data} cargando={facetas.isPending} filtros={filtros} esExperto={puede(usuario, ['admin', 'experto'])} />
+      </aside>
+      <div className="min-w-0 lg:col-span-8 xl:col-span-9">
+        <Calculo modelo={modelo} universo={false} grupo={grupo}
+          listo={filtros.guardada !== null || filtros.entradas.length > 0} />
+      </div>
+    </div>
+  )
+}
+
+function Universo({ modelo }: { modelo: string }) {
+  return <Calculo modelo={modelo} universo grupo={{}} listo />
+}
+
+/** Lanza el cálculo (asíncrono: estado y progreso), y muestra los agregados y la tabla por páginas cuando termina. */
+function Calculo({ modelo, universo, grupo, listo }: {
+  modelo: string; universo: boolean; grupo: { muestra?: MuestraJson; muestra_id?: number }; listo: boolean
+}) {
   const { usuario } = useSesion()
   const admin = puede(usuario, ['admin'])
-  const muestras = useMuestras(!universo)
   const biblioteca = useBibliotecaEjemplos(modelo || null)
-  const [muestraId, setMuestraId] = useState('')
   const [visita, setVisita] = useState('')
   const [excluir, setExcluir] = useState(false)
-  const predecir = usePredecirMuestra()
+  const [trabajoId, setTrabajoId] = useState<number | null>(null)
+  const lanzar = useLanzarPrediccion()
+  const trabajo = useTrabajoPrediccion(trabajoId)
   const cuerpo: CuerpoPrediccionMuestra = {
-    modelo: modelo || null, muestra_id: !universo && muestraId ? Number(muestraId) : null, excluir_entrenamiento: excluir,
-    visita: visita || null,
+    modelo: modelo || null, ...grupo, excluir_entrenamiento: excluir, visita: visita || null,
   }
-  const lista = muestras.data ?? []
+  const t = trabajo.data
+  const corriendo = lanzar.isPending || (t !== undefined && EN_CURSO.includes(t.estado))
   return (
     <div className="space-y-4">
       <Panel titulo={universo ? 'Todo el universo' : 'Muestra'}
-        descripcion={universo ? 'Todos los niños del corte vigente, con la visita que elija.' : 'Los niños de una muestra guardada en Explorar.'}>
-        <form className="grid gap-4 sm:grid-cols-2" onSubmit={(e) => { e.preventDefault(); predecir.mutate(cuerpo) }}>
-          {!universo && (
-            <Campo etiqueta="Muestra guardada" id="muestra-prediccion"
-              ayuda={!muestras.isPending && !lista.length ? 'Todavía no hay muestras guardadas: arme una en Explorar.' : undefined}>
-              <Selector id="muestra-prediccion" value={muestraId} onChange={(e) => setMuestraId(e.target.value)}>
-                <option value="">Elija una muestra</option>
-                {lista.map((m) => <option key={m.id} value={m.id}>{m.titulo} · {num(m.n_ninos)} niños</option>)}
-              </Selector>
-            </Campo>
-          )}
+        descripcion={universo ? 'Todos los niños del corte vigente, con la visita que elija.' : 'Los niños que cumplen el grupo que armó a la izquierda.'}>
+        <form className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" onSubmit={(e) => { e.preventDefault(); lanzar.mutate(cuerpo, { onSuccess: (x) => setTrabajoId(x.id) }) }}>
           <Campo etiqueta="Visita" id="visita-prediccion">
             <Selector id="visita-prediccion" value={visita} onChange={(e) => setVisita(e.target.value)}>
               <option value="">La última a la que fue cada niño</option>
               {(biblioteca.data?.visitas ?? []).map((v) => <option key={v.etapa} value={v.etapa}>{v.nombre}</option>)}
             </Selector>
           </Campo>
-          <label className="flex items-center gap-2 text-sm sm:col-span-2">
+          <label className="flex items-center gap-2 self-end text-sm">
             <input type="checkbox" checked={excluir} onChange={(e) => setExcluir(e.target.checked)} />
             Dejar fuera a los niños con que se entrenó el modelo
           </label>
           <div className="sm:col-span-2">
-            <Boton type="submit" disabled={predecir.isPending || (!universo && !muestraId)}>
-              {predecir.isPending ? 'Calculando…' : 'Calcular el riesgo'}
-            </Boton>
+            <Boton type="submit" disabled={corriendo || !listo}>{corriendo ? 'Calculando…' : 'Calcular el riesgo'}</Boton>
+            {!listo && <p className="mt-1 text-xs text-salvia">Marque al menos una opción o elija un filtro guardado para armar la muestra.</p>}
           </div>
         </form>
       </Panel>
-      {predecir.isError && <Aviso>{predecir.error.message}</Aviso>}
-      {predecir.isPending && <Cargando texto="Calculando el riesgo de los niños…" />}
-      {predecir.data && !predecir.isPending && <Resultado r={predecir.data} admin={admin} cuerpo={cuerpo} />}
+      {lanzar.isError && <Aviso>{lanzar.error.message}</Aviso>}
+      {trabajo.isError && <Aviso>{trabajo.error.message}</Aviso>}
+      {t && EN_CURSO.includes(t.estado) && <Avance t={t} />}
+      {t?.estado === 'error' && <Aviso>{t.mensaje ?? 'El cálculo falló. Intente de nuevo.'}</Aviso>}
+      {t?.estado === 'ok' && t.resultado && <Resultado t={t} r={t.resultado} admin={admin} />}
+      {t?.estado === 'ok' && !t.resultado && <Aviso tono="teal">Este cálculo ya venció (se conserva una hora). Vuelva a calcular.</Aviso>}
     </div>
   )
 }
 
-function Resultado({ r, admin, cuerpo }: { r: RespuestaPrediccionMuestra; admin: boolean; cuerpo: CuerpoPrediccionMuestra }) {
+function Avance({ t }: { t: TrabajoPrediccion }) {
+  return (
+    <div role="status" aria-live="polite" className="rounded-panel border border-linea bg-papel p-4">
+      <p className="text-sm font-semibold">{t.estado === 'pendiente' ? 'En cola…' : t.paso ?? 'Calculando…'}</p>
+      <progress className="mt-2 h-2 w-full" value={t.progreso} max={100} aria-label="Avance del cálculo" />
+      <p className="mt-1 text-xs text-salvia">{t.progreso} %{t.n_filtro ? ` · ${num(t.n_filtro)} niños` : ''}. Puede esperar aquí: el resultado aparece solo.</p>
+    </div>
+  )
+}
+
+function Resultado({ t, r, admin }: { t: TrabajoPrediccion; r: ResultadoTrabajoPrediccion; admin: boolean }) {
   if (r.insuficiente) {
     return (
       <Aviso tono="teal">
@@ -136,11 +174,12 @@ function Resultado({ r, admin, cuerpo }: { r: RespuestaPrediccionMuestra; admin:
       </Aviso>
     )
   }
-  return <ResultadoMuestra r={r} admin={admin} cuerpo={cuerpo} />
+  return <ResultadoMuestra t={t} r={r} admin={admin} />
 }
 
-function ResultadoMuestra({ r, admin, cuerpo }: { r: PrediccionMuestra; admin: boolean; cuerpo: CuerpoPrediccionMuestra }) {
+function ResultadoMuestra({ t, r, admin }: { t: TrabajoPrediccion; r: Extract<ResultadoTrabajoPrediccion, { insuficiente: false }>; admin: boolean }) {
   const a = r.agregados
+  const cuerpo = t.parametros
   const [error, setError] = useState<string | null>(null)
   const [bajando, setBajando] = useState(false)
   const bajar = async () => {
@@ -160,6 +199,9 @@ function ResultadoMuestra({ r, admin, cuerpo }: { r: PrediccionMuestra; admin: b
     <div className="space-y-4">
       {r.aviso_corte && <Aviso tono="coral">{r.aviso_corte}</Aviso>}
       {r.excluidos > 0 && <Aviso tono="teal">Se dejaron fuera {num(r.excluidos)} niños con que se entrenó el modelo.</Aviso>}
+      {!r.fuga_no_verificable && r.en_entrenamiento === 0 && (
+        <Aviso tono="teal">Ninguno de estos niños estaba en el entrenamiento del modelo: el riesgo es el de niños que no conocía.</Aviso>
+      )}
       {r.fuga_no_verificable && cuerpo.excluir_entrenamiento && (
         <Aviso tono="coral">Este modelo no trae la lista de niños con que se entrenó: no se pudieron dejar fuera.</Aviso>
       )}
@@ -168,6 +210,7 @@ function ResultadoMuestra({ r, admin, cuerpo }: { r: PrediccionMuestra; admin: b
         <Cifra valor={num(a.niveles.muy_alto)} texto={`con riesgo muy alto (percentil ${a.niveles.percentil_muy_alto} o más)`} tono="coral" />
         <Cifra valor={num(a.niveles.alto)} texto={`con riesgo alto (percentil ${a.niveles.percentil_alto} a ${a.niveles.percentil_muy_alto})`} tono="coral" />
       </div>
+      <p className="text-xs text-salvia">El <Termino id="percentil">percentil</Termino> ordena a los niños de menor a mayor riesgo.</p>
       <Grafica titulo={dist.titulo} descripcion={dist.descripcion}
         exportar={{ nombre: 'distribucion-del-riesgo', filas: a.histograma.map((b) => ({ 'Percentil desde': b.desde, 'Percentil hasta': b.hasta, Niños: b.n })),
           muestra: `${num(a.n_puntuados)} niños · modelo ${r.modelo.version}` }}>
@@ -184,12 +227,12 @@ function ResultadoMuestra({ r, admin, cuerpo }: { r: PrediccionMuestra; admin: b
             )
           })}
         </svg>
-        <p className="mt-1 text-xs text-salvia">Cada barra es un tramo de 10 puntos de percentil; en coral, el riesgo alto.</p>
+        <p className="mt-1 text-xs text-salvia">Cada barra es un tramo de 10 puntos de <Termino id="percentil">percentil</Termino>; en coral, el riesgo alto.</p>
       </Grafica>
       <TablaDatos titulo={descripcionDe('riesgo_por_desenlace').titulo} descripcion={descripcionDe('riesgo_por_desenlace').descripcion}
         exportar={{ nombre: 'riesgo-por-desenlace', filas: a.por_desenlace.map((d) => ({ Desenlace: d.desenlace, Visita: d.momento_nombre, Niños: d.n, 'Riesgo mediano': d.riesgo_mediano, Altos: d.altos, 'Muy altos': d.muy_altos })) }}>
         <Tabla apilar>
-          <thead><tr><th>Desenlace</th><th>Visita</th><th className="text-right">Niños</th><th className="text-right">Riesgo mediano</th><th className="text-right">Riesgo alto</th></tr></thead>
+          <thead><tr><th>Desenlace</th><th>Visita</th><th className="text-right">Niños</th><th className="text-right">Riesgo <Termino id="mediana">mediano</Termino></th><th className="text-right">Riesgo alto</th></tr></thead>
           <tbody>
             {a.por_desenlace.map((d) => (
               <tr key={d.clave}>
@@ -201,7 +244,8 @@ function ResultadoMuestra({ r, admin, cuerpo }: { r: PrediccionMuestra; admin: b
           </tbody>
         </Tabla>
       </TablaDatos>
-      <TablaNinos r={r} accion={admin && (
+      <RiesgoPorVisita celdas={r.por_visita} muestra={`${num(a.n_puntuados)} niños · modelo ${r.modelo.version}`} />
+      <TablaNinos t={t} total={r.tabla_total} accion={admin && (
         <Boton variante="secundario" chico onClick={bajar} disabled={bajando}>
           <Download aria-hidden className="size-4" /> Exportar CSV
         </Boton>
@@ -211,20 +255,63 @@ function ResultadoMuestra({ r, admin, cuerpo }: { r: PrediccionMuestra; admin: b
   )
 }
 
-function TablaNinos({ r, accion }: { r: PrediccionMuestra; accion?: ReactNode }) {
+/** El porcentaje de niños con riesgo alto en cada visita, para los tres desenlaces con más casos; sin cifras si la celda tiene menos de 5. */
+function RiesgoPorVisita({ celdas, muestra }: { celdas: CeldaVisitaPrediccion[]; muestra: string }) {
+  const { titulo, descripcion } = descripcionDe('riesgo_alto_visita')
+  const { series, filas } = useMemo(() => {
+    const maximo = new Map<string, { nombre: string; p: number }>()
+    for (const c of celdas) {
+      if (c.pct_altos === null) continue
+      const previo = maximo.get(c.clave)
+      if (!previo || c.pct_altos > previo.p) maximo.set(c.clave, { nombre: c.desenlace, p: c.pct_altos })
+    }
+    const principales = [...maximo.entries()].sort((x, y) => y[1].p - x[1].p).slice(0, 3)
+    const orden = new Map<string, number>()
+    celdas.forEach((c) => orden.set(c.momento_nombre, c.orden))
+    const visitas = [...orden.entries()].sort((x, y) => x[1] - y[1]).map(([n]) => n)
+    const s: Serie[] = principales.map(([clave, d], i) => ({ clave, nombre: d.nombre, color: i as 0 | 1 | 2 }))
+    const f: FilaSeries[] = visitas.map((x) => {
+      const fila: FilaSeries = { x }
+      for (const [clave] of principales) fila[clave] = celdas.find((c) => c.momento_nombre === x && c.clave === clave)?.pct_altos ?? null
+      return fila
+    })
+    return { series: s, filas: f }
+  }, [celdas])
+  if (series.length === 0) return null
+  return (
+    <Grafica titulo={titulo} descripcion={descripcion}
+      exportar={{ nombre: 'riesgo-alto-por-visita', muestra,
+        filas: celdas.filter((c) => !c.oculta).map((c) => ({ Desenlace: c.desenlace, Visita: c.momento_nombre, Niños: c.n, 'Riesgo mediano': c.riesgo_mediano, 'Con riesgo alto (%)': c.pct_altos })) }}>
+      <LeyendaSeries series={series} />
+      <LineasSeries filas={filas} series={series} etiqueta={titulo} formatoY={(v) => `${Math.round(v)} %`} dominioY={[0, 100]} />
+    </Grafica>
+  )
+}
+
+function TablaNinos({ t, total, accion }: { t: TrabajoPrediccion; total: number; accion?: ReactNode }) {
   const d = descripcionDe('riesgo_calculado')
-  const filas = r.tabla.filas
+  const [pagina, setPagina] = useState(1)
+  const tabla = useTablaPrediccion(t.id, pagina, t.tabla_disponible)
+  const filas = tabla.data?.filas ?? []
+  const limite = tabla.data?.limite ?? 200
   return (
     <TablaDatos titulo="Niños con más riesgo" accion={accion}
-      descripcion={`${d.descripcion} Se muestran los ${num(filas.length)} de mayor riesgo, de ${num(r.tabla.total)} niños.`}>
-      <Tabla apilar>
-        <thead>
-          <tr><th>Niño</th><th>Desenlace</th><th className="text-right">Riesgo</th><th>Frente a los demás</th><th>Perfil</th><th>Primera alerta</th><th>Motivos</th></tr>
-        </thead>
-        <tbody>
-          {filas.map((f) => <FilaNino key={`${f.sujeto}-${f.clave}`} f={f} />)}
-        </tbody>
-      </Tabla>
+      descripcion={`${d.descripcion} De mayor a menor riesgo, ${num(limite)} niños por página, de ${num(total)} niños.`}>
+      {!t.tabla_disponible || tabla.isError ? (
+        <Aviso tono="teal">La tabla por niño ya no está disponible (se conserva una hora). Vuelva a calcular.</Aviso>
+      ) : tabla.isPending ? <Cargando /> : (
+        <>
+          <Tabla apilar>
+            <thead>
+              <tr><th>Niño</th><th>Desenlace</th><th className="text-right">Riesgo</th><th>Frente a los demás</th><th>Perfil</th><th>Primera alerta</th><th>Motivos</th></tr>
+            </thead>
+            <tbody>
+              {filas.map((f) => <FilaNino key={`${f.sujeto}-${f.clave}`} f={f} />)}
+            </tbody>
+          </Tabla>
+          <Paginador pagina={pagina} tamano={limite} total={total} cambiar={setPagina} />
+        </>
+      )}
     </TablaDatos>
   )
 }
@@ -256,6 +343,12 @@ function NinoNuevo({ modelo }: { modelo: string }) {
   const predecir = usePredecirNino()
   const [cambios, setCambios] = useState<Record<string, string>>({})
   const [todos, setTodos] = useState(false)
+  const usar = (n: NinoGuardado) => {
+    setVisita(n.visita)
+    setPerfil(n.perfil)
+    setCambios(Object.fromEntries(Object.entries(n.cambios).map(([k, v]) => [k, v === null ? '' : String(v)])))
+    predecir.reset()
+  }
 
   if (biblioteca.isPending) return <Cargando />
   if (biblioteca.isError) return <Aviso>{biblioteca.error.message}</Aviso>
@@ -269,8 +362,8 @@ function NinoNuevo({ modelo }: { modelo: string }) {
   const e = ejemplo.data
   return (
     <div className="space-y-4">
-      <Panel titulo="Biblioteca de niños de ejemplo"
-        descripcion="Elija una visita y un perfil: el ejemplo trae el valor típico de los niños de ese grupo en cada dato.">
+      <Panel titulo={descripcionDe('biblioteca_ejemplos').titulo}
+        descripcion={descripcionDe('biblioteca_ejemplos').descripcion}>
         <p className="mb-2 text-sm font-semibold">Visita</p>
         <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Visita">
           {b.visitas.map((v) => (
@@ -281,7 +374,7 @@ function NinoNuevo({ modelo }: { modelo: string }) {
           ))}
         </div>
         <p className="mb-2 text-sm font-semibold">Perfil</p>
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4" role="group" aria-label="Perfil">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-6" role="group" aria-label="Perfil">
           {b.perfiles.map((p) => (
             <button key={p.perfil} type="button" disabled={p.insuficiente} aria-pressed={perfil === p.perfil} onClick={() => elegir(visita, p.perfil)}
               className={cn('rounded-panel border p-3 text-left text-sm disabled:opacity-50',
@@ -312,7 +405,69 @@ function NinoNuevo({ modelo }: { modelo: string }) {
       ) : null}
       {predecir.isError && <Aviso>{predecir.error.message}</Aviso>}
       {predecir.data && <ResultadoNino r={predecir.data} />}
+      {e && !e.insuficiente && visita && perfil && (
+        <GuardarNino modelo={modelo} visita={visita} perfil={perfil} cambios={valoresCambiados(e.campos, cambios)} />
+      )}
+      <NinosGuardados usar={usar} />
     </div>
+  )
+}
+
+/** «Guardar como niño nuevo» (o como plantilla de un perfil): va a su propia tabla, aparte del corte oficial. */
+function GuardarNino({ modelo, visita, perfil, cambios }: {
+  modelo: string; visita: string; perfil: string; cambios: Record<string, string | number | null>
+}) {
+  const [titulo, setTitulo] = useState('')
+  const [tipo, setTipo] = useState<'nino' | 'plantilla'>('nino')
+  const guardar = useGuardarNino()
+  return (
+    <Panel titulo={descripcionDe('guardar_nino').titulo} descripcion={descripcionDe('guardar_nino').descripcion}>
+      <form className="grid gap-3 sm:grid-cols-[1fr_12rem_auto] sm:items-end"
+        onSubmit={(ev) => { ev.preventDefault(); guardar.mutate({ modelo: modelo || null, visita, perfil, cambios, titulo: titulo.trim(), tipo }, { onSuccess: () => setTitulo('') }) }}>
+        <Campo etiqueta="Nombre" id="guardar-nino-titulo">
+          <Entrada id="guardar-nino-titulo" value={titulo} maxLength={120} onChange={(ev) => setTitulo(ev.target.value)} />
+        </Campo>
+        <Campo etiqueta="Guardar como" id="guardar-nino-tipo">
+          <Selector id="guardar-nino-tipo" value={tipo} onChange={(ev) => setTipo(ev.target.value as 'nino' | 'plantilla')}>
+            <option value="nino">Niño nuevo</option>
+            <option value="plantilla">Plantilla del perfil</option>
+          </Selector>
+        </Campo>
+        <Boton type="submit" disabled={!titulo.trim() || guardar.isPending}>{tipo === 'nino' ? 'Guardar como niño nuevo' : 'Guardar como plantilla'}</Boton>
+      </form>
+      {guardar.isError && <div className="mt-2"><Aviso>{guardar.error.message}</Aviso></div>}
+      {guardar.isSuccess && <p role="status" className="mt-2 text-sm text-teal">Guardado: «{guardar.data.titulo}».</p>}
+    </Panel>
+  )
+}
+
+function NinosGuardados({ usar }: { usar: (n: NinoGuardado) => void }) {
+  const lista = useNinosGuardados()
+  const borrar = useBorrarNinoGuardado()
+  const filas = lista.data ?? []
+  if (lista.isPending || filas.length === 0) return null
+  return (
+    <TablaDatos titulo={descripcionDe('ninos_guardados').titulo}
+      descripcion={descripcionDe('ninos_guardados').descripcion}>
+      <Tabla apilar>
+        <thead><tr><th>Nombre</th><th>Clase</th><th>Perfil</th><th>Visita</th><th>De</th><th><span className="sr-only">Acciones</span></th></tr></thead>
+        <tbody>
+          {filas.map((n) => (
+            <tr key={n.id}>
+              <td className="font-semibold">{n.titulo}</td>
+              <td><Insignia tono={n.tipo === 'plantilla' ? 'teal' : 'neutro'}>{n.tipo === 'plantilla' ? 'Plantilla' : 'Niño nuevo'}</Insignia></td>
+              <td>{n.perfil ?? '—'}</td>
+              <td>{n.visita}</td>
+              <td>{n.propio ? 'Usted' : n.dueno ?? '—'}</td>
+              <td className="whitespace-nowrap text-right">
+                <Boton variante="secundario" chico onClick={() => usar(n)} aria-label={`Usar ${n.titulo}`}>Usar</Boton>{' '}
+                {n.propio && <Boton variante="fantasma" chico disabled={borrar.isPending} onClick={() => borrar.mutate(n.id)} aria-label={`Borrar ${n.titulo}`}>Borrar</Boton>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </Tabla>
+    </TablaDatos>
   )
 }
 
@@ -345,7 +500,7 @@ function EditorEjemplo({ campos, visitas, cambios, todos, verTodos, cambiar, eti
         {grupos.map(([etapa, lista]) => (
           <fieldset key={etapa}>
             <legend className="mb-2 text-sm font-semibold">{etapa ? nombres[etapa] ?? etapa : 'Datos generales'}</legend>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
               {lista.map((c) => {
                 const v = cambios[c.variable]
                 const cambiado = !igual(c, v)
@@ -426,7 +581,7 @@ function ResultadoNino({ r }: { r: PrediccionNino }) {
           exportar={{ nombre: 'riesgo-nino-nuevo', filas: trayectoria.map((t) => ({ Desenlace: t.desenlace, Visita: t.momento_nombre, Riesgo: t.riesgo, Percentil: t.percentil })) }}>
           <LeyendaSeries series={series} />
           <LineasSeries filas={filas} series={series} etiqueta={d.titulo} formatoY={(v) => String(Math.round(v))} dominioY={[0, 100]} />
-          <p className="mt-1 text-xs text-salvia">El eje es el percentil: sobre la línea de alerta, el niño está entre el 10 % con más riesgo.</p>
+          <p className="mt-1 text-xs text-salvia">El eje es el <Termino id="percentil">percentil</Termino>: sobre la línea de alerta, el niño está entre el 10 % con más riesgo.</p>
         </Grafica>
       )}
     </div>

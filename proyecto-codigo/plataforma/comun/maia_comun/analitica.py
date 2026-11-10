@@ -545,11 +545,12 @@ def resumen_perfiles_ampliado(sev, riesgos: pd.DataFrame | None, medidas: Mappin
 
 # ------------------------------------------------------------------------------------------------ anticipación
 
-_DESDE = re.compile(r'^(?P<familia>.+)_desde_(?P<n>\d+[a-z]*)$')
+_DESDE = re.compile(r'^(?P<familia>.+)_desde_(?P<n>[0-9a-z]+)$')   # «3», «12m», «pmc» (la entrada al programa)
 
 
 def familia_desde(clave: str) -> tuple[str, str] | None:
-    """``talla_baja_12m_desde_3`` -> (``talla_baja_12m``, ``3``); None si la clave no es de una familia."""
+    """``talla_baja_12m_desde_3`` -> (``talla_baja_12m``, ``3``); ``readm_6m_desde_pmc`` -> (``readm_6m``, ``pmc``);
+    None si la clave no es de una familia."""
     m = _DESDE.match(clave)
     return (m['familia'], m['n']) if m else None
 

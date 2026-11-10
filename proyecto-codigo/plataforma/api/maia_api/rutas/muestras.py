@@ -58,6 +58,12 @@ def _cuerpo(cuerpo: dict) -> dict:
     return m
 
 
+def _extra(cuerpo: dict) -> list[dict]:
+    """Las variables agregadas al panel (``"variables": [{"variable", "cuando"}]``), si vienen."""
+    v = cuerpo.get('variables') if isinstance(cuerpo, dict) else None
+    return [x for x in v if isinstance(x, dict)] if isinstance(v, list) else []
+
+
 def _salida(s: Session, m: Muestra) -> dict:
     dueno = s.get(Usuario, m.propietario_id) if m.propietario_id else None
     corte = s.get(Corte, m.corte_id) if m.corte_id else None
@@ -106,7 +112,7 @@ def facetas(cuerpo: dict = Body(...), s: Session = Depends(sesion), _: Usuario =
     salen como «<5»."""
     corte = P.corte_actual(s)
     try:
-        r = P.facetas(s, corte.id, _cuerpo(cuerpo))
+        r = P.facetas(s, corte.id, _cuerpo(cuerpo), extra=_extra(cuerpo))
     except M.MuestraInvalida as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, ' '.join(e.errores)) from None
     return {**r, 'n_base': P.n_base(s, corte.id), 'minimo': P.MIN_NINOS}

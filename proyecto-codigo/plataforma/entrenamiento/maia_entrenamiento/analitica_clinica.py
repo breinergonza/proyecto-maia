@@ -3,11 +3,10 @@ vio) calcula los artefactos agregados de ``maia_comun.analitica`` y los guarda e
 
 * Solo agregados (D7): el riesgo por niño vive en memoria y se descarta.
 * Un fallo aquí nunca rompe el entrenamiento: se captura y queda un aviso.
-* ``MAIA_ANALITICA=0`` la apaga. SHAP, dependencia parcial e interacciones solo si ``shap`` está instalado.
+* ``MAIA_ANALITICA=0`` la apaga. SHAP, dependencia parcial, motivos e interacción: ``analitica_interpretabilidad``.
 """
 from __future__ import annotations
 
-import importlib.util
 import os
 import sys
 from datetime import UTC, datetime
@@ -17,8 +16,11 @@ import pandas as pd
 from sqlalchemy import func, select
 
 from maia_comun import analitica as AN
+from maia_comun import analitica_distribuciones as AD
 from maia_comun import db
 from maia_comun.modelos_analitica import Analitica
+from maia_entrenamiento import analitica_interpretabilidad as AI
+from maia_entrenamiento import anticipacion as AA
 from sevarti.contrato import nacimiento_referencia
 
 MAX_FILAS = 200_000          # submuestra para lo pesado (bootstrap, PSI): predicciones de más se submuestrean
@@ -87,6 +89,8 @@ def predicciones(modelo, p) -> dict[str, dict]:
                        {'paso': 'con desenlace conocido', 'n': int(ok.sum())},
                        {'paso': 'con el evento', 'n': int(y[ok].sum())}],
             'desenlace': des,
+            'universo': {'categorias': grupos_base,      # todos los niños de la validación, para muestra frente a universo
+                         'numericas': {'edad gestacional (semanas)': pd.to_numeric(suj.eg_semanas, errors='coerce')}},
         }
     return sal
 
@@ -101,54 +105,20 @@ def _submuestra(d: dict, semilla: int = 0) -> dict:
 
 
 def _avisos_shap() -> list[str]:
-    if importlib.util.find_spec('shap') is None:
-        return ['SHAP, dependencia parcial e interacciones omitidos: el paquete shap no está instalado.']
-    return ['shap está instalado, pero SHAP, dependencia parcial e interacciones aún no se calculan en esta versión.']
+    return []   # SHAP, dependencia parcial, motivos e interacción: ``analitica_interpretabilidad`` (contribuciones de LightGBM)
 
 
-def anticipacion_artefactos(preds: dict[str, dict], orden: dict[str, int], top_pct: int = 10) -> dict[str, dict]:
-    """Por familia de desenlaces «_desde_N» con modelos desde varias visitas (D50): por visita de partida los casos
-    detectados y las alertas acertadas con el ``top_pct`` % de mayor riesgo, la ventaja en visitas (visita del
-    desenlace menos visita de partida) y qué parte de los casos se avisó con al menos una visita de antelación. Solo
-    agregados (D7): las predicciones por niño no se guardan. ``preds`` es lo de ``predicciones``; ``orden``, el orden de
-    las visitas."""
-    familias: dict[str, list[tuple[str, dict]]] = {}
-    for clave, d in preds.items():
-        f = AN.familia_desde(clave)
-        if f is not None:
-            familias.setdefault(f[0], []).append((clave, d))
-    sal = {}
-    for familia, partes in familias.items():
-        if len(partes) < 2:      # una sola visita de partida no es una anticipación
-            continue
-        visitas, casos, avisados = [], set(), set()
-        for clave, d in sorted(partes, key=lambda kv: orden.get(kv[1]['desenlace'].momento, 99)):
-            des = d['desenlace']
-            ventaja = orden.get(des.etapa, 0) - orden.get(des.momento, 0)
-            y, r = np.asarray(d['y'], dtype=bool), np.asarray(d['r'], dtype=float)
-            ninos = np.asarray(d['variables'].index)
-            k = max(1, int(round(len(y) * top_pct / 100)))
-            alerta = np.zeros(len(y), dtype=bool)
-            alerta[AN._orden(r)[:k]] = True
-            casos |= set(ninos[y])
-            if ventaja >= 1:
-                avisados |= set(ninos[y & alerta])
-            visitas.append({'clave': clave, 'desde': des.momento, 'etapa': des.etapa, 'ventaja_visitas': int(ventaja),
-                            **AN.anticipacion_visita(y, r, top_pct)})
-        n_casos, n_av = len(casos), len(avisados)
-        sal[familia] = {
-            'familia': familia, 'nombre': partes[0][1]['desenlace'].nombre.split(' (riesgo')[0], 'top_pct': top_pct,
-            'etiqueta': 'En prueba', 'visitas': visitas,
-            'avisados_antes': {'casos': n_casos if n_casos >= AN.MIN_CELDA else None,
-                               'avisados': n_av if n_av >= AN.MIN_CELDA else None,
-                               'pct': AN._r(100 * n_av / n_casos, 2) if n_casos >= AN.MIN_CELDA else None,
-                               'meta': 'D12: avisar al menos una visita antes del desenlace'}}
-    return AN.limpio(sal)
+def anticipacion_artefactos(preds: dict[str, dict], orden: dict[str, int], top_pct: int = 10,
+                            etapa_de_variable: dict[str, str] | None = None) -> dict[str, dict]:
+    """El artefacto ``anticipacion`` de cada familia de desenlaces con modelos desde varias visitas (D20, D50); el
+    detalle (y ``metricas_por_visita`` y ``primera_alerta``) está en ``maia_entrenamiento.anticipacion``."""
+    completos = AA.artefactos(preds, orden, top_pct, etapa_de_variable)
+    return {familia: por_tipo['anticipacion'] for familia, por_tipo in completos.items()}
 
 
 def calcular(modelo, p) -> tuple[dict[str, dict[str, dict]], list[dict]]:
     """``({clave: {submodulo: artefactos}}, descripcion_de_desenlaces)``. Las familias «_desde_N» agregan además
-    ``{familia: {'anticipacion': ...}}``."""
+    ``{familia: {'anticipacion', 'metricas_por_visita', 'primera_alerta'}}``."""
     avisos = _avisos_shap()
     resultados, descripcion = {}, []
     preds = predicciones(modelo, p)
@@ -159,13 +129,21 @@ def calcular(modelo, p) -> tuple[dict[str, dict[str, dict]], list[dict]]:
             d['r'], d['y'], grupos={k: pd.Series(v) for k, v in d['grupos'].items()},
             trimestre=pd.Series(d['trimestre']) if hay_trimestres else None,
             variables=d['variables'], embudo=d['embudo'], importancias=d['importancias'], avisos=avisos)
+        if 'calibracion' in resultados[clave]:      # histograma por desenlace y muestra frente a universo
+            resultados[clave].update(AD.artefactos_extra(d['y'], d['r'], d['variables'].index, d.get('universo')))
         des = d['desenlace']
         descripcion.append({'clave': clave, 'nombre': des.nombre, 'momento': des.momento,
                             'etiqueta': 'En prueba' if AN.familia_desde(clave) else 'En uso'})
     try:
-        et = p.sev.etapas
-        for familia, datos in anticipacion_artefactos(preds, dict(zip(et.etapa, et.orden))).items():
-            resultados[familia] = {'anticipacion': datos}
+        AI.agregar(resultados, modelo, preds)
+    except Exception as e:  # noqa: BLE001  (la interpretabilidad no rompe el resto de la analítica)
+        _aviso(f'no se pudo calcular la interpretabilidad ({type(e).__name__}: {e}).')
+    try:
+        et, esq = p.sev.etapas, p.sev.esquema
+        etapa_de_variable = {v: e for v, e in zip(esq.variable, esq.etapa) if isinstance(e, str) and e}
+        for familia, por_tipo in AA.artefactos(preds, dict(zip(et.etapa, et.orden)),
+                                               etapa_de_variable=etapa_de_variable).items():
+            resultados.setdefault(familia, {}).update(por_tipo)   # la fila base de la familia ya trae sus artefactos
     except Exception as e:  # noqa: BLE001  (la anticipación no rompe el resto de la analítica)
         _aviso(f'no se pudo calcular la anticipación ({type(e).__name__}: {e}).')
     return resultados, descripcion

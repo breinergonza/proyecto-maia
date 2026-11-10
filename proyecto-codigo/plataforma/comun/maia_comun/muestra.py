@@ -44,7 +44,13 @@ CUANDO_SIMPLE = ('primera', 'ultima', 'alguna')
 CAMPOS_FECHA = ('fecha_nacimiento', 'anio_nacimiento', 'fecha_visita')
 MODOS_TIEMPO = ('periodo', 'ultimos_meses')
 MODOS_MUESTREO = ('todos', 'estratificado')
-VIRTUALES = {'sede': ('lista', 'Sede'), 'eg_semanas': ('numero', 'Edad gestacional (semanas)')}
+VIRTUALES = {'sede': ('lista', 'Sede'), 'eg_semanas': ('numero', 'Edad gestacional (semanas)'),
+             'eg_categoria': ('lista', 'Edad gestacional (categoría)')}
+#: categorías por semanas de gestación: (nombre, desde incluido, hasta excluido). Cada una es una opción por sí sola:
+#: elegir «muy prematuro» y «a término» NO incluye a los moderados (no es un rango continuo).
+CATEGORIAS_EG = (('extremo', None, 28.0), ('muy_prematuro', 28.0, 32.0), ('moderado_tardio', 32.0, 37.0),
+                 ('a_termino', 37.0, None))
+NOMBRES_EG = tuple(c[0] for c in CATEGORIAS_EG)
 SUFIJO_ULTIMA = '@ultima'
 SIN_DATO = '(sin dato)'
 MAX_BINS = 10
@@ -114,6 +120,17 @@ def canonico(texto: object, num: object = None) -> str:
     if num is not None and not (isinstance(num, float) and np.isnan(num)):
         return str(int(num)) if float(num).is_integer() else repr(float(num))
     return str(texto)
+
+
+def categoria_eg(semanas: object) -> str | None:
+    """La categoría por semanas de gestación (``CATEGORIAS_EG``); ``None`` si falta o no es un número."""
+    try:
+        eg = float(semanas)   # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    if not np.isfinite(eg):
+        return None
+    return next(n for n, lo, hi in CATEGORIAS_EG if (lo is None or eg >= lo) and (hi is None or eg < hi))
 
 
 def huella(sujetos: Iterable[object]) -> str:
@@ -226,6 +243,8 @@ def _errores_filtro(e: object, filas: dict[str, dict]) -> list[str]:
     if v in VIRTUALES:
         if tipo != VIRTUALES[v][0]:
             errores.append(f'"{v}" se filtra con tipo {VIRTUALES[v][0]}')
+        elif v == 'eg_categoria' and (malas := [x for x in valores if x not in NOMBRES_EG]):
+            errores.append(f'"{v}": {malas[0]!r} no es una categoría; use {", ".join(NOMBRES_EG)}')
         return errores
     fila = filas[v]
     if fila['tipo'] in ('date', 'text'):
@@ -276,8 +295,8 @@ def _errores_muestreo(mu: object, filas: dict[str, dict]) -> list[str]:
         return []
     errores = []
     por = mu.get('por')
-    if por != 'sede' and (por not in filas or filas[por]['tipo'] not in ('categorical', 'boolean')):
-        errores.append(f'Muestreo: "por" debe ser "sede" o una variable categórica (trae {por!r})')
+    if por not in ('sede', 'eg_categoria') and (por not in filas or filas[por]['tipo'] not in ('categorical', 'boolean')):
+        errores.append(f'Muestreo: "por" debe ser "sede", "eg_categoria" o una variable categórica (trae {por!r})')
     m = mu.get('maximo_por_categoria')
     if not (isinstance(m, int) and not isinstance(m, bool) and m >= 1):
         errores.append('Muestreo: "maximo_por_categoria" debe ser un entero mayor que cero')
@@ -344,6 +363,9 @@ class _Motor:
         if variable == 'eg_semanas':
             eg = pd.to_numeric(self.sujetos.set_index('sujeto').eg_semanas, errors='coerce').dropna()
             return pd.DataFrame({'txt': eg.map(str), 'num': eg})
+        if variable == 'eg_categoria':
+            eg = pd.to_numeric(self.sujetos.set_index('sujeto').eg_semanas, errors='coerce').dropna()
+            return pd.DataFrame({'txt': eg.map(categoria_eg), 'num': np.nan}, index=eg.index)
         df = self.validas(variable)
         if cuando.startswith('etapa:'):
             df = self._en_etapa(df, cuando[6:].strip())

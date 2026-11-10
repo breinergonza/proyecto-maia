@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis,
   YAxis } from 'recharts'
 import { cn } from '../../lib/cn'
+import { GraficaNavegable, resumenDe } from './navegacion'
 
 /** Los colores de serie en su orden fijo: el color sigue a la serie, no a su posición en una lista filtrada. */
 export const SERIES_COLOR = ['var(--color-serie-1)', 'var(--color-serie-2)', 'var(--color-serie-3)', 'var(--color-serie-4)'] as const
@@ -33,6 +34,14 @@ export function LeyendaSeries({ series, marca = 'linea' }: { series: Serie[]; ma
       ))}
     </ul>
   )
+}
+
+/** El texto de una fila de varias series para anunciarlo: «Serie: valor; Serie: valor». */
+export function textoSeries(fila: FilaSeries, series: Serie[], formato: (v: number, fila: FilaSeries, s: Serie) => string, vacio = 'sin dato'): string {
+  return series.map((s) => {
+    const v = fila[s.clave]
+    return `${s.nombre}: ${typeof v === 'number' ? formato(v, fila, s) : vacio}`
+  }).join('; ')
 }
 
 function TooltipSeries({ active, payload, label, series, formato }: {
@@ -70,8 +79,10 @@ export function LineasSeries({ filas, series, etiqueta, formatoY, dominioY, alto
   alto?: number
   formatoTooltip?: (v: number, fila: FilaSeries, s: Serie) => string
 }) {
+  const fmt = formatoTooltip ?? ((v: number) => formatoY(v))
+  const items = filas.map((f) => `${f.x}. ${textoSeries(f, series, fmt)}`)
   return (
-    <div style={{ height: alto }} role="figure" aria-label={etiqueta}>
+    <GraficaNavegable etiqueta={etiqueta} resumen={resumenDe('Líneas', filas.length, ['punto', 'puntos'])} items={items} style={{ height: alto }}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={filas} margin={{ left: 0, right: 12, top: 8, bottom: 0 }}>
           <CartesianGrid stroke={COLOR.rejilla} vertical={false} />
@@ -87,7 +98,37 @@ export function LineasSeries({ filas, series, etiqueta, formatoY, dominioY, alto
           ))}
         </LineChart>
       </ResponsiveContainer>
-    </div>
+    </GraficaNavegable>
+  )
+}
+
+const MAX_LINEAS_ETIQUETA = 3
+
+/** Parte una etiqueta en renglones de a lo más `ancho` caracteres (por palabras); lo que sobra de MAX_LINEAS_ETIQUETA se corta con «…». */
+function partirEtiqueta(texto: string, ancho: number): string[] {
+  const lineas: string[] = []
+  let actual = ''
+  for (const palabra of texto.split(/\s+/)) {
+    if (actual && `${actual} ${palabra}`.length > ancho) { lineas.push(actual); actual = palabra } else actual = actual ? `${actual} ${palabra}` : palabra
+  }
+  if (actual) lineas.push(actual)
+  if (lineas.length <= MAX_LINEAS_ETIQUETA) return lineas
+  const corta = lineas.slice(0, MAX_LINEAS_ETIQUETA)
+  corta[MAX_LINEAS_ETIQUETA - 1] = `${corta[MAX_LINEAS_ETIQUETA - 1].slice(0, Math.max(1, ancho - 1))}…`
+  return corta
+}
+
+/** Etiqueta del eje X que baja de renglón según el ancho de cada barra, para que no se pisen entre vecinas. */
+function EtiquetaEjeX({ x, y, payload, width, visibleTicksCount, formato }: {
+  x?: number; y?: number; payload?: { value: string }; width?: number; visibleTicksCount?: number; formato?: (x: string) => string
+}) {
+  const texto = formato ? formato(payload?.value ?? '') : (payload?.value ?? '')
+  const banda = (width ?? 200) / Math.max(1, visibleTicksCount ?? 1)
+  const lineas = partirEtiqueta(texto, Math.max(6, Math.floor(banda / 6.8)))
+  return (
+    <text x={x} y={y} textAnchor="middle" fill={COLOR.eje} fontSize={12}>
+      {lineas.map((l, i) => <tspan key={i} x={x} dy={i === 0 ? 12 : 14}>{l}</tspan>)}
+    </text>
   )
 }
 
@@ -99,12 +140,15 @@ export function BarrasApiladas({ filas, series, etiqueta, formatoX, alto = 180 }
   formatoX?: (x: string) => string
   alto?: number
 }) {
+  const items = filas.map((f) => `${formatoX ? formatoX(f.x) : f.x}. ${textoSeries(f, series, (v) => String(v))}`)
   return (
-    <div style={{ height: alto }} role="figure" aria-label={etiqueta}>
+    <GraficaNavegable etiqueta={etiqueta} resumen={resumenDe('Barras apiladas', filas.length, ['periodo', 'periodos'])} items={items} style={{ height: alto }}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={filas} margin={{ left: 0, right: 8, top: 8, bottom: 0 }} barCategoryGap={1}>
           <CartesianGrid stroke={COLOR.rejilla} vertical={false} />
-          <XAxis dataKey="x" stroke={COLOR.eje} fontSize={12} tickLine={false} interval={0} tickFormatter={formatoX} />
+          <XAxis dataKey="x" stroke={COLOR.eje} fontSize={12} tickLine={false} interval={0} tickFormatter={formatoX}
+            height={filas.some((f) => (formatoX ? formatoX(f.x) : f.x).length > 10) ? 60 : 30}
+            tick={(p) => <EtiquetaEjeX x={Number(p.x)} y={Number(p.y)} payload={p.payload} width={Number(p.width)} visibleTicksCount={p.visibleTicksCount} formato={formatoX} />} />
           <YAxis allowDecimals={false} stroke={COLOR.eje} fontSize={12} width={32} tickLine={false} axisLine={false} />
           <Tooltip cursor={{ fill: COLOR.franja }}
             content={(p) => <TooltipSeries {...p} series={series} formato={(v) => String(v)} />} />
@@ -114,7 +158,7 @@ export function BarrasApiladas({ filas, series, etiqueta, formatoX, alto = 180 }
           ))}
         </BarChart>
       </ResponsiveContainer>
-    </div>
+    </GraficaNavegable>
   )
 }
 
@@ -166,8 +210,9 @@ export function MiniSerie({ puntos, etiqueta, dominioY, ticksY, formatoY, ticksX
   guias?: { y: number; punteada?: boolean }[]
   alto?: number
 }) {
+  const items = puntos.map((p) => [p.titulo, ...(p.detalle ?? [])].join('. '))
   return (
-    <div style={{ height: alto }} role="figure" aria-label={etiqueta}>
+    <GraficaNavegable etiqueta={etiqueta} resumen={resumenDe('Serie', puntos.length, ['punto', 'puntos'])} items={items} style={{ height: alto }}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={puntos} margin={{ left: 0, right: 12, top: 8, bottom: 0 }}>
           <CartesianGrid stroke={COLOR.rejilla} vertical={false} />
@@ -189,7 +234,7 @@ export function MiniSerie({ puntos, etiqueta, dominioY, ticksY, formatoY, ticksX
             dot={PuntoMarcado} activeDot={{ r: 6, stroke: COLOR.papel, strokeWidth: 2 }} />
         </LineChart>
       </ResponsiveContainer>
-    </div>
+    </GraficaNavegable>
   )
 }
 

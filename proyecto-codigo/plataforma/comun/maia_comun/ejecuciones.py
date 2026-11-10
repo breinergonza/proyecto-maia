@@ -12,6 +12,7 @@ Una sola ejecución a la vez: el programador toma la más antigua pendiente con 
 """
 from __future__ import annotations
 
+import math
 from datetime import UTC, date, datetime
 from typing import Any
 
@@ -239,3 +240,112 @@ def cancelar(s: Session, eid: int, por: str) -> Ejecucion | None:
     e.estado, e.terminada, e.mensaje = 'error', ahora(), f'Cancelada por {por}.'
     e.parametros = {**(e.parametros or {}), 'cancelada': True}
     return e
+
+
+# ------------------------------------------------------------------ borrado a los 90 días (D17, D38)
+
+def _fecha(v) -> datetime | None:
+    if isinstance(v, datetime):
+        return v if v.tzinfo else v.replace(tzinfo=UTC)
+    try:
+        d = datetime.fromisoformat(str(v))
+    except (TypeError, ValueError):
+        return None
+    return d if d.tzinfo else d.replace(tzinfo=UTC)
+
+
+def ultimo_uso(e: Ejecucion) -> datetime | None:
+    """La última vez que se usó un modelo personal: la marca ``ultimo_uso`` (Predicción) o, si nunca se usó, cuando
+    terminó de entrenarse."""
+    marcas = [d for d in (_fecha((e.parametros or {}).get('ultimo_uso')), e.terminada) if d is not None]
+    return max(marcas) if marcas else None
+
+
+def marcar_uso(s: Session, eid: int, momento: datetime | None = None) -> None:
+    """Anota que el modelo del entrenamiento ``eid`` se usó ahora (reinicia sus 90 días)."""
+    e = s.get(Ejecucion, eid)
+    if e is not None:
+        e.parametros = {**(e.parametros or {}), 'ultimo_uso': (momento or ahora()).isoformat()}
+
+
+def _tipo_version(e: Ejecucion) -> list[tuple[str, str]]:
+    """(tipo de modelo, versión) de lo que dejó el entrenamiento en MLflow."""
+    return [(tipo, str(m['version'])) for tipo, m in ((e.resultado or {}).get('modelos') or {}).items()
+            if isinstance(m, dict) and m.get('version')]
+
+
+def versiones_de(e: Ejecucion) -> list[tuple[str, str]]:
+    """(registro, versión) de cada modelo que dejó el entrenamiento en MLflow."""
+    return [(str(m['registro']), str(m['version'])) for m in ((e.resultado or {}).get('modelos') or {}).values()
+            if isinstance(m, dict) and m.get('registro') and m.get('version')]
+
+
+def _protegidas(s: Session) -> set[tuple[str, str]]:
+    """Versiones que no se borran: las que alguna aprobación (hecha o en trámite) llevó o lleva a producción."""
+    protegidas: set[tuple[str, str]] = set()
+    for a in s.scalars(select(Ejecucion).where(Ejecucion.tipo == 'aprobacion', Ejecucion.estado != 'error')):
+        p = a.parametros or {}
+        for tipo in ('anomalias', 'clinico'):
+            if p.get(tipo):
+                protegidas.add((tipo, str(p[tipo])))
+    return protegidas
+
+
+def _en_uso(s: Session) -> set[int]:
+    """Entrenamientos que una ejecución en cola o en curso está usando (``entrenamiento_id`` o ``modelo_id``)."""
+    ids: set[int] = set()
+    for a in s.scalars(select(Ejecucion).where(Ejecucion.estado.in_(ACTIVAS))):
+        for k in ('entrenamiento_id', 'modelo_id'):
+            v = (a.parametros or {}).get(k)
+            if isinstance(v, int):
+                ids.add(v)
+    return ids
+
+
+def purgables(s: Session, momento: datetime | None = None, dias: int | None = None) -> list[Ejecucion]:
+    """Entrenamientos personales con dueño que ya se pueden borrar: los que su dueño descartó y los que llevan más de
+    ``dias`` (90 por defecto) sin uso. Nunca los que una aprobación llevó a producción ni los que algo está usando."""
+    from maia_comun import cuotas as CU
+    momento = momento or ahora()
+    dias = CU.dias_sin_uso(s) if dias is None else dias
+    limite = momento.timestamp() - dias * 86400
+    protegidas, en_uso = _protegidas(s), _en_uso(s)
+    salida = []
+    for e in s.scalars(select(Ejecucion).where(Ejecucion.tipo == 'entrenamiento', Ejecucion.estado == 'ok',
+                                               Ejecucion.solicitada_por.is_not(None)).order_by(Ejecucion.id)):
+        p = e.parametros or {}
+        if not es_personal(e) or p.get('borrado') or e.id in en_uso or protegidas & set(_tipo_version(e)):
+            continue
+        uso = ultimo_uso(e)
+        if p.get('descartado') or (uso is not None and uso.timestamp() < limite):
+            salida.append(e)
+    return salida
+
+
+def dias_para_borrar(e: Ejecucion, momento: datetime | None = None, dias: int = 90) -> int | None:
+    """Días que le quedan a un modelo personal antes del borrado por falta de uso (0 si ya toca); ``None`` si no aplica."""
+    uso = ultimo_uso(e)
+    if not es_personal(e) or e.estado != 'ok' or (e.parametros or {}).get('borrado') or uso is None:
+        return None
+    restante = (uso.timestamp() + dias * 86400 - (momento or ahora()).timestamp()) / 86400
+    return max(0, math.ceil(restante))
+
+
+def purgar(s: Session, borrar_modelo=None, momento: datetime | None = None, dias: int | None = None) -> list[int]:
+    """Borra los artefactos de lo purgable: la analítica del entrenamiento, las versiones del Model Registry (con
+    ``borrar_modelo(registro, version)``, que no debe tocar una versión con alias ``produccion``) y el registro de la
+    ejecución. La ejecución queda marcada ``borrado`` para que el historial conserve quién entrenó qué. Sin commit.
+    Devuelve los ids tratados."""
+    from maia_comun.modelos_analitica import Analitica
+    hechos = []
+    for e in purgables(s, momento, dias):
+        s.execute(Analitica.__table__.delete().where((Analitica.entrenamiento_id == e.id) |
+                                                      (Analitica.ejecucion_id == e.id)))
+        if borrar_modelo is not None:
+            for registro, version in versiones_de(e):
+                borrar_modelo(registro, version)
+        e.parametros = {**(e.parametros or {}), 'descartado': True, 'borrado': True,
+                        'borrado_en': (momento or ahora()).isoformat()}
+        e.registro = None
+        hechos.append(e.id)
+    return hechos

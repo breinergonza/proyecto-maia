@@ -409,6 +409,7 @@ def test_revision(cliente, admin, corrida):
     oxigeno = [x for x in lineas if x.startswith('Oxígeno')]
     assert oxigeno and all(x.rsplit(': ', 1)[1] in ('displasia broncopulmonar', 'sin diagnóstico') for x in oxigeno), oxigeno
     assert all('riesgo' not in m and 'percentil' not in m for m in muestra), 'la revisión es ciega'
+    assert all(isinstance(m['crecimiento'], dict) for m in muestra), 'el crecimiento del niño viene en cada caso'
     if muestra:
         assert cliente.post(f'/api/revision/riesgos/{muestra[0]["id"]}', headers=experta,
                             json={'preocupa': 'si'}).status_code == 204
@@ -622,3 +623,27 @@ def test_primera_alerta_es_la_primera_visita_en_riesgo_alto(cliente, admin, corr
             assert primera['momento'] in {p['momento'] for p in altos}
         else:
             assert primera is None
+
+
+def test_riesgo_por_visita_marca_la_primera_alerta_y_solo_lo_ve_el_experto(cliente, admin, corrida):
+    claves = [x['clave'] for x in cliente.get('/api/tablero/resumen', headers=admin).json()['riesgos_por_desenlace']]
+    desenlace = claves[0]
+    sin_pedir = cliente.get('/api/analitica/riesgo-por-visita', headers=admin, params={'desenlace': desenlace, 'n': 2})
+    assert sin_pedir.status_code == 200, sin_pedir.text
+    cuerpo = sin_pedir.json()
+    assert cuerpo['elegidos_por'] == 'mayor_riesgo' and cuerpo['umbral_percentil'] == 90 and 1 <= len(cuerpo['ninos']) <= 2
+    nino = cuerpo['ninos'][0]
+    assert nino['puntos'] and {p['clave'] for p in nino['puntos']} == {desenlace}
+    ordenes = [p['orden'] for p in nino['puntos']]
+    assert ordenes == sorted(ordenes)
+    altos = [p for p in nino['puntos'] if p['percentil'] >= 90]
+    assert (nino['primera_alerta'] is None) == (not altos)
+    if altos:
+        assert nino['primera_alerta']['orden'] == min(p['orden'] for p in altos)
+    pedido = cliente.get('/api/analitica/riesgo-por-visita', headers=admin,
+                         params={'desenlace': desenlace, 'sujetos': f'{nino["sujeto"]},no-existe'}).json()
+    assert pedido['elegidos_por'] == 'pedido' and pedido['ninos'][0]['puntos'] == nino['puntos']
+    assert 'error' in pedido['ninos'][1]
+    visor = _login(cliente, 'visor@maia.prueba', 'clave-larga-123')
+    assert cliente.get('/api/analitica/riesgo-por-visita', headers=visor, params={'desenlace': desenlace}).status_code == 403
+    assert cliente.get('/api/analitica/riesgo-por-visita', params={'desenlace': desenlace}).status_code == 401

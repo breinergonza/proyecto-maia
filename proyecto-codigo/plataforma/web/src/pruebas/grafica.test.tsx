@@ -72,3 +72,47 @@ describe('catálogo de descripciones', () => {
     }
   })
 })
+
+describe('Ver como tabla', () => {
+  const filas = [{ Grupo: 'A', Valor: 1.5 }, { Grupo: 'B', Valor: null }]
+  it('alterna entre el gráfico y la tabla con aria-pressed y recuerda la elección', () => {
+    const { unmount } = render(<Grafica titulo="Alterna" descripcion="d" exportar={{ nombre: 'a', filas }}><p>el gráfico</p></Grafica>)
+    const boton = screen.getByRole('button', { name: 'Ver como tabla' })
+    expect(boton).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByText('el gráfico')).toBeInTheDocument()
+    fireEvent.click(boton)
+    expect(boton).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByText('el gráfico')).not.toBeInTheDocument()
+    expect(screen.getByRole('table')).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Valor' })).toBeInTheDocument()
+    expect(screen.getByText('1,5')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Descargar PNG: Alterna' })).not.toBeInTheDocument()
+    unmount()
+    render(<Grafica titulo="Alterna" descripcion="d" exportar={{ nombre: 'a', filas }}><p>el gráfico</p></Grafica>)
+    expect(screen.getByRole('button', { name: 'Ver como tabla' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Ver como tabla' }))
+    expect(screen.getByText('el gráfico')).toBeInTheDocument()
+  })
+  it('sin filas no hay botón', () => {
+    render(<Grafica titulo="SinFilas" descripcion="d" exportar={{ nombre: 'a' }}><p>x</p></Grafica>)
+    expect(screen.queryByRole('button', { name: 'Ver como tabla' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Grafica con un hijo que falla', () => {
+  it('muestra el aviso sin stack y Reintentar recupera', () => {
+    let falla = true
+    function Roto() { if (falla) throw new Error('detalle técnico secreto'); return <p>ya funciona</p> }
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    render(<><Grafica titulo="Rota" descripcion="d"><Roto /></Grafica><p>otra parte</p></>)
+    const aviso = screen.getByRole('alert')
+    expect(aviso).toHaveTextContent('No se pudo mostrar la gráfica «Rota». Los demás datos de la pantalla siguen disponibles.')
+    expect(aviso).not.toHaveTextContent('secreto')
+    expect(screen.getByText('otra parte')).toBeInTheDocument()
+    falla = false
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
+    expect(screen.getByText('ya funciona')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    vi.restoreAllMocks()
+  })
+})

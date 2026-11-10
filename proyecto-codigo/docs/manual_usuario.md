@@ -31,8 +31,8 @@ la base de la Fundación).
 | Perfil (como aparece en pantalla) | Qué puede hacer |
 |---|---|
 | **Consulta** | Ver el **Tablero**, la lista de **Niños** y la historia de cada niño |
-| **Experto clínico** | Todo lo de Consulta, más **Revisión de riesgos**, **Calcular el riesgo de un niño** y **Diccionario** |
-| **Administración** | Todo lo anterior, más **Calidad de datos**, **Modelos**, **Corridas**, **Usuarios** y **Notificaciones** |
+| **Experto clínico** | Todo lo de Consulta, más **Revisión de riesgos**, **Predicción**, **Mis modelos** y **Diccionario** |
+| **Administración** | Todo lo anterior, más **Calidad de datos**, **Configuración**, **Modelos y corridas** y **Usuarios** |
 
 Si una opción del menú no aparece, su perfil no la incluye. Pida el cambio a la administración.
 
@@ -63,6 +63,11 @@ Mensajes posibles:
 **Salir.** Abajo a la izquierda aparecen sus iniciales, su nombre y su perfil. El botón de la puerta (**Cerrar sesión**)
 termina la sesión. Ciérrela siempre en computadores compartidos. Aunque no la cierre, vence sola a los pocos días.
 
+**Aviso de sesión por vencer.** Cuando la sesión está por vencer, arriba de la pantalla aparece una franja coral que dice
+«Su sesión está por vencer. Guarde su trabajo e ingrese de nuevo.»; si ya venció, dice «Su sesión venció.». La franja no
+lo saca de la pantalla ni borra lo que está haciendo: termine o guarde su trabajo y, cuando quiera, pulse **Ingresar de
+nuevo**. Al ingresar, la aplicación lo devuelve a la misma pantalla en que estaba, con sus filtros.
+
 **¿Olvidó la contraseña?** La aplicación no tiene un enlace para recuperarla. La administración le pone una nueva
 (ver [Usuarios](#usuarios)).
 
@@ -71,13 +76,40 @@ termina la sesión. Ciérrela siempre en computadores compartidos. Aunque no la 
 ## Cómo está organizada la pantalla
 
 * **Menú lateral** (en el teléfono se abre con el botón de las tres rayas, arriba a la derecha) con tres secciones:
-  * **Seguimiento:** **Tablero** y **Niños**.
-  * **Revisión clínica:** **Revisión de riesgos**, **Calcular el riesgo de un niño** y
-    **Diccionario**.
-  * **Administración:** **Calidad de datos**, **Modelos**, **Corridas**, **Usuarios** y **Notificaciones**.
-* **Contenido** en el centro.
+  * **Seguimiento:** **Tablero**, **Explorar**, **Niños** y **Analítica**.
+  * **Revisión clínica:** **Revisión de riesgos**, **Predicción**, **Mis modelos** y **Diccionario**.
+  * **Administración:** **Calidad de datos**, **Configuración**, **Modelos y corridas** y **Usuarios**.
+* **Grupos que se abren y se cierran.** **Analítica**, **Configuración** y **Modelos y corridas** son grupos: el nombre
+  lleva a su primera pantalla y la flecha de al lado muestra u oculta las demás (**General**, **Programación** y
+  **Notificaciones** dentro de Configuración; **Entrenamientos**, **Modelos** y **Corridas** dentro de Modelos y
+  corridas). El grupo en que está parado empieza abierto, pero puede cerrarlo con la flecha cuando quiera; al
+  cambiar de pantalla vuelve a abrirse solo si la nueva pantalla es parte del grupo.
+* **Buscar en el menú.** El campo de arriba filtra el propio menú mientras escribe: se ocultan las opciones que no
+  coinciden y los grupos con coincidencias se abren mostrando solo esas (si coincide el nombre del grupo, se ven todas
+  sus opciones). No distingue tildes ni mayúsculas. **Enter** va a la primera coincidencia; **Esc** o la **×** devuelven
+  el menú completo. Se enfoca con **/** o **Ctrl+K** (**⌘K** en Mac). En el teléfono está dentro del menú. Con el menú
+  plegado, la lupa lo despliega.
+* **Plegar el menú (computador).** El botón de arriba del menú (**Plegar menú** / **Desplegar menú**) lo reduce a una
+  tira de íconos, para dar más espacio al contenido; al pasar el mouse sobre un ícono se ve su nombre. Vuelva a pulsarlo
+  para dejarlo completo. La aplicación recuerda su elección en ese navegador.
+* **Contenido** en el centro. Al cambiar de pantalla, el teclado queda al inicio del contenido.
 * **Pie de página:** «Apoyo a la decisión, no diagnóstico. El riesgo ordena a los niños; la decisión es del equipo
   clínico.»
+
+### Confirmaciones
+
+Antes de una acción que cambia algo (por ejemplo desactivar un usuario, aprobar un modelo, borrar una programación o
+guardar la conexión a la base), la aplicación abre su propia ventana de confirmación, no la del navegador. Dice qué va a
+pasar, a quién afecta y si **se puede deshacer** o **no se puede deshacer**. El botón de acción lleva el nombre de lo que
+hace (no «Aceptar»); en las acciones delicadas el foco queda en **Cancelar**. Para no seguir, pulse **Cancelar**, la
+tecla Esc o haga clic fuera de la ventana: no se cambia nada y el cursor vuelve al botón con que empezó.
+
+### Términos con «¿qué significa?»
+
+Algunas palabras técnicas (por ejemplo **AUC**, **percentil**, **cron** o **falsas por 1.000**) se ven con un subrayado
+de puntos. Al pasar el mouse, enfocarlas con el teclado o tocarlas aparece una explicación corta en palabras
+corrientes; se cierra con Esc o al salir de la palabra. Las explicaciones están en el
+[glosario](#glosario-de-indicadores-y-columnas).
 
 ---
 
@@ -154,7 +186,10 @@ Al pulsar el nombre de una columna, la lista se ordena por ella; un segundo clic
 Se abre al pulsar el código de un niño en **Niños**, en **Datos por revisar** o en un correo de aviso. **Todos los
 niños** vuelve a la lista.
 
-* **Encabezado:** «Niño …», semanas de gestación al nacer, año de nacimiento, grupo y fecha de los datos.
+* **Encabezado:** «Niño …», semanas de gestación al nacer, año de nacimiento, grupo y fecha de los datos. A la derecha,
+  el botón **Imprimir ficha** abre la impresión del navegador (o permite guardar en PDF). La hoja sale solo con el
+  contenido del niño, en blanco y negro, sin menú ni botones y con la frase «Apoyo a la decisión, no diagnóstico» al pie.
+  Imprima solo donde la Fundación lo autorice (ver [Privacidad](#privacidad)).
 * **Tarjetas de riesgo** (si tiene riesgo calculado), una por desenlace:
   * Grande, **«N de 10»**: de cada 10 niños, cuántos tienen menos riesgo. Si es alto, borde coral y la marca
     **Riesgo alto** o **Riesgo muy alto**. Al pasar el mouse se ve la posición técnica.
@@ -182,12 +217,18 @@ Tablero, pero para el grupo de niños que usted elija; el Tablero no cambia y si
 
 * **Filtros (panel de la izquierda):** casillas por variable (por ejemplo sexo o categoría al nacer), con cuántos niños
   tendría cada opción. Lo elegido aparece como fichas que se quitan con la **x**. Con **+ Agregar variable** suma otras.
-  Si una variable se mide muchas veces, elija si cuenta la primera, la última, en alguna visita o en una etapa.
+  Si una variable se mide muchas veces, elija si cuenta la primera, la última, en alguna visita o en una visita concreta.
+  La **edad gestacional (categoría)** es una lista (extremo, muy prematuro, moderado o tardío, a término): cada casilla
+  es su propio tramo. Las secciones **Tiempo** y **Muestreo** acotan por fecha y fijan un tope por grupo; todo viaja en
+  la dirección, así que un enlace copiado abre el mismo filtro.
 * **Guardar este filtro:** queda en la lista de filtros guardados para volver a usarlo (por ejemplo en Predicción).
 * **Qué se ve:** niños en el grupo, datos leídos, niños con algún riesgo alto, crecimiento bajo frente a la OMS, y
   tres gráficas: riesgo del grupo, crecimiento del grupo y quiénes son los niños.
 * **Privacidad:** con menos de 20 niños no se muestran cifras; basta quitar algún filtro. Quien solo consulta ve las
   cifras menores de 100 aproximadas de 5 en 5. Los grupos de menos de 5 niños se ocultan.
+* **Cómo leer los símbolos:** una opción sin niños se ve **0**; **<5** es un dato oculto por privacidad; **—** es un grupo
+  de menos de 20 niños. Si ningún niño cumple, aparece «Ningún niño cumple estos filtros» con el botón para quitarlos.
+  El muestreo no cambia las cifras de Explorar: solo dice con cuántos niños se entrenaría.
 
 ### Analítica de los modelos
 
@@ -198,6 +239,9 @@ submódulos, como fichas arriba (en el teléfono se deslizan): **Resumen**, **Re
 
 * **Contexto de análisis:** arriba se elige el **Entrenamiento**, el **Desenlace** y se ve el modelo, su versión y la
   fecha de los datos. Queda en la dirección, así que un enlace copiado abre la misma vista. En el teléfono se pliega.
+  Además, la aplicación recuerda el último **desenlace** y la última **visita** que eligió: al volver a entrar a
+  Analítica en la misma pestaña del navegador no tiene que elegirlos de nuevo. Si abre un enlace con otros valores, mandan
+  los del enlace.
 * **Guía de lectura:** cada submódulo explica en pocas líneas cómo leerlo. Su interruptor **Modo técnico** agrega los
   términos y cifras de detalle (se recuerda en el navegador).
 * **En prueba:** un desenlace marcado así se ve, pero aún no es oficial ni genera correos.
@@ -207,13 +251,31 @@ submódulos, como fichas arriba (en el teléfono se deslizan): **Resumen**, **Re
   desenlaces entrenados desde varias visitas).
 * Un grupo con menos de 5 niños dice «n menor que 5» y no muestra cifras.
 * **Perfiles** son provisionales: edad gestacional y clasificación de Lubchenco; ningún experto los ha aprobado todavía.
-* **Comparar** pone dos entrenamientos (A y B) lado a lado; por ahora no permite aprobar B desde allí.
+* **Anticipación:** elija una familia de desenlaces y vea cuántos casos se avisaron antes, con qué ventaja, la primera
+  visita con alerta y el costo de avisar antes. Experto y administración ven además tres niños visita por visita. Solo
+  funciona si el entrenamiento se hizo con las familias «En prueba» activadas.
+* **Calibración y Población:** Calibración suma el riesgo de los niños con y sin el desenlace; Población, la muestra frente
+  a todos los niños y sus cuantiles. Un entrenamiento anterior no trae estos dos paneles y lo explica.
+* **Qué datos pesan (Interpretabilidad):** importancia de cada dato, cómo cambia el riesgo al variar un dato, los motivos más
+  frecuentes de alerta y cómo se combinan dos datos. Es **asociación, no causa**. Un entrenamiento anterior muestra solo la
+  importancia general y pide reentrenar.
+* **Comparar** pone dos entrenamientos (A y B) lado a lado, con intervalos del 95 % (aproximados) y la pestaña **Grupos de
+  niños** para comparar dos grupos. Solo la administración ve **Aprobar B**: pide confirmación, usa las anomalías en
+  producción y queda en la auditoría.
 
 ### Descripciones, PNG y CSV
 
 Cada gráfica y tabla de datos lleva bajo el título una frase fija que dice qué muestra y cómo leerla (también en el
 teléfono). Sus botones permiten llevarse el dato: **PNG** de la gráfica (con título, descripción, muestra y fecha) y
 **CSV** de las tablas de agregados. Esto vale también para las gráficas del Tablero.
+
+* **Ver como tabla:** en las gráficas con datos de filas, este botón cambia la gráfica por una tabla con los mismos
+  números, útil para leer valores exactos o para quien no distingue bien los colores. Pulse otra vez para volver a la
+  gráfica. Mientras la pantalla siga abierta, la aplicación recuerda qué eligió en cada gráfica (el botón **PNG** solo
+  está en la vista de gráfica).
+* **Recorrer con el teclado:** con el Tab llegue a la gráfica y use las flechas izquierda y derecha para pasar de un
+  punto o barra al siguiente; **Inicio** y **Fin** saltan al primero y al último. Cada valor se anuncia en voz alta para
+  los lectores de pantalla.
 
 ### Perfil del niño y primera alerta
 
@@ -275,12 +337,18 @@ precisión ajusta qué tan exigente será el modelo en el siguiente entrenamient
 Una revisión **ciega**: una muestra fija de niños (hasta 20 de riesgo alto y 20 del resto, mezclados en un orden fijo
 para esa corrida). **A propósito no se muestran ni el riesgo ni la posición.**
 
+Se ve **un niño por pantalla**, con **Anterior** y **Siguiente**; al responder pasa al siguiente sin responder.
 Cada caso muestra el número de caso, el código del niño, la visita y su fecha, el **desenlace** a evaluar y un resumen
 con lo que vería en consulta: edad gestacional, datos al nacer y lo medido en esa visita. No incluye texto libre,
 porque podría traer nombres.
 
 * **¿Le preocupa este niño?** **Sí**, **No** o **No sé**, según su criterio clínico para ese desenlace.
-* **Comentario (opcional):** igual que en Calidad de datos, escríbalo antes de responder.
+* **Motivo (opcional):** escríbalo antes de responder, porque se guarda junto con la respuesta. Mientras escribe, el
+  texto queda como **borrador** en esta pestaña del navegador: si pasa a otro niño con **Anterior** o **Siguiente**, o
+  recarga la página, lo encuentra al volver. El borrador se borra al responder o al cerrar la pestaña.
+* **Pantallas anchas:** en un computador el caso se reparte en dos columnas. A la izquierda, el niño, la visita, el
+  resumen y el crecimiento; a la derecha, la pregunta, los botones y el motivo. Así no hay que bajar para responder. En
+  el teléfono todo va en una sola columna.
 * Arriba a la derecha, la barra **Respondidos** muestra cuántos lleva de cuántos.
 
 **Por qué es ciega.** Si el modelo ordena bien, los niños de riesgo alto deberían preocupar más que el resto. Para
@@ -312,7 +380,14 @@ edita en la página, con formularios, y guarda todas sus versiones. El Excel que
 * **Historial de versiones:** cada versión con su estado, quién la subió, cuándo y su nota. Puede **Descargar**
   cualquiera o **Volver a esta**. Ninguna versión se borra.
 
-### Calcular el riesgo de un niño
+### Predicción (Experto y Administración)
+
+**Predicción** es una sola entrada del menú, con dos pestañas arriba: **Un niño** (la que abre por defecto) y **Un
+grupo de niños**. La pestaña elegida queda en la dirección (`/prediccion` y `/prediccion?vista=grupo`), así que se puede
+copiar el enlace y el botón Atrás del navegador la respeta. Con el teclado, las flechas izquierda y derecha pasan de una
+pestaña a otra. La dirección antigua `/inferencia` lleva a la pestaña **Un niño**.
+
+#### Predicción · Un niño
 
 Sirve para ver qué riesgo calcula el modelo para un niño que no está en la base, o para un caso puntual, sin escribir
 código. **No se guarda nada.** El formulario se arma solo con las variables del paquete activo, así que cambia cuando
@@ -345,37 +420,45 @@ El resultado aparece a la derecha (debajo en el celular), con las mismas palabra
 hasta 50 niños a la vez o casos que el formulario no cubre (por ejemplo, episodios de hospitalización), con
 `sujetos`, `mediciones` y `episodios` y los nombres de variable del diccionario.
 
-Si dice «No hay un paquete de modelos activo», la administración debe activar uno en **Modelos** (quien es de
+Si dice «No hay un paquete de modelos activo», la administración debe activar uno en **Modelos y corridas › Modelos** (quien es de
 administración ve el enlace; los demás ven «Pídale a la administración que active un modelo.»). Si el cálculo falla
 con los datos escritos, dice «No se pudo calcular el riesgo con estos datos. Revise los valores que escribió e intente
 de nuevo.»; el detalle técnico queda en el registro de la API.
 
 Recuerde: si escribe datos de un niño real, no ponga su nombre ni su documento; el formulario no los pide.
 
-### Predicción (Experto y Administración)
+#### Predicción · Un grupo de niños
 
 Calcula el riesgo con un modelo ya entrenado, sin guardar nada por niño.
 
 * **Modelo:** cualquier versión del registro. Un modelo de un corte anterior se puede usar, con un aviso en coral.
 * **Muestra o todo el universo:** use una muestra guardada (hecha en Explorar) o todo el universo de niños. Los niños con
   que se entrenó el modelo se dejan fuera, y la pantalla lo avisa.
-* **Resultado:** cómo se reparte el riesgo, riesgo por desenlace y los niños con más riesgo (los de riesgo alto o muy alto
-  llevan etiqueta).
+* **Resultado:** cómo se reparte el riesgo, riesgo por desenlace, el **riesgo alto en cada visita** y los niños con más
+  riesgo (los de riesgo alto o muy alto llevan etiqueta). El cálculo corre en segundo plano con barra de avance; la tabla
+  por niño se conserva **una hora** y se ve de 200 en 200 (después hay que recalcular).
 * **Niño nuevo:** elija una visita y un perfil, parta de un niño de ejemplo con valores típicos, cambie solo lo que sea
-  distinto y calcule. Con menos de 20 niños en el perfil no se da un ejemplo.
-* **Exportar CSV por niño:** solo lo ve y lo puede usar la administración; queda registrado quién lo descargó.
+  distinto y calcule. Con menos de 20 niños en el perfil no se da un ejemplo. **Guardar este niño** lo deja como niño o
+  como plantilla (las plantillas las ven todos los expertos) y se borra desde la tabla de guardados.
+* **Niños del entrenamiento:** «Dejar fuera a los niños del entrenamiento» funciona con los modelos nuevos; en un modelo
+  anterior dice «no verificable» hasta reentrenar.
+* **Exportar CSV por niño:** solo lo ve y lo puede usar la administración; queda registrado quién lo descargó. Con menos de
+  20 niños no se exporta.
 
 ### Mis modelos (Experto y Administración)
 
 Permite entrenar un modelo propio con los hiperparámetros vigentes (solo administración los cambia).
 
-* **Sus límites:** 3 modelos personales guardados y 1 entrenamiento en cola por persona. La administración no tiene límite.
+* **Sus límites:** por defecto 3 modelos personales guardados y 1 entrenamiento en cola por persona. La administración no
+  tiene límite y puede cambiar estos valores en el panel **Límites de Mis modelos**.
 * **Entrenar modelo nuevo:** nombre, descripción, datos y **Muestra de niños** (o **Armar una muestra** con filtros,
   fecha y tope por grupo). Con menos de 200 niños el aviso dice que el modelo puede salir poco confiable. El
   entrenamiento entra a la **cola**, que muestra posición, dueño y tiempo estimado; puede cancelar el suyo.
 * **Banco de modelos:** lo ven todos los expertos, con dueño, muestra, corte y AUC. La etiqueta **Personal** significa que
   no cambia el tablero ni envía correos; **Oficial** solo lo da la administración. **Corte anterior** marca un modelo de
-  un corte de datos previo: sigue usable en Predicción con aviso. Los modelos personales sin uso se borran a los 90 días.
+  un corte de datos previo: sigue usable en Predicción con aviso. Los modelos personales descartados o sin uso se borran a los
+  90 días (con un aviso «Se borra en N días» desde 14 días antes); nunca se borran los aprobados ni los que están en uso.
+  Puede filtrar por **Mostrar** y **Dueño**, y ver el AUC y **Otras medidas**. Una versión personal no se puede aprobar.
 
 ---
 
@@ -486,7 +569,7 @@ aprobar en **Entrenamientos** el paquete se arma, se sube y se activa solo; aqu�
   (**Modelo clínico**, **Modelo de anomalías**). **AUC de validación por desenlace** despliega, por desenlace, el
   **AUC** y el **Top 10 %** (de los niños que tuvieron el desenlace, qué parte estaba en el 10 % de mayor riesgo). La
   validación técnica de los modelos solo se ve aquí y en **Entrenamientos**, no en el Tablero.
-* **Activar:** pone ese paquete en uso. Las corridas y **Calcular el riesgo de un niño** usan siempre el paquete activo.
+* **Activar:** pone ese paquete en uso. Las corridas y **Predicción › Un niño** usan siempre el paquete activo.
 
 Mensajes comunes: «La firma no coincide» (el paquete se firmó con otra clave) y «El paquete se hizo con LightGBM X»
 (versiones distintas). Los dos se resuelven en el equipo técnico.
@@ -589,6 +672,29 @@ anotado en otra unidad», «la fecha no corresponde a esta visita», «cambió d
 * **Edad corregida (EC):** la edad ajustada por la prematurez, es decir, contada como si el niño hubiera nacido a
   término. En pantalla se abrevia «d» (días), «m» (meses) y «a» (años).
 
+### Términos con explicación en pantalla
+
+Estas son las definiciones que aparecen al pasar el mouse por un término subrayado (ver
+[Términos con «¿qué significa?»](#términos-con-qué-significa)):
+
+* **AUC:** qué tan bien separa el modelo a los niños con y sin el problema. 1 es perfecto; 0,5 equivale a lanzar una
+  moneda.
+* **Curva ROC:** compara los aciertos con las falsas alarmas; mientras más se aleja de la diagonal, mejor.
+* **PSI:** cuánto cambió el grupo de niños actual frente al de entrenamiento; si es alto, conviene revisar el modelo.
+* **Percentil:** lugar del niño entre todos, de 0 a 100. Un percentil 95 significa que solo 5 de cada 100 niños tienen
+  más riesgo.
+* **Calibración:** qué tanto coincide el riesgo que dice el modelo con lo que ocurre de verdad. Con 20 % de riesgo,
+  debería pasar en 2 de cada 10.
+* **Sensibilidad:** de los niños que sí tendrán el problema, qué parte detecta el modelo.
+* **Especificidad:** de los niños que no tendrán el problema, qué parte descarta bien el modelo.
+* **Brier:** error promedio de las probabilidades, de 0 a 1; más cerca de 0 es más confiable.
+* **Precisión promedio (PR-AUC):** qué tan bien acierta el modelo cuando marca a un niño en riesgo, sobre todo si el
+  problema es poco frecuente.
+* **Falsas por 1.000:** niños marcados en riesgo que no tenían el problema, por cada 1.000 revisados.
+* **Mediana:** valor del medio: la mitad de los niños tiene menos riesgo y la otra mitad, más.
+* **Cron:** forma corta de indicar cuándo se repite una tarea, con cinco campos: minuto, hora, día del mes, mes y día de
+  la semana.
+
 ### Otros términos
 
 * **Corte:** la copia de la base de la Fundación en una fecha. En las pantallas clínicas se dice «Datos al …».
@@ -607,12 +713,12 @@ anotado en otra unidad», «la fecha no corresponde a esta visita», «cambió d
 * **Correos sin datos clínicos.** Los avisos llevan solo el código, el desenlace, «más riesgo que N de cada 10 niños»
   y un enlace.
 * **Sin texto libre en la revisión ciega**, porque podría traer nombres.
-* **No escriba datos que identifiquen** (nombres, documentos, direcciones, teléfonos) en los comentarios ni en
-  **Calcular el riesgo de un niño**.
+* **No escriba datos que identifiquen** (nombres, documentos, direcciones, teléfonos) en los comentarios, en los
+  motivos ni en **Predicción › Un niño**.
 * **Los datos reales no salen del equipo de la Fundación.** La versión de demostración usa solo niños simulados.
 * **Cuide su cuenta.** No comparta su contraseña, cierre la sesión en equipos compartidos y avise a la administración
   si cree que alguien más la conoce.
-* **No saque capturas ni exportaciones con datos de niños** fuera de los canales que autorice la Fundación.
+* **No saque capturas, impresiones ni exportaciones con datos de niños** fuera de los canales que autorice la Fundación (esto incluye **Imprimir ficha**).
 * La aplicación registra los ingresos y las respuestas de revisión para auditoría.
 
 ---
@@ -642,11 +748,21 @@ Es a propósito (revisión ciega): así se puede saber si el modelo coincide con
 **¿Mis respuestas las ven los demás expertos?**
 No. Cada experto ve solo las suyas. La administración ve el resumen agregado de todos.
 
-**¿Por qué no veo Revisión de riesgos o Calcular el riesgo de un niño?**
+**¿Por qué no veo Revisión de riesgos o Predicción?**
 Su perfil es Consulta. Si necesita esas opciones, pídale a la administración el perfil de Experto clínico.
 
 **¿Por qué no veo Calidad de datos?**
 Es una opción de Administración y solo la ve el perfil de administración.
+
+**Me apareció una franja que dice «Su sesión está por vencer».**
+No pierde nada. Termine o guarde lo que está haciendo y pulse **Ingresar de nuevo**; al ingresar vuelve a la misma
+pantalla.
+
+**Escribí un motivo en Revisión de riesgos y cambié de niño. ¿Se perdió?**
+No. Queda como borrador en esa pestaña del navegador hasta que responda o la cierre.
+
+**Se fue el menú y solo veo íconos.**
+Plegó el menú. Pulse **Desplegar menú**, arriba del menú; la aplicación recuerda su elección en ese navegador.
 
 **Cambié el orden de las columnas en Niños y en otro computador no aparece.**
 El orden se guarda solo en el navegador donde lo cambió. **Columnas → Restablecer** vuelve al orden original.

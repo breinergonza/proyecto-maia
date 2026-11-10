@@ -191,12 +191,11 @@ describe('analítica: acceso y menú', () => {
 })
 
 describe('analítica: comparar', () => {
-  it('«Aprobar B» solo para administración, deshabilitado y «próximamente»', async () => {
+  it('«Aprobar B» solo para administración; sin registro de modelos queda deshabilitado y lo explica', async () => {
     api('admin')
     montar('/analitica/comparar?entrenamiento=7&desenlace=des_a')
     const boton = await screen.findByRole('button', { name: /Aprobar B/ })
-    expect(boton).toBeDisabled()
-    expect(boton).toHaveAttribute('title', 'Próximamente')
+    await waitFor(() => expect(boton).toBeDisabled())
     expect(await screen.findByText('Diferencia de B frente a A')).toBeInTheDocument()
   })
 

@@ -23,7 +23,7 @@ export function QuienesSon({ distribuciones }: { distribuciones: Record<string, 
     <>
       <LeyendaSeries series={LEYENDA} marca="barra" />
       <svg viewBox={`0 0 ${ANCHO} ${y}`} width="100%" role="img" aria-label={`Quiénes son los niños del grupo frente a todos. ${descripcion}`}
-        className="mt-1 block max-w-full" style={{ fontSize: 12 }}>
+        className="mt-1 block max-w-full" style={{ fontSize: 12.8 }}>
         {dibujo.map(({ clave, d, arriba }) => (
           <g key={clave} transform={`translate(0 ${arriba})`}>
             <text x={0} y={14} fontWeight={700} fill="currentColor">{d.etiqueta}</text>

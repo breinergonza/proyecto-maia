@@ -53,6 +53,11 @@ CASOS = {
     'sí/no con códigos': _muestra(_y('oxigeno_3m', 'si_no', [True], 'primera')),
     'sede': _muestra(_y('sede', 'lista', [1, 3])),
     'edad gestacional': _muestra(_y('eg_semanas', 'numero', [28, 32])),
+    'categorías de edad gestacional': _muestra(_y('eg_categoria', 'lista', ['muy_prematuro', 'a_termino'])),
+    'una categoría y la fecha': _muestra(_y('eg_categoria', 'lista', ['moderado_tardio']),
+                                         tiempo={'fecha': 'fecha_nacimiento', 'modo': 'periodo', 'desde': '2016'}),
+    'estratificada por categoría de edad gestacional': _muestra(muestreo={
+        'modo': 'estratificado', 'por': 'eg_categoria', 'maximo_por_categoria': 40, 'semilla': 3}),
     'primera medición': _muestra(_y('peso_3m', 'numero', [4000, 7000], 'primera')),
     'última medición': _muestra(_y('peso_6m', 'numero', [None, 8000], 'ultima')),
     'código especial -1': _muestra(_y('hematocrito', 'numero', [-1, 0], 'primera')),
@@ -182,6 +187,31 @@ def test_cargar_atributos_es_idempotente(motor, sev, corte_id):
     puestas = AT.cargar_atributos(motor, corte_id, sev.esquema)
     assert estado() == antes
     assert puestas == {'atributos': antes[0][0], 'resumen': len(sev.sujetos)}
+
+
+def test_cada_categoria_de_edad_gestacional_es_un_tramo_propio(motor, sev, corte_id):
+    """Elegir dos categorías separadas no incluye a la del medio (no es un rango continuo)."""
+    eg = sev.sujetos.set_index('sujeto').eg_semanas
+    sel = {c: {x for x in eg.index if M.categoria_eg(eg[x]) == c} for c in M.NOMBRES_EG}
+    assert all(sel.values()), 'el corte de prueba debe tener niños en las cuatro categorías'
+    with Session(motor) as s:
+        ids = set(F.ids_muestra(s, corte_id, _muestra(_y('eg_categoria', 'lista', ['extremo', 'a_termino']))))
+    assert ids == sel['extremo'] | sel['a_termino']
+    assert not ids & (sel['muy_prematuro'] | sel['moderado_tardio'])
+
+
+def test_lecturas_alguna_y_etapa_leen_solo_esa_variable(motor, sev, corte_id):
+    ids = sorted(sev.sujetos.sujeto)[:150]
+    with Session(motor) as s:
+        alguna = F.lecturas(s, corte_id, 'peso_6m', 'alguna', ids)
+        etapa = F.lecturas(s, corte_id, 'peso_6m', 'etapa:6 m EC', ids)
+        with pytest.raises(M.MuestraInvalida, match='no_hay'):
+            F.lecturas(s, corte_id, 'peso_6m', 'etapa:no_hay', ids)
+        assert F.lecturas(s, corte_id, 'peso_6m', 'alguna', []).empty
+    med = sev.mediciones[(sev.mediciones.variable == 'peso_6m') & sev.mediciones.sujeto.isin(ids) & sev.mediciones.valor.notna()]
+    assert len(alguna) == len(med) and set(alguna.sujeto) == set(med.sujeto)
+    assert etapa.sujeto.is_unique and set(etapa.sujeto) <= set(alguna.sujeto)
+
 
 
 def test_al_reemplazar_el_corte_vigente_se_van_sus_atributos(url_db_propia, sev, corte_id):

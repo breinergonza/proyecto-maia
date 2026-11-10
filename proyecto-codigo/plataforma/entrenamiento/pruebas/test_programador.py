@@ -222,3 +222,158 @@ def test_corrida_sin_modelos_aprobados_dice_que_hacer(motor):
     Programador(motor=motor, lanzar=Lanzador({'corrida': (1, salida)}), cfg=CFG).ciclo()
     e = _ultima(motor)
     assert e.estado == 'error' and e.mensaje.startswith('Todavía no hay modelos aprobados')
+
+
+# ------------------------------------------------------------------ Mis modelos: etiquetas, métricas y borrado
+
+def test_entrenamiento_personal_lleva_dueno_y_visibilidad_y_guarda_el_auc(motor):
+    import uuid
+
+    from maia_comun.modelos_db import Usuario
+    uid = uuid.uuid4()
+    with Session(motor) as s:
+        s.add(Usuario(id=uid, email='exp@maia.prueba', nombre='Exp', rol='experto', hash_clave='x'))
+        s.flush()
+        EJ.encolar(s, 'entrenamiento', 'simulado', 'manual', {'modelos': ['anomalias', 'clinico'], 'extraer': False,
+                                                              'visibilidad': 'personal'}, usuario_id=uid)
+        s.commit()
+    lanzador = Lanzador({'entrenar': (0, 'Corte 2026-06-30 (900 niños).\nRegistrado como maia-clinico-demo v7 (alias candidato).')})
+    leidas = []
+
+    def metricas(registro, version):
+        leidas.append((registro, version))
+        return {'auc__a': 0.8, 'auc__b': 0.6, 'auc_regla__a': 0.5, 'pr_auc__a': 0.3, 'top10__a': 40.0}
+
+    Programador(motor=motor, lanzar=lanzador, cfg=CFG, leer_metricas=metricas).ciclo()
+    for _, env in lanzador.llamadas:
+        assert env['MAIA_VISIBILIDAD'] == 'personal' and env['MAIA_PROPIETARIO'] == str(uid)
+    e = _ultima(motor)
+    assert e.estado == 'ok' and e.resultado['auc'] == pytest.approx(0.7)       # promedio, sin la regla simple
+    assert e.resultado['metricas']['clinico'] == {'auc': 0.7, 'pr_auc': 0.3, 'top10': 40.0}
+    assert ('maia-clinico-demo', '7') in leidas
+    with Session(motor) as s:
+        s.execute(delete(Usuario).where(Usuario.id == uid))
+        s.commit()
+
+
+def test_corrida_programada_se_registra_como_oficial_sin_dueno(motor):
+    with Session(motor) as s:
+        EJ.encolar(s, 'corrida', 'simulado', 'manual')
+        s.commit()
+    lanzador = Lanzador({'corrida': (0, 'Corrida 1 terminada en 1 min.')})
+    Programador(motor=motor, lanzar=lanzador, cfg=CFG).ciclo()
+    env = lanzador.llamadas[0][1]
+    assert env['MAIA_VISIBILIDAD'] == 'oficial' and 'MAIA_PROPIETARIO' not in env
+
+
+def test_metricas_caidas_no_hacen_fallar_el_entrenamiento(motor):
+    with Session(motor) as s:
+        EJ.encolar(s, 'entrenamiento', 'simulado', 'manual', {'modelos': ['clinico'], 'extraer': False})
+        s.commit()
+
+    def sin_mlflow(registro, version):
+        raise ConnectionError('MLflow no responde')
+
+    lanzador = Lanzador({'entrenar': (0, 'Registrado como maia-clinico-demo v7 (alias candidato).')})
+    Programador(motor=motor, lanzar=lanzador, cfg=CFG, leer_metricas=sin_mlflow).ciclo()
+    e = _ultima(motor)
+    assert e.estado == 'ok' and e.resultado['metricas'] == {} and 'auc' not in e.resultado
+
+
+def _personal(s, dias_terminada: int, version: str, dueno, tipo='entrenamiento', **parametros) -> int:
+    e = EJ.encolar(s, tipo, 'simulado', 'manual', {'visibilidad': 'personal', **parametros}, usuario_id=dueno)
+    e.estado, e.iniciada = 'ok', EJ.ahora() - timedelta(days=dias_terminada, minutes=5)
+    e.terminada = EJ.ahora() - timedelta(days=dias_terminada)
+    e.resultado = {'modelos': {'clinico': {'registro': 'maia-clinico-demo', 'version': version}}}
+    e.registro = 'salida'
+    s.flush()
+    return e.id
+
+
+def test_borrado_a_los_90_dias_solo_de_lo_propio_vencido_o_descartado(motor):
+    import uuid
+
+    from maia_comun.modelos_analitica import Analitica
+    from maia_comun.modelos_db import Usuario
+    uid = uuid.uuid4()
+    borrados: list[tuple[str, str]] = []
+    with Session(motor) as s:
+        s.add(Usuario(id=uid, email='dueno@maia.prueba', nombre='Dueño', rol='experto', hash_clave='x'))
+        s.flush()
+        vencido = _personal(s, 91, '1', uid)
+        reciente = _personal(s, 30, '2', uid)
+        usado = _personal(s, 120, '3', uid, ultimo_uso=(EJ.ahora() - timedelta(days=10)).isoformat())
+        descartado = _personal(s, 5, '4', uid, descartado=True)
+        aprobado = _personal(s, 200, '5', uid)           # una aprobación lo llevó a producción
+        en_uso = _personal(s, 200, '6', uid)             # una ejecución en cola lo usa
+        oficial = _personal(s, 400, '7', uid)
+        s.get(Ejecucion, oficial).parametros = {'visibilidad': 'oficial'}
+        sin_dueno = _personal(s, 400, '8', None)
+        ap = EJ.encolar(s, 'aprobacion', 'simulado', 'manual', {'anomalias': '1', 'clinico': '5'})
+        ap.estado = 'ok'
+        EJ.encolar(s, 'corrida', 'simulado', 'manual', {'entrenamiento_id': en_uso})
+        for eid in (vencido, reciente, aprobado):
+            s.add(Analitica(entrenamiento_id=eid, modelo='clinico', tipo='meta', datos={}))
+        s.commit()
+    prog = Programador(motor=motor, lanzar=Lanzador({}), cfg=CFG, borrar_modelo=lambda r, v: borrados.append((r, v)) or True)
+    assert sorted(prog.purgar(forzar=True)) == sorted([vencido, descartado])
+    assert sorted(v for _, v in borrados) == ['1', '4']
+    with Session(motor) as s:
+        estados = {i: s.get(Ejecucion, i) for i in (vencido, reciente, usado, descartado, aprobado, en_uso, oficial,
+                                                    sin_dueno)}
+        assert all(estados[i].parametros.get('borrado') for i in (vencido, descartado))
+        assert estados[vencido].registro is None
+        assert not any(estados[i].parametros.get('borrado') for i in (reciente, usado, aprobado, en_uso, oficial, sin_dueno))
+        quedan = {a.entrenamiento_id for a in s.scalars(select(Analitica))}
+        assert {reciente, aprobado} <= quedan and vencido not in quedan       # la analítica del vencido se borró
+        assert EJ.personales_guardados(s, uid) == 4          # reciente, usado, aprobado, en_uso siguen contando
+        s.execute(delete(Analitica).where(Analitica.entrenamiento_id.in_([reciente, aprobado])))
+        s.execute(delete(Usuario).where(Usuario.id == uid))
+        s.commit()
+    # a la hora siguiente no repite el trabajo
+    assert prog.purgar() == []
+
+
+def test_purga_respeta_los_dias_que_fija_el_admin(motor):
+    import uuid
+
+    from maia_comun.cuotas import CuotaConfig
+    from maia_comun.modelos_db import Usuario
+    uid = uuid.uuid4()
+    with Session(motor) as s:
+        s.add(Usuario(id=uid, email='dueno2@maia.prueba', nombre='Dueño', rol='experto', hash_clave='x'))
+        s.flush()
+        e30 = _personal(s, 40, '1', uid)
+        s.commit()
+    prog = Programador(motor=motor, lanzar=Lanzador({}), cfg=CFG, borrar_modelo=lambda r, v: True)
+    assert prog.purgar(forzar=True) == []                     # 40 días: aún dentro de los 90 de fábrica
+    with Session(motor) as s:
+        s.add(CuotaConfig(clave='dias_sin_uso', valor=30))
+        s.commit()
+    assert prog.purgar(forzar=True) == [e30]
+    with Session(motor) as s:
+        s.execute(delete(CuotaConfig))
+        s.execute(delete(Usuario).where(Usuario.id == uid))
+        s.commit()
+
+
+def test_purga_que_falla_en_mlflow_no_tumba_el_ciclo(motor):
+    import uuid
+
+    from maia_comun.modelos_db import Usuario
+    uid = uuid.uuid4()
+    with Session(motor) as s:
+        s.add(Usuario(id=uid, email='dueno3@maia.prueba', nombre='Dueño', rol='experto', hash_clave='x'))
+        s.flush()
+        _personal(s, 100, '1', uid)
+        s.commit()
+
+    def roto(registro, version):
+        raise ConnectionError('MLflow caído')
+
+    prog = Programador(motor=motor, lanzar=Lanzador({}), cfg=CFG, borrar_modelo=roto)
+    assert prog.ciclo() is None
+    with Session(motor) as s:   # nada quedó marcado: se reintenta después
+        assert not any((e.parametros or {}).get('borrado') for e in s.scalars(select(Ejecucion)))
+        s.execute(delete(Usuario).where(Usuario.id == uid))
+        s.commit()

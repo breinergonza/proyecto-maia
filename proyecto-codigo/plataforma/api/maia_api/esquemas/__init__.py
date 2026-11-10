@@ -379,12 +379,28 @@ class ItemCola(Base):
     cancelable: bool = False
 
 
+class CuotasConfig(Base):
+    """Los límites de Mis modelos que administra el admin (tabla ``app.cuotas_config``)."""
+    cola_max: int                            # entrenamientos en cola o en curso por persona
+    modelos_max: int                         # modelos personales guardados por persona
+    dias_sin_uso: int                        # días sin uso antes de borrar un modelo personal
+    dias_aviso: int                          # días antes del borrado en que el banco avisa
+
+
+class CuotasCambio(Base):
+    cola_max: int | None = Field(default=None, ge=0, le=50)
+    modelos_max: int | None = Field(default=None, ge=0, le=200)
+    dias_sin_uso: int | None = Field(default=None, ge=1, le=3650)
+    dias_aviso: int | None = Field(default=None, ge=0, le=365)
+
+
 class LimitesPersona(Base):
     sin_limite: bool
     cola_max: int
     cola_usada: int
     modelos_max: int
     modelos_usados: int
+    dias_sin_uso: int = 90
 
 
 class ColaEntrenamientos(Base):
@@ -409,3 +425,6 @@ class ItemBanco(Base):
     terminada: datetime | None = None
     propia: bool = False
     descartado: bool = False
+    propietario_id: uuid.UUID | None = None
+    metricas: dict[str, dict[str, float]] = Field(default_factory=dict)   # principales por modelo (AUC del clínico...)
+    vence_en_dias: int | None = None         # modelo personal: días que le quedan antes del borrado por falta de uso

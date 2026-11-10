@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { pedir } from '../api/cliente'
 import type { Rol, Usuario, UsuarioCambio } from '../api/tipos'
 import { useSesion } from '../auth/sesion'
+import { useConfirmar } from '../components/Confirmar'
 import { Aviso, Boton, Campo, Cargando, Encabezado, Entrada, Insignia, Panel, Selector, Tabla } from '../components/ui'
 import { fechaHora, ROLES } from '../lib/formato'
 
@@ -36,7 +37,7 @@ export default function AdminUsuarios() {
         Administración crea usuarios y cambia todo; un experto clínico responde las revisiones y calcula niños; consulta solo
         ve el tablero y la lista de niños.
       </Encabezado>
-      <div className="grid grid-cols-1 items-start gap-4 2xl:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="min-w-0">
           {lista.isPending ? <Cargando /> : lista.error ? <Aviso>{lista.error.message}</Aviso> : (
             <div className="rounded-panel border border-linea bg-papel p-2">
@@ -47,7 +48,7 @@ export default function AdminUsuarios() {
             </div>
           )}
         </div>
-        <Panel titulo="Nuevo usuario" className="max-w-xl 2xl:max-w-none">
+        <Panel titulo="Nuevo usuario" className="max-w-xl xl:max-w-none">
           <form className="space-y-3" noValidate onSubmit={f.handleSubmit((d) => crear.mutate(d))}>
             <Campo id="n-nombre" etiqueta="Nombre" error={e.nombre?.message}><Entrada id="n-nombre" aria-invalid={!!e.nombre} {...f.register('nombre')} /></Campo>
             <Campo id="n-email" etiqueta="Correo" error={e.email?.message}><Entrada id="n-email" type="email" aria-invalid={!!e.email} {...f.register('email')} /></Campo>
@@ -77,10 +78,21 @@ function Fila({ u }: { u: Usuario }) {
     },
   })
   const soyYo = yo?.id === u.id
+  const { confirmar, dialogo } = useConfirmar()
+  const pedirCambio = async (rol: Rol) => {
+    const ok = await confirmar({
+      titulo: 'Cambiar el perfil',
+      mensaje: <>Se cambiará el perfil de <strong>{u.nombre}</strong> de {ROLES[u.rol]} a {ROLES[rol]}.</>,
+      efecto: `Desde su próximo ingreso, ${u.nombre} verá y podrá hacer lo que permite el perfil ${ROLES[rol]}.`,
+      reversible: true, textoConfirmar: 'Cambiar perfil',
+    })
+    if (ok) cambiar.mutate({ rol })
+  }
   return (
     <>
       <tr>
         <td className="min-w-48">
+          {dialogo}
           <p className="flex flex-wrap items-center gap-2 font-semibold">
             {u.nombre}{u.activo ? <Insignia tono="teal">Activo</Insignia> : <Insignia>Inactivo</Insignia>}
           </p>
@@ -90,10 +102,7 @@ function Fila({ u }: { u: Usuario }) {
         <td>
           <label className="sr-only" htmlFor={`rol-${u.id}`}>Perfil de {u.nombre}</label>
           <Selector id={`rol-${u.id}`} className="h-8 w-40 text-sm" value={u.rol} disabled={soyYo || cambiar.isPending}
-            onChange={(e) => {
-              const rol = e.target.value as Rol
-              if (window.confirm(`¿Cambiar el perfil de ${u.nombre} de ${ROLES[u.rol]} a ${ROLES[rol]}?`)) cambiar.mutate({ rol })
-            }}>
+            onChange={(e) => void pedirCambio(e.target.value as Rol)}>
             {Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </Selector>
         </td>

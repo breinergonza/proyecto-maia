@@ -2,6 +2,8 @@
 // una serie; cada gráfica es una figura con su etiqueta para lectores de pantalla.
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { COLOR, LeyendaSeries, SERIES_COLOR, type ColorSerie } from './index'
+import { GraficaNavegable, resumenDe } from './navegacion'
+import { N_MENOR_QUE_5 } from '../../lib/lenguaje'
 
 export interface SerieXY {
   clave: string
@@ -38,10 +40,14 @@ export function CurvaXY({ series, etiqueta, ejeX, ejeY, formatoX = (v) => String
   alto?: number
 }) {
   const filas = unir(series)
+  const items = filas.map((f) => `${ejeX} ${formatoX(f.x)}. ` + series.map((s) => {
+    const v = f[s.clave]
+    return `${s.nombre}: ${typeof v === 'number' ? formatoY(v) : 'sin dato'}`
+  }).join('; '))
   return (
     <div>
       <LeyendaSeries series={series.map((s) => ({ clave: s.clave, nombre: s.nombre, color: s.color }))} />
-      <div style={{ height: alto }} role="figure" aria-label={etiqueta} className="mt-2">
+      <GraficaNavegable etiqueta={etiqueta} resumen={resumenDe('Curva', filas.length, ['punto', 'puntos'])} items={items} style={{ height: alto }} className="mt-2">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={filas} margin={{ left: 0, right: 12, top: 8, bottom: 18 }}>
             <CartesianGrid stroke={COLOR.rejilla} />
@@ -59,7 +65,7 @@ export function CurvaXY({ series, etiqueta, ejeX, ejeY, formatoX = (v) => String
             ))}
           </LineChart>
         </ResponsiveContainer>
-      </div>
+      </GraficaNavegable>
     </div>
   )
 }
@@ -69,17 +75,18 @@ export function Histograma({ tramos, etiqueta, formatoX = (v) => String(v), alto
   tramos: { desde: number | null; hasta: number | null; n: number | null }[]; etiqueta: string; formatoX?: (v: number) => string; alto?: number
 }) {
   const filas = tramos.map((t) => ({ x: t.desde != null ? formatoX(t.desde) : '', n: t.n ?? 0 }))
+  const items = tramos.map((t, i) => `${filas[i].x || `Tramo ${i + 1}`}. ${t.n == null ? N_MENOR_QUE_5 : `${t.n} niños`}`)
   return (
-    <div style={{ height: alto }} role="figure" aria-label={etiqueta}>
+    <GraficaNavegable etiqueta={etiqueta} resumen={resumenDe('Barras', tramos.length, ['tramo', 'tramos'])} items={items} style={{ height: alto }}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={filas} margin={{ left: 0, right: 12, top: 8, bottom: 0 }}>
           <CartesianGrid stroke={COLOR.rejilla} vertical={false} />
-          <XAxis dataKey="x" stroke={COLOR.eje} fontSize={11} tickLine={false} interval="preserveStartEnd" />
+          <XAxis dataKey="x" stroke={COLOR.eje} fontSize={12} tickLine={false} interval="preserveStartEnd" />
           <YAxis stroke={COLOR.eje} fontSize={12} width={40} tickLine={false} axisLine={false} allowDecimals={false} />
           <Tooltip />
           <Bar dataKey="n" name="Niños" fill={SERIES_COLOR[0]} isAnimationActive={false} />
         </BarChart>
       </ResponsiveContainer>
-    </div>
+    </GraficaNavegable>
   )
 }

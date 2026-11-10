@@ -3,14 +3,19 @@ registro y sus alias. Aprobar unas versiones candidatas deja una ejecución ``ap
 las promueve a ``produccion`` y arma el paquete; la API lo importa y lo activa (``trabajos.importar_aprobados``)."""
 from __future__ import annotations
 
+import uuid
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from maia_api.dependencias import ADMIN, EXPERTO, auditar, configuracion, sesion
 from maia_api.esquemas import (
     AprobacionEntrada,
     ColaEntrenamientos,
+    CuotasCambio,
+    CuotasConfig,
     EjecucionSalida,
     Entrenamientos,
     EntrenarAhora,
@@ -39,10 +44,13 @@ def _enlace(cfg: Configuracion, e: dict) -> str | None:
 
 @ruta.get('', response_model=Entrenamientos)
 def listar(fuente: Fuente | None = Query(None), limite: int = Query(30, ge=1, le=200),
+           propietario: uuid.UUID | None = Query(None, description='Solo lo entrenado por esta persona.'),
+           visibilidad: Literal['personal', 'oficial'] | None = Query(None),
            cfg: Configuracion = Depends(configuracion), _: Usuario = Depends(ADMIN)) -> Entrenamientos:
     lector = ML.Lector(cfg.mlflow_tracking_uri, cfg.mlflow_tracking_username, cfg.mlflow_tracking_password)
     try:
-        datos = {t: lector.entrenamientos(t, fuente, limite) for t in ML.EXPERIMENTOS}
+        datos = {t: lector.entrenamientos(t, fuente, limite, str(propietario) if propietario else None, visibilidad)
+                 for t in ML.EXPERIMENTOS}
     except ML.MlflowNoDisponible as e:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(e)) from e
     for lista in datos.values():
@@ -50,6 +58,24 @@ def listar(fuente: Fuente | None = Query(None), limite: int = Query(30, ge=1, le
             e['enlace'] = _enlace(cfg, e)
             e['metricas'] = {k: v for k, v in e['metricas'].items() if not interna(k)}
     return Entrenamientos(mlflow_url=cfg.mlflow_url_publica, **datos)
+
+
+NOMBRES = {'anomalias': 'anomalías', 'clinico': 'clínico'}
+
+
+def _es_personal(s: Session, cfg: Configuracion, tipo: str, numero: str, fuente: str) -> bool:
+    """¿Esa versión es de un usuario? Se mira lo que registró el programador (ejecución personal que dejó esa versión)
+    y, si MLflow responde, el alias ``personal`` o la etiqueta ``visibilidad`` de la versión."""
+    for e in s.scalars(select(Ejecucion).where(Ejecucion.tipo == 'entrenamiento', Ejecucion.estado == 'ok',
+                                               Ejecucion.fuente == fuente)):
+        if EJ.es_personal(e) and (tipo, str(numero)) in EJ._tipo_version(e):
+            return True
+    lector = ML.Lector(cfg.mlflow_tracking_uri, cfg.mlflow_tracking_username, cfg.mlflow_tracking_password)
+    try:
+        v = lector.version(ML.nombre_registro(tipo, fuente), numero)
+    except ML.MlflowNoDisponible:
+        return False        # el registro propio de la base ya cubrió lo que sabemos; MLflow caído no frena al admin
+    return 'personal' in (v.get('alias') or []) or (v.get('etiquetas') or {}).get('visibilidad') == 'personal'
 
 
 @ruta.post('/aprobar', response_model=EjecucionSalida, status_code=status.HTTP_202_ACCEPTED)
@@ -61,6 +87,11 @@ def aprobar(datos: AprobacionEntrada, s: Session = Depends(sesion), cfg: Configu
     if s.scalars(select(Ejecucion.id).where(Ejecucion.tipo == 'aprobacion',
                                             Ejecucion.estado.in_(EJ.ACTIVAS))).first() is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, 'Ya hay una aprobación pendiente o en curso.')
+    for tipo in ('anomalias', 'clinico'):
+        if _es_personal(s, cfg, tipo, getattr(datos, tipo), datos.fuente):
+            raise HTTPException(status.HTTP_409_CONFLICT,
+                                f'La versión {getattr(datos, tipo)} del modelo de {NOMBRES[tipo]} es un modelo personal: '
+                                'solo se aprueban modelos oficiales (alias candidato).')
     e = EJ.encolar(s, 'aprobacion', datos.fuente, 'manual',
                    {'anomalias': datos.anomalias, 'clinico': datos.clinico}, None, admin.id)
     auditar(s, admin, 'aprobar_modelos', str(e.id), datos.model_dump())
@@ -82,12 +113,12 @@ def entrenar(datos: EntrenarAhora, s: Session = Depends(sesion), cfg: Configurac
     if not es_admin and visibilidad != 'personal':
         raise HTTPException(status.HTTP_403_FORBIDDEN, 'Solo administración entrena modelos oficiales.')
     if not es_admin:
-        if EJ.activas_de(s, usuario.id) >= CU.cuota_cola():
+        if EJ.activas_de(s, usuario.id) >= CU.cuota_cola(s):
             raise HTTPException(status.HTTP_409_CONFLICT,
                                 'Ya tiene un entrenamiento en cola o en curso: espere a que termine o cancélelo.')
-        if EJ.personales_guardados(s, usuario.id) >= CU.cuota_modelos():
+        if EJ.personales_guardados(s, usuario.id) >= CU.cuota_modelos(s):
             raise HTTPException(status.HTTP_409_CONFLICT,
-                                f'Ya tiene {CU.cuota_modelos()} modelos personales guardados: descarte alguno.')
+                                f'Ya tiene {CU.cuota_modelos(s)} modelos personales guardados: descarte alguno.')
     extraer = datos.extraer if es_admin else False       # un experto entrena con el corte vigente
     if datos.muestra_id is not None and 'extraer' not in datos.model_fields_set:
         extraer = False                                  # una muestra es del corte vigente: no se extrae aparte
@@ -128,8 +159,30 @@ def entrenar(datos: EntrenarAhora, s: Session = Depends(sesion), cfg: Configurac
 
 
 def _limites(s: Session, u: Usuario) -> LimitesPersona:
-    return LimitesPersona(sin_limite=u.rol == 'admin', cola_max=CU.cuota_cola(), cola_usada=EJ.activas_de(s, u.id),
-                          modelos_max=CU.cuota_modelos(), modelos_usados=EJ.personales_guardados(s, u.id))
+    v = CU.valores(s)
+    return LimitesPersona(sin_limite=u.rol == 'admin', cola_max=v['cola_max'], cola_usada=EJ.activas_de(s, u.id),
+                          modelos_max=v['modelos_max'], modelos_usados=EJ.personales_guardados(s, u.id),
+                          dias_sin_uso=v['dias_sin_uso'])
+
+
+@ruta.get('/cuotas', response_model=CuotasConfig)
+def ver_cuotas(s: Session = Depends(sesion), _: Usuario = Depends(EXPERTO)) -> CuotasConfig:
+    """Los límites vigentes de Mis modelos (los cambia administración)."""
+    return CuotasConfig(**CU.valores(s))
+
+
+@ruta.put('/cuotas', response_model=CuotasConfig)
+def cambiar_cuotas(datos: CuotasCambio, s: Session = Depends(sesion), admin: Usuario = Depends(ADMIN)) -> CuotasConfig:
+    """Administración cambia los límites de cola, modelos guardados y días sin uso; queda en la auditoría."""
+    cambios = datos.model_dump(exclude_none=True)
+    antes = CU.valores(s)
+    try:
+        nuevos = CU.guardar(s, cambios, admin.id)
+    except ValueError as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from e
+    auditar(s, admin, 'ajustar_cuotas_modelos', 'cuotas', {'antes': antes, 'despues': nuevos})
+    s.commit()
+    return CuotasConfig(**nuevos)
 
 
 @ruta.get('/cola', response_model=ColaEntrenamientos)
@@ -182,13 +235,22 @@ def descartar(ejecucion_id: int, s: Session = Depends(sesion), u: Usuario = Depe
 
 
 @ruta.get('/banco', response_model=list[ItemBanco])
-def banco(limite: int = Query(100, ge=1, le=300), s: Session = Depends(sesion),
-          u: Usuario = Depends(EXPERTO)) -> list[ItemBanco]:
-    """El banco compartido: entrenamientos terminados (oficiales y personales) con dueño, muestra y si su corte ya
-    no es el vigente (D38). Lo ven administración y expertos."""
+def banco(limite: int = Query(100, ge=1, le=300),
+          propietario_id: uuid.UUID | None = Query(None, description='Solo los de esta persona.'),
+          mios: bool = Query(False, description='Solo los míos.'),
+          visibilidad: Literal['personal', 'oficial'] | None = Query(None),
+          s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> list[ItemBanco]:
+    """El banco compartido: entrenamientos terminados (oficiales y personales) con dueño, muestra, métricas
+    principales y si su corte ya no es el vigente (D38). Filtros por dueño y por Personal u Oficial. Lo ven
+    administración y expertos."""
+    cuotas = CU.valores(s)
     vigentes = {c.fuente: str(c.fecha_corte) for c in s.scalars(select(Corte).where(Corte.vigente.is_(True)))}
     filas = s.execute(select(Ejecucion, Usuario.nombre).outerjoin(Usuario, Usuario.id == Ejecucion.solicitada_por)
-                      .where(Ejecucion.tipo == 'entrenamiento', Ejecucion.estado == 'ok')
+                      .where(Ejecucion.tipo == 'entrenamiento', Ejecucion.estado == 'ok',
+                             *([Ejecucion.solicitada_por == (u.id if mios else propietario_id)]
+                               if mios or propietario_id else []),
+                             *([func.coalesce(Ejecucion.parametros['visibilidad'].astext, 'oficial') == visibilidad]
+                               if visibilidad else []))
                       .order_by(Ejecucion.id.desc()).limit(limite)).all()
     ids = {(e.parametros or {}).get('muestra_id') for e, _ in filas} - {None}
     titulos = {m.id: m.titulo for m in s.scalars(select(Muestra).where(Muestra.id.in_(ids)))} if ids else {}
@@ -199,13 +261,19 @@ def banco(limite: int = Query(100, ge=1, le=300), s: Session = Depends(sesion),
             continue
         corte = r.get('corte')
         auc = r.get('auc')
+        metricas = r.get('metricas') if isinstance(r.get('metricas'), dict) else {}
+        if not isinstance(auc, (int, float)):
+            auc = (metricas.get('clinico') or {}).get('auc')
+        aviso = EJ.dias_para_borrar(e, dias=cuotas['dias_sin_uso'])
         salida.append(ItemBanco(
             id=e.id, propietario=dueno, visibilidad=p.get('visibilidad', 'oficial'), nombre=p.get('nombre'),
             descripcion=p.get('descripcion'), fuente=e.fuente, modelos=list(p.get('modelos') or []),
             muestra_id=p.get('muestra_id'), muestra=titulos.get(p.get('muestra_id')), corte=corte,
             corte_anterior=bool(corte and vigentes.get(e.fuente) and corte != vigentes[e.fuente]),
             auc=auc if isinstance(auc, (int, float)) else None, terminada=e.terminada,
-            propia=e.solicitada_por == u.id, descartado=bool(p.get('descartado'))))
+            propia=e.solicitada_por == u.id, descartado=bool(p.get('descartado')),
+            propietario_id=e.solicitada_por, metricas=metricas,
+            vence_en_dias=aviso if aviso is not None and aviso <= cuotas['dias_aviso'] else None))
     return salida
 
 

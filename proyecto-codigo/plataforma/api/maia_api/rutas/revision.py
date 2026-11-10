@@ -22,10 +22,12 @@ from maia_api.consultas import (
     medidas_numericas,
     nombre_etapa,
     unidad_mostrada,
+    unidades_crecimiento,
     valor_legible,
 )
 from maia_api.dependencias import ADMIN, EXPERTO, auditar, sesion
 from maia_api.esquemas import RevisionDatoEntrada, RevisionRiesgoEntrada
+from maia_api.rutas.ninos import unidad_crecimiento
 from maia_comun.modelos_db import PERCENTIL_ALTO, AlertaDato, RevisionDato, RevisionRiesgo, Riesgo, Usuario
 from sevarti import contrato as SV
 
@@ -231,6 +233,25 @@ def _resumen_nino(s: Session, corte_id: int, sujeto: str, momento: str, esq: dic
     return lineas[:14]
 
 
+def _crecimiento_hasta(s: Session, corrida_id: int, sujeto: str, momento: str, esq: dict, mapa: dict) -> dict[str, list[dict]]:
+    """El crecimiento del niño frente a la OMS hasta la visita del riesgo (lo posterior no se muestra: el experto
+    juzga con lo que se sabía entonces). Misma forma que ``crecimiento`` de la ficha."""
+    tope = mapa.get(momento, {}).get('orden')
+    unidades = unidades_crecimiento(esq)
+    filas = s.execute(text('SELECT etapa, indicador, variable, fecha, edad_corregida, valor, z, bajo_2de, caida_1de, improbable '
+                           'FROM resultados.crecimiento WHERE corrida_id = :c AND sujeto = :s ORDER BY edad_corregida'),
+                      {'c': corrida_id, 's': sujeto})
+    serie: dict[str, list[dict]] = defaultdict(list)
+    for g in filas:
+        orden = mapa.get(g.etapa, {}).get('orden') if g.etapa else None
+        if tope is not None and orden is not None and orden > tope:
+            continue
+        d = dict(g._mapping)
+        d['unidad'] = unidad_crecimiento(esq, unidades, g.variable, g.indicador, g.etapa)
+        serie[g.indicador].append(d)
+    return dict(serie)
+
+
 @ruta.get('/riesgos')
 def riesgos(corrida_id: int | None = None, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> dict:
     c = corrida_de(s, corrida_id)
@@ -250,6 +271,7 @@ def riesgos(corrida_id: int | None = None, s: Session = Depends(sesion), u: Usua
         d = dict(f._mapping)
         d['momento_nombre'] = nombre_etapa(mapa, d['momento'])
         d['resumen'] = _resumen_nino(s, c.corte_id, f.sujeto, f.momento, esq, mapa) if c.corte_id else []
+        d['crecimiento'] = _crecimiento_hasta(s, c.id, f.sujeto, f.momento, esq, mapa)
         items.append(d)
     return {'corrida_id': c.id, 'items': items}
 

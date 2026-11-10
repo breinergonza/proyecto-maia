@@ -178,8 +178,8 @@ export const AYUDA_DOS_CIFRAS = 'El porcentaje es la probabilidad estimada de qu
 // ------------------------------------------------------------------ familias de desenlaces (trayectoria de riesgo)
 
 /** Desenlaces que son el mismo evento visto desde distintas visitas: «readm_3m» y «readm_6m» son «readm»;
- * «talla_baja_12m_desde_3» es «talla_baja_12m». */
-export const familia = (clave: string) => clave.replace(/_(desde_)?\d+[a-z]*$/, '')
+ * «talla_baja_12m_desde_3» es «talla_baja_12m»; «readm_6m_desde_pmc» (desde la entrada al programa), «readm_6m». */
+export const familia = (clave: string) => clave.replace(/_(desde_[0-9a-z]+|\d+[a-z]*)$/, '')
 
 const SUELTAS = new Set(['a', 'al', 'la', 'las', 'los', 'el', 'de', 'del', 'entre', 'antes', 'desde', 'en', 'y'])
 
