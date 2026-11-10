@@ -9,8 +9,8 @@ import { CurvaXY } from '../../components/graficos/xy'
 import { Aviso, Selector, Tabla, Vacio } from '../../components/ui'
 import { descripcionDe } from '../../lib/descripciones'
 import { dec2, num, pct } from '../../lib/formato'
-import { N_MENOR_QUE_5 } from '../../lib/lenguaje'
-import { Guia, muestraDe, PorDesenlace } from './comun'
+import { N_MENOR_QUE_5, variable } from '../../lib/lenguaje'
+import { Guia, muestraDe, PorDesenlace, useTecnico } from './comun'
 import { useContextoAnalitica } from './contexto'
 
 const fmt = (v: number) => (Math.abs(v) >= 100 ? num(Math.round(v)) : dec2(v))
@@ -75,7 +75,15 @@ function Combinacion({ d, muestra }: { d: NonNullable<DatosInterpretabilidad['in
   )
 }
 
+/** Los avisos del entrenamiento dichos en lenguaje claro (el trainer los escribe para el equipo técnico). */
+function avisoClaro(a: string) {
+  return /shap|dependencia parcial|instalad/i.test(a)
+    ? 'Este entrenamiento solo trae la importancia general de los datos. Para ver cómo cambia el riesgo, los motivos frecuentes y la combinación de datos, hay que volver a entrenar el modelo.'
+    : a
+}
+
 export default function Interpretabilidad() {
+  const { tecnico } = useTecnico()
   const { entrenamiento, desenlace } = useContextoAnalitica()
   const consulta = useSubmodulo<DatosInterpretabilidad>(entrenamiento, 'interpretabilidad', desenlace)
   const dPesan = descripcionDe('variables_pesan'), dMot = descripcionDe('motivos_frecuentes')
@@ -89,14 +97,14 @@ export default function Interpretabilidad() {
         {(datos) => {
           const sg = datos.shap_global
           const filas = sg ? sg.variables.map((i) => ({ variable: i.variable, etiqueta: i.etiqueta, pct: i.importancia_pct }))
-            : datos.importancia.map((i) => ({ variable: i.variable, etiqueta: i.variable, pct: i.importancia_pct }))
+            : datos.importancia.map((i) => ({ variable: i.variable, etiqueta: variable(tecnico, i.variable), pct: i.importancia_pct }))
           const max = Math.max(1, ...filas.map((i) => i.pct))
           const muestra = muestraDe(sg?.n)
           const completo = !!(sg || datos.pdp || datos.motivos_frecuentes || datos.interaccion)
           const mot = datos.motivos_frecuentes
           return (
             <>
-              {datos.avisos.map((a) => <Aviso key={a} tono="teal">{a}</Aviso>)}
+              {datos.avisos.map((a) => <Aviso key={a} tono="teal">{avisoClaro(a)}</Aviso>)}
               {!completo && (
                 <Vacio titulo="Este entrenamiento no trae el detalle de interpretabilidad">
                   Solo tiene la importancia general de los datos. Para ver cómo cambia el riesgo, los motivos frecuentes y la combinación de datos, vuelva a entrenar el modelo; no se recalcula en silencio.

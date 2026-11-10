@@ -7,7 +7,7 @@ import { useTrayectorias } from '../../api/analitica'
 import type { AgruparTrayectoria, EjeTrayectoria, GrupoTrayectoria, IndicadorTrayectoria } from '../../api/tipos'
 import { COLOR, LeyendaSeries, SERIES_COLOR, type ColorSerie, type Serie } from '../../components/graficos'
 import { Grafica, TablaDatos } from '../../components/grafica'
-import { Aviso, Selector, Tabla } from '../../components/ui'
+import { Aviso, Boton, Selector, Tabla, Vacio } from '../../components/ui'
 import { descripcionDe } from '../../lib/descripciones'
 import { dec2, num } from '../../lib/formato'
 import { N_MENOR_QUE_5 } from '../../lib/lenguaje'
@@ -131,7 +131,16 @@ export default function Trayectorias() {
           </Selector>
         </label>
       </div>
-      <ResultadoVivo consulta={consulta}>
+      <ResultadoVivo consulta={consulta} pendiente={(r) => r.motivo !== 'sin_riesgo' ? null : (
+        <Vacio titulo="Sin riesgo calculado para este desenlace">
+          <p>{r.mensaje}</p>
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+            <span className="font-semibold">Ver agrupado por:</span>
+            <Boton variante="secundario" chico onClick={() => setAgrupar('perfil')}>Perfil</Boton>
+            <Boton variante="secundario" chico onClick={() => setAgrupar('sexo')}>Sexo</Boton>
+          </div>
+        </Vacio>
+      )}>
         {(r) => {
           const grupos = r.grupos ?? []
           const base = `trayectorias-${indicador}-${agrupar}`
@@ -142,6 +151,7 @@ export default function Trayectorias() {
           })))
           return (
             <>
+              {r.fuente === 'validacion' && r.nota && <p className="text-sm text-salvia">{r.nota}</p>}
               {(r.etiqueta === 'En prueba' || indicador === 'peso_para_talla') && (
                 <p className="flex items-center gap-2 text-sm"><EnPrueba /> El peso para la talla aún se está validando.</p>
               )}

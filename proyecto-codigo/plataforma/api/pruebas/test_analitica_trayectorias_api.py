@@ -172,6 +172,47 @@ def test_otros_agrupamientos_y_ejes(cliente, tokens, datos):
     assert _get(cliente, tokens, 'visualizador', ruta, indicador='otro').status_code == 422
 
 
+def test_sexo_de_ambas_fuentes():
+    from maia_api.rutas.analitica import sexo_legible
+    assert [sexo_legible(v) for v in ('1', '2', '1.0', 'M', 'f', ' F ', 'Femenino')] == \
+        ['masculino', 'femenino', 'masculino', 'masculino', 'femenino', 'femenino', 'femenino']
+    assert sexo_legible(None) is None and sexo_legible('x') is None
+
+
+def test_sin_riesgo_para_el_desenlace_se_explica(cliente, tokens, datos):
+    """La corrida solo calcula el riesgo de los niños en seguimiento: sin riesgo del desenlace no es «n < 5»."""
+    t = _get(cliente, tokens, 'visualizador', f'{datos["con"]}/trayectorias', agrupar='riesgo', desenlace='otro').json()
+    assert t['estado'] == 'pendiente' and t['motivo'] == 'sin_riesgo' and 'seguimiento' in t['mensaje']
+    p = _get(cliente, tokens, 'visualizador', f'{datos["con"]}/perfiles', desenlace='otro').json()
+    assert p['riesgo_disponible'] is False and p['n_con_riesgo'] == 0 and 'seguimiento' in p['mensaje_riesgo']
+    con = _get(cliente, tokens, 'visualizador', f'{datos["con"]}/perfiles', desenlace='readm_3m').json()
+    assert con['riesgo_disponible'] is True and 'mensaje_riesgo' not in con
+
+
+def test_usa_lo_guardado_por_el_entrenamiento(cliente, tokens, datos):
+    """Con ``trayectorias_riesgo`` y ``perfiles`` guardados (niños de validación), la API los usa en vez de la corrida."""
+    from maia_entrenamiento import analitica_clinica as AL
+    tray = {'peso': {'grupos': [{'grupo': 'Riesgo alto', 'ninos': 50, 'etapas': [{'etapa': '40 sem', 'nombre': '40 semanas',
+                                                                             'orden': 0, 'n': 50, 'z_media': -1.0}]},
+                                {'grupo': 'Resto', 'ninos': 450, 'etapas': [{'etapa': '40 sem', 'nombre': '40 semanas',
+                                                                        'orden': 0, 'n': 450, 'z_media': 0.1}]}],
+                     'grupos_omitidos': 0, 'celdas_omitidas': 0}}
+    perf = {'eg': [{'categoria': 'extremo', 'etiqueta': 'Prematuro extremo', 'n': 40, 'oculto': False,
+                    'tasa_observada': 0.3, 'tasa_riesgo_alto': 0.4, 'eg_media': 26.0, 'peso_medio': None}],
+            'lubchenco': [], 'ninos': 500, 'casos': 80, 'top_riesgo_alto': 10}
+    meta = {'fuente': 'simulado', 'registro': 'maia-clinico-demo', 'version_registro': '4', 'corte': '2026-06-30'}
+    ent = AL.guardar({'otro_3m': {'rendimiento': {'auc_desenlace': {'auc': 0.7}}, 'trayectorias_riesgo': tray, 'perfiles': perf}},
+                     [{'clave': 'otro_3m', 'nombre': 'otro', 'momento': '40 sem', 'etiqueta': 'En uso'}], meta)
+    t = _get(cliente, tokens, 'visualizador', f'{ent}/trayectorias', agrupar='riesgo', desenlace='otro_3m').json()
+    assert t['estado'] == 'ok' and t['fuente'] == 'validacion' and t['individuales'] == []
+    assert [g['grupo'] for g in t['grupos']] == ['Riesgo alto', 'Resto']
+    cron = _get(cliente, tokens, 'visualizador', f'{ent}/trayectorias', agrupar='riesgo', desenlace='otro_3m', eje='cronologica').json()
+    assert cron.get('fuente') != 'validacion', 'lo guardado es por edad corregida'
+    p = _get(cliente, tokens, 'visualizador', f'{ent}/perfiles', desenlace='otro_3m').json()
+    assert p['fuente'] == 'validacion' and p['riesgo_disponible'] is True and p['ninos'] == 500
+    assert p['eg'][0]['tasa_observada'] == 0.3 and p['eg'][0]['tasa'] == 0.4
+
+
 def test_perfiles(cliente, tokens, datos):
     j = _get(cliente, tokens, 'visualizador', f'{datos["con"]}/perfiles', desenlace='readm_3m').json()
     assert j['estado'] == 'ok' and j['confianza']['aprobacion'] == 'pendiente' and j['confianza']['minimo_ninos'] == 5

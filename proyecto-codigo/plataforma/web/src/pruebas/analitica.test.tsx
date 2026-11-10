@@ -72,7 +72,8 @@ describe('analítica: contexto en la URL', () => {
   it('lee entrenamiento y desenlace de la URL, pide ese desenlace y marca «En prueba»', async () => {
     const llamadas = api('experto')
     montar('/analitica/rendimiento?entrenamiento=7&desenlace=des_b', <Ubicacion />)
-    expect(await screen.findByRole('heading', { name: 'Analítica de los modelos' })).toBeInTheDocument()
+    // el encabezado nombra el submódulo y su pregunta (plan v3.7, 6.1)
+    expect(await screen.findByRole('heading', { level: 1, name: 'Rendimiento' })).toBeInTheDocument()
     await waitFor(() => expect(screen.getByLabelText('Desenlace')).toHaveValue('des_b'))
     expect(screen.getAllByText('En prueba').length).toBeGreaterThan(0)
     await waitFor(() => expect(llamadas.some((l) => l.url === '/api/analitica/7/rendimiento?desenlace=des_b')).toBe(true))
@@ -136,14 +137,13 @@ describe('analítica: a cuántos niños se alerta', () => {
     expect(screen.getAllByText('n menor que 5').length).toBeGreaterThan(1)
   })
 
-  it('el modo técnico (guía de lectura) muestra la jerga y se recuerda', async () => {
+  it('el modo técnico (interruptor del encabezado) muestra la jerga y se recuerda', async () => {
     api('experto')
     montar('/analitica/rendimiento?entrenamiento=7&desenlace=des_a')
     await screen.findByRole('slider')
-    expect(screen.queryByText(/Sensibilidad \(recall\)/)).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Guía de lectura' }))
+    expect(screen.queryByText('Sensibilidad')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('switch', { name: 'Modo técnico' }))
-    expect(screen.getByText('Sensibilidad (recall)')).toBeInTheDocument()
+    expect(screen.getAllByText('Sensibilidad').length).toBeGreaterThan(0)
     expect(localStorage.getItem('maia.analitica.tecnico')).toBe('1')
   })
 })
@@ -160,9 +160,12 @@ describe('analítica: privacidad (n<5) en equidad', () => {
       return undefined
     })
     montar('/analitica/equidad?entrenamiento=7&desenlace=des_a')
-    const mapa = await screen.findByRole('table', { name: 'Mapa de equidad por grupo' })
-    expect(within(mapa).getAllByText('n menor que 5')).toHaveLength(5)
+    // el mapa ahora es grupo × desenlace para el «Subgrupo por» elegido (aquí, un solo desenlace)
+    const mapa = await screen.findByRole('table', { name: 'Qué tan bien ordena por grupo y desenlace' })
+    expect(within(mapa).getAllByText('n menor que 5')).toHaveLength(1)
     expect(within(mapa).getByText('0,8')).toBeInTheDocument()
+    expect(within(mapa).queryByText('0,5')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Sexo', pressed: true })).toBeInTheDocument()
   })
 })
 
@@ -170,7 +173,7 @@ describe('analítica: acceso y menú', () => {
   it('el perfil de consulta (visualizador) entra a la analítica', async () => {
     api('visualizador')
     montar('/analitica/resumen?entrenamiento=7')
-    expect(await screen.findByRole('heading', { name: 'Analítica de los modelos' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Resumen' })).toBeInTheDocument()
     expect(screen.queryByText('Sin permiso')).not.toBeInTheDocument()
   })
 
@@ -185,7 +188,7 @@ describe('analítica: acceso y menú', () => {
   it('en la analítica el grupo del menú se abre solo y lista los submódulos', async () => {
     api('experto')
     montar('/analitica/resumen?entrenamiento=7')
-    await screen.findByRole('heading', { name: 'Analítica de los modelos' })
+    await screen.findByRole('heading', { level: 1, name: 'Resumen' })
     for (const s of SUBMODULOS) expect(screen.getAllByRole('link', { name: s.texto }).length).toBeGreaterThan(0)
   })
 })
@@ -204,5 +207,18 @@ describe('analítica: comparar', () => {
     montar('/analitica/comparar?entrenamiento=7&desenlace=des_a')
     await screen.findByText('Entrenamiento B')
     expect(screen.queryByRole('button', { name: /Aprobar B/ })).not.toBeInTheDocument()
+  })
+})
+
+describe('analítica: sin riesgo calculado para el desenlace', () => {
+  it('Trayectorias lo explica y ofrece agrupar por perfil o sexo', async () => {
+    api('experto', (url) => (url.startsWith('/api/analitica/7/trayectorias')
+      ? { cuerpo: { estado: 'pendiente', entrenamiento: 7, submodulo: 'trayectorias', motivo: 'sin_riesgo', grupos: [],
+        mensaje: 'La última corrida no calculó el riesgo de este desenlace: el riesgo se calcula solo para los niños que siguen en seguimiento.' } }
+      : undefined))
+    montar('/analitica/trayectorias?entrenamiento=7&desenlace=des_a')
+    expect(await screen.findByText(/siguen en seguimiento/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Perfil' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Sexo' })).toBeInTheDocument()
   })
 })

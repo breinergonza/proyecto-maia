@@ -27,11 +27,15 @@ MAX_FILAS = 200_000          # submuestra para lo pesado (bootstrap, PSI): predi
 PRIMER_ID_PROPIO = 1_000_000  # entrenamientos sin ejecución (CLI a mano): numeración aparte de las ejecuciones
 SUBMODULOS_CALCULADOS = ('resumen', 'rendimiento', 'calibracion', 'poblacion', 'equidad', 'estabilidad',
                          'interpretabilidad')
-# trayectorias y perfiles se calculan al pedirlos (de resultados.crecimiento y los perfiles al nacer); la anticipación
-# solo existe si el entrenamiento incluyó desenlaces «_desde_N»
+# trayectorias y perfiles se calculan al pedirlos (de resultados.crecimiento y los perfiles al nacer); además, aquí se
+# guardan sus agregados por riesgo con los niños de validación (``trayectorias_riesgo`` y ``perfiles``), porque la
+# corrida solo calcula el riesgo de los niños en seguimiento. La anticipación solo existe si el entrenamiento incluyó
+# desenlaces «_desde_N»
 SUBMODULOS_PENDIENTES = ('anticipacion',)
 BANDAS_EG = ((28, 'menos de 28 semanas'), (32, '28 a 31 semanas'), (37, '32 a 36 semanas'))
 ROTULO_SEXO = {1: 'masculino', 2: 'femenino'}
+TOP_RIESGO_ALTO = 10          # % de los niños de validación con más riesgo que forman el grupo «Riesgo alto» (D19)
+INDICADORES_TRAYECTORIA = ('peso', 'talla', 'perimetro_cefalico')
 
 
 def activa() -> bool:
@@ -108,6 +112,92 @@ def _avisos_shap() -> list[str]:
     return []   # SHAP, dependencia parcial, motivos e interacción: ``analitica_interpretabilidad`` (contribuciones de LightGBM)
 
 
+def _riesgo_alto(r: np.ndarray) -> np.ndarray:
+    """Verdadero para los k = 10 % niños de validación con más riesgo, contados igual que en Rendimiento
+    (``AN.metricas_top``: el mismo orden con empates al azar con semilla y k = round(n · 10 / 100)). Los empates en
+    el corte no agrandan el grupo (con LightGBM son frecuentes y lo llevaban al 20 %)."""
+    r = np.asarray(r, dtype=float)
+    k = max(1, int(round(len(r) * TOP_RIESGO_ALTO / 100)))
+    alto = np.zeros(len(r), dtype=bool)
+    alto[AN._orden(r)[:k]] = True
+    return alto
+
+
+def crecimiento_largo(modelo, p) -> pd.DataFrame:
+    """Los puntajes z de crecimiento de la validación en largo: ``sujeto``, ``etapa``, ``indicador``, ``variable``,
+    ``x`` (edad corregida en meses), ``z`` y ``valor``; sin los datos improbables."""
+    c = modelo.crecimiento(p)
+    if c is None or not len(c):
+        return pd.DataFrame(columns=['sujeto', 'etapa', 'indicador', 'variable', 'x', 'z', 'valor'])
+    c = c[~c.improbable.fillna(False).astype(bool) & c.z.notna()]
+    return pd.DataFrame({
+        'sujeto': c.sujeto.astype(str).to_numpy(), 'etapa': c.etapa.to_numpy(), 'indicador': c.concepto.astype(str).to_numpy(),
+        'variable': c.variable.to_numpy(), 'x': (pd.to_numeric(c.ec_dias, errors='coerce') / AN.DIAS_POR_MES).to_numpy(),
+        'z': pd.to_numeric(c.z, errors='coerce').to_numpy(),
+        'valor': pd.to_numeric(p.x.reindex(c.index), errors='coerce').to_numpy()})
+
+
+def trayectorias_riesgo(d: dict, crec: pd.DataFrame, orden: dict, nombres: dict, unidades: dict) -> dict:
+    """Por indicador, el puntaje z por visita de los niños de validación en «Riesgo alto» (10 % con más riesgo) y en
+    el «Resto». Solo agregados (D7): ``AN.trayectorias`` omite celdas de menos de 5 niños y grupos pequeños."""
+    grupo = pd.Series(np.where(_riesgo_alto(d['r']), 'Riesgo alto', 'Resto'), index=d['variables'].index.astype(str))
+    sal = {}
+    for indicador in INDICADORES_TRAYECTORIA:
+        df = crec[(crec.indicador == indicador) & crec.sujeto.isin(grupo.index)].copy()
+        if df.empty:
+            continue
+        df['grupo'] = df.sujeto.map(grupo)
+        r = AN.trayectorias(df, orden, nombres, lambda variable, etapa: unidades.get(variable))
+        if r['grupos']:
+            sal[indicador] = r
+    return sal
+
+
+def perfiles_desenlace(d: dict, sev) -> dict:
+    """Perfiles provisionales de los niños de validación con la **tasa observada** del desenlace y la proporción en
+    riesgo alto. Categorías de menos de 5 niños ocultas (D4)."""
+    from types import SimpleNamespace
+    ids = pd.Index(d['variables'].index.astype(str))
+    suj = sev.sujetos.assign(sujeto=sev.sujetos.sujeto.astype(str)).drop_duplicates('sujeto')
+    sub = SimpleNamespace(sujetos=suj[suj.sujeto.isin(ids)][['sujeto', 'eg_semanas']],
+                          mediciones=sev.mediciones.assign(sujeto=sev.mediciones.sujeto.astype(str)))
+    observada = AN.resumen_perfiles_ampliado(sub, pd.DataFrame({'sujeto': ids, 'evento': d['y'].astype(int)}))
+    alto = AN.resumen_perfiles_ampliado(sub, pd.DataFrame({'sujeto': ids, 'evento': _riesgo_alto(d['r']).astype(int)}))
+    for clave in ('eg', 'lubchenco'):
+        tasas_alto = {f['categoria']: f['tasa'] for f in alto[clave]}
+        for f in observada[clave]:
+            f['tasa_observada'] = f.pop('tasa')
+            f['tasa_riesgo_alto'] = tasas_alto.get(f['categoria'])
+    return AN.limpio({**observada, 'ninos': int(len(ids)), 'casos': int(d['y'].sum()), 'top_riesgo_alto': TOP_RIESGO_ALTO})
+
+
+def agregar_vivos(resultados: dict, modelo, p, preds: dict) -> None:
+    """Agrega a cada desenlace ``trayectorias_riesgo`` y ``perfiles`` (de los niños de validación). Un fallo deja aviso."""
+    try:
+        crec = crecimiento_largo(modelo, p)
+    except Exception as e:  # noqa: BLE001  (sin crecimiento no hay trayectorias; los perfiles siguen)
+        _aviso(f'no se pudo leer el crecimiento de la validación ({type(e).__name__}: {e}).')
+        crec = pd.DataFrame(columns=['sujeto', 'etapa', 'indicador', 'variable', 'x', 'z', 'valor'])
+    try:
+        et, esq = p.sev.etapas, p.sev.esquema
+        orden = dict(zip(et.etapa, et.orden))
+        nombres = dict(zip(et.etapa, et.nombre)) if 'nombre' in et else {}
+        unidades = {v: (str(u).strip() or None) for v, u in zip(esq.variable, esq.unidad) if isinstance(u, str)}
+    except Exception as e:  # noqa: BLE001  (sin etapas ni esquema no hay trayectorias ni perfiles; el resto sigue)
+        _aviso(f'no se pudieron leer las etapas o el esquema de la validación ({type(e).__name__}: {e}).')
+        return
+    for clave, d in preds.items():
+        if clave not in resultados:
+            continue
+        try:
+            t = trayectorias_riesgo(d, crec, orden, nombres, unidades)
+            if t:
+                resultados[clave]['trayectorias_riesgo'] = AN.limpio(t)
+            resultados[clave]['perfiles'] = perfiles_desenlace(d, p.sev)
+        except Exception as e:  # noqa: BLE001  (un desenlace que falla no frena a los demás)
+            _aviso(f'no se pudieron calcular trayectorias o perfiles de {clave} ({type(e).__name__}: {e}).')
+
+
 def anticipacion_artefactos(preds: dict[str, dict], orden: dict[str, int], top_pct: int = 10,
                             etapa_de_variable: dict[str, str] | None = None) -> dict[str, dict]:
     """El artefacto ``anticipacion`` de cada familia de desenlaces con modelos desde varias visitas (D20, D50); el
@@ -134,6 +224,7 @@ def calcular(modelo, p) -> tuple[dict[str, dict[str, dict]], list[dict]]:
         des = d['desenlace']
         descripcion.append({'clave': clave, 'nombre': des.nombre, 'momento': des.momento,
                             'etiqueta': 'En prueba' if AN.familia_desde(clave) else 'En uso'})
+    agregar_vivos(resultados, modelo, p, preds)
     try:
         AI.agregar(resultados, modelo, preds)
     except Exception as e:  # noqa: BLE001  (la interpretabilidad no rompe el resto de la analítica)

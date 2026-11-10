@@ -1,6 +1,7 @@
 // Piezas comunes de los submódulos de analítica: modo técnico, guía de lectura, estados vacíos y formatos.
 import type { UseQueryResult } from '@tanstack/react-query'
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
 import type { RespuestaAnalitica } from '../../api/tipos'
 import { puede, useSesion } from '../../auth/sesion'
@@ -29,30 +30,50 @@ export function ProveedorTecnico({ children }: { children: ReactNode }) {
   return <Tecnico.Provider value={valor}>{children}</Tecnico.Provider>
 }
 
-/** «Guía de lectura» de un submódulo: explicación breve y el interruptor del modo técnico. */
-export function Guia({ children }: { children: ReactNode }) {
-  const [abierta, setAbierta] = useState(false)
+/** El lugar del encabezado donde cada submódulo pone su «Guía de lectura» (lo fija `AnaliticaLayout`). */
+export const RanuraGuia = createContext<HTMLElement | null>(null)
+
+/** Interruptor del modo técnico: muestra la jerga y las cifras completas. */
+export function InterruptorTecnico() {
   const { tecnico, fijar } = useTecnico()
   return (
-    <div className="mb-4">
+    <label className="flex items-center gap-2 text-sm font-semibold text-salvia">
+      <button type="button" role="switch" aria-checked={tecnico} aria-label="Modo técnico" onClick={() => fijar(!tecnico)}
+        className={cn('relative h-6 w-11 shrink-0 rounded-full border transition-colors', tecnico ? 'border-teal bg-teal' : 'border-linea bg-fondo')}>
+        <span className={cn('absolute top-0.5 size-4.5 rounded-full bg-papel shadow-suave transition-all', tecnico ? 'left-5.5' : 'left-0.5')} />
+      </button>
+      Modo técnico
+    </label>
+  )
+}
+
+/** «Guía de lectura» de un submódulo: un botón en el encabezado que despliega una explicación breve. */
+export function Guia({ children }: { children: ReactNode }) {
+  const [abierta, setAbierta] = useState(false)
+  const ranura = useContext(RanuraGuia)
+  const caja = useRef<HTMLDivElement>(null)
+  useEffect(() => {   // se cierra con Escape o al hacer clic fuera
+    if (!abierta) return
+    const tecla = (e: KeyboardEvent) => e.key === 'Escape' && setAbierta(false)
+    const clic = (e: MouseEvent) => { if (caja.current && !caja.current.contains(e.target as Node)) setAbierta(false) }
+    document.addEventListener('keydown', tecla)
+    document.addEventListener('mousedown', clic)
+    return () => { document.removeEventListener('keydown', tecla); document.removeEventListener('mousedown', clic) }
+  }, [abierta])
+  const guia = (
+    <div ref={caja} className="relative">
       <Boton variante="secundario" chico aria-expanded={abierta} aria-controls="guia-lectura" onClick={() => setAbierta(!abierta)}>
         Guía de lectura
       </Boton>
       {abierta && (
-        <div id="guia-lectura" className="mt-2 rounded-panel border border-linea bg-teal-tinte/50 p-4 text-sm">
-          <div className="max-w-[70ch] space-y-2">{children}</div>
-          <label className="mt-3 flex items-center gap-2 font-semibold">
-            <button type="button" role="switch" aria-checked={tecnico} aria-label="Modo técnico" onClick={() => fijar(!tecnico)}
-              className={cn('relative h-6 w-11 shrink-0 rounded-full border transition-colors', tecnico ? 'border-teal bg-teal' : 'border-linea bg-fondo')}>
-              <span className={cn('absolute top-0.5 size-4.5 rounded-full bg-papel shadow-suave transition-all', tecnico ? 'left-5.5' : 'left-0.5')} />
-            </button>
-            Modo técnico
-            <span className="font-normal text-salvia">Muestra la jerga y las cifras completas.</span>
-          </label>
+        <div id="guia-lectura" role="region" aria-label="Guía de lectura"
+          className="absolute right-0 z-20 mt-2 w-[min(28rem,calc(100vw-2rem))] rounded-panel border border-linea bg-papel p-4 text-sm shadow-elevada">
+          <div className="space-y-2">{children}</div>
         </div>
       )}
     </div>
   )
+  return ranura ? createPortal(guia, ranura) : <div className="mb-4">{guia}</div>
 }
 
 // ------------------------------------------------------------------ estados de la respuesta
@@ -125,3 +146,48 @@ export function useNombreDesenlace() {
 /** El pie de las exportaciones: con cuántos niños se calculó. */
 export const muestraDe = (n?: number | null, casos?: number | null) =>
   n == null ? undefined : `${n} niños${casos != null ? `, ${casos} casos` : ''}`
+
+// ------------------------------------------------------------------ aciertos y errores de la alerta (2×2)
+export type ModoMatriz = 'conteos' | 'fila' | 'total'
+interface Confusion { tp: number | null; fp: number | null; fn: number | null; tn: number | null }
+
+/** La matriz de aciertos y errores como un cuadro de 2×2: conteos, % por fila (de los que tuvieron o no el desenlace)
+ *  o % del total. Las celdas con menos de 5 niños dicen «n menor que 5» y no entran en los porcentajes. */
+export function MatrizAlerta({ c, modo = 'conteos', compacta }: { c: Confusion; modo?: ModoMatriz; compacta?: boolean }) {
+  const suma = (...v: (number | null)[]) => (v.some((x) => x == null) ? null : v.reduce<number>((a, b) => a + (b ?? 0), 0))
+  const total = suma(c.tp, c.fp, c.fn, c.tn), casos = suma(c.tp, c.fn), sanos = suma(c.fp, c.tn)
+  const texto = (v: number | null, base: number | null) => {
+    if (v == null) return N_MENOR_QUE_5
+    if (modo === 'conteos') return v.toLocaleString('es-CO')
+    const b = modo === 'fila' ? base : total
+    return b ? pct((100 * v) / b) : '—'
+  }
+  const celda = 'grid place-content-center rounded-control text-center leading-tight'
+  const alto = compacta ? 'h-16' : 'h-20'
+  const cifra = compacta ? 'text-xl' : 'text-2xl'
+  return (
+    <div role="table" aria-label="Aciertos y errores de la alerta" className="grid grid-cols-[4.5rem_1fr_1fr] gap-1 text-xs text-salvia">
+      <span role="row" className="contents">
+        <span role="columnheader" />
+        <span role="columnheader" className="text-center font-semibold">Con alerta</span>
+        <span role="columnheader" className="text-center font-semibold">Sin alerta</span>
+      </span>
+      <span role="row" className="contents">
+        <span role="rowheader" className="self-center">Tuvo el desenlace</span>
+        <span role="cell" className={cn(celda, alto, 'bg-teal text-white')}><b className={cn(cifra, 'tabular-nums')}>{texto(c.tp, casos)}</b>detectados</span>
+        <span role="cell" className={cn(celda, alto, 'bg-coral-tinte text-coral-hondo')}><b className={cn(cifra, 'tabular-nums')}>{texto(c.fn, casos)}</b>no detectados</span>
+      </span>
+      <span role="row" className="contents">
+        <span role="rowheader" className="self-center">No lo tuvo</span>
+        <span role="cell" className={cn(celda, alto, 'bg-ocre-tinte text-ocre-hondo')}><b className={cn(cifra, 'tabular-nums')}>{texto(c.fp, sanos)}</b>falsas alarmas</span>
+        <span role="cell" className={cn(celda, alto, 'bg-teal-tinte text-teal')}><b className={cn(cifra, 'tabular-nums')}>{texto(c.tn, sanos)}</b>sin falsa alarma</span>
+      </span>
+    </div>
+  )
+}
+
+/** Enlace «Ver ›» a otro submódulo conservando el contexto de la URL. */
+export function IrA({ submodulo, children }: { submodulo: string; children: ReactNode }) {
+  const { search } = useContextoAnalitica()
+  return <Link to={{ pathname: `/analitica/${submodulo}`, search }} className="text-sm font-semibold text-teal hover:underline">{children} ›</Link>
+}

@@ -1,4 +1,6 @@
-// Población: embudo de la muestra, casos por desenlace y datos faltantes.
+// Población (plan v3.7, 6.3.6): cifras de la muestra, embudo, muestra frente a todos los niños, datos faltantes con su
+// límite (30 %) y casos por desenlace con aviso de pocos casos (menos de 100) y la nota de psicomotor «por definición».
+import { useState } from 'react'
 import { useSubmodulo } from '../../api/analitica'
 import type { DatosPoblacion } from '../../api/tipos'
 import { Grafica, TablaDatos } from '../../components/grafica'
@@ -6,15 +8,25 @@ import { BarrasAgrupadas } from '../../components/graficos/distribuciones'
 import { Aviso, Cifra, Panel, Tabla } from '../../components/ui'
 import { descripcionDe } from '../../lib/descripciones'
 import { dec2, frase, num, pct } from '../../lib/formato'
-import { N_MENOR_QUE_5 } from '../../lib/lenguaje'
-import { Guia, omitida, PorDesenlace, pctN } from './comun'
+import { cn } from '../../lib/cn'
+import { N_MENOR_QUE_5, nombreVariable, variable } from '../../lib/lenguaje'
+import { Guia, omitida, PorDesenlace, pctN, useNombreDesenlace, useTecnico } from './comun'
 import { useContextoAnalitica } from './contexto'
+
+/** Porcentaje de niños sin un dato desde el que se pinta en coral, y casos por debajo de los que se avisa. */
+const LIMITE_FALTANTES = 30
+const POCOS_CASOS = 100
+const FALTANTES_VISIBLES = 8
 
 const textoEtapa = (e: Record<string, string | number | null>) => String(e.etapa ?? e.nombre ?? e.paso ?? e.filtro ?? e.descripcion ?? '—')
 
 export default function Poblacion() {
+  const { tecnico } = useTecnico()
   const { entrenamiento, desenlace } = useContextoAnalitica()
   const consulta = useSubmodulo<DatosPoblacion>(entrenamiento, 'poblacion', desenlace)
+  const todos = useSubmodulo<DatosPoblacion>(entrenamiento, 'poblacion')   // todos los desenlaces, para «casos por desenlace»
+  const nombreDes = useNombreDesenlace()
+  const [verTodos, setVerTodos] = useState(false)
   const dEmb = descripcionDe('embudo'), dEv = descripcionDe('eventos'), dNul = descripcionDe('datos_faltantes')
   const dMu = descripcionDe('muestra_universo'), dMuNum = descripcionDe('muestra_universo_numerica')
   return (
@@ -27,14 +39,21 @@ export default function Poblacion() {
           const max = Math.max(1, ...d.embudo.map((e) => Number(e.n ?? 0)))
           const mu = d.distribuciones_muestra_universo
           const categoricas = Object.entries(mu?.categoricas ?? {})
+          const nulos = [...d.nulos].sort((x, y) => (y.nulos_pct ?? -1) - (x.nulos_pct ?? -1))
+          const porDesenlace: [string, DatosPoblacion['eventos']][] = todos.data?.estado === 'ok' && Object.keys(todos.data.desenlaces ?? {}).length
+            ? Object.entries(todos.data.desenlaces ?? {}).map(([c, x]) => [c, x.eventos] as [string, DatosPoblacion['eventos']]).sort(([, a], [, b]) => (b.casos ?? 0) - (a.casos ?? 0))
+            : [[desenlace ?? '', d.eventos]]
+          const maxCasos = Math.max(1, ...porDesenlace.map(([, e]) => e.casos ?? 0))
           const numericas = Object.entries(mu?.numericas ?? {})
           return (
             <>
-              <Panel titulo={dEv.titulo} descripcion={dEv.descripcion}>
-                <div className="grid gap-4 sm:grid-cols-3">
+              <Panel titulo="La muestra en cifras" descripcion="Con cuántos niños y casos se valida el modelo para este desenlace.">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <Cifra valor={num(d.eventos.niños)} texto="niños evaluados" />
                   <Cifra valor={omitida(d.eventos.casos, num)} texto="casos del desenlace" />
                   <Cifra valor={d.eventos.tasa != null ? pct(100 * d.eventos.tasa) : '—'} texto="de los niños tuvo el desenlace" />
+                  <Cifra valor={num(d.nulos.filter((n) => (n.nulos_pct ?? 0) > 50).length)} tono={d.nulos.some((n) => (n.nulos_pct ?? 0) > 50) ? 'coral' : undefined}
+                    texto="datos faltan en más de la mitad de los niños" />
                 </div>
               </Panel>
               {d.embudo.length > 0 && (
@@ -88,13 +107,53 @@ export default function Poblacion() {
                   ))}
                 </>
               )}
-              <TablaDatos titulo={dNul.titulo} descripcion={dNul.descripcion}
-                exportar={{ nombre: 'poblacion-faltantes', filas: d.nulos.map((n) => ({ dato: n.variable, sin_dato_pct: n.nulos_pct })) }}>
-                <Tabla densa>
-                  <thead><tr><th>Dato</th><th>Niños sin el dato</th></tr></thead>
-                  <tbody>{d.nulos.map((n) => <tr key={n.variable}><td>{n.variable}</td><td>{pctN(n.nulos_pct)}</td></tr>)}</tbody>
-                </Tabla>
-              </TablaDatos>
+              <div className="grid gap-4 xl:grid-cols-2">
+              <Grafica titulo={dNul.titulo} descripcion={`Porcentaje de niños sin el dato. La raya es el límite aceptable (${LIMITE_FALTANTES} %); en coral, los que lo pasan.`}
+                exportar={{ nombre: 'poblacion-faltantes', filas: nulos.map((n) => ({ dato: nombreVariable(n.variable), sin_dato_pct: n.nulos_pct })) }}>
+                <ul role="figure" aria-label="Porcentaje de niños sin cada dato" className="space-y-2">
+                  {(verTodos ? nulos : nulos.slice(0, FALTANTES_VISIBLES)).map((n) => {
+                    const alto = (n.nulos_pct ?? 0) > LIMITE_FALTANTES
+                    return (
+                      <li key={n.variable} className="grid grid-cols-[minmax(8rem,15rem)_1fr_4rem] items-center gap-2 text-sm">
+                        <span className="leading-tight">{variable(tecnico, n.variable)}</span>
+                        <span className="relative h-3 rounded-full bg-fondo">
+                          <span className={cn('block h-3 rounded-full', alto ? 'bg-coral-hondo' : 'bg-teal-medio')} style={{ width: `${n.nulos_pct ?? 0}%` }} />
+                          <span className="absolute -inset-y-1 w-0.5 bg-tinta" style={{ left: `${LIMITE_FALTANTES}%` }} aria-hidden />
+                        </span>
+                        <span className={cn('text-right tabular-nums', alto && 'font-bold text-coral-hondo')}>{pctN(n.nulos_pct)}</span>
+                      </li>
+                    )
+                  })}
+                </ul>
+                {nulos.length > FALTANTES_VISIBLES && (
+                  <button type="button" onClick={() => setVerTodos(!verTodos)} className="mt-3 text-sm font-semibold text-teal hover:underline">
+                    {verTodos ? 'Ver menos' : `Ver los ${nulos.length} datos`}
+                  </button>
+                )}
+              </Grafica>
+              <Panel titulo={dEv.titulo} descripcion={`Cuántos casos hay para validar en cada desenlace; con menos de ${POCOS_CASOS} el modelo es poco confiable.`}>
+                <ul className="space-y-2.5">
+                  {porDesenlace.map(([clave, ev]) => {
+                    const pocos = ev.casos != null && ev.casos < POCOS_CASOS
+                    return (
+                      <li key={clave} className="grid grid-cols-[minmax(8rem,15rem)_1fr_3.5rem] items-center gap-2 text-sm">
+                        <span className={cn('leading-tight', clave === desenlace && 'font-semibold')}>{nombreDes(clave).nombre}{nombreDes(clave).enPrueba ? ' (En prueba)' : ''}</span>
+                        <span className="relative h-3 rounded-full bg-fondo">
+                          <span className={cn('block h-3 rounded-full', pocos ? 'bg-ocre' : 'bg-teal-medio')} style={{ width: `${(100 * (ev.casos ?? 0)) / maxCasos}%` }} />
+                          {maxCasos > POCOS_CASOS && <span className="absolute -inset-y-1 w-0.5 bg-tinta" style={{ left: `${(100 * POCOS_CASOS) / maxCasos}%` }} aria-hidden />}
+                        </span>
+                        <span className={cn('text-right tabular-nums font-semibold', pocos && 'text-ocre-hondo')}>{omitida(ev.casos, num)}</span>
+                      </li>
+                    )
+                  })}
+                </ul>
+                {porDesenlace.some(([clave]) => /psicomotor/i.test(nombreDes(clave).nombre)) && (
+                  <p className="mt-3 rounded-control bg-ocre-tinte p-3 text-sm text-ocre-hondo">
+                    Desarrollo psicomotor bajo es, <b>por definición</b>, el 10 % más bajo de los niños del entrenamiento: sus «casos» no son un retraso clínico diagnosticado.
+                  </p>
+                )}
+              </Panel>
+              </div>
             </>
           )
         }}

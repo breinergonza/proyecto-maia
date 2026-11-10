@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from maia_api.consultas import corrida_de, esquema, etapas, medidas_numericas
 from maia_api.dependencias import CUALQUIERA, sesion
+from maia_api.poblacion import VARIABLES_SEXO
 from maia_api.rutas import analitica_anticipacion as anticipacion
 from maia_api.rutas import analitica_comparar as comparar
 from maia_api.rutas.ninos import _variables_perfil, unidad_crecimiento
@@ -37,8 +38,11 @@ EXTRAS = {'calibracion': ('hist_riesgo',), 'poblacion': ('distribuciones_muestra
 EN_VIVO = ('trayectorias', 'perfiles')   # se calculan al pedirlos (de crecimiento y riesgos), no son artefactos guardados
 INDICADORES = {'peso': 'Peso para la edad', 'talla': 'Talla para la edad',
                'perimetro_cefalico': 'Perímetro cefálico para la edad', 'peso_para_talla': 'Peso para la talla'}
-SEXOS = {'1': 'masculino', '2': 'femenino'}
-VARIABLE_SEXO = 'ern_sexo'
+# el sexo viene como 1/2 en la base de la Fundación (ern_sexo) y como M/F en los datos simulados (sexo)
+SEXOS = {'1': 'masculino', '2': 'femenino', 'm': 'masculino', 'f': 'femenino', 'masculino': 'masculino', 'femenino': 'femenino'}
+MSG_SIN_RIESGO = ('La última corrida no calculó el riesgo de este desenlace: el riesgo se calcula solo para los niños que '
+                  'siguen en seguimiento. Agrupe por sexo o por perfil, o elija otro desenlace.')
+AL_TOP = 10   # el grupo «Riesgo alto» guardado por el entrenamiento (TOP_RIESGO_ALTO de analitica_clinica)
 MSG_SIN_ANTICIPACION = 'No hay desenlaces entrenados desde varias visitas en este entrenamiento'
 
 
@@ -89,6 +93,11 @@ def contexto(entrenamiento: int | None = Query(None), s: Session = Depends(sesio
                                 'version_registro': (x.datos or {}).get('version_registro')} for x in _metas(s)[:30]]}
 
 
+def sexo_legible(valor: object) -> str | None:
+    """«masculino» o «femenino» desde 1/2 (base de la Fundación, también «1.0»), M/F (datos simulados) o el texto."""
+    return None if valor is None else SEXOS.get(str(valor).split('.')[0].strip().lower())
+
+
 def _ninos(s: Session, corte_id: int | None) -> pd.DataFrame:
     """Un niño por fila: sede, edad gestacional, nacimiento, sexo y Lubchenco (códigos seudonimizados)."""
     cols = ['sujeto', 'sede', 'eg_semanas', 'fecha_nacimiento', 'sexo', 'lubchenco']
@@ -98,13 +107,13 @@ def _ninos(s: Session, corte_id: int | None) -> pd.DataFrame:
                        'WHERE corte_id = :c'), {'c': corte_id})
     df = pd.DataFrame(f.fetchall(), columns=['sujeto', 'sede', 'eg_semanas', 'fecha_nacimiento'])
     primero = {}
-    for variable, nombre in ((VARIABLE_SEXO, 'sexo'), (PF.VARIABLE_LUBCHENCO, 'lubchenco')):
+    for variables, nombre in ((VARIABLES_SEXO, 'sexo'), ((PF.VARIABLE_LUBCHENCO,), 'lubchenco')):
         primero[nombre] = {}
         for suj, valor in s.execute(text('SELECT sujeto, valor FROM sevarti.mediciones WHERE corte_id = :c AND '
-                                         'variable = :v AND valor IS NOT NULL ORDER BY fecha NULLS FIRST, id'),
-                                    {'c': corte_id, 'v': variable}):
+                                         'variable = ANY(:v) AND valor IS NOT NULL ORDER BY fecha NULLS FIRST, id'),
+                                    {'c': corte_id, 'v': list(variables)}):
             primero[nombre].setdefault(suj, valor)
-    df['sexo'] = df.sujeto.map(lambda x: SEXOS.get(str(primero['sexo'].get(x, '')).split('.')[0]))
+    df['sexo'] = df.sujeto.map(lambda x: sexo_legible(primero['sexo'].get(x)))
     df['lubchenco'] = df.sujeto.map(primero['lubchenco'])
     return df[cols]
 
@@ -116,6 +125,15 @@ def _riesgo_max(s: Session, corrida: int, desenlace: str | None) -> pd.Series:
     sql += ' GROUP BY sujeto'
     filas = s.execute(text(sql), {'c': corrida, 'd': desenlace}).fetchall()
     return pd.Series({f[0]: f[1] for f in filas}, dtype=float)
+
+
+def _guardado(s: Session, entrenamiento: int, desenlace: str | None, tipo: str) -> dict | None:
+    """Un artefacto agregado que guardó el entrenamiento para un desenlace (``trayectorias_riesgo``, ``perfiles``)."""
+    if not desenlace:
+        return None
+    a = s.scalars(select(Analitica).where(Analitica.entrenamiento_id == entrenamiento, Analitica.desenlace == desenlace,
+                                          Analitica.tipo == tipo).order_by(Analitica.id.desc())).first()
+    return a.datos if a is not None else None
 
 
 def _sin_datos(base: dict, mensaje: str) -> dict:
@@ -137,6 +155,14 @@ def trayectorias(entrenamiento: int, indicador: Literal['peso', 'talla', 'perime
             'eje': eje, 'etiqueta_indicador': INDICADORES[indicador],
             'etiqueta': 'En prueba' if indicador == 'peso_para_talla' else 'En uso',
             'referencia': 'OMS (z = 0)', 'minimo_ninos': AN.MIN_CELDA}
+    # por riesgo, lo guardado por el entrenamiento con los niños de validación (la corrida solo tiene el riesgo de los
+    # niños en seguimiento); con el eje de edad cronológica o sin ese artefacto, se calcula en vivo como antes
+    if agrupar == 'riesgo' and eje == 'edad_corregida':
+        guardado = (_guardado(s, entrenamiento, desenlace, 'trayectorias_riesgo') or {}).get(indicador)
+        if guardado and guardado.get('grupos'):
+            return {'estado': 'ok', **base, **guardado, 'fuente': 'validacion', 'individuales_visibles': False,
+                    'individuales': [],
+                    'nota': f'Niños de validación del entrenamiento: «Riesgo alto» es el {AL_TOP} % con más riesgo.'}
     try:
         c = corrida_de(s, corrida_id)
     except HTTPException:
@@ -156,6 +182,8 @@ def trayectorias(entrenamiento: int, indicador: Literal['peso', 'talla', 'perime
         df['x'] = pd.to_numeric(df.edad_corregida, errors='coerce') / AN.DIAS_POR_MES
     if agrupar == 'riesgo':
         p = _riesgo_max(s, c.id, desenlace)
+        if p.empty:
+            return _sin_datos(base, MSG_SIN_RIESGO) | {'motivo': 'sin_riesgo'}
         df['p'] = df.sujeto.map(p)
         df = df[df.p.notna()]
         df['grupo'] = df.p.map(lambda v: 'Riesgo alto' if v >= PERCENTIL_ALTO else 'Resto')
@@ -202,6 +230,14 @@ def perfiles(entrenamiento: int, desenlace: str | None = Query(None), corrida_id
                           'aprobados por expertos.'}
     base = {'entrenamiento': entrenamiento, 'submodulo': 'perfiles', 'desenlace': desenlace, 'confianza': confianza,
             'tasa_significa': f'proporción de niños con riesgo alto (percentil {PERCENTIL_ALTO} o más)'}
+    guardado = _guardado(s, entrenamiento, desenlace, 'perfiles')
+    if guardado:
+        # de los niños de validación: tasa observada del desenlace y proporción en riesgo alto, guardadas al entrenar
+        filas = {k: [{**f, 'tasa': f.get('tasa_riesgo_alto')} for f in guardado.get(k, [])] for k in ('eg', 'lubchenco')}
+        return {'estado': 'ok', **base, 'fuente': 'validacion', 'ninos': guardado.get('ninos'), 'casos': guardado.get('casos'),
+                'categorias_ocultas': sum(1 for k in filas for f in filas[k] if f.get('oculto')), 'unidad_peso': None,
+                'riesgo_disponible': True, 'n_con_riesgo': guardado.get('ninos'), **filas,
+                'tasa_significa': f'proporción de niños de validación en el {AL_TOP} % con más riesgo'}
     try:
         c = corrida_de(s, corrida_id)
     except HTTPException:
@@ -223,8 +259,12 @@ def perfiles(entrenamiento: int, desenlace: str | None = Query(None), corrida_id
         medidas = {suj: x for suj, _, x in medidas_numericas(s, c.corte_id, pesos[:1], esq)}
     res = AN.resumen_perfiles_ampliado(sev, riesgos if len(riesgos) else None, medidas)
     ocultos = sum(1 for k in ('eg', 'lubchenco') for f in res[k] if f['oculto'])
+    # sin riesgo calculado para el desenlace, la tasa no es «n < 5»: no existe; la web lo dice así
+    sin_riesgo = {'riesgo_disponible': len(riesgos) > 0, 'n_con_riesgo': int(len(riesgos))}
+    if not len(riesgos):
+        sin_riesgo['mensaje_riesgo'] = MSG_SIN_RIESGO.replace(' Agrupe por sexo o por perfil, o elija otro desenlace.', '')
     return {'estado': 'ok', **base, 'corrida_id': c.id, 'ninos': int(len(ninos)), 'categorias_ocultas': ocultos,
-            'unidad_peso': unidad, **res}
+            'unidad_peso': unidad, **sin_riesgo, **res}
 
 
 @ruta.get('/{entrenamiento}/{submodulo}')

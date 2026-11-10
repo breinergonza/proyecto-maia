@@ -2,8 +2,8 @@
 // de distribución con un marcador. Usan los tokens de color de estilos.css; el coral marca lo que hay que mirar y nunca
 // es el color de una serie. Las series toman serie-1, serie-2 y serie-3 en ese orden fijo.
 import type { ReactNode } from 'react'
-import { Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis,
-  YAxis } from 'recharts'
+import { Area, Bar, BarChart, CartesianGrid, ComposedChart, Line, LineChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip,
+  XAxis, YAxis } from 'recharts'
 import { cn } from '../../lib/cn'
 import { GraficaNavegable, resumenDe } from './navegacion'
 
@@ -386,4 +386,48 @@ export function ticksEnteros([a, b]: [number, number], obligatorios: number[] = 
   const ticks = new Set(obligatorios.filter((v) => v >= a && v <= b))
   for (let v = desde; v <= b; v += paso) ticks.add(v)
   return [...ticks].sort((m, n) => m - n)
+}
+
+/** Índice de un trimestre «2021-T3» (año × 4 + trimestre) o null si no tiene esa forma. */
+function indiceTrimestre(t: string): number | null {
+  const m = /^(\d{4})-T([1-4])$/.exec(t)
+  return m ? Number(m[1]) * 4 + Number(m[2]) : null
+}
+
+export interface PuntoTrimestre { trimestre: string; valor: number | null; bajo?: number | null; alto?: number | null }
+
+/** Una medida por trimestre con su banda de incertidumbre y una raya de mínimo aceptable. Si faltan trimestres entre dos
+ *  puntos (años sin niños), la línea se corta y el eje lo marca con «…», en vez de unirlos como si fueran seguidos. */
+export function SerieTrimestral({ puntos, etiqueta, nombre, formatoY, dominioY, minimo, textoMinimo, color = 0, alto = 240 }: {
+  puntos: PuntoTrimestre[]; etiqueta: string; nombre: string; formatoY: (v: number) => string; dominioY?: [number, number]
+  minimo?: number; textoMinimo?: string; color?: ColorSerie; alto?: number
+}) {
+  const filas: { x: string; valor: number | null; banda: [number, number] | null }[] = []
+  puntos.forEach((p, i) => {
+    const antes = i > 0 ? indiceTrimestre(puntos[i - 1].trimestre) : null, ahora = indiceTrimestre(p.trimestre)
+    if (antes != null && ahora != null && ahora - antes > 1) filas.push({ x: '…', valor: null, banda: null })
+    filas.push({ x: p.trimestre, valor: p.valor, banda: p.bajo != null && p.alto != null ? [p.bajo, p.alto] : null })
+  })
+  const items = puntos.map((p) => `${p.trimestre}. ${nombre}: ${p.valor == null ? 'pocos niños' : formatoY(p.valor)}`
+    + (p.bajo != null && p.alto != null ? `, entre ${formatoY(p.bajo)} y ${formatoY(p.alto)}` : ''))
+  const c = SERIES_COLOR[color]
+  return (
+    <GraficaNavegable etiqueta={etiqueta} resumen={resumenDe('Líneas', puntos.length, ['trimestre', 'trimestres'])} items={items} style={{ height: alto }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <ComposedChart data={filas} margin={{ left: 0, right: 12, top: 14, bottom: 0 }}>
+          <CartesianGrid stroke={COLOR.rejilla} vertical={false} />
+          <XAxis dataKey="x" stroke={COLOR.eje} fontSize={12} tickLine={false} interval="preserveStartEnd" padding={{ left: 12, right: 12 }} />
+          <YAxis domain={dominioY ?? ['auto', 'auto']} tickFormatter={formatoY} stroke={COLOR.eje} fontSize={12} width={44} tickLine={false} axisLine={false} />
+          <Tooltip formatter={(v) => (Array.isArray(v) ? v.map((x) => formatoY(Number(x))).join(' a ') : typeof v === 'number' ? formatoY(v) : String(v))} />
+          <Area dataKey="banda" name="Incertidumbre" stroke="none" fill={c} fillOpacity={0.14} isAnimationActive={false} connectNulls={false} />
+          {minimo != null && (
+            <ReferenceLine y={minimo} stroke={COLOR.marca} strokeDasharray="6 4"
+              label={{ value: textoMinimo ?? formatoY(minimo), position: 'insideBottomLeft', fontSize: 12, fill: COLOR.marca }} />
+          )}
+          <Line dataKey="valor" name={nombre} type="linear" stroke={c} strokeWidth={2.5} connectNulls={false} isAnimationActive={false}
+            dot={{ r: 4, fill: COLOR.papel, strokeWidth: 2 }} activeDot={{ r: 6, stroke: COLOR.papel, strokeWidth: 2 }} />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </GraficaNavegable>
+  )
 }

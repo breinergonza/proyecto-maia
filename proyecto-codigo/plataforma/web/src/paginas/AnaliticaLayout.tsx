@@ -1,38 +1,47 @@
-// Analítica de los modelos: contexto de análisis (entrenamiento, modelo y versión, desenlace, evaluación) guardado en la
-// URL y las fichas de los submódulos. En el teléfono el contexto se pliega en una tarjeta y las fichas se deslizan.
+// Analítica de los modelos: encabezado con el submódulo y su pregunta, contexto de análisis (entrenamiento, modelo y
+// versión, desenlace, evaluación) guardado en la URL y, solo en el teléfono, las fichas de los submódulos (en el
+// computador ya están en el menú lateral). En el teléfono el contexto se pliega en una tarjeta.
 import { ChevronDown } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, Outlet, useParams } from 'react-router'
 import { useEntrenamientosAnalitica } from '../api/analitica'
-import { Aviso, Cargando, Encabezado, Insignia, Selector } from '../components/ui'
+import { Aviso, Cargando, Insignia, Selector } from '../components/ui'
 import { cn } from '../lib/cn'
 import { fechaHora } from '../lib/formato'
 import { datosAl } from '../lib/lenguaje'
-import { EnPrueba, ProveedorTecnico } from './analitica/comun'
+import { EnPrueba, InterruptorTecnico, ProveedorTecnico, RanuraGuia } from './analitica/comun'
 import { useContextoAnalitica } from './analitica/contexto'
 import { SUBMODULOS } from './analitica/submodulos'
+
+const NOMBRE_MODELO: Record<string, string> = { clinico: 'Clínico', anomalias: 'Anomalías', crecimiento: 'Crecimiento' }
 
 function Contexto() {
   const { entrenamiento, desenlace, desenlaces, contexto, modelo, fijar } = useContextoAnalitica()
   const lista = useEntrenamientosAnalitica().data?.entrenamientos ?? []
   const elegido = desenlaces.find((d) => d.clave === desenlace)
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))]">
       <label className="block text-sm">
         <span className="mb-1 block font-semibold">Entrenamiento</span>
         <Selector value={entrenamiento ?? ''} onChange={(e) => fijar({ entrenamiento: Number(e.target.value) })}>
           {entrenamiento != null && !lista.some((m) => m.entrenamiento === entrenamiento) && <option value={entrenamiento}>Entrenamiento {entrenamiento}</option>}
           {lista.map((m) => (
             <option key={m.entrenamiento} value={m.entrenamiento}>
-              Entrenamiento {m.entrenamiento}{m.creada ? ` · ${fechaHora(m.creada)}` : ''}
+              N.º {m.entrenamiento}{m.creada ? ` · ${fechaHora(m.creada)}` : ''}
             </option>
           ))}
         </Selector>
       </label>
-      <div className="text-sm">
+      <label className="block text-sm">
         <span className="mb-1 block font-semibold">Modelo y versión</span>
-        <p>{modelo?.modelo ?? '—'}{modelo?.version_registro != null ? ` · versión ${modelo.version_registro}` : ''}</p>
-      </div>
+        <Selector value="0" disabled={(contexto?.modelos.length ?? 0) < 2} onChange={() => {}}>
+          {(contexto?.modelos.length ? contexto.modelos : [null]).map((m, i) => (
+            <option key={i} value={String(i)}>
+              {m?.modelo ? (NOMBRE_MODELO[m.modelo] ?? `${m.modelo.charAt(0).toUpperCase()}${m.modelo.slice(1)}`) : '—'}{m?.version_registro != null ? ` · versión ${m.version_registro}` : ''}
+            </option>
+          ))}
+        </Selector>
+      </label>
       <div className="text-sm">
         <label className="block">
           <span className="mb-1 block font-semibold">Desenlace</span>
@@ -42,11 +51,17 @@ function Contexto() {
         </label>
         {elegido?.etiqueta === 'En prueba' && <span className="mt-1 inline-block"><EnPrueba /></span>}
       </div>
-      <div className="text-sm">
+      <label className="block text-sm">
         <span className="mb-1 block font-semibold">Evaluación</span>
-        <p>{modelo?.corte ? datosAl(modelo.corte) : '—'}</p>
-        {modelo?.fuente && <p className="text-salvia">{modelo.fuente === 'simulado' ? 'Datos simulados' : 'Base de la Fundación'}</p>}
-      </div>
+        <Selector value="0" disabled onChange={() => {}}>
+          <option value="0">Validación temporal</option>
+        </Selector>
+      </label>
+      <p className="flex flex-wrap items-center gap-2 text-xs text-salvia sm:col-span-2 lg:col-span-4">
+        {modelo?.corte && <span className="rounded-full bg-teal-tinte px-2.5 py-1 font-semibold text-teal">{datosAl(modelo.corte)}</span>}
+        {modelo?.fuente && <span className="rounded-full bg-teal-tinte px-2.5 py-1 font-semibold text-teal">{modelo.fuente === 'simulado' ? 'Datos simulados' : 'Base de la Fundación'}</span>}
+        <span>El contexto vive en el enlace y se conserva al cambiar de submódulo.</span>
+      </p>
       {contexto?.estado === 'sin_artefactos' && entrenamiento != null && (
         <p className="sm:col-span-2 lg:col-span-4"><Insignia tono="ocre">Sin analítica</Insignia></p>
       )}
@@ -60,12 +75,23 @@ export default function AnaliticaLayout() {
   const [plegado, setPlegado] = useState(true)
   const estados = new Map((contexto?.submodulos ?? []).map((s) => [s.id, s.estado]))
   const elegido = desenlaces.find((d) => d.clave === desenlace)
+  const actual = SUBMODULOS.find((s) => s.id === submodulo)
+  const [ranura, setRanura] = useState<HTMLElement | null>(null)
 
   return (
     <ProveedorTecnico>
-      <Encabezado titulo="Analítica de los modelos">
-        Cómo se comporta el modelo: qué tan bien ordena a los niños, si su riesgo es fiable y si funciona igual para todos.
-      </Encabezado>
+      <RanuraGuia.Provider value={ranura}>
+      <header className="mb-4 flex animate-aparecer flex-wrap items-end justify-between gap-3 lg:mb-3">
+        <div className="max-w-[110ch]">
+          <p className="text-sm font-semibold text-teal-medio">Analítica ›</p>
+          <h1>{actual?.titulo ?? 'Analítica de los modelos'}</h1>
+          <p className="mt-1 text-sm text-salvia">{actual?.pregunta ?? 'Cómo se comporta el modelo: qué tan bien ordena, si su riesgo es fiable y si funciona igual para todos.'}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
+          <div ref={setRanura} />
+          <InterruptorTecnico />
+        </div>
+      </header>
 
       <section aria-label="Contexto de análisis" className="mb-4 rounded-panel border border-linea/80 bg-papel p-4 shadow-suave">
         <button type="button" className="flex w-full items-center justify-between gap-2 text-left lg:hidden" aria-expanded={!plegado}
@@ -84,7 +110,7 @@ export default function AnaliticaLayout() {
         </div>
       </section>
 
-      <nav aria-label="Submódulos de analítica" className="-mx-4 mb-4 sm:mx-0">
+      <nav aria-label="Submódulos de analítica" className="-mx-4 mb-4 sm:mx-0 lg:hidden">
         <ul className="flex snap-x snap-mandatory gap-2 overflow-x-auto px-4 pb-2 sm:px-0">
           {SUBMODULOS.map((s) => (
             <li key={s.id} className="snap-start">
@@ -100,6 +126,7 @@ export default function AnaliticaLayout() {
       </nav>
 
       <Outlet />
+      </RanuraGuia.Provider>
     </ProveedorTecnico>
   )
 }

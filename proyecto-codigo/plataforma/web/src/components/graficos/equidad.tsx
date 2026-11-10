@@ -45,42 +45,47 @@ export interface PuntoBosque { etiqueta: string; valor: number | null; bajo: num
 export function Bosque({ puntos, referencia, dominio = [0.4, 1], etiqueta, nombreValor = 'Valor' }: {
   puntos: PuntoBosque[]; referencia?: number | null; dominio?: [number, number]; etiqueta: string; nombreValor?: string
 }) {
-  const ancho = 640, izq = 190, der = 20, fila = 30, arriba = 10, abajo = 26
-  const alto = arriba + fila * puntos.length + abajo
-  const x = (v: number) => izq + ((Math.max(dominio[0], Math.min(dominio[1], v)) - dominio[0]) / (dominio[1] - dominio[0])) * (ancho - izq - der)
+  // HTML y no SVG escalado: el texto mantiene su tamaño a cualquier ancho y las etiquetas largas bajan de renglón
+  const pos = (v: number) => `${((Math.max(dominio[0], Math.min(dominio[1], v)) - dominio[0]) / (dominio[1] - dominio[0])) * 100}%`
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => dominio[0] + t * (dominio[1] - dominio[0]))
   const fmt = (v: number) => v.toFixed(2).replace('.', ',')
   const items = puntos.map((p) => `${p.etiqueta}. ` + (p.pequena ? N_MENOR_QUE_5 : p.valor == null ? (p.nota ?? 'Muy pocos niños para calcularlo')
     : `${nombreValor} ${fmt(p.valor)}` + (p.bajo != null && p.alto != null ? `, entre ${fmt(p.bajo)} y ${fmt(p.alto)}` : '')))
+  const marcas = [dominio[0], (dominio[0] + dominio[1]) / 2, dominio[1]]
   return (
-    <GraficaNavegable etiqueta={etiqueta} resumen={resumenDe('Bosque', puntos.length, ['grupo', 'grupos'])} items={items} className="overflow-x-auto">
-      <svg viewBox={`0 0 ${ancho} ${alto}`} aria-hidden className="h-auto w-full min-w-[34rem]">
-        {ticks.map((t) => (
-          <g key={t}>
-            <line x1={x(t)} x2={x(t)} y1={arriba} y2={alto - abajo} stroke="var(--color-linea)" />
-            <text x={x(t)} y={alto - 8} textAnchor="middle" fontSize="12" fill="var(--color-salvia)">{t.toFixed(2).replace('.', ',')}</text>
-          </g>
+    <GraficaNavegable etiqueta={etiqueta} resumen={resumenDe('Bosque', puntos.length, ['grupo', 'grupos'])} items={items}>
+      {/* cada fila: nombre y cifra arriba, la raya debajo a todo el ancho; así se lee igual en un panel angosto */}
+      <div aria-hidden className="flex flex-col gap-2.5 py-1">
+        {puntos.map((p) => (
+          <div key={p.etiqueta}>
+            <div className="flex items-baseline justify-between gap-3 text-sm leading-tight">
+              <span>{p.etiqueta}</span>
+              <span className="shrink-0 font-semibold tabular-nums">{p.pequena || p.valor == null ? '' : fmt(p.valor)}</span>
+            </div>
+            <div className="relative mt-1 h-4">
+              <span className="absolute inset-x-0 top-1/2 h-px bg-linea" />
+              {ticks.map((t) => <span key={t} className="absolute inset-y-0.5 w-px bg-linea" style={{ left: pos(t) }} />)}
+              {referencia != null && <span className="absolute -inset-y-1 border-l-2 border-dashed border-referencia" style={{ left: pos(referencia) }} />}
+              {p.pequena || p.valor == null ? (
+                <span className="absolute inset-y-0 left-1 flex items-center bg-papel pr-1 text-xs text-salvia">{p.pequena ? N_MENOR_QUE_5 : (p.nota ?? 'Muy pocos niños para calcularlo')}</span>
+              ) : (
+                <>
+                  {p.bajo != null && p.alto != null && (
+                    <span className="absolute top-1/2 h-0.5 -translate-y-1/2 bg-serie-1" style={{ left: pos(p.bajo), width: `calc(${pos(p.alto)} - ${pos(p.bajo)})` }} />
+                  )}
+                  <span title={`${p.etiqueta}: ${nombreValor} ${fmt(p.valor)}`} className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-papel bg-serie-1"
+                    style={{ left: pos(p.valor) }} />
+                </>
+              )}
+            </div>
+          </div>
         ))}
-        {referencia != null && <line x1={x(referencia)} x2={x(referencia)} y1={arriba} y2={alto - abajo} stroke="var(--color-referencia)" strokeDasharray="4 3" strokeWidth="1.5" />}
-        {puntos.map((p, i) => {
-          const y = arriba + fila * i + fila / 2
-          return (
-            <g key={p.etiqueta}>
-              <text x={izq - 8} y={y + 4} textAnchor="end" fontSize="12.8" fill="var(--color-tinta)">{p.etiqueta}</text>
-              {p.pequena ? <text x={izq + 8} y={y + 4} fontSize="12" fill="var(--color-salvia)">{N_MENOR_QUE_5}</text>
-                : p.valor == null ? <text x={izq + 8} y={y + 4} fontSize="12" fill="var(--color-salvia)">{p.nota ?? 'Muy pocos niños para calcularlo'}</text>
-                : (
-                  <>
-                    {p.bajo != null && p.alto != null && <line x1={x(p.bajo)} x2={x(p.alto)} y1={y} y2={y} stroke="var(--color-serie-1)" strokeWidth="2" />}
-                    <circle cx={x(p.valor)} cy={y} r="5" fill="var(--color-serie-1)" stroke="var(--color-papel)" strokeWidth="2">
-                      <title>{`${p.etiqueta}: ${nombreValor} ${p.valor.toFixed(2).replace('.', ',')}`}</title>
-                    </circle>
-                  </>
-                )}
-            </g>
-          )
-        })}
-      </svg>
+        <div className="relative h-4 text-xs text-salvia tabular-nums">
+          {marcas.map((t, i) => (
+            <span key={t} className={cn('absolute', i === 0 ? '' : i === marcas.length - 1 ? '-translate-x-full' : '-translate-x-1/2')} style={{ left: pos(t) }}>{fmt(t)}</span>
+          ))}
+        </div>
+      </div>
     </GraficaNavegable>
   )
 }

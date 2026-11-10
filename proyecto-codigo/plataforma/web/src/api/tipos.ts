@@ -703,16 +703,25 @@ export interface RespuestaTrayectorias {
   estado: 'ok' | 'pendiente' | 'sin_artefactos'; entrenamiento: number; mensaje?: string
   indicador?: IndicadorTrayectoria; etiqueta_indicador?: string; etiqueta?: string; agrupar?: AgruparTrayectoria; eje?: EjeTrayectoria
   minimo_ninos?: number; grupos?: GrupoTrayectoria[]; celdas_omitidas?: number; grupos_omitidos?: number
+  /** «sin_riesgo»: la corrida no calculó el riesgo de este desenlace (solo se calcula a los niños en seguimiento). */
+  motivo?: 'sin_riesgo'
+  fuente?: 'validacion'; nota?: string
   individuales_visibles?: boolean; individuales?: NinoTrayectoria[]
 }
 export interface FilaPerfil {
   categoria: string; etiqueta: string; n: number | null; tasa: number | null; oculto: boolean
   eg_media?: number | null; peso_medio?: number | null
+  /** Guardadas al entrenar con los niños de validación: tasa observada del desenlace y proporción en riesgo alto. */
+  tasa_observada?: number | null; tasa_riesgo_alto?: number | null
 }
 export interface RespuestaPerfiles {
   estado: 'ok' | 'pendiente' | 'sin_artefactos'; entrenamiento: number; mensaje?: string
   confianza?: { minimo_ninos: number; aprobacion: 'pendiente' | string; texto?: string }
   tasa_significa?: string; ninos?: number; categorias_ocultas?: number; unidad_peso?: string | null
+  /** Si la corrida calculó el riesgo del desenlace; sin él, la tasa no existe (no es «n < 5»). */
+  riesgo_disponible?: boolean; n_con_riesgo?: number; mensaje_riesgo?: string
+  /** «validacion»: agregados guardados por el entrenamiento; sin él, calculados en vivo de la última corrida. */
+  fuente?: 'validacion'; casos?: number
   eg?: FilaPerfil[]; lubchenco?: FilaPerfil[]
 }
 export interface VisitaAnticipacion {

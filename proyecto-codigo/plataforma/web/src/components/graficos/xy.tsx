@@ -49,18 +49,19 @@ export function CurvaXY({ series, etiqueta, ejeX, ejeY, formatoX = (v) => String
       <LeyendaSeries series={series.map((s) => ({ clave: s.clave, nombre: s.nombre, color: s.color }))} />
       <GraficaNavegable etiqueta={etiqueta} resumen={resumenDe('Curva', filas.length, ['punto', 'puntos'])} items={items} style={{ height: alto }} className="mt-2">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={filas} margin={{ left: 0, right: 12, top: 8, bottom: 18 }}>
+          <LineChart data={filas} margin={{ left: 14, right: 12, top: 8, bottom: 18 }}>
             <CartesianGrid stroke={COLOR.rejilla} />
             <XAxis type="number" dataKey="x" domain={dominioX} tickFormatter={formatoX} stroke={COLOR.eje} fontSize={12} tickLine={false}
               label={{ value: ejeX, position: 'insideBottom', offset: -10, fontSize: 12, fill: 'var(--color-salvia)' }} />
-            <YAxis type="number" domain={dominioY} tickFormatter={formatoY} stroke={COLOR.eje} fontSize={12} width={48} tickLine={false} axisLine={false}
-              label={{ value: ejeY, angle: -90, position: 'insideLeft', offset: 14, fontSize: 12, fill: 'var(--color-salvia)', style: { textAnchor: 'middle' } }} />
+            <YAxis type="number" domain={dominioY} tickFormatter={formatoY} stroke={COLOR.eje} fontSize={12} width={52} tickLine={false} axisLine={false}
+              // el título va fuera de las marcas del eje (antes se montaba sobre «50 %»)
+              label={{ value: ejeY, angle: -90, position: 'left', offset: 2, fontSize: 12, fill: 'var(--color-salvia)', style: { textAnchor: 'middle' } }} />
             <Tooltip formatter={(v) => (typeof v === 'number' ? formatoY(v) : String(v))} labelFormatter={(x) => `${ejeX}: ${formatoX(Number(x))}`} />
             {diagonal && <ReferenceLine segment={[{ x: dominioX[0], y: dominioY[0] as number }, { x: dominioX[1], y: Number(dominioY[1]) }]}
               stroke={COLOR.referencia} strokeDasharray="4 4" ifOverflow="extendDomain" />}
             {referenciaY != null && <ReferenceLine y={referenciaY} stroke={COLOR.referencia} strokeDasharray="4 4" />}
             {series.map((s) => (
-              <Line key={s.clave} dataKey={s.clave} name={s.nombre} type="monotone" stroke={SERIES_COLOR[s.color]} strokeWidth={2}
+              <Line key={s.clave} dataKey={s.clave} name={s.nombre} type="linear" stroke={SERIES_COLOR[s.color]} strokeWidth={2}
                 isAnimationActive={false} connectNulls dot={s.sinPuntos ? false : { r: 3, fill: COLOR.papel, strokeWidth: 2 }} />
             ))}
           </LineChart>

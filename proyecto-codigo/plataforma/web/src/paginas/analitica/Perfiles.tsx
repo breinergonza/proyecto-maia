@@ -15,7 +15,7 @@ import { ResultadoVivo } from './vivo'
 type Clave = 'eg' | 'lubchenco'
 const TIPOS: [Clave, string][] = [['eg', 'Por edad gestacional'], ['lubchenco', 'Por Lubchenco']]
 
-function Tarjeta({ f, unidadPeso }: { f: FilaPerfil; unidadPeso?: string | null }) {
+function Tarjeta({ f, unidadPeso, conRiesgo = true }: { f: FilaPerfil; unidadPeso?: string | null; conRiesgo?: boolean }) {
   const oculto = f.oculto || f.n == null
   return (
     <li className="rounded-panel border border-linea bg-papel p-4">
@@ -23,9 +23,10 @@ function Tarjeta({ f, unidadPeso }: { f: FilaPerfil; unidadPeso?: string | null 
       {oculto ? <p className="mt-2 text-sm text-salvia">{N_MENOR_QUE_5}</p> : (
         <dl className="mt-2 space-y-1 text-sm">
           <div className="flex justify-between gap-3"><dt className="text-salvia">Niños</dt><dd className="font-semibold">{num(f.n)}</dd></div>
-          <div className="flex justify-between gap-3"><dt className="text-salvia">Con riesgo alto</dt><dd className="font-semibold">{f.tasa == null ? N_MENOR_QUE_5 : pct(100 * f.tasa)}</dd></div>
+          {f.tasa_observada !== undefined && <div className="flex justify-between gap-3"><dt className="text-salvia">Tuvo el desenlace</dt><dd className="font-semibold text-teal">{f.tasa_observada == null ? N_MENOR_QUE_5 : pct(100 * f.tasa_observada)}</dd></div>}
+          {conRiesgo && <div className="flex justify-between gap-3"><dt className="text-salvia">Con riesgo alto</dt><dd className="font-semibold">{f.tasa == null ? N_MENOR_QUE_5 : pct(100 * f.tasa)}</dd></div>}
           <div className="flex justify-between gap-3"><dt className="text-salvia">Edad gestacional media</dt><dd>{f.eg_media == null ? N_MENOR_QUE_5 : `${dec(f.eg_media)} semanas`}</dd></div>
-          <div className="flex justify-between gap-3"><dt className="text-salvia">Peso medio al nacer</dt><dd>{f.peso_medio == null ? N_MENOR_QUE_5 : `${dec(f.peso_medio)}${unidadPeso ? ` ${unidadPeso}` : ''}`}</dd></div>
+          {(f.peso_medio != null || f.tasa_observada === undefined) && <div className="flex justify-between gap-3"><dt className="text-salvia">Peso medio al nacer</dt><dd>{f.peso_medio == null ? N_MENOR_QUE_5 : `${dec(f.peso_medio)}${unidadPeso ? ` ${unidadPeso}` : ''}`}</dd></div>}
         </dl>
       )}
     </li>
@@ -60,8 +61,11 @@ export default function Perfiles() {
                 filas: filas.map((f) => ({ perfil: f.etiqueta, ninos: f.oculto ? N_MENOR_QUE_5 : f.n, con_riesgo_alto_pct: f.oculto || f.tasa == null ? null : Math.round(1000 * f.tasa) / 10,
                   eg_media_semanas: f.eg_media ?? null, peso_medio: f.peso_medio ?? null })),
               }}>
-                <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{filas.map((f) => <Tarjeta key={f.categoria} f={f} unidadPeso={unidad} />)}</ul>
-                <p className="mt-3 text-xs text-salvia">Con riesgo alto: {r.tasa_significa ?? 'proporción de niños con riesgo alto del desenlace elegido'}. {dDist.descripcion}</p>
+                <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{filas.map((f) => <Tarjeta key={f.categoria} f={f} unidadPeso={unidad} conRiesgo={r.riesgo_disponible !== false} />)}</ul>
+                {r.fuente === 'validacion' && <p className="mt-3 text-xs text-salvia">Con los {r.ninos != null ? r.ninos.toLocaleString('es-CO') : ''} niños de validación del entrenamiento: qué parte tuvo el desenlace y qué parte quedó en el 10 % con más riesgo.</p>}
+                {r.riesgo_disponible === false && <p className="mt-3 rounded-control bg-teal-tinte/60 p-3 text-sm">{r.mensaje_riesgo ?? 'La última corrida no calculó el riesgo de este desenlace.'}</p>}
+                {filas.length > 0 && filas.every((f) => f.oculto || f.n == null) && <p className="mt-3 text-sm text-salvia">Este corte no trae el dato para agrupar así.</p>}
+                {r.riesgo_disponible !== false && <p className="mt-3 text-xs text-salvia">Con riesgo alto: {r.tasa_significa ?? 'proporción de niños con riesgo alto del desenlace elegido'}. {dDist.descripcion}</p>}
                 {(r.categorias_ocultas ?? 0) > 0 && <p className="mt-1 text-xs text-salvia">{r.categorias_ocultas} categoría(s): {N_MENOR_QUE_5}.</p>}
               </Grafica>
               <Panel titulo={dConf.titulo} descripcion={dConf.descripcion}>
