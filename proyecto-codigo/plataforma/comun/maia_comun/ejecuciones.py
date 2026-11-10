@@ -12,6 +12,7 @@ Una sola ejecución a la vez: el programador toma la más antigua pendiente con 
 """
 from __future__ import annotations
 
+import math
 from datetime import UTC, date, datetime
 from typing import Any
 
@@ -19,9 +20,19 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from maia_comun import calendario as CAL
-from maia_comun.modelos_db import Ejecucion, Programacion
+from maia_comun.modelos_db import Corte, Ejecucion, Programacion
+from maia_comun.modelos_muestras import Muestra
 
 ACTIVAS = ('pendiente', 'en_curso')
+VISIBILIDADES = ('personal', 'oficial')
+
+
+def _claves_hiperparametros() -> frozenset[str]:
+    from maia_comun import hiperparametros as HP
+    return frozenset({c.nombre for campos in HP.CAMPOS.values() for c in campos} | {'hiperparametros', 'guardar'})
+
+
+CLAVES_HIPERPARAMETROS = _claves_hiperparametros()
 LINEAS_REGISTRO = 200
 
 
@@ -31,9 +42,15 @@ def ahora() -> datetime:
 
 # ------------------------------------------------------------------ parámetros de una programación
 
-def validar_parametros(fuente: str, p: dict[str, Any]) -> dict[str, Any]:
+def validar_parametros(fuente: str, p: dict[str, Any], rol: str | None = None,
+                       hiperparametros: dict | None = None) -> dict[str, Any]:
     """Los filtros que admite una corrida programada. ``ventana_meses`` se vuelve ``--desde-visita`` (hoy menos N
-    meses) al lanzarla, para que cada ejecución tome su propia ventana."""
+    meses) al lanzarla, para que cada ejecución tome su propia ventana. Un experto no cambia hiperparámetros (D40):
+    cualquier clave de hiperparámetros, sea en ``p`` o en ``hiperparametros``, se rechaza."""
+    if rol == 'experto':
+        if any(v not in (None, '', {}) for v in (hiperparametros or {}).values()) or \
+                set(p or {}) & CLAVES_HIPERPARAMETROS:
+            raise ValueError('Los expertos no cambian los hiperparámetros: se entrena con los vigentes.')
     permitidos = {'anio_desde', 'anio_hasta', 'ventana_meses'}
     limpio = {k: v for k, v in (p or {}).items() if v not in (None, '')}
     if extra := set(limpio) - permitidos:
@@ -54,6 +71,24 @@ def validar_parametros(fuente: str, p: dict[str, Any]) -> dict[str, Any]:
     if 'ventana_meses' in salida and not 1 <= salida['ventana_meses'] <= 240:
         raise ValueError('ventana_meses debe estar entre 1 y 240')
     return salida
+
+
+def validar_muestra(s: Session, muestra_id: int, usuario_id, rol: str, fuente: str) -> Muestra:
+    """La muestra con la que se entrena, o ``ValueError`` en español: tiene que existir, ser de la misma fuente,
+    poder usarla quien entrena (su dueño o administración; las de otros solo se leen o se duplican) y ser del corte
+    vigente (D18)."""
+    m = s.get(Muestra, muestra_id)
+    if m is None:
+        raise ValueError(f'La muestra {muestra_id} no existe.')
+    if rol != 'admin' and (m.propietario_id is None or m.propietario_id != usuario_id):
+        raise ValueError(f'La muestra «{m.titulo}» es de otra persona: puede verla o duplicarla, pero no entrenar con ella.')
+    if m.fuente != fuente:
+        raise ValueError(f'La muestra «{m.titulo}» es de la fuente {m.fuente}, no de {fuente}.')
+    vigente = s.scalars(select(Corte.id).where(Corte.fuente == fuente, Corte.vigente.is_(True))).first()
+    if m.corte_id is None or m.corte_id != vigente:
+        raise ValueError(f'La muestra «{m.titulo}» se armó con un corte que ya no es el vigente: duplíquela para '
+                         'usarla con los datos actuales.')
+    return m
 
 
 def meses_atras(hoy: date, meses: int) -> date:
@@ -121,7 +156,7 @@ def vencer(s: Session, momento: datetime | None = None) -> list[Ejecucion]:
 
 
 def tomar(s: Session) -> Ejecucion | None:
-    """La pendiente más antigua, marcada en curso (nadie más la toma)."""
+    """La pendiente más antigua (cola FIFO), marcada en curso (nadie más la toma; una sola en curso a la vez)."""
     if s.scalars(select(Ejecucion.id).where(Ejecucion.estado == 'en_curso')).first() is not None:
         return None
     e = s.scalars(select(Ejecucion).where(Ejecucion.estado == 'pendiente').order_by(Ejecucion.id)
@@ -157,3 +192,160 @@ def cerrar_interrumpidas(s: Session) -> int:
                       .values(estado='error', terminada=ahora(),
                               mensaje='Interrumpida: el programador se reinició durante la ejecución.'))
     return filas.rowcount or 0
+
+
+# ------------------------------------------------------------------ cola de entrenamientos (Mis modelos)
+
+def es_personal(e: Ejecucion) -> bool:
+    return (e.parametros or {}).get('visibilidad') == 'personal'
+
+
+def activas_de(s: Session, usuario_id) -> int:
+    """Entrenamientos de esta persona que siguen en cola o en curso."""
+    return len(s.scalars(select(Ejecucion.id).where(Ejecucion.tipo == 'entrenamiento', Ejecucion.estado.in_(ACTIVAS),
+                                                    Ejecucion.solicitada_por == usuario_id)).all())
+
+
+def personales_guardados(s: Session, usuario_id) -> int:
+    """Modelos personales terminados bien y no descartados de esta persona."""
+    filas = s.scalars(select(Ejecucion).where(Ejecucion.tipo == 'entrenamiento', Ejecucion.estado == 'ok',
+                                              Ejecucion.solicitada_por == usuario_id)).all()
+    return sum(1 for e in filas if es_personal(e) and not (e.parametros or {}).get('descartado'))
+
+
+def posicion_en_cola(s: Session, e: Ejecucion) -> int | None:
+    """0 si corre ahora; 1 si es la próxima; ``None`` si ya no está en la cola."""
+    if e.estado == 'en_curso':
+        return 0
+    if e.estado != 'pendiente':
+        return None
+    delante = s.scalars(select(Ejecucion.id).where(Ejecucion.estado == 'pendiente', Ejecucion.id < e.id)).all()
+    return len(delante) + 1
+
+
+def promedio_minutos(s: Session, tipo: str = 'entrenamiento', ultimas: int = 5) -> float | None:
+    """Promedio de duración de las últimas ejecuciones terminadas bien del mismo tipo; ``None`` sin historia."""
+    filas = s.execute(select(Ejecucion.iniciada, Ejecucion.terminada).where(
+        Ejecucion.tipo == tipo, Ejecucion.estado == 'ok', Ejecucion.iniciada.is_not(None),
+        Ejecucion.terminada.is_not(None)).order_by(Ejecucion.id.desc()).limit(ultimas)).all()
+    duraciones = [(f - i).total_seconds() / 60 for i, f in filas if f >= i]
+    return round(sum(duraciones) / len(duraciones), 1) if duraciones else None
+
+
+def cancelar(s: Session, eid: int, por: str) -> Ejecucion | None:
+    """Cancela una pendiente (con bloqueo, para no pelear con ``tomar``). ``None`` si ya no está pendiente."""
+    e = s.scalars(select(Ejecucion).where(Ejecucion.id == eid).with_for_update()).first()
+    if e is None or e.estado != 'pendiente':
+        return None
+    e.estado, e.terminada, e.mensaje = 'error', ahora(), f'Cancelada por {por}.'
+    e.parametros = {**(e.parametros or {}), 'cancelada': True}
+    return e
+
+
+# ------------------------------------------------------------------ borrado a los 90 días (D17, D38)
+
+def _fecha(v) -> datetime | None:
+    if isinstance(v, datetime):
+        return v if v.tzinfo else v.replace(tzinfo=UTC)
+    try:
+        d = datetime.fromisoformat(str(v))
+    except (TypeError, ValueError):
+        return None
+    return d if d.tzinfo else d.replace(tzinfo=UTC)
+
+
+def ultimo_uso(e: Ejecucion) -> datetime | None:
+    """La última vez que se usó un modelo personal: la marca ``ultimo_uso`` (Predicción) o, si nunca se usó, cuando
+    terminó de entrenarse."""
+    marcas = [d for d in (_fecha((e.parametros or {}).get('ultimo_uso')), e.terminada) if d is not None]
+    return max(marcas) if marcas else None
+
+
+def marcar_uso(s: Session, eid: int, momento: datetime | None = None) -> None:
+    """Anota que el modelo del entrenamiento ``eid`` se usó ahora (reinicia sus 90 días)."""
+    e = s.get(Ejecucion, eid)
+    if e is not None:
+        e.parametros = {**(e.parametros or {}), 'ultimo_uso': (momento or ahora()).isoformat()}
+
+
+def _tipo_version(e: Ejecucion) -> list[tuple[str, str]]:
+    """(tipo de modelo, versión) de lo que dejó el entrenamiento en MLflow."""
+    return [(tipo, str(m['version'])) for tipo, m in ((e.resultado or {}).get('modelos') or {}).items()
+            if isinstance(m, dict) and m.get('version')]
+
+
+def versiones_de(e: Ejecucion) -> list[tuple[str, str]]:
+    """(registro, versión) de cada modelo que dejó el entrenamiento en MLflow."""
+    return [(str(m['registro']), str(m['version'])) for m in ((e.resultado or {}).get('modelos') or {}).values()
+            if isinstance(m, dict) and m.get('registro') and m.get('version')]
+
+
+def _protegidas(s: Session) -> set[tuple[str, str]]:
+    """Versiones que no se borran: las que alguna aprobación (hecha o en trámite) llevó o lleva a producción."""
+    protegidas: set[tuple[str, str]] = set()
+    for a in s.scalars(select(Ejecucion).where(Ejecucion.tipo == 'aprobacion', Ejecucion.estado != 'error')):
+        p = a.parametros or {}
+        for tipo in ('anomalias', 'clinico'):
+            if p.get(tipo):
+                protegidas.add((tipo, str(p[tipo])))
+    return protegidas
+
+
+def _en_uso(s: Session) -> set[int]:
+    """Entrenamientos que una ejecución en cola o en curso está usando (``entrenamiento_id`` o ``modelo_id``)."""
+    ids: set[int] = set()
+    for a in s.scalars(select(Ejecucion).where(Ejecucion.estado.in_(ACTIVAS))):
+        for k in ('entrenamiento_id', 'modelo_id'):
+            v = (a.parametros or {}).get(k)
+            if isinstance(v, int):
+                ids.add(v)
+    return ids
+
+
+def purgables(s: Session, momento: datetime | None = None, dias: int | None = None) -> list[Ejecucion]:
+    """Entrenamientos personales con dueño que ya se pueden borrar: los que su dueño descartó y los que llevan más de
+    ``dias`` (90 por defecto) sin uso. Nunca los que una aprobación llevó a producción ni los que algo está usando."""
+    from maia_comun import cuotas as CU
+    momento = momento or ahora()
+    dias = CU.dias_sin_uso(s) if dias is None else dias
+    limite = momento.timestamp() - dias * 86400
+    protegidas, en_uso = _protegidas(s), _en_uso(s)
+    salida = []
+    for e in s.scalars(select(Ejecucion).where(Ejecucion.tipo == 'entrenamiento', Ejecucion.estado == 'ok',
+                                               Ejecucion.solicitada_por.is_not(None)).order_by(Ejecucion.id)):
+        p = e.parametros or {}
+        if not es_personal(e) or p.get('borrado') or e.id in en_uso or protegidas & set(_tipo_version(e)):
+            continue
+        uso = ultimo_uso(e)
+        if p.get('descartado') or (uso is not None and uso.timestamp() < limite):
+            salida.append(e)
+    return salida
+
+
+def dias_para_borrar(e: Ejecucion, momento: datetime | None = None, dias: int = 90) -> int | None:
+    """Días que le quedan a un modelo personal antes del borrado por falta de uso (0 si ya toca); ``None`` si no aplica."""
+    uso = ultimo_uso(e)
+    if not es_personal(e) or e.estado != 'ok' or (e.parametros or {}).get('borrado') or uso is None:
+        return None
+    restante = (uso.timestamp() + dias * 86400 - (momento or ahora()).timestamp()) / 86400
+    return max(0, math.ceil(restante))
+
+
+def purgar(s: Session, borrar_modelo=None, momento: datetime | None = None, dias: int | None = None) -> list[int]:
+    """Borra los artefactos de lo purgable: la analítica del entrenamiento, las versiones del Model Registry (con
+    ``borrar_modelo(registro, version)``, que no debe tocar una versión con alias ``produccion``) y el registro de la
+    ejecución. La ejecución queda marcada ``borrado`` para que el historial conserve quién entrenó qué. Sin commit.
+    Devuelve los ids tratados."""
+    from maia_comun.modelos_analitica import Analitica
+    hechos = []
+    for e in purgables(s, momento, dias):
+        s.execute(Analitica.__table__.delete().where((Analitica.entrenamiento_id == e.id) |
+                                                      (Analitica.ejecucion_id == e.id)))
+        if borrar_modelo is not None:
+            for registro, version in versiones_de(e):
+                borrar_modelo(registro, version)
+        e.parametros = {**(e.parametros or {}), 'descartado': True, 'borrado': True,
+                        'borrado_en': (momento or ahora()).isoformat()}
+        e.registro = None
+        hechos.append(e.id)
+    return hechos

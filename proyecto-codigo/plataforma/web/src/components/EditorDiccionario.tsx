@@ -12,6 +12,7 @@ import type {
 } from '../api/tipos-diccionario'
 import { cn } from '../lib/cn'
 import { num } from '../lib/formato'
+import { useConfirmar } from './Confirmar'
 import DiferenciasDiccionario from './DiferenciasDiccionario'
 import { Aviso, Boton, Campo, Cargando, Entrada, Insignia, Paginador, Selector, Tabla, Texto, Vacio } from './ui'
 
@@ -69,6 +70,7 @@ export default function EditorDiccionario({ vigente, pedida, alAbrirPedida, alGu
   const [pendientes, setPendientes] = useState<Pendientes>({})
   const [abierta, setAbierta] = useState<{ hoja: string; clave: string | null } | null>(null)
   const [revisando, setRevisando] = useState(false)
+  const { confirmar, dialogo } = useConfirmar()
   const hojas = vista.data?.hojas ?? []
   const hoja = hojas[indice]
   const n = contar(pendientes)
@@ -111,8 +113,14 @@ export default function EditorDiccionario({ vigente, pedida, alAbrirPedida, alGu
     setBuscar('')
     setPagina(1)
   }
-  const descartar = () => {
-    if (window.confirm(`¿Descartar los cambios de ${n} fila${n === 1 ? '' : 's'}?`)) setPendientes({})
+  const descartar = async () => {
+    const ok = await confirmar({
+      titulo: 'Descartar los cambios sin guardar',
+      mensaje: `Hay cambios sin guardar en ${n} fila${n === 1 ? '' : 's'} del diccionario.`,
+      efecto: 'Las filas vuelven a como están guardadas. Nada se ha enviado todavía a la base.',
+      reversible: false, textoConfirmar: 'Descartar cambios', tono: 'peligro',
+    })
+    if (ok) setPendientes({})
   }
 
   const formulario = abierta && hojas.find((h) => h.nombre === abierta.hoja)
@@ -123,6 +131,7 @@ export default function EditorDiccionario({ vigente, pedida, alAbrirPedida, alGu
       <header className="px-4 pt-4 sm:px-6 sm:pt-5">
         <h2 id={titulo} className="text-base">Editar el diccionario</h2>
       </header>
+      {dialogo}
       <div className="space-y-3 p-4 sm:p-6">
         {vista.isPending ? <Cargando /> : vista.error ? <Aviso><span className="whitespace-pre-line">{vista.error.message}</span></Aviso> : hoja && (
           <>
@@ -134,7 +143,7 @@ export default function EditorDiccionario({ vigente, pedida, alAbrirPedida, alGu
                     className={cn('shrink-0 rounded-control px-3 py-1.5 text-sm font-semibold transition-colors',
                       i === indice ? 'bg-teal-tinte text-teal' : 'text-salvia hover:bg-fondo hover:text-tinta')}>
                     {h.nombre} <span className="font-normal opacity-70">{num(h.filas.length)}</span>
-                    {cambios > 0 && <span className="ml-1 text-ocre" aria-label={`, ${cambios} con cambios`}>•</span>}
+                    {cambios > 0 && <span className="ml-1 text-ocre-hondo" aria-label={`, ${cambios} con cambios`}>•</span>}
                   </button>
                 )
               })}

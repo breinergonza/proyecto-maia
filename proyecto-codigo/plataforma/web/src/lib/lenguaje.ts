@@ -178,8 +178,8 @@ export const AYUDA_DOS_CIFRAS = 'El porcentaje es la probabilidad estimada de qu
 // ------------------------------------------------------------------ familias de desenlaces (trayectoria de riesgo)
 
 /** Desenlaces que son el mismo evento visto desde distintas visitas: «readm_3m» y «readm_6m» son «readm»;
- * «talla_baja_12m_desde_3» es «talla_baja_12m». */
-export const familia = (clave: string) => clave.replace(/_(desde_)?\d+[a-z]*$/, '')
+ * «talla_baja_12m_desde_3» es «talla_baja_12m»; «readm_6m_desde_pmc» (desde la entrada al programa), «readm_6m». */
+export const familia = (clave: string) => clave.replace(/_(desde_[0-9a-z]+|\d+[a-z]*)$/, '')
 
 const SUELTAS = new Set(['a', 'al', 'la', 'las', 'los', 'el', 'de', 'del', 'entre', 'antes', 'desde', 'en', 'y'])
 
@@ -199,3 +199,53 @@ export function nombreFamilia(desenlaces: string[]): string {
 
 /** «Datos al 30 de jun de 2026»: el corte, dicho sin la palabra técnica. */
 export const datosAl = (corte: string | null | undefined) => `Datos al ${fecha(corte)}`
+
+// ------------------------------------------------------------------ analítica de los modelos (entradas nuevas)
+
+/** Término técnico → cómo se dice en la pantalla clínica. El modo técnico muestra la jerga. */
+export const GLOSARIO_ANALITICA: Record<string, string> = {
+  AUC: 'Qué tan bien ordena a los niños',
+  ROC: 'Aciertos frente a falsas alarmas',
+  PR: 'Alertas acertadas frente a casos detectados',
+  sensibilidad: 'Casos detectados',
+  VPP: 'Alertas acertadas',
+  especificidad: 'Niños sin falsa alarma',
+  umbral: 'A cuántos niños se alerta',
+  calibración: 'Si el porcentaje de riesgo es el real',
+  Brier: 'Error del porcentaje de riesgo',
+  PSI: 'Cambio frente al entrenamiento',
+  lift: 'Qué tanto ayuda revisar a los primeros',
+}
+
+/** Jerga o palabra clínica según el modo técnico. */
+export const jerga = (tecnico: boolean, clinico: string, tecnicoTexto: string) => (tecnico ? tecnicoTexto : clinico)
+
+export const N_MENOR_QUE_5 = 'n menor que 5'
+
+/** El nombre clínico del estado de un semáforo. */
+export const SEMAFORO: Record<string, string> = { verde: 'Confiable', ambar: 'Mirar con cuidado', rojo: 'No confiable', gris: 'Sin datos para decidir' }
+
+// ------------------------------------------------------------------ nombres de variables del modelo
+// Los artefactos de analítica traen el código de cada variable; la pantalla muestra su nombre clínico. Mientras no
+// haya un servicio con las etiquetas del Diccionario para todas las variables del modelo, se traducen los códigos
+// conocidos y el resto se vuelve legible (guiones bajos a espacios, «z_» como «frente a la OMS»). El modo técnico
+// sigue mostrando el código.
+const NOMBRES_VARIABLE: Record<string, string> = {
+  ingreso_hogar: 'Ingreso del hogar', personas_hogar: 'Personas en el hogar', edad_madre: 'Edad de la madre',
+  controles_prenatales: 'Controles prenatales', eg_semanas: 'Edad gestacional', sexo: 'Sexo', dias_uci: 'Días en UCI',
+  peso_nacer: 'Peso al nacer', talla_nacer: 'Talla al nacer', peso_salida: 'Peso al salir', hematocrito: 'Hematocrito',
+  peso_40: 'Peso a las 40 semanas', talla_40: 'Talla a las 40 semanas', pc_40: 'Perímetro cefálico a las 40 semanas',
+  z_peso_40_sem: 'Peso a las 40 semanas frente a la OMS', z_talla_40_sem: 'Talla a las 40 semanas frente a la OMS',
+  z_perimetro_cefalico_40_sem: 'Perímetro cefálico a las 40 semanas frente a la OMS',
+  quiebre_cambio_de_sistema_2022: 'Cambio de sistema de registro (2022)', oxigeno_salida: 'Oxígeno al salir',
+}
+export function nombreVariable(codigo: string): string {
+  if (NOMBRES_VARIABLE[codigo]) return NOMBRES_VARIABLE[codigo]
+  if (!/^[a-z0-9_]+$/.test(codigo)) return codigo   // ya es un nombre legible
+  const oms = codigo.startsWith('z_')
+  const base = (oms ? codigo.slice(2) : codigo).replace(/_(\d+)(_sem)?$/, ' a las $1 semanas').replaceAll('_', ' ')
+  const texto = base.charAt(0).toUpperCase() + base.slice(1)
+  return oms ? `${texto} frente a la OMS` : texto
+}
+/** El nombre de la variable y, en modo técnico, su código entre paréntesis. */
+export const variable = (tecnico: boolean, codigo: string) => (tecnico ? `${nombreVariable(codigo)} (${codigo})` : nombreVariable(codigo))

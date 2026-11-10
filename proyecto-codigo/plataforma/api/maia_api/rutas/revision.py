@@ -1,4 +1,5 @@
-"""Revisión experta: la cola de datos por revisar (¿es un error?) y la revisión ciega de riesgos (¿le preocupa?).
+"""Revisión: la cola de datos por revisar (¿es un error?, solo administración: Calidad de datos) y la revisión ciega
+de riesgos (¿le preocupa?, expertos).
 
 La revisión de riesgos es ciega: mezcla niños de riesgo alto (posición 90 o más) con el resto, en un orden fijo por
 corrida, y no muestra ni el riesgo ni la posición. ``/revision/resumen`` mide después qué tanto acierta cada capa y si
@@ -21,10 +22,12 @@ from maia_api.consultas import (
     medidas_numericas,
     nombre_etapa,
     unidad_mostrada,
+    unidades_crecimiento,
     valor_legible,
 )
-from maia_api.dependencias import EXPERTO, auditar, sesion
+from maia_api.dependencias import ADMIN, EXPERTO, auditar, sesion
 from maia_api.esquemas import RevisionDatoEntrada, RevisionRiesgoEntrada
+from maia_api.rutas.ninos import unidad_crecimiento
 from maia_comun.modelos_db import PERCENTIL_ALTO, AlertaDato, RevisionDato, RevisionRiesgo, Riesgo, Usuario
 from sevarti import contrato as SV
 
@@ -35,7 +38,7 @@ MUESTRA_POR_GRUPO = 20
 @ruta.get('/datos')
 def datos(estado: str = Query('pendiente', pattern='^(pendiente|revisado|todos)$'), capa: str | None = None,
           variable: str | None = None, pagina: int = Query(1, ge=1), tamano: int = Query(25, ge=1, le=200),
-          corrida_id: int | None = None, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> dict:
+          corrida_id: int | None = None, s: Session = Depends(sesion), u: Usuario = Depends(ADMIN)) -> dict:
     c = corrida_de(s, corrida_id)
     mapa = etapas(s, c.corte_id)
     filtros = ['a.corrida_id = :c']
@@ -66,6 +69,72 @@ def datos(estado: str = Query('pendiente', pattern='^(pendiente|revisado|todos)$
     for d, serie in zip(items, _series(s, c.corte_id, items, esquema(s, c.corte_id), mapa), strict=True):
         d['serie'] = serie
     return {'total': total, 'pagina': pagina, 'tamano': tamano, 'items': items}
+
+
+PUNTOS_ACIERTOS = (50, 100, 200, 300, 400, 500)
+MINIMO_CELDA = 5   # D46/D4: una celda con menos alertas que esto no se muestra sola
+
+
+def _cortes_aciertos(maximo: int) -> list[int]:
+    ks = [k for k in PUNTOS_ACIERTOS if k < maximo]
+    k = PUNTOS_ACIERTOS[-1]
+    while k < maximo and len(ks) < 24:
+        k += 100
+        if k < maximo:
+            ks.append(k)
+    return [*ks, maximo] if maximo else []
+
+
+@ruta.get('/datos/aciertos')
+def aciertos(corrida_id: int | None = None, s: Session = Depends(sesion), _: Usuario = Depends(ADMIN)) -> dict:
+    """Qué tanto acierta la cola: de las k primeras alertas (por prioridad) que ya tienen respuesta, qué porcentaje se
+    marcó «error». Una alerta cuenta como error si alguna respuesta dijo «sí». Las respuestas «no sé» cuentan como
+    respondidas pero no como error."""
+    c = corrida_de(s, corrida_id)
+    maximo = s.execute(text('SELECT coalesce(max(prioridad), 0) FROM resultados.alertas_dato WHERE corrida_id = :c'),
+                       {'c': c.id}).scalar_one()
+    filas = s.execute(text("""SELECT a.prioridad, bool_or(r.es_error = 'si') AS error
+                              FROM resultados.alertas_dato a JOIN resultados.revision_datos r ON r.alerta_id = a.id
+                              WHERE a.corrida_id = :c GROUP BY a.id, a.prioridad"""), {'c': c.id}).all()
+    serie = []
+    for k in _cortes_aciertos(maximo):
+        dentro = [f for f in filas if f.prioridad <= k]
+        errores = sum(1 for f in dentro if f.error)
+        serie.append({'k': k, 'respondidas': len(dentro),
+                      'precision': round(100 * errores / len(dentro), 1) if dentro else None})
+    errores = sum(1 for f in filas if f.error)
+    return {'corrida_id': c.id, 'serie': serie, 'respondidas': len(filas),
+            'confirmadas_error_pct': round(100 * errores / len(filas), 1) if filas else None}
+
+
+@ruta.get('/datos/concentracion')
+def concentracion(corrida_id: int | None = None, s: Session = Depends(sesion), _: Usuario = Depends(ADMIN)) -> dict:
+    """Dónde se acumulan las alertas: por variable y, si el corte trae más de un grupo o sede, por grupo y variable.
+    Lo que tenga menos de ``MINIMO_CELDA`` alertas no se muestra solo: se suma en «otras»."""
+    c = corrida_de(s, corrida_id)
+    por_celda = s.execute(text("""SELECT su.grupo, a.variable, max(a.etiqueta) AS etiqueta, count(*) AS alertas
+                                  FROM resultados.alertas_dato a
+                                  LEFT JOIN sevarti.sujetos su ON su.corte_id = :k AND su.sujeto = a.sujeto
+                                  WHERE a.corrida_id = :c GROUP BY su.grupo, a.variable"""),
+                          {'c': c.id, 'k': c.corte_id}).all()
+    hay_sede = len({f.grupo for f in por_celda if f.grupo}) >= 2
+    variables: dict[str, dict] = {}
+    for f in por_celda:
+        v = variables.setdefault(f.variable, {'variable': f.variable, 'etiqueta': f.etiqueta, 'alertas': 0})
+        v['alertas'] += f.alertas
+    por_variable = sorted((v for v in variables.values() if v['alertas'] >= MINIMO_CELDA),
+                          key=lambda v: (-v['alertas'], v['variable']))
+    otras_variables = sum(v['alertas'] for v in variables.values() if v['alertas'] < MINIMO_CELDA)
+    celdas, otras_celdas = [], 0
+    if hay_sede:
+        for f in sorted(por_celda, key=lambda f: (-f.alertas, str(f.grupo), f.variable)):
+            if f.alertas >= MINIMO_CELDA:
+                celdas.append({'grupo': f.grupo or 'sin grupo', 'variable': f.variable, 'etiqueta': f.etiqueta,
+                               'alertas': f.alertas})
+            else:
+                otras_celdas += f.alertas
+    return {'corrida_id': c.id, 'hay_sede': hay_sede, 'minimo_celda': MINIMO_CELDA, 'por_variable': por_variable,
+            'otras_variables': otras_variables, 'celdas': celdas, 'otras_celdas': otras_celdas}
 
 
 def _factor(unidad: object) -> tuple[str, float] | None:
@@ -132,7 +201,7 @@ def _series(s: Session, corte_id: int, items: list[dict], esq: dict, mapa: dict)
 
 @ruta.post('/datos/{alerta_id}', status_code=status.HTTP_204_NO_CONTENT)
 def responder_dato(alerta_id: int, datos: RevisionDatoEntrada, s: Session = Depends(sesion),
-                   u: Usuario = Depends(EXPERTO)) -> None:
+                   u: Usuario = Depends(ADMIN)) -> None:
     if s.get(AlertaDato, alerta_id) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, 'No existe ese dato en la cola.')
     q = pg_insert(RevisionDato).values(alerta_id=alerta_id, usuario_id=u.id, es_error=datos.es_error,
@@ -164,6 +233,25 @@ def _resumen_nino(s: Session, corte_id: int, sujeto: str, momento: str, esq: dic
     return lineas[:14]
 
 
+def _crecimiento_hasta(s: Session, corrida_id: int, sujeto: str, momento: str, esq: dict, mapa: dict) -> dict[str, list[dict]]:
+    """El crecimiento del niño frente a la OMS hasta la visita del riesgo (lo posterior no se muestra: el experto
+    juzga con lo que se sabía entonces). Misma forma que ``crecimiento`` de la ficha."""
+    tope = mapa.get(momento, {}).get('orden')
+    unidades = unidades_crecimiento(esq)
+    filas = s.execute(text('SELECT etapa, indicador, variable, fecha, edad_corregida, valor, z, bajo_2de, caida_1de, improbable '
+                           'FROM resultados.crecimiento WHERE corrida_id = :c AND sujeto = :s ORDER BY edad_corregida'),
+                      {'c': corrida_id, 's': sujeto})
+    serie: dict[str, list[dict]] = defaultdict(list)
+    for g in filas:
+        orden = mapa.get(g.etapa, {}).get('orden') if g.etapa else None
+        if tope is not None and orden is not None and orden > tope:
+            continue
+        d = dict(g._mapping)
+        d['unidad'] = unidad_crecimiento(esq, unidades, g.variable, g.indicador, g.etapa)
+        serie[g.indicador].append(d)
+    return dict(serie)
+
+
 @ruta.get('/riesgos')
 def riesgos(corrida_id: int | None = None, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> dict:
     c = corrida_de(s, corrida_id)
@@ -183,6 +271,7 @@ def riesgos(corrida_id: int | None = None, s: Session = Depends(sesion), u: Usua
         d = dict(f._mapping)
         d['momento_nombre'] = nombre_etapa(mapa, d['momento'])
         d['resumen'] = _resumen_nino(s, c.corte_id, f.sujeto, f.momento, esq, mapa) if c.corte_id else []
+        d['crecimiento'] = _crecimiento_hasta(s, c.id, f.sujeto, f.momento, esq, mapa)
         items.append(d)
     return {'corrida_id': c.id, 'items': items}
 

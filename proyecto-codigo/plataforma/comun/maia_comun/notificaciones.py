@@ -3,7 +3,7 @@
 Regla: tras una corrida que no es en silencio, por cada desenlace activo en ``app.config_notificaciones``, un correo
 por destinatario con los niños cuyo percentil es mayor o igual al mínimo configurado. Idempotente por
 (riesgo, destinatario). El correo lleva solo el código seudonimizado, el desenlace, la posición y un enlace;
-nunca valores clínicos.
+nunca valores clínicos. Sí lleva la etiqueta de perfil (p. ej. «Muy prematuro · Peso adecuado») y la visita.
 """
 from __future__ import annotations
 
@@ -12,12 +12,13 @@ import ssl
 from email.message import EmailMessage
 from html import escape
 
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from maia_comun.config import Configuracion, obtener
-from maia_comun.modelos_db import ConfigNotificacion, Notificacion, Riesgo
+from maia_comun.modelos_db import ConfigNotificacion, Corrida, Notificacion, Riesgo
+from maia_comun.perfiles import VARIABLE_LUBCHENCO, perfil_provisional
 
 MAX_NINOS_POR_CORREO = 200
 
@@ -45,17 +46,49 @@ def cuantos_menos(percentil: float) -> int:
     return max(0, min(9, int(percentil // 10)))
 
 
-def _cuerpo(nombre: str, filas: list[Riesgo], url: str, minimo: float) -> tuple[str, str]:
+def _etiqueta(r, perfiles: dict[str, dict]) -> str:
+    """«Muy prematuro · Peso adecuado · visita 6 meses»: solo categorías y nombre de visita, ningún valor numérico."""
+    p = perfiles.get(r.sujeto) or {}
+    partes = [p.get('etiqueta_corta') or 'Sin clasificar']
+    visita = getattr(r, 'momento', None)
+    if visita:
+        partes.append(f'visita {visita}')
+    return ' · '.join(partes)
+
+
+def _marca(r, perfiles: dict[str, dict]) -> str:
+    return f' ({_etiqueta(r, perfiles)})' if perfiles else ''
+
+
+def perfiles_de(s: Session, corte_id: int | None, filas: list[Riesgo]) -> dict[str, dict]:
+    """Perfil provisional de cada niño de ``filas`` (con la visita de su riesgo) leído de la base del corte."""
+    if corte_id is None or not filas:
+        return {}
+    codigos = sorted({r.sujeto for r in filas})
+    eg = dict(s.execute(text('SELECT sujeto, eg_semanas FROM sevarti.sujetos WHERE corte_id = :c AND sujeto = ANY(:s)'),
+                        {'c': corte_id, 's': codigos}).all())
+    lub = dict(s.execute(text('SELECT sujeto, valor FROM sevarti.mediciones WHERE corte_id = :c AND variable = :v '
+                              'AND sujeto = ANY(:s) AND valor IS NOT NULL'),
+                         {'c': corte_id, 'v': VARIABLE_LUBCHENCO, 's': codigos}).all())
+    return {c: perfil_provisional(eg.get(c), lub.get(c)) for c in codigos}
+
+
+def _cuerpo(nombre: str, filas: list[Riesgo], url: str, minimo: float,
+            perfiles: dict[str, dict] | None = None) -> tuple[str, str]:
     # en palabras del equipo clínico y con la escala de la web: la posición (percentil) se dice «más riesgo que N de cada 10»
     titulo = f'Niños con más riesgo que {cuantos_menos(minimo)} de cada 10 niños del programa en "{nombre}":'
+    perfiles = perfiles or {}
     lineas = [titulo, '']
-    lineas += [f'- {r.sujeto}: más riesgo que {cuantos_menos(r.percentil)} de cada 10 niños · {url}/ninos/{r.sujeto}' for r in filas]
+    lineas += [f'- {r.sujeto}{_marca(r, perfiles)}: más riesgo que {cuantos_menos(r.percentil)} de cada 10 niños · '
+               f'{url}/ninos/{r.sujeto}' for r in filas]
     lineas += ['', 'Apoyo a la decisión, no diagnóstico. El riesgo ordena a los niños; la decisión es del equipo clínico.']
+    col_perfil = '<th align="left">Perfil y visita</th>' if perfiles else ''
     filas_html = ''.join(
         f'<tr><td><a href="{escape(url)}/ninos/{escape(r.sujeto)}">{escape(r.sujeto)}</a></td>'
+        f'{f"<td>{escape(_etiqueta(r, perfiles))}</td>" if perfiles else ""}'
         f'<td style="text-align:right">{cuantos_menos(r.percentil)} de cada 10</td></tr>' for r in filas)
     html = (f'<p>Niños con más riesgo que {cuantos_menos(minimo)} de cada 10 niños del programa en <b>{escape(nombre)}</b>:</p>'
-            f'<table cellpadding="4" style="border-collapse:collapse"><tr><th align="left">Niño</th>'
+            f'<table cellpadding="4" style="border-collapse:collapse"><tr><th align="left">Niño</th>{col_perfil}'
             f'<th align="right">Tiene más riesgo que</th></tr>{filas_html}</table>'
             '<p style="color:#555">Apoyo a la decisión, no diagnóstico. El riesgo ordena a los niños; '
             'la decisión es del equipo clínico.</p>')
@@ -68,6 +101,7 @@ def enviar_pendientes(motor: Engine, corrida_id: int, cfg: Configuracion | None 
     url = cfg.maia_url_publica.rstrip('/')
     resumen = {'correos': 0, 'ninos': 0, 'errores': 0}
     with Session(motor) as s:
+        corte_id = s.scalar(select(Corrida.corte_id).where(Corrida.id == corrida_id))
         configs = s.scalars(select(ConfigNotificacion).where(ConfigNotificacion.activo.is_(True))).all()
         for c in configs:
             riesgos = s.scalars(select(Riesgo).where(Riesgo.corrida_id == corrida_id, Riesgo.clave == c.desenlace,
@@ -83,7 +117,7 @@ def enviar_pendientes(motor: Engine, corrida_id: int, cfg: Configuracion | None 
                 if not nuevos:
                     continue
                 nombre = c.nombre or nuevos[0].desenlace
-                texto, html = _cuerpo(nombre, nuevos, url, c.percentil_minimo)
+                texto, html = _cuerpo(nombre, nuevos, url, c.percentil_minimo, perfiles_de(s, corte_id, nuevos))
                 estado, error = 'enviado', None
                 try:
                     enviar([destinatario], f'[MAIA] {len(nuevos)} niños con riesgo alto: {nombre}', texto, html, cfg)

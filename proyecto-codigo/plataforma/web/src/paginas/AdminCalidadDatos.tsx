@@ -1,19 +1,22 @@
-// Cola de datos raros para los expertos: tarjetas compactas en grilla, que se desplazan por dentro de la ventana,
-// con los filtros junto al título y el paginador fijo abajo.
+// Calidad de datos (Administración): cuatro cifras, tres paneles (alertas por tipo, aciertos frente a la revisión y
+// dónde se concentran) y, debajo, la cola de datos raros con tarjetas compactas en grilla y los filtros junto al título.
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { pedir } from '../api/cliente'
-import type { DatoRevision, Pagina, Respuesta } from '../api/tipos'
-import { Aviso, Boton, Cargando, Encabezado, Insignia, Paginador, Selector, Texto, Vacio } from '../components/ui'
+import { useAciertos, useConcentracion } from '../api/calidad'
+import type { ConcentracionAlertas, DatoRevision, Pagina, Respuesta, ResumenTablero } from '../api/tipos'
+import { Aviso, Boton, Cargando, Cifra, Encabezado, Insignia, Paginador, Panel, Selector, Texto, Vacio } from '../components/ui'
 import { cn } from '../lib/cn'
-import { escalaRedonda, MiniSerie, RangoEsperado, type PuntoSerie } from '../components/graficos'
-import { aproximado, fecha, medida, num, RESPUESTAS } from '../lib/formato'
+import {
+  BarrasApiladas, escalaRedonda, LineasSeries, MiniSerie, RangoEsperado, type FilaSeries, type PuntoSerie, type Serie,
+} from '../components/graficos'
+import { aproximado, fecha, medida, num, numero, pct, RESPUESTAS } from '../lib/formato'
 import { alerta, ayudaAlerta, motivoExtra } from '../lib/lenguaje'
 
 const TAMANO = 12
 
-export default function RevisionDatos() {
+export default function AdminCalidadDatos() {
   const [estado, setEstado] = useState<'pendiente' | 'revisado' | 'todos'>('pendiente')
   const [capa, setCapa] = useState('')
   const [pagina, setPagina] = useState(1)
@@ -24,8 +27,8 @@ export default function RevisionDatos() {
   })
 
   return (
-    <div className="flex flex-col lg:h-full">
-      <Encabezado titulo="Datos por revisar"
+    <div className="flex flex-col">
+      <Encabezado titulo="Calidad de datos"
         accion={
           <div className="flex w-full flex-wrap gap-2 sm:w-auto">
             <label className="sr-only" htmlFor="estado">Estado</label>
@@ -44,23 +47,104 @@ export default function RevisionDatos() {
         Datos que el modelo de anomalías encontró raros. Diga si cree que cada uno es un error de registro: sus respuestas
         miden qué tan bien acierta cada tipo de alerta y ajustan la exigencia del siguiente entrenamiento.
       </Encabezado>
+      <Medidas />
+      <h2 className="mb-2 mt-6">Datos por revisar</h2>
       {q.isPending ? <Cargando /> : q.error ? <Aviso>{q.error.message}</Aviso> : q.data.items.length === 0 ? (
         <Vacio titulo={estado === 'pendiente' ? 'No queda nada por revisar' : 'No hay datos con estos filtros'}>
           {estado === 'pendiente' ? 'Cuando lleguen datos nuevos, aquí aparecerán los que parezcan raros.' : undefined}
         </Vacio>
       ) : (
         <>
-          <p className="mb-2 shrink-0 text-xs text-salvia">
+          <p className="mb-2 text-xs text-salvia">
             {num(q.data.total)} datos. Primero los que tienen más alertas y más fuertes.
           </p>
-          <ol className="grid grid-cols-1 content-start gap-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1 xl:grid-cols-2 2xl:grid-cols-3">
+          <ol className="grid grid-cols-1 content-start gap-3 xl:grid-cols-2 2xl:grid-cols-3">
             {q.data.items.map((d) => <Tarjeta key={d.id} dato={d} />)}
           </ol>
-          <div className="shrink-0 [&>nav]:mt-3">
+          <div className="[&>nav]:mt-3">
             <Paginador pagina={pagina} tamano={TAMANO} total={q.data.total} cambiar={setPagina} />
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+const SERIE_ALERTAS: Serie[] = [{ clave: 'alertas', nombre: 'Alertas', color: 0 }]
+const SERIE_ACIERTOS: Serie[] = [{ clave: 'precision', nombre: 'Confirmadas como error', color: 0 }]
+
+/** Lo que dicen las alertas de la corrida y qué tanto aciertan frente a lo que respondió el equipo. */
+function Medidas() {
+  const resumen = useQuery({ queryKey: ['tablero', 'resumen'], queryFn: () => pedir<ResumenTablero>('/tablero/resumen') })
+  const aciertos = useAciertos()
+  const concentracion = useConcentracion()
+  const r = resumen.data
+  const porCapa: FilaSeries[] = Object.entries(r?.alertas_por_capa ?? {}).sort(([a], [b]) => a.localeCompare(b))
+    .map(([capa, n]) => ({ x: alerta(capa), alertas: n }))
+  const puntos: FilaSeries[] = (aciertos.data?.serie ?? []).filter((p) => p.precision != null)
+    .map((p) => ({ x: `${p.k}`, precision: p.precision, respondidas: p.respondidas }))
+  return (
+    <div className="flex flex-col gap-4">
+      <Panel>
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <Cifra valor={r ? num(r.datos_revisar) : '—'} texto="datos por revisar" />
+          <Cifra valor={r ? numero(r.alertas_por_1000) : '—'} texto="alertas por cada mil datos" />
+          <Cifra valor={pct(aciertos.data?.confirmadas_error_pct)} texto="de los respondidos, confirmados como error" />
+          <Cifra valor={r ? num(r.alarmas_grupo) : '—'} texto="alarmas de grupo" />
+        </div>
+      </Panel>
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Panel titulo="Alertas por tipo">
+          <p className="mb-2 text-sm text-salvia">Cuántos datos raros encontró cada revisión.</p>
+          {resumen.isPending ? <Cargando /> : porCapa.length === 0 ? <p className="text-sm text-salvia">No hay alertas en esta corrida.</p> : (
+            <BarrasApiladas filas={porCapa} series={SERIE_ALERTAS} alto={200}
+              etiqueta={`Alertas por tipo: ${porCapa.map((f) => `${f.x}, ${f.alertas}`).join('; ')}`} />
+          )}
+        </Panel>
+        <Panel titulo="Aciertos frente a la revisión">
+          <p className="mb-2 text-sm text-salvia">Cuántas alertas confirmó el equipo al revisar las primeras.</p>
+          {aciertos.isPending ? <Cargando /> : puntos.length === 0 ? (
+            <p className="text-sm text-salvia">Todavía no hay alertas respondidas.</p>
+          ) : (
+            <>
+              <LineasSeries filas={puntos} series={SERIE_ACIERTOS} alto={200} dominioY={[0, 100]} formatoY={(v) => `${v} %`}
+                formatoTooltip={(v, f) => `${pct(v)} de ${num(Number(f.respondidas))} respondidas`}
+                etiqueta={`Porcentaje de alertas confirmadas como error entre las primeras: ${puntos.map((f) => `${f.x}, ${pct(Number(f.precision))}`).join('; ')}`} />
+              <p className="mt-1 text-xs text-salvia">Eje inferior: las primeras alertas de la cola.</p>
+            </>
+          )}
+        </Panel>
+        <Panel titulo="Dónde se concentran">
+          <p className="mb-2 text-sm text-salvia">Sede y dato con más alertas.</p>
+          {concentracion.isPending ? <Cargando /> : concentracion.error ? <Aviso>{concentracion.error.message}</Aviso>
+            : <Concentracion c={concentracion.data} />}
+        </Panel>
+      </div>
+    </div>
+  )
+}
+
+/** Mapa de calor simple: sede por dato si hay sedes; si no, solo los datos con más alertas. Sin celdas pequeñas. */
+function Concentracion({ c }: { c: ConcentracionAlertas }) {
+  const otras = c.hay_sede ? c.otras_celdas : c.otras_variables
+  const filas = c.hay_sede
+    ? c.celdas.slice(0, 8).map((x) => ({ clave: `${x.grupo}|${x.variable}`, titulo: x.etiqueta ?? x.variable, sub: x.grupo, n: x.alertas }))
+    : c.por_variable.slice(0, 8).map((x) => ({ clave: x.variable, titulo: x.etiqueta ?? x.variable, sub: '', n: x.alertas }))
+  const maximo = Math.max(1, ...filas.map((x) => x.n))
+  const tono = (n: number) => ({ background: `color-mix(in srgb, var(--color-teal) ${Math.round(15 + 70 * n / maximo)}%, transparent)` })
+  if (filas.length === 0) return <p className="text-sm text-salvia">Todavía no hay alertas suficientes para mostrar.</p>
+  return (
+    <div>
+      <ul className="grid grid-cols-2 gap-1.5" aria-label="Alertas por sede y dato">
+        {filas.map((x) => (
+          <li key={x.clave} className="rounded-lg px-2 py-1.5 text-sm" style={tono(x.n)}>
+            <span className="block truncate font-semibold" title={x.titulo}>{x.titulo}</span>
+            <span className="block truncate text-xs">{x.sub && <>{x.sub} · </>}{num(x.n)} alertas</span>
+          </li>
+        ))}
+      </ul>
+      {!c.hay_sede && <p className="mt-2 text-xs text-salvia">Este corte no trae sedes: solo se muestra por dato.</p>}
+      {otras > 0 && <p className="mt-2 text-xs text-salvia">Otras: {num(otras)} alertas en grupos con menos de {c.minimo_celda}.</p>}
     </div>
   )
 }

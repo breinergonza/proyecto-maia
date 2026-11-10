@@ -14,8 +14,63 @@ export class ErrorApi extends Error {
   }
 }
 
+/** Estado de la sesión para el aviso: «ok», «por_vencer» (el refresco falló y el acceso aún sirve) o «vencida». */
+export type EstadoSesion = 'ok' | 'por_vencer' | 'vencida'
+let estado: EstadoSesion = 'ok'
+let venceEn: number | null = null          // milisegundos; sale del campo «exp» del token, si lo trae
+let temporizador: ReturnType<typeof setTimeout> | null = null
+const oyentesEstado = new Set<() => void>()
+
+/** Milisegundos antes de vencer el acceso en que se intenta renovar (si falla, se avisa). */
+const ANTES_DE_VENCER_MS = 60_000
+
+export const estadoSesion = (): EstadoSesion => estado
+export function alCambiarEstadoSesion(f: () => void) {
+  oyentesEstado.add(f)
+  return () => oyentesEstado.delete(f)
+}
+function marcar(nuevo: EstadoSesion) {
+  if (estado === nuevo) return
+  estado = nuevo
+  oyentesEstado.forEach((f) => f())
+}
+
+/** ``exp`` de un JWT en milisegundos, o ``null`` si el token no es un JWT legible (no se valida: solo se lee). */
+function vencimientoDe(token: string): number | null {
+  try {
+    const carga = token.split('.')[1]
+    if (!carga) return null
+    const b64 = carga.replace(/-/g, '+').replace(/_/g, '/')
+    const exp = (JSON.parse(atob(b64.padEnd(Math.ceil(b64.length / 4) * 4, '='))) as { exp?: unknown }).exp
+    return typeof exp === 'number' ? exp * 1000 : null
+  } catch {
+    return null
+  }
+}
+
 export function fijarAcceso(token: string | null) {
   acceso = token
+  if (temporizador) clearTimeout(temporizador)
+  temporizador = null
+  venceEn = token ? vencimientoDe(token) : null
+  marcar('ok')
+  if (venceEn !== null) {
+    // poco antes de vencer se renueva sola; si no se puede, la persona recibe el aviso mientras aún puede guardar
+    temporizador = setTimeout(() => void refrescar(), Math.max(venceEn - Date.now() - ANTES_DE_VENCER_MS, 0))
+  }
+}
+
+/** El refresco falló con una sesión abierta: se avisa sin sacar a la persona de su pantalla. */
+function avisarVencimiento() {
+  if (temporizador) clearTimeout(temporizador)
+  temporizador = null
+  const resta = venceEn === null ? 0 : venceEn - Date.now()
+  if (resta > 0) {
+    marcar('por_vencer')
+    temporizador = setTimeout(() => marcar('vencida'), resta)
+  } else {
+    marcar('vencida')
+  }
 }
 
 /** Avisa cuando la sesión cambia por un refresco (nuevo usuario o sesión terminada). */
@@ -42,9 +97,15 @@ function mensajeDe(cuerpo: unknown, estado: number): string {
 export async function refrescar(): Promise<RespuestaLogin | null> {
   if (!refrescando) {
     refrescando = (async () => {
+      const habiaSesion = acceso !== null
       try {
         const r = await fetch('/api/auth/refrescar', { method: 'POST', credentials: 'same-origin' })
         const datos = r.ok ? ((await r.json()) as RespuestaLogin) : null
+        if (!datos && habiaSesion) {
+          // la sesión estaba abierta: no se tira la pantalla, se avisa para que guarde su trabajo
+          avisarVencimiento()
+          return null
+        }
         fijarAcceso(datos?.acceso ?? null)
         oyentes.forEach((f) => f(datos))
         return datos

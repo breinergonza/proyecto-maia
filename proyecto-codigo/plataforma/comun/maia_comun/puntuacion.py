@@ -128,7 +128,7 @@ def tabla_crecimiento(c: pd.DataFrame, p: AC.Preparado, corrida_id: int) -> pd.D
     c = c.join(p.datos[['t']], how='left')
     return pd.DataFrame({
         'corrida_id': corrida_id, 'sujeto': c.sujeto.astype(str), 'etapa': c.etapa.map(_texto),
-        'indicador': c.concepto.astype(str), 'fecha': _fecha(c.t), 'edad_corregida': pd.to_numeric(c.ec_dias),
+        'indicador': c.concepto.astype(str), 'variable': c.variable.map(_texto), 'fecha': _fecha(c.t), 'edad_corregida': pd.to_numeric(c.ec_dias),
         'valor': pd.to_numeric(p.x.reindex(c.index), errors='coerce'), 'z': pd.to_numeric(c.z),
         'bajo_2de': c.bajo.fillna(False).astype(bool), 'caida_1de': c.cae.fillna(False).astype(bool),
         'improbable': c.improbable.fillna(False).astype(bool),

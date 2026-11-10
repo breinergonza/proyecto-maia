@@ -2,9 +2,10 @@
 // de distribución con un marcador. Usan los tokens de color de estilos.css; el coral marca lo que hay que mirar y nunca
 // es el color de una serie. Las series toman serie-1, serie-2 y serie-3 en ese orden fijo.
 import type { ReactNode } from 'react'
-import { Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis,
-  YAxis } from 'recharts'
+import { Area, Bar, BarChart, CartesianGrid, ComposedChart, Line, LineChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip,
+  XAxis, YAxis } from 'recharts'
 import { cn } from '../../lib/cn'
+import { GraficaNavegable, resumenDe } from './navegacion'
 
 /** Los colores de serie en su orden fijo: el color sigue a la serie, no a su posición en una lista filtrada. */
 export const SERIES_COLOR = ['var(--color-serie-1)', 'var(--color-serie-2)', 'var(--color-serie-3)', 'var(--color-serie-4)'] as const
@@ -33,6 +34,14 @@ export function LeyendaSeries({ series, marca = 'linea' }: { series: Serie[]; ma
       ))}
     </ul>
   )
+}
+
+/** El texto de una fila de varias series para anunciarlo: «Serie: valor; Serie: valor». */
+export function textoSeries(fila: FilaSeries, series: Serie[], formato: (v: number, fila: FilaSeries, s: Serie) => string, vacio = 'sin dato'): string {
+  return series.map((s) => {
+    const v = fila[s.clave]
+    return `${s.nombre}: ${typeof v === 'number' ? formato(v, fila, s) : vacio}`
+  }).join('; ')
 }
 
 function TooltipSeries({ active, payload, label, series, formato }: {
@@ -70,8 +79,10 @@ export function LineasSeries({ filas, series, etiqueta, formatoY, dominioY, alto
   alto?: number
   formatoTooltip?: (v: number, fila: FilaSeries, s: Serie) => string
 }) {
+  const fmt = formatoTooltip ?? ((v: number) => formatoY(v))
+  const items = filas.map((f) => `${f.x}. ${textoSeries(f, series, fmt)}`)
   return (
-    <div style={{ height: alto }} role="figure" aria-label={etiqueta}>
+    <GraficaNavegable etiqueta={etiqueta} resumen={resumenDe('Líneas', filas.length, ['punto', 'puntos'])} items={items} style={{ height: alto }}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={filas} margin={{ left: 0, right: 12, top: 8, bottom: 0 }}>
           <CartesianGrid stroke={COLOR.rejilla} vertical={false} />
@@ -87,7 +98,37 @@ export function LineasSeries({ filas, series, etiqueta, formatoY, dominioY, alto
           ))}
         </LineChart>
       </ResponsiveContainer>
-    </div>
+    </GraficaNavegable>
+  )
+}
+
+const MAX_LINEAS_ETIQUETA = 3
+
+/** Parte una etiqueta en renglones de a lo más `ancho` caracteres (por palabras); lo que sobra de MAX_LINEAS_ETIQUETA se corta con «…». */
+function partirEtiqueta(texto: string, ancho: number): string[] {
+  const lineas: string[] = []
+  let actual = ''
+  for (const palabra of texto.split(/\s+/)) {
+    if (actual && `${actual} ${palabra}`.length > ancho) { lineas.push(actual); actual = palabra } else actual = actual ? `${actual} ${palabra}` : palabra
+  }
+  if (actual) lineas.push(actual)
+  if (lineas.length <= MAX_LINEAS_ETIQUETA) return lineas
+  const corta = lineas.slice(0, MAX_LINEAS_ETIQUETA)
+  corta[MAX_LINEAS_ETIQUETA - 1] = `${corta[MAX_LINEAS_ETIQUETA - 1].slice(0, Math.max(1, ancho - 1))}…`
+  return corta
+}
+
+/** Etiqueta del eje X que baja de renglón según el ancho de cada barra, para que no se pisen entre vecinas. */
+function EtiquetaEjeX({ x, y, payload, width, visibleTicksCount, formato }: {
+  x?: number; y?: number; payload?: { value: string }; width?: number; visibleTicksCount?: number; formato?: (x: string) => string
+}) {
+  const texto = formato ? formato(payload?.value ?? '') : (payload?.value ?? '')
+  const banda = (width ?? 200) / Math.max(1, visibleTicksCount ?? 1)
+  const lineas = partirEtiqueta(texto, Math.max(6, Math.floor(banda / 6.8)))
+  return (
+    <text x={x} y={y} textAnchor="middle" fill={COLOR.eje} fontSize={12}>
+      {lineas.map((l, i) => <tspan key={i} x={x} dy={i === 0 ? 12 : 14}>{l}</tspan>)}
+    </text>
   )
 }
 
@@ -99,12 +140,15 @@ export function BarrasApiladas({ filas, series, etiqueta, formatoX, alto = 180 }
   formatoX?: (x: string) => string
   alto?: number
 }) {
+  const items = filas.map((f) => `${formatoX ? formatoX(f.x) : f.x}. ${textoSeries(f, series, (v) => String(v))}`)
   return (
-    <div style={{ height: alto }} role="figure" aria-label={etiqueta}>
+    <GraficaNavegable etiqueta={etiqueta} resumen={resumenDe('Barras apiladas', filas.length, ['periodo', 'periodos'])} items={items} style={{ height: alto }}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={filas} margin={{ left: 0, right: 8, top: 8, bottom: 0 }} barCategoryGap={1}>
           <CartesianGrid stroke={COLOR.rejilla} vertical={false} />
-          <XAxis dataKey="x" stroke={COLOR.eje} fontSize={12} tickLine={false} interval={0} tickFormatter={formatoX} />
+          <XAxis dataKey="x" stroke={COLOR.eje} fontSize={12} tickLine={false} interval={0} tickFormatter={formatoX}
+            height={filas.some((f) => (formatoX ? formatoX(f.x) : f.x).length > 10) ? 60 : 30}
+            tick={(p) => <EtiquetaEjeX x={Number(p.x)} y={Number(p.y)} payload={p.payload} width={Number(p.width)} visibleTicksCount={p.visibleTicksCount} formato={formatoX} />} />
           <YAxis allowDecimals={false} stroke={COLOR.eje} fontSize={12} width={32} tickLine={false} axisLine={false} />
           <Tooltip cursor={{ fill: COLOR.franja }}
             content={(p) => <TooltipSeries {...p} series={series} formato={(v) => String(v)} />} />
@@ -114,7 +158,7 @@ export function BarrasApiladas({ filas, series, etiqueta, formatoX, alto = 180 }
           ))}
         </BarChart>
       </ResponsiveContainer>
-    </div>
+    </GraficaNavegable>
   )
 }
 
@@ -134,6 +178,8 @@ export interface PuntoSerie {
   y: number
   /** Punto que hay que mirar: se pinta en coral y más grande. */
   marcado?: boolean
+  /** Primera visita con alerta: se pinta como estrella. */
+  estrella?: boolean
   /** Primera línea del tooltip (p. ej. la visita o la edad). */
   titulo: string
   detalle?: string[]
@@ -164,8 +210,9 @@ export function MiniSerie({ puntos, etiqueta, dominioY, ticksY, formatoY, ticksX
   guias?: { y: number; punteada?: boolean }[]
   alto?: number
 }) {
+  const items = puntos.map((p) => [p.titulo, ...(p.detalle ?? [])].join('. '))
   return (
-    <div style={{ height: alto }} role="figure" aria-label={etiqueta}>
+    <GraficaNavegable etiqueta={etiqueta} resumen={resumenDe('Serie', puntos.length, ['punto', 'puntos'])} items={items} style={{ height: alto }}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={puntos} margin={{ left: 0, right: 12, top: 8, bottom: 0 }}>
           <CartesianGrid stroke={COLOR.rejilla} vertical={false} />
@@ -187,13 +234,21 @@ export function MiniSerie({ puntos, etiqueta, dominioY, ticksY, formatoY, ticksX
             dot={PuntoMarcado} activeDot={{ r: 6, stroke: COLOR.papel, strokeWidth: 2 }} />
         </LineChart>
       </ResponsiveContainer>
-    </div>
+    </GraficaNavegable>
   )
 }
 
 function PuntoMarcado({ cx, cy, payload, index }: { cx?: number; cy?: number; payload?: PuntoSerie; index?: number }) {
   if (cx == null || cy == null) return <g key={index} />
   const marcado = payload?.marcado
+  if (payload?.estrella) {
+    const pts = Array.from({ length: 10 }, (_, i) => {
+      const r = i % 2 === 0 ? 8 : 3.4
+      const a = (Math.PI / 5) * i - Math.PI / 2
+      return `${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`
+    }).join(' ')
+    return <polygon key={index} points={pts} fill={COLOR.marca} stroke={COLOR.papel} strokeWidth={1.5} data-testid="estrella" />
+  }
   return (
     <circle key={index} cx={cx} cy={cy} r={marcado ? 5.5 : 4} fill={marcado ? COLOR.marca : COLOR.papel}
       stroke={marcado ? COLOR.papel : COLOR.serie} strokeWidth={2} />
@@ -213,14 +268,15 @@ function ContenidoTooltip({ active, payload }: { active?: boolean; payload?: Rea
 }
 
 /** Muestra de color para una leyenda escrita aparte de la gráfica. */
-export function Muestra({ tipo, children }: { tipo: 'franja' | 'alerta' | 'punto' | 'marcado'; children: ReactNode }) {
+export function Muestra({ tipo, children }: { tipo: 'franja' | 'alerta' | 'punto' | 'marcado' | 'estrella'; children: ReactNode }) {
   return (
     <span className="inline-flex items-center gap-1.5">
       <span aria-hidden className={cn('inline-block shrink-0',
         tipo === 'franja' && 'h-3 w-4 rounded-sm bg-teal-tinte ring-1 ring-teal/20',
         tipo === 'alerta' && 'h-3 w-4 rounded-sm bg-coral-tinte ring-1 ring-coral/30',
         tipo === 'punto' && 'size-2.5 rounded-full border-2 border-teal-medio bg-papel',
-        tipo === 'marcado' && 'size-3 rounded-full bg-coral-hondo')} />
+        tipo === 'marcado' && 'size-3 rounded-full bg-coral-hondo',
+        tipo === 'estrella' && 'size-3.5 bg-coral-hondo [clip-path:polygon(50%_0,62%_36%,100%_38%,69%_60%,80%_96%,50%_75%,20%_96%,31%_60%,0_38%,38%_36%)]')} />
       {children}
     </span>
   )
@@ -330,4 +386,48 @@ export function ticksEnteros([a, b]: [number, number], obligatorios: number[] = 
   const ticks = new Set(obligatorios.filter((v) => v >= a && v <= b))
   for (let v = desde; v <= b; v += paso) ticks.add(v)
   return [...ticks].sort((m, n) => m - n)
+}
+
+/** Índice de un trimestre «2021-T3» (año × 4 + trimestre) o null si no tiene esa forma. */
+function indiceTrimestre(t: string): number | null {
+  const m = /^(\d{4})-T([1-4])$/.exec(t)
+  return m ? Number(m[1]) * 4 + Number(m[2]) : null
+}
+
+export interface PuntoTrimestre { trimestre: string; valor: number | null; bajo?: number | null; alto?: number | null }
+
+/** Una medida por trimestre con su banda de incertidumbre y una raya de mínimo aceptable. Si faltan trimestres entre dos
+ *  puntos (años sin niños), la línea se corta y el eje lo marca con «…», en vez de unirlos como si fueran seguidos. */
+export function SerieTrimestral({ puntos, etiqueta, nombre, formatoY, dominioY, minimo, textoMinimo, color = 0, alto = 240 }: {
+  puntos: PuntoTrimestre[]; etiqueta: string; nombre: string; formatoY: (v: number) => string; dominioY?: [number, number]
+  minimo?: number; textoMinimo?: string; color?: ColorSerie; alto?: number
+}) {
+  const filas: { x: string; valor: number | null; banda: [number, number] | null }[] = []
+  puntos.forEach((p, i) => {
+    const antes = i > 0 ? indiceTrimestre(puntos[i - 1].trimestre) : null, ahora = indiceTrimestre(p.trimestre)
+    if (antes != null && ahora != null && ahora - antes > 1) filas.push({ x: '…', valor: null, banda: null })
+    filas.push({ x: p.trimestre, valor: p.valor, banda: p.bajo != null && p.alto != null ? [p.bajo, p.alto] : null })
+  })
+  const items = puntos.map((p) => `${p.trimestre}. ${nombre}: ${p.valor == null ? 'pocos niños' : formatoY(p.valor)}`
+    + (p.bajo != null && p.alto != null ? `, entre ${formatoY(p.bajo)} y ${formatoY(p.alto)}` : ''))
+  const c = SERIES_COLOR[color]
+  return (
+    <GraficaNavegable etiqueta={etiqueta} resumen={resumenDe('Líneas', puntos.length, ['trimestre', 'trimestres'])} items={items} style={{ height: alto }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <ComposedChart data={filas} margin={{ left: 0, right: 12, top: 14, bottom: 0 }}>
+          <CartesianGrid stroke={COLOR.rejilla} vertical={false} />
+          <XAxis dataKey="x" stroke={COLOR.eje} fontSize={12} tickLine={false} interval="preserveStartEnd" padding={{ left: 12, right: 12 }} />
+          <YAxis domain={dominioY ?? ['auto', 'auto']} tickFormatter={formatoY} stroke={COLOR.eje} fontSize={12} width={44} tickLine={false} axisLine={false} />
+          <Tooltip formatter={(v) => (Array.isArray(v) ? v.map((x) => formatoY(Number(x))).join(' a ') : typeof v === 'number' ? formatoY(v) : String(v))} />
+          <Area dataKey="banda" name="Incertidumbre" stroke="none" fill={c} fillOpacity={0.14} isAnimationActive={false} connectNulls={false} />
+          {minimo != null && (
+            <ReferenceLine y={minimo} stroke={COLOR.marca} strokeDasharray="6 4"
+              label={{ value: textoMinimo ?? formatoY(minimo), position: 'insideBottomLeft', fontSize: 12, fill: COLOR.marca }} />
+          )}
+          <Line dataKey="valor" name={nombre} type="linear" stroke={c} strokeWidth={2.5} connectNulls={false} isAnimationActive={false}
+            dot={{ r: 4, fill: COLOR.papel, strokeWidth: 2 }} activeDot={{ r: 6, stroke: COLOR.papel, strokeWidth: 2 }} />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </GraficaNavegable>
+  )
 }

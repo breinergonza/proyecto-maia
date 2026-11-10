@@ -1,13 +1,13 @@
 // La historia de un niño: sus visitas en orden, lo que se midió en cada una, los datos por revisar, el riesgo
 // calculado (y cómo fue cambiando visita a visita), su crecimiento frente a la OMS y cómo nació frente a los demás.
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Printer } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { pedir } from '../api/cliente'
 import type { AlertaDato, LineaTemporal, Visita } from '../api/tipos'
-import { CrecimientoOms, PerfilCohorte, TarjetaRiesgo, TrayectoriaRiesgo } from '../components/ficha'
-import { Aviso, Cargando, Insignia, Panel, Tabla, Vacio } from '../components/ui'
+import { CrecimientoOms, PerfilCohorte, PerfilDelNino, TarjetaRiesgo, TrayectoriaRiesgo } from '../components/ficha'
+import { Aviso, Boton, Cargando, Insignia, Panel, Tabla, Vacio } from '../components/ui'
 import { cn } from '../lib/cn'
 import { aproximado, dec, edad, fecha, indicador, RIESGO_ALTO } from '../lib/formato'
 import { alerta, AYUDA_DOS_CIFRAS, AYUDA_OMS, ayudaAlerta, ayudaZ, datosAl, frenteOms, motivo } from '../lib/lenguaje'
@@ -33,7 +33,7 @@ export default function Nino() {
 
   return (
     <>
-      <Link to="/ninos" className="mb-2 inline-flex items-center gap-1 text-sm text-teal hover:underline">
+      <Link to="/ninos" className="no-imprimir mb-2 inline-flex items-center gap-1 text-sm text-teal hover:underline">
         <ArrowLeft size={16} aria-hidden /> Todos los niños
       </Link>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
@@ -45,6 +45,9 @@ export default function Nino() {
             {n.grupo && <>. Grupo {n.grupo}</>}. {datosAl(n.corte)}.
           </p>
         </div>
+        <Boton variante="secundario" className="no-imprimir" onClick={() => window.print()}>
+          <Printer size={16} aria-hidden /> Imprimir ficha
+        </Boton>
       </div>
 
       <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
@@ -58,6 +61,7 @@ export default function Nino() {
         </section>
       )}
 
+      <PerfilDelNino perfil={n.perfil} />
       <TrayectoriaRiesgo sujeto={n.sujeto} />
       <CrecimientoOms crecimiento={n.crecimiento} />
       <PerfilCohorte sujeto={n.sujeto} />
@@ -72,6 +76,9 @@ export default function Nino() {
         )}
       </Panel>
       </div>
+      <p className="solo-imprimir">
+        Impreso el {fecha(new Date().toISOString())} · Observatorio Canguro · Documento de apoyo clínico: no reemplaza el criterio médico
+      </p>
     </>
   )
 }

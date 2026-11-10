@@ -228,6 +228,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tablero/alarmas-por-trimestre": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Alarmas Por Trimestre
+         * @description Cuántas alarmas de grupo hubo en cada trimestre y por qué señal, de todas las de la corrida (la lista de
+         *     ``/alarmas-grupo`` trae solo las más recientes). Solo están los trimestres con alguna alarma.
+         */
+        get: operations["alarmas_por_trimestre_api_tablero_alarmas_por_trimestre_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tablero/alarmas-grupo": {
         parameters: {
             query?: never;
@@ -279,6 +300,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ninos/{sujeto}/historia-riesgo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Historia Riesgo
+         * @description El riesgo de cada desenlace en cada visita del niño, calculado ahora con el paquete activo: cada punto usa solo lo
+         *     medido hasta su visita. La corrida guarda solo la última visita, así que esto no sale de ``resultados.riesgos``.
+         */
+        get: operations["historia_riesgo_api_ninos__sujeto__historia_riesgo_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ninos/{sujeto}/perfil": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Perfil
+         * @description Dónde queda el niño frente a los demás niños del corte en su edad gestacional y sus medidas al nacer. De la
+         *     cohorte solo salen agregados (cuantiles y cuántos niños), nunca valores de otro niño.
+         */
+        get: operations["perfil_api_ninos__sujeto__perfil_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/revision/datos": {
         parameters: {
             query?: never;
@@ -288,6 +351,49 @@ export interface paths {
         };
         /** Datos */
         get: operations["datos_api_revision_datos_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/revision/datos/aciertos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Aciertos
+         * @description Qué tanto acierta la cola: de las k primeras alertas (por prioridad) que ya tienen respuesta, qué porcentaje se
+         *     marcó «error». Una alerta cuenta como error si alguna respuesta dijo «sí». Las respuestas «no sé» cuentan como
+         *     respondidas pero no como error.
+         */
+        get: operations["aciertos_api_revision_datos_aciertos_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/revision/datos/concentracion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Concentracion
+         * @description Dónde se acumulan las alertas: por variable y, si el corte trae más de un grupo o sede, por grupo y variable.
+         *     Lo que tenga menos de ``MINIMO_CELDA`` alertas no se muestra solo: se suma en «otras».
+         */
+        get: operations["concentracion_api_revision_datos_concentracion_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -414,7 +520,15 @@ export interface paths {
         };
         /**
          * Ejemplo
-         * @description Una petición lista para probar: un niño simulado (nunca uno real), con las variables del modelo activo.
+         * @description Una petición lista para probar: un niño inventado (nunca uno real) con un valor habitual en cada campo principal
+         *     de sus visitas, según el paquete activo. Sale del diccionario del paquete y de la referencia OMS, no del simulador:
+         *     el simulador tiene sus propios nombres de variables, que no son los de la base de la Fundación.
+         *
+         *     Es para ver cómo se ve un resultado, así que tiene que dar un riesgo y ningún dato raro: las visitas van en orden
+         *     (cada una a la mitad de su ventana, pero antes de que abra la siguiente), se llenan las primeras hasta donde
+         *     todavía queda un desenlace por predecir (con todas llenas no hay riesgo que mostrar) y lo que el detector de
+         *     anomalías del paquete encuentre raro (p. ej. la mediana OMS al nacer, que es la de un bebé a término) se cambia
+         *     por lo que él espera.
          */
         get: operations["ejemplo_api_inferencia_ejemplo_get"];
         put?: never;
@@ -744,10 +858,118 @@ export interface paths {
         put?: never;
         /**
          * Entrenar
-         * @description Entrena ya: el programador trae los datos de la fuente y entrena cada modelo con estos hiperparámetros. El
-         *     resultado queda en MLflow como ``candidato``; el avance se ve en ``GET /entrenamientos/ejecuciones``.
+         * @description Entrena ya (administración y expertos): se pone en la cola y el programador los toma uno por vez, en orden de
+         *     llegada. Un experto entrena modelos personales con los hiperparámetros vigentes y tiene cuota (D17, D40); el
+         *     resultado queda en MLflow como ``candidato`` (u ``personal`` si es personal). El avance se ve en
+         *     ``GET /entrenamientos/cola``.
          */
         post: operations["entrenar_api_entrenamientos_entrenar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/entrenamientos/cuotas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ver Cuotas
+         * @description Los límites vigentes de Mis modelos (los cambia administración).
+         */
+        get: operations["ver_cuotas_api_entrenamientos_cuotas_get"];
+        /**
+         * Cambiar Cuotas
+         * @description Administración cambia los límites de cola, modelos guardados y días sin uso; queda en la auditoría.
+         */
+        put: operations["cambiar_cuotas_api_entrenamientos_cuotas_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/entrenamientos/cola": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Cola
+         * @description Los entrenamientos en cola o en curso, con su posición y el tiempo estimado, y los límites de esta persona.
+         */
+        get: operations["cola_api_entrenamientos_cola_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/entrenamientos/{ejecucion_id}/cancelar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancelar
+         * @description Cancela un entrenamiento pendiente propio (administración cancela cualquiera); uno en curso no se cancela.
+         */
+        post: operations["cancelar_api_entrenamientos__ejecucion_id__cancelar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/entrenamientos/{ejecucion_id}/descartar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Descartar
+         * @description Descarta un modelo personal terminado propio (libera un lugar de la cuota; administración puede con cualquiera).
+         */
+        post: operations["descartar_api_entrenamientos__ejecucion_id__descartar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/entrenamientos/banco": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Banco
+         * @description El banco compartido: entrenamientos terminados (oficiales y personales) con dueño, muestra, métricas
+         *     principales y si su corte ya no es el vigente (D38). Filtros por dueño y por Personal u Oficial. Lo ven
+         *     administración y expertos.
+         */
+        get: operations["banco_api_entrenamientos_banco_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -986,6 +1208,537 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/analitica/comparar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Entrenamientos
+         * @description Las medidas de A y B para un desenlace, con la diferencia de B frente a A y su intervalo del 95 % por réplicas;
+         *     el rendimiento por subgrupo (sexo, edad gestacional, sede) con su diferencia; y las diferencias de la muestra.
+         */
+        get: operations["entrenamientos_api_analitica_comparar_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analitica/comparar/grupos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Grupos */
+        post: operations["grupos_api_analitica_comparar_grupos_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analitica/riesgo-por-visita": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Riesgo Por Visita
+         * @description Por niño, sus puntos de riesgo en cada visita para el desenlace pedido y la primera visita con alerta
+         *     (``percentil >= umbral``). Un niño que no está en el corte sale con ``error`` y los demás se calculan.
+         */
+        get: operations["riesgo_por_visita_api_analitica_riesgo_por_visita_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analitica/entrenamientos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Entrenamientos
+         * @description Los entrenamientos con analítica, el más reciente primero, y los submódulos de cada uno.
+         */
+        get: operations["entrenamientos_api_analitica_entrenamientos_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analitica/contexto": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Contexto
+         * @description Qué se puede mirar: modelos, versiones y desenlaces (En uso / En prueba) del entrenamiento pedido o, sin
+         *     pedir, del más reciente.
+         */
+        get: operations["contexto_api_analitica_contexto_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analitica/{entrenamiento}/trayectorias": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Trayectorias
+         * @description Puntaje z de crecimiento por grupo y visita frente a la OMS, de la corrida pedida o la más reciente. Solo
+         *     agregados (D7): celdas de menos de 5 niños omitidas, desvíos con 20 o más. Los niños individuales (hasta 30, con su
+         *     código seudonimizado) solo los ven el experto y el administrador.
+         */
+        get: operations["trayectorias_api_analitica__entrenamiento__trayectorias_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analitica/{entrenamiento}/perfiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Perfiles
+         * @description Perfiles provisionales (edad gestacional y Lubchenco): niños por categoría (oculta si hay menos de 5), la tasa de
+         *     riesgo alto del desenlace elegido (percentil >= PERCENTIL_ALTO) y qué los distingue (edad gestacional y peso al nacer
+         *     medios). No son perfiles reales: ningún experto los ha aprobado todavía.
+         */
+        get: operations["perfiles_api_analitica__entrenamiento__perfiles_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analitica/{entrenamiento}/{submodulo}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Submodulo
+         * @description Los artefactos de un submódulo, por desenlace (``desenlaces[clave]``). Estados: ``ok``, ``pendiente`` (aún no
+         *     se calcula) o ``sin_artefactos`` (entrenamiento anterior a la analítica: no se recalcula).
+         */
+        get: operations["submodulo_api_analitica__entrenamiento___submodulo__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/muestras/variables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Variables
+         * @description Las variables que se ofrecen como filtro: tipo, opciones y la regla ``cuando`` que se sugiere.
+         */
+        get: operations["variables_api_muestras_variables_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/muestras/facetas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Facetas
+         * @description Niños por opción de cada variable con los demás filtros aplicados (el propio no). Opciones con menos de 5 niños
+         *     salen como «<5».
+         */
+        post: operations["facetas_api_muestras_facetas_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/muestras/contar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Contar */
+        post: operations["contar_api_muestras_contar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/muestras": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar */
+        get: operations["listar_api_muestras_get"];
+        put?: never;
+        /** Guardar */
+        post: operations["guardar_api_muestras_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/muestras/{muestra_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Leer */
+        get: operations["leer_api_muestras__muestra_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/muestras/{muestra_id}/duplicar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Duplicar
+         * @description Una muestra nueva con la definición de la original (o la que se envíe), calculada sobre el corte vigente.
+         */
+        post: operations["duplicar_api_muestras__muestra_id__duplicar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/exploracion/resumen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resumen */
+        post: operations["resumen_api_exploracion_resumen_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/exploracion/facetas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Facetas
+         * @description Las opciones de filtro con cuántos niños tendría cada una (los demás filtros puestos). Con menos de 20 niños en
+         *     el grupo no se dan cifras: quedan las opciones para poder quitar o cambiar filtros. Con 0 niños se dice (``vacio``).
+         */
+        post: operations["facetas_api_exploracion_facetas_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/prediccion/modelos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Modelos Usables
+         * @description Los modelos que se pueden usar para predecir: los paquetes oficiales y los personales empaquetados. Un modelo cuyo
+         *     corte no es el vigente se ofrece con aviso: sus niños y variables pueden no corresponder.
+         */
+        get: operations["modelos_usables_api_prediccion_modelos_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/prediccion/muestra": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Predecir Muestra
+         * @description El riesgo de los niños del filtro con el modelo elegido. Con menos de 20 niños no hay cifras (D46). La tabla por
+         *     niño, solo para administración y experto; nada se guarda.
+         */
+        post: operations["predecir_muestra_api_prediccion_muestra_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/prediccion/muestra/csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Csv Muestra
+         * @description CSV por niño (D36), solo administración. No se guarda en el servidor y la auditoría lleva la huella de la lista y
+         *     cuántos niños, nunca el contenido.
+         */
+        get: operations["csv_muestra_api_prediccion_muestra_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/prediccion/ejemplos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ejemplos
+         * @description Sin ``visita``: la biblioteca (visitas reales y perfiles, con cuántos niños tiene cada subgrupo). Con ``visita``
+         *     y ``perfil`` (o ``eg_semanas``): el niño de ejemplo, con la mediana o la moda de cada variable en ese subgrupo del
+         *     corte vigente en lugar del punto medio del Diccionario.
+         */
+        get: operations["ejemplos_api_prediccion_ejemplos_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/prediccion/nino": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Predecir Nino
+         * @description Un niño nuevo: el ejemplo típico del subgrupo con los campos que el usuario cambió. Devuelve el riesgo por
+         *     desenlace con sus motivos, el perfil provisional y el riesgo visita por visita con la línea de alerta. No se guarda
+         *     (para guardarlo: ``POST /prediccion/ninos-nuevos``).
+         */
+        post: operations["predecir_nino_api_prediccion_nino_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/prediccion/trabajos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Mis Trabajos
+         * @description Los últimos cálculos de quien pregunta.
+         */
+        get: operations["mis_trabajos_api_prediccion_trabajos_get"];
+        put?: never;
+        /**
+         * Lanzar Trabajo
+         * @description Lanza el cálculo de una muestra o de todo el universo en un hilo de la API y devuelve su número; el avance se
+         *     consulta en ``GET /prediccion/trabajos/{id}``. Uno a la vez.
+         */
+        post: operations["lanzar_trabajo_api_prediccion_trabajos_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/prediccion/trabajos/{pid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Estado Trabajo
+         * @description Estado y progreso; al terminar, los agregados (distribución, niveles, por desenlace, por visita y fuga).
+         */
+        get: operations["estado_trabajo_api_prediccion_trabajos__pid__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/prediccion/trabajos/{pid}/tabla": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tabla Trabajo
+         * @description Una página de la tabla por niño, de mayor a menor riesgo. Vive en memoria una hora: después hay que recalcular.
+         */
+        get: operations["tabla_trabajo_api_prediccion_trabajos__pid__tabla_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/prediccion/ninos-nuevos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Listar Ninos
+         * @description Las plantillas (de todos los expertos) y los niños guardados propios (administración ve todos).
+         */
+        get: operations["listar_ninos_api_prediccion_ninos_nuevos_get"];
+        put?: never;
+        /**
+         * Guardar Nino
+         * @description Guarda un niño inventado (o una plantilla de un perfil) en ``app.ninos_nuevos``: aparte del corte oficial. Se
+         *     guardan la visita, el perfil, lo que se cambió, el niño completo y su riesgo de ese momento.
+         */
+        post: operations["guardar_nino_api_prediccion_ninos_nuevos_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/prediccion/ninos-nuevos/{nid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ver Nino */
+        get: operations["ver_nino_api_prediccion_ninos_nuevos__nid__get"];
+        put?: never;
+        post?: never;
+        /** Borrar Nino */
+        delete: operations["borrar_nino_api_prediccion_ninos_nuevos__nid__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1127,6 +1880,14 @@ export interface components {
              */
             estado: "Lista" | "No usar";
         };
+        /** ColaEntrenamientos */
+        ColaEntrenamientos: {
+            /** Items */
+            items: components["schemas"]["ItemCola"][];
+            limites: components["schemas"]["LimitesPersona"];
+            /** Promedio Min */
+            promedio_min?: number | null;
+        };
         /** ColumnaVista */
         ColumnaVista: {
             /** Clave */
@@ -1161,6 +1922,15 @@ export interface components {
              * @default false
              */
             obligatoria: boolean;
+        };
+        /** ComparaGrupos */
+        ComparaGrupos: {
+            a: components["schemas"]["LadoGrupo"];
+            b: components["schemas"]["LadoGrupo"];
+            /** Corrida Id */
+            corrida_id?: number | null;
+            /** Desenlace */
+            desenlace?: string | null;
         };
         /** ConexionEntrada */
         ConexionEntrada: {
@@ -1246,6 +2016,19 @@ export interface components {
              */
             activo: boolean;
         };
+        /** Consulta */
+        Consulta: {
+            /** Muestra */
+            muestra?: {
+                [key: string]: unknown;
+            } | null;
+            /** Muestra Id */
+            muestra_id?: number | null;
+            /** Corrida Id */
+            corrida_id?: number | null;
+            /** Variables */
+            variables?: components["schemas"]["VariableExtra"][] | null;
+        };
         /** CorridaNueva */
         CorridaNueva: {
             /**
@@ -1292,6 +2075,31 @@ export interface components {
             terminada?: string | null;
             /** Mensaje */
             mensaje?: string | null;
+        };
+        /** CuotasCambio */
+        CuotasCambio: {
+            /** Cola Max */
+            cola_max?: number | null;
+            /** Modelos Max */
+            modelos_max?: number | null;
+            /** Dias Sin Uso */
+            dias_sin_uso?: number | null;
+            /** Dias Aviso */
+            dias_aviso?: number | null;
+        };
+        /**
+         * CuotasConfig
+         * @description Los límites de Mis modelos que administra el admin (tabla ``app.cuotas_config``).
+         */
+        CuotasConfig: {
+            /** Cola Max */
+            cola_max: number;
+            /** Modelos Max */
+            modelos_max: number;
+            /** Dias Sin Uso */
+            dias_sin_uso: number;
+            /** Dias Aviso */
+            dias_aviso: number;
         };
         /** DiferenciasDiccionario */
         DiferenciasDiccionario: {
@@ -1374,6 +2182,8 @@ export interface components {
             registro?: string | null;
             /** Mensaje */
             mensaje?: string | null;
+            /** Solicitada Por */
+            solicitada_por?: string | null;
             /** Creada En */
             creada_en?: string | null;
             /** Iniciada */
@@ -1465,6 +2275,14 @@ export interface components {
              * @default false
              */
             guardar: boolean;
+            /** Visibilidad */
+            visibilidad?: ("personal" | "oficial") | null;
+            /** Nombre */
+            nombre?: string | null;
+            /** Descripcion */
+            descripcion?: string | null;
+            /** Muestra Id */
+            muestra_id?: number | null;
         };
         /** EpisodioEntrada */
         EpisodioEntrada: {
@@ -1516,6 +2334,131 @@ export interface components {
             /** Filas */
             filas: (string | null)[][];
         };
+        /** ItemBanco */
+        ItemBanco: {
+            /** Id */
+            id: number;
+            /** Propietario */
+            propietario?: string | null;
+            /**
+             * Visibilidad
+             * @enum {string}
+             */
+            visibilidad: "personal" | "oficial";
+            /** Nombre */
+            nombre?: string | null;
+            /** Descripcion */
+            descripcion?: string | null;
+            /** Fuente */
+            fuente: string;
+            /** Modelos */
+            modelos?: string[];
+            /** Muestra Id */
+            muestra_id?: number | null;
+            /** Muestra */
+            muestra?: string | null;
+            /** Corte */
+            corte?: string | null;
+            /**
+             * Corte Anterior
+             * @default false
+             */
+            corte_anterior: boolean;
+            /** Auc */
+            auc?: number | null;
+            /** Terminada */
+            terminada?: string | null;
+            /**
+             * Propia
+             * @default false
+             */
+            propia: boolean;
+            /**
+             * Descartado
+             * @default false
+             */
+            descartado: boolean;
+            /** Propietario Id */
+            propietario_id?: string | null;
+            /** Metricas */
+            metricas?: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            };
+            /** Vence En Dias */
+            vence_en_dias?: number | null;
+        };
+        /** ItemCola */
+        ItemCola: {
+            /** Id */
+            id: number;
+            /**
+             * Estado
+             * @enum {string}
+             */
+            estado: "pendiente" | "en_curso";
+            /** Posicion */
+            posicion: number;
+            /** Estimado Min */
+            estimado_min?: number | null;
+            /** Propietario */
+            propietario?: string | null;
+            /**
+             * Visibilidad
+             * @default oficial
+             * @enum {string}
+             */
+            visibilidad: "personal" | "oficial";
+            /** Nombre */
+            nombre?: string | null;
+            /** Muestra Id */
+            muestra_id?: number | null;
+            /** Creada En */
+            creada_en?: string | null;
+            /**
+             * Propia
+             * @default false
+             */
+            propia: boolean;
+            /**
+             * Cancelable
+             * @default false
+             */
+            cancelable: boolean;
+        };
+        /**
+         * LadoGrupo
+         * @description Un grupo de niños: un filtro guardado (``muestra_id``) o una combinación de facetas (``muestra``).
+         */
+        LadoGrupo: {
+            /** Muestra */
+            muestra?: {
+                [key: string]: unknown;
+            } | null;
+            /** Muestra Id */
+            muestra_id?: number | null;
+            /** Nombre */
+            nombre?: string | null;
+        };
+        /** LimitesPersona */
+        LimitesPersona: {
+            /** Sin Limite */
+            sin_limite: boolean;
+            /** Cola Max */
+            cola_max: number;
+            /** Cola Usada */
+            cola_usada: number;
+            /** Modelos Max */
+            modelos_max: number;
+            /** Modelos Usados */
+            modelos_usados: number;
+            /**
+             * Dias Sin Uso
+             * @default 90
+             */
+            dias_sin_uso: number;
+        };
         /** Login */
         Login: {
             /** Email */
@@ -1544,6 +2487,28 @@ export interface components {
             version: string;
             /** Alias */
             alias?: string[];
+        };
+        /** MuestraDuplicada */
+        MuestraDuplicada: {
+            /** Titulo */
+            titulo?: string | null;
+            /** Descripcion */
+            descripcion?: string | null;
+            /** Muestra */
+            muestra?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** MuestraNueva */
+        MuestraNueva: {
+            /** Titulo */
+            titulo: string;
+            /** Descripcion */
+            descripcion?: string | null;
+            /** Muestra */
+            muestra: {
+                [key: string]: unknown;
+            };
         };
         /** PaqueteSalida */
         PaqueteSalida: {
@@ -1583,6 +2548,34 @@ export interface components {
             /** Ventana Meses */
             ventana_meses?: number | null;
         };
+        /** PeticionGuardarNino */
+        PeticionGuardarNino: {
+            /** Modelo */
+            modelo?: string | null;
+            /** Visita */
+            visita: string;
+            /** Perfil */
+            perfil?: string | null;
+            /** Eg Semanas */
+            eg_semanas?: number | null;
+            /**
+             * Cambios
+             * @description variable → valor nuevo (null la quita)
+             */
+            cambios?: {
+                [key: string]: unknown;
+            };
+            /** Titulo */
+            titulo: string;
+            /** Descripcion */
+            descripcion?: string | null;
+            /**
+             * Tipo
+             * @default nino
+             * @enum {string}
+             */
+            tipo: "nino" | "plantilla";
+        };
         /** PeticionInferencia */
         PeticionInferencia: {
             /** Corte */
@@ -1593,6 +2586,70 @@ export interface components {
             mediciones: components["schemas"]["MedicionEntrada"][];
             /** Episodios */
             episodios?: components["schemas"]["EpisodioEntrada"][];
+        };
+        /** PeticionMuestra */
+        PeticionMuestra: {
+            /** Modelo */
+            modelo?: string | null;
+            /** Muestra */
+            muestra?: {
+                [key: string]: unknown;
+            } | null;
+            /** Muestra Id */
+            muestra_id?: number | null;
+            /**
+             * Excluir Entrenamiento
+             * @default false
+             */
+            excluir_entrenamiento: boolean;
+            /** Visita */
+            visita?: string | null;
+            /**
+             * Pagina
+             * @default 1
+             */
+            pagina: number;
+            /**
+             * Limite
+             * @default 200
+             */
+            limite: number;
+        };
+        /** PeticionNino */
+        PeticionNino: {
+            /** Modelo */
+            modelo?: string | null;
+            /** Visita */
+            visita: string;
+            /** Perfil */
+            perfil?: string | null;
+            /** Eg Semanas */
+            eg_semanas?: number | null;
+            /**
+             * Cambios
+             * @description variable → valor nuevo (null la quita)
+             */
+            cambios?: {
+                [key: string]: unknown;
+            };
+        };
+        /** PeticionTrabajo */
+        PeticionTrabajo: {
+            /** Modelo */
+            modelo?: string | null;
+            /** Muestra */
+            muestra?: {
+                [key: string]: unknown;
+            } | null;
+            /** Muestra Id */
+            muestra_id?: number | null;
+            /**
+             * Excluir Entrenamiento
+             * @default false
+             */
+            excluir_entrenamiento: boolean;
+            /** Visita */
+            visita?: string | null;
         };
         /** PorClasificar */
         PorClasificar: {
@@ -1826,6 +2883,16 @@ export interface components {
             visita?: string | null;
             /** Nota */
             nota?: string | null;
+        };
+        /**
+         * VariableExtra
+         * @description Una variable que se agregó al panel de filtros y la regla con que se lee (D1).
+         */
+        VariableExtra: {
+            /** Variable */
+            variable: string;
+            /** Cuando */
+            cuando?: string | null;
         };
         /** VersionDiccionarioSalida */
         VersionDiccionarioSalida: {
@@ -2294,6 +3361,39 @@ export interface operations {
             };
         };
     };
+    alarmas_por_trimestre_api_tablero_alarmas_por_trimestre_get: {
+        parameters: {
+            query?: {
+                corrida_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     alarmas_grupo_api_tablero_alarmas_grupo_get: {
         parameters: {
             query?: {
@@ -2337,7 +3437,7 @@ export interface operations {
                 pagina?: number;
                 tamano?: number;
                 corrida_id?: number | null;
-                orden?: ("sujeto" | "eg_semanas" | "desenlace_max" | "percentil_max" | "n_alertas" | "crecimiento") | null;
+                orden?: ("sujeto" | "eg_semanas" | "desenlace_max" | "percentil_max" | "n_alertas" | "crecimiento" | "ultimo_control") | null;
                 dir?: "asc" | "desc";
             };
             header?: never;
@@ -2403,6 +3503,76 @@ export interface operations {
             };
         };
     };
+    historia_riesgo_api_ninos__sujeto__historia_riesgo_get: {
+        parameters: {
+            query?: {
+                corrida_id?: number | null;
+            };
+            header?: never;
+            path: {
+                sujeto: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    perfil_api_ninos__sujeto__perfil_get: {
+        parameters: {
+            query?: {
+                corrida_id?: number | null;
+            };
+            header?: never;
+            path: {
+                sujeto: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     datos_api_revision_datos_get: {
         parameters: {
             query?: {
@@ -2411,6 +3581,72 @@ export interface operations {
                 variable?: string | null;
                 pagina?: number;
                 tamano?: number;
+                corrida_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    aciertos_api_revision_datos_aciertos_get: {
+        parameters: {
+            query?: {
+                corrida_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    concentracion_api_revision_datos_concentracion_get: {
+        parameters: {
+            query?: {
                 corrida_id?: number | null;
             };
             header?: never;
@@ -3217,6 +4453,9 @@ export interface operations {
             query?: {
                 fuente?: ("kmc" | "simulado") | null;
                 limite?: number;
+                /** @description Solo lo entrenado por esta persona. */
+                propietario?: string | null;
+                visibilidad?: ("personal" | "oficial") | null;
             };
             header?: never;
             path?: never;
@@ -3297,6 +4536,177 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EjecucionSalida"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ver_cuotas_api_entrenamientos_cuotas_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CuotasConfig"];
+                };
+            };
+        };
+    };
+    cambiar_cuotas_api_entrenamientos_cuotas_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CuotasCambio"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CuotasConfig"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cola_api_entrenamientos_cola_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ColaEntrenamientos"];
+                };
+            };
+        };
+    };
+    cancelar_api_entrenamientos__ejecucion_id__cancelar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ejecucion_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EjecucionSalida"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    descartar_api_entrenamientos__ejecucion_id__descartar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ejecucion_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EjecucionSalida"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    banco_api_entrenamientos_banco_get: {
+        parameters: {
+            query?: {
+                limite?: number;
+                /** @description Solo los de esta persona. */
+                propietario_id?: string | null;
+                /** @description Solo los míos. */
+                mios?: boolean;
+                visibilidad?: ("personal" | "oficial") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemBanco"][];
                 };
             };
             /** @description Validation Error */
@@ -3678,6 +5088,1003 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["VersionDiccionarioSalida"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    entrenamientos_api_analitica_comparar_get: {
+        parameters: {
+            query: {
+                a: number;
+                b: number;
+                desenlace: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    grupos_api_analitica_comparar_grupos_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ComparaGrupos"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    riesgo_por_visita_api_analitica_riesgo_por_visita_get: {
+        parameters: {
+            query: {
+                desenlace: string;
+                /** @description códigos separados por coma; sin pedir, los de más riesgo */
+                sujetos?: string | null;
+                n?: number;
+                corrida_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    entrenamientos_api_analitica_entrenamientos_get: {
+        parameters: {
+            query?: {
+                limite?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    contexto_api_analitica_contexto_get: {
+        parameters: {
+            query?: {
+                entrenamiento?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trayectorias_api_analitica__entrenamiento__trayectorias_get: {
+        parameters: {
+            query?: {
+                indicador?: "peso" | "talla" | "perimetro_cefalico" | "peso_para_talla";
+                agrupar?: "riesgo" | "sexo" | "perfil" | "sede";
+                eje?: "edad_corregida" | "cronologica";
+                desenlace?: string | null;
+                corrida_id?: number | null;
+            };
+            header?: never;
+            path: {
+                entrenamiento: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    perfiles_api_analitica__entrenamiento__perfiles_get: {
+        parameters: {
+            query?: {
+                desenlace?: string | null;
+                corrida_id?: number | null;
+            };
+            header?: never;
+            path: {
+                entrenamiento: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submodulo_api_analitica__entrenamiento___submodulo__get: {
+        parameters: {
+            query?: {
+                desenlace?: string | null;
+            };
+            header?: never;
+            path: {
+                entrenamiento: number;
+                submodulo: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    variables_api_muestras_variables_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    facetas_api_muestras_facetas_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    contar_api_muestras_contar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listar_api_muestras_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+        };
+    };
+    guardar_api_muestras_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MuestraNueva"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    leer_api_muestras__muestra_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                muestra_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    duplicar_api_muestras__muestra_id__duplicar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                muestra_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["MuestraDuplicada"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resumen_api_exploracion_resumen_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Consulta"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    facetas_api_exploracion_facetas_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Consulta"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    modelos_usables_api_prediccion_modelos_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    predecir_muestra_api_prediccion_muestra_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PeticionMuestra"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    csv_muestra_api_prediccion_muestra_csv_get: {
+        parameters: {
+            query?: {
+                modelo?: string | null;
+                /** @description Definición JSON de la muestra */
+                muestra?: string | null;
+                muestra_id?: number | null;
+                visita?: string | null;
+                excluir_entrenamiento?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ejemplos_api_prediccion_ejemplos_get: {
+        parameters: {
+            query?: {
+                visita?: string | null;
+                perfil?: string | null;
+                eg_semanas?: number | null;
+                modelo?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    predecir_nino_api_prediccion_nino_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PeticionNino"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mis_trabajos_api_prediccion_trabajos_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+        };
+    };
+    lanzar_trabajo_api_prediccion_trabajos_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PeticionTrabajo"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    estado_trabajo_api_prediccion_trabajos__pid__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tabla_trabajo_api_prediccion_trabajos__pid__tabla_get: {
+        parameters: {
+            query?: {
+                pagina?: number;
+                limite?: number;
+            };
+            header?: never;
+            path: {
+                pid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listar_ninos_api_prediccion_ninos_nuevos_get: {
+        parameters: {
+            query?: {
+                tipo?: ("nino" | "plantilla") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    guardar_nino_api_prediccion_ninos_nuevos_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PeticionGuardarNino"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ver_nino_api_prediccion_ninos_nuevos__nid__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    borrar_nino_api_prediccion_ninos_nuevos__nid__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

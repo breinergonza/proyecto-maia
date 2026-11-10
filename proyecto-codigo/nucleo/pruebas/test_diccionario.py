@@ -51,7 +51,9 @@ def archivo(borrador, tmp_path):
 # ---------------------------------------------------------------- the draft
 
 def test_el_borrador_reproduce_el_esquema_de_las_reglas(meta, borrador):
-    pd.testing.assert_frame_equal(D.esquema(borrador), SV.normalizar_esquema(K.esquema_sevarti(meta)))
+    # the draft only adds the "Usar como filtro" marks (they are not part of what the rules produced)
+    pd.testing.assert_frame_equal(D.esquema(borrador).drop(columns='usar_como_filtro'),
+                                  SV.normalizar_esquema(K.esquema_sevarti(meta)).drop(columns='usar_como_filtro'))
     assert (borrador.variables.estado == D.LISTA).all()
 
 
@@ -60,7 +62,10 @@ def _igual_a_lo_de_antes(sev: SV.Sevarti, tmp_path: Path) -> None:
     on the same simulated base."""
     nuevo, esperado = SV.leer(SV.guardar(sev, tmp_path / 'nuevo')), SV.leer(CARPETA / 'esperado_kmc')
     for tabla in SV.COLUMNAS:
-        pd.testing.assert_frame_equal(getattr(nuevo, tabla), getattr(esperado, tabla), obj=tabla)
+        a, b = getattr(nuevo, tabla), getattr(esperado, tabla)
+        if tabla == 'esquema':   # the files of before have no "Usar como filtro" marks
+            a, b = a.drop(columns='usar_como_filtro'), b.drop(columns='usar_como_filtro')
+        pd.testing.assert_frame_equal(a, b, obj=tabla)
     assert nuevo.corte == esperado.corte
 
 
@@ -359,7 +364,8 @@ def test_cargar_sevarti_crea_el_borrador_si_no_hay_diccionario(base_falsa, tmp_p
     ruta = tmp_path / 'entradas' / 'diccionario.xlsx'
     sev = K.cargar_sevarti(ruta)
     assert ruta.exists() and 'se creó' in capsys.readouterr().out
-    pd.testing.assert_frame_equal(sev.esquema, SV.leer(CARPETA / 'esperado_kmc').esquema)
+    pd.testing.assert_frame_equal(sev.esquema.drop(columns='usar_como_filtro'),
+                                  SV.leer(CARPETA / 'esperado_kmc').esquema.drop(columns='usar_como_filtro'))
     assert (D.leer(ruta).variables.estado == D.LISTA).all()
 
 

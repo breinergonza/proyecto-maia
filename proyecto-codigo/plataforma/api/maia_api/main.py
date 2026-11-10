@@ -14,14 +14,18 @@ from maia_api import errores
 from maia_api import trabajos as T
 from maia_api.rutas import (
     administracion,
+    analitica,
     auth,
     corridas,
     diccionario,
     entrenamientos,
+    exploracion,
     inferencia,
     modelos,
+    muestras,
     ninos,
     notificaciones,
+    prediccion,
     revision,
     salud,
     tablero,
@@ -57,7 +61,7 @@ def crear_app() -> FastAPI:
                            allow_methods=['*'], allow_headers=['*'])
     errores.registrar(app)
     for r in (salud, auth, usuarios, modelos, corridas, tablero, ninos, revision, inferencia, notificaciones,
-              administracion, entrenamientos, diccionario):
+              administracion, entrenamientos, diccionario, analitica, muestras, exploracion, prediccion):
         app.include_router(r.ruta, prefix='/api')
     return app
 

@@ -83,6 +83,21 @@ def test_resumen_inicial(cliente, admin):
     assert r['mlflow_url'] == 'http://localhost:5000'
 
 
+def _valores(o):
+    """Los valores de una estructura JSON, para buscar un secreto como valor entero y no como subcadena suelta (con
+    testcontainers el usuario y la clave valen lo mismo, 'test'): se omiten los campos 'usuario' y 'base', que pueden
+    coincidir con la clave sin filtrarla."""
+    if isinstance(o, dict):
+        for k, v in o.items():
+            if k not in ('usuario', 'base'):
+                yield from _valores(v)
+    elif isinstance(o, (list, tuple)):
+        for v in o:
+            yield from _valores(v)
+    elif o is not None:
+        yield str(o)
+
+
 def test_conexion_con_clave_cifrada_que_nunca_vuelve(cliente, admin, servidor_pg):
     u = make_url(servidor_pg)
     inicial = cliente.get('/api/administracion/conexion', headers=admin).json()
@@ -96,7 +111,8 @@ def test_conexion_con_clave_cifrada_que_nunca_vuelve(cliente, admin, servidor_pg
     assert r.json()['ok'] and 'tables' in r.json()['tablas']
     r = cliente.put('/api/administracion/conexion', headers=admin, json={**datos, 'clave': u.password})
     assert r.status_code == 200, r.text
-    assert r.json()['origen_clave'] == 'guardada' and u.password not in r.text and 'clave' not in r.json()
+    assert r.json()['origen_clave'] == 'guardada' and 'clave' not in r.json()
+    assert u.password not in _valores(r.json()), 'la clave no vuelve como valor de ningún campo'
     # cambiar otro dato sin escribir la clave la conserva; probar sin cuerpo usa lo guardado
     r = cliente.put('/api/administracion/conexion', headers=admin, json={**datos, 'timeout': 8})
     assert r.json()['timeout'] == 8 and r.json()['origen_clave'] == 'guardada'
@@ -104,9 +120,9 @@ def test_conexion_con_clave_cifrada_que_nunca_vuelve(cliente, admin, servidor_pg
     from maia_comun import db
     from maia_comun.modelos_db import Auditoria, ConexionOrigen
     with db.fabrica()() as s:
-        assert u.password not in s.get(ConexionOrigen, 'kmc').clave_cifrada
+        assert s.get(ConexionOrigen, 'kmc').clave_cifrada != u.password, 'la clave se guarda cifrada'
         detalles = [a.detalle for a in s.scalars(select(Auditoria).where(Auditoria.accion.like('%conexion%')))]
-    assert detalles and all(u.password not in str(d) for d in detalles)
+    assert detalles and all(u.password not in _valores(d) for d in detalles)
     assert cliente.get('/api/administracion/resumen', headers=admin).json()['clave_disponible']
     r = cliente.put('/api/administracion/conexion', headers=admin, json={**datos, 'sslmode': 'nada'})
     assert r.status_code == 422
@@ -251,7 +267,6 @@ def test_aprobar_e_importar_el_paquete(cliente, admin, monkeypatch):
 def test_entrenar_ahora(cliente, admin, experto):
     cuerpo = {'fuente': 'simulado', 'modelos': ['clinico'], 'extraer': True, 'sujetos': 2000,
               'hiperparametros': {'clinico': {'rondas': 800, 'tasa': 0.03, 'hojas': None}}, 'guardar': True}
-    assert cliente.post('/api/entrenamientos/entrenar', headers=experto, json=cuerpo).status_code == 403
     malo = {**cuerpo, 'hiperparametros': {'clinico': {'rondas': 1}}}
     assert cliente.post('/api/entrenamientos/entrenar', headers=admin, json=malo).status_code == 422
     r = cliente.post('/api/entrenamientos/entrenar', headers=admin, json=cuerpo)
@@ -259,10 +274,10 @@ def test_entrenar_ahora(cliente, admin, experto):
     e = r.json()
     assert e['tipo'] == 'entrenamiento' and e['estado'] == 'pendiente'
     assert e['parametros'] == {'modelos': ['clinico'], 'extraer': True, 'filtros': {}, 'sujetos': 2000,
-                               'hiperparametros': {'clinico': {'rondas': 800, 'tasa': 0.03}}}
-    assert cliente.post('/api/entrenamientos/entrenar', headers=admin, json=cuerpo).status_code == 409
+                               'hiperparametros': {'clinico': {'rondas': 800, 'tasa': 0.03}}, 'visibilidad': 'oficial'}
+    assert cliente.post('/api/entrenamientos/entrenar', headers=admin, json=cuerpo).status_code == 202   # cola FIFO
     lista = cliente.get('/api/entrenamientos/ejecuciones', headers=admin).json()
-    assert [x['id'] for x in lista] == [e['id']]
+    assert e['id'] in [x['id'] for x in lista]
     hp = {h['modelo']: h for h in cliente.get('/api/administracion/hiperparametros', headers=admin).json()}
     assert {c['nombre']: c['valor'] for c in hp['clinico']['campos']}['rondas'] == 800   # guardar=True
 

@@ -38,7 +38,10 @@ export default function Ingresar() {
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Datos>({ resolver: zodResolver(esquema) })
 
   // a la página que se pidió antes de ingresar (con sus filtros), o al tablero
-  const desde = (lugar.state as { desde?: string } | null)?.desde ?? '/'
+  // o a la que traiga el parámetro ?volver= (solo rutas internas)
+  const volver = new URLSearchParams(lugar.search).get('volver')
+  const interna = (r: string | null | undefined) => (r && /^\/(?![/\\])/.test(r) ? r : null)
+  const desde = interna((lugar.state as { desde?: string } | null)?.desde) ?? interna(volver) ?? '/'
   if (!cargando && usuario) return <Navigate to={desde} replace />
 
   const enviar = async (d: Datos) => {

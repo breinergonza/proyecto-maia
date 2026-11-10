@@ -27,7 +27,8 @@ from maia_api.consultas import (
 )
 from maia_api.dependencias import CUALQUIERA, sesion
 from maia_comun import puntuacion as PU
-from maia_comun.modelos_db import Usuario
+from maia_comun.modelos_db import PERCENTIL_ALTO, Usuario
+from maia_comun.perfiles import VARIABLE_LUBCHENCO, perfil_provisional
 
 ruta = APIRouter(prefix='/ninos', tags=['niños'])
 registro = logging.getLogger(__name__)
@@ -117,6 +118,14 @@ def listar(buscar: str | None = None, desenlace: str | None = None,
     return {'total': total, 'pagina': pagina, 'tamano': tamano, 'items': items}
 
 
+def unidad_crecimiento(esq: dict, unidades: dict, variable: str | None, indicador: str, etapa: str | None) -> str | None:
+    """La unidad de un dato de crecimiento: la de su variable de origen (así el peso para la talla lleva la del peso que
+    se midió) o, en las corridas viejas que no la guardaron, la que sale del indicador y la etapa."""
+    if variable and variable in esq:
+        return str(esq[variable].get('unidad') or '').strip() or None
+    return unidades.get((indicador, etapa))
+
+
 def _tabla(s: Session, sql: str, p: dict) -> pd.DataFrame:
     r = s.execute(text(sql), p)
     return pd.DataFrame(r.fetchall(), columns=list(r.keys()))
@@ -150,9 +159,13 @@ def linea_temporal(sujeto: str, corrida_id: int | None = None, s: Session = Depe
               WHERE corrida_id = :c AND NOT silencio GROUP BY clave) m ON m.clave = r.clave
         WHERE r.corrida_id = :c AND r.sujeto = :s AND NOT r.silencio
         ORDER BY r.percentil DESC"""), {'c': c.id, 's': sujeto})
-    crec = s.execute(text('SELECT etapa, indicador, fecha, edad_corregida, valor, z, bajo_2de, caida_1de, improbable '
+    crec = s.execute(text('SELECT etapa, indicador, variable, fecha, edad_corregida, valor, z, bajo_2de, caida_1de, improbable '
                           'FROM resultados.crecimiento WHERE corrida_id = :c AND sujeto = :s ORDER BY edad_corregida'),
                      {'c': c.id, 's': sujeto})
+
+    lub = s.execute(text('SELECT valor FROM sevarti.mediciones WHERE corte_id = :c AND sujeto = :s AND variable = :v '
+                         'AND valor IS NOT NULL ORDER BY fecha NULLS FIRST, id LIMIT 1'),
+                    {'c': c.corte_id, 's': sujeto, 'v': VARIABLE_LUBCHENCO}).scalar()
 
     visitas: dict[str, dict] = {}
     sin_visita: list[dict] = []
@@ -194,19 +207,23 @@ def linea_temporal(sujeto: str, corrida_id: int | None = None, s: Session = Depe
     unidades = unidades_crecimiento(esq)
     for g in crec:
         d = dict(g._mapping)
-        d['unidad'] = unidades.get((g.indicador, g.etapa))   # el valor se guarda tal como se midió
+        d['unidad'] = unidad_crecimiento(esq, unidades, g.variable, g.indicador, g.etapa)
         serie[g.indicador].append(d)
         if g.etapa:
             v = visita(g.etapa)
             v['z'][g.indicador] = g.z
             if g.edad_corregida is not None:
                 v['edad_corregida'] = g.edad_corregida
+    ordenadas = sorted(visitas.values(), key=lambda v: v['orden'])
+    con_datos = [v for v in ordenadas if v['mediciones'] or v['riesgos'] or v['z']]
+    actual = (con_datos or ordenadas or [None])[-1]
     return {
         'sujeto': sujeto, 'grupo': datos_nino['grupo'], 'eg_semanas': datos_nino['eg_semanas'],
+        'perfil': perfil_provisional(datos_nino['eg_semanas'], lub, actual['nombre'] if actual else None),
         'anio_nacimiento': datos_nino['anio_nacimiento'] or (datos_nino['fecha_nacimiento'].year
                                                               if datos_nino['fecha_nacimiento'] else None),
         'corte': str(c.fecha_corte) if c.fecha_corte else None, 'corrida_id': c.id,
-        'visitas': sorted(visitas.values(), key=lambda v: v['orden']),
+        'visitas': ordenadas,
         'contexto': sin_visita,
         'crecimiento': {k: v for k, v in serie.items()},
         'nombre_etapa': {k: nombre_etapa(mapa, k) for k in mapa},
@@ -255,7 +272,12 @@ def historia_riesgo(sujeto: str, corrida_id: int | None = None, s: Session = Dep
         'fecha_visita': None if pd.isna(f.fecha_visita) else str(f.fecha_visita)[:10],
     } for f in tabla.itertuples()]
     puntos.sort(key=lambda x: (x['orden'], x['desenlace']))
-    return {'paquete': manifest['version'], 'paquete_corrida': c.paquete, 'puntos': puntos}
+    # primera visita en que el niño llegó a riesgo alto, por desenlace (null si nunca)
+    primera: dict[str, dict | None] = {x['clave']: None for x in puntos}
+    for x in puntos:
+        if primera[x['clave']] is None and x['percentil'] >= PERCENTIL_ALTO:
+            primera[x['clave']] = {'momento': x['momento'], 'momento_nombre': x['momento_nombre'], 'orden': x['orden']}
+    return {'paquete': manifest['version'], 'paquete_corrida': c.paquete, 'puntos': puntos, 'primera_alerta': primera}
 
 
 # Valores de cada variable del perfil (uno por niño), por corte y ordenados. Los datos de un corte no cambian: se leen

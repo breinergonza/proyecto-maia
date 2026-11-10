@@ -5,6 +5,8 @@ import { useEffect, useState, type ChangeEvent } from 'react'
 import { Link } from 'react-router'
 import { pedir } from '../api/cliente'
 import type { Calendario, Ejecucion, Programacion, ProgramacionEntrada } from '../api/tipos'
+import { Termino } from '../components/Termino'
+import { useConfirmar } from '../components/Confirmar'
 import { Aviso, Boton, Campo, Cargando, Encabezado, Entrada, Insignia, Panel, Selector, Tabla, Vacio } from '../components/ui'
 import { ESTADOS_EJECUCION, fechaHora, FUENTES, TIPOS_EJECUCION } from '../lib/formato'
 
@@ -62,8 +64,19 @@ function ListaProgramaciones({ editar }: { editar: (p: Programacion) => void }) 
   const ejecutar = useMutation({ mutationFn: (id: number) => pedir<Ejecucion>(`/administracion/programaciones/${id}/ejecutar`, { metodo: 'POST' }), onSuccess: refrescar })
   const borrar = useMutation({ mutationFn: (id: number) => pedir<void>(`/administracion/programaciones/${id}`, { metodo: 'DELETE' }), onSuccess: refrescar })
   const error = ejecutar.error ?? borrar.error
+  const { confirmar, dialogo } = useConfirmar()
+  const pedirBorrar = async (p: Programacion) => {
+    const ok = await confirmar({
+      titulo: 'Borrar la programación',
+      mensaje: <>Se borrará la programación <strong>«{p.nombre}»</strong> ({p.cron}).</>,
+      efecto: 'Deja de ejecutarse en su horario. Las ejecuciones que ya hizo siguen en el historial. Afecta a quienes dependen de esa corrida automática.',
+      reversible: false, textoConfirmar: 'Borrar programación', tono: 'peligro',
+    })
+    if (ok) borrar.mutate(p.id)
+  }
   return (
     <Panel titulo="Horarios">
+      {dialogo}
       {lista.isPending ? <Cargando /> : lista.error ? <Aviso>{lista.error.message}</Aviso> : lista.data.length === 0 ? (
         <Vacio titulo="Sin horarios">Cree uno con el formulario: la corrida semestral es el punto de partida.</Vacio>
       ) : (
@@ -76,14 +89,14 @@ function ListaProgramaciones({ editar }: { editar: (p: Programacion) => void }) 
                   <p className="font-semibold">{p.nombre} {!p.activo && <Insignia>Pausada</Insignia>}</p>
                   <p className="text-sm text-salvia">{FUENTES[p.fuente] ?? p.fuente}{p.silencio && ' · en silencio'}{p.solo_si_nuevo && p.fuente === 'kmc' && ' · solo si hay datos nuevos'}</p>
                 </td>
-                <td className="text-sm">{p.descripcion}<br /><code className="text-salvia">{p.cron}</code> <span className="text-salvia">({p.zona})</span></td>
+                <td className="text-sm">{p.descripcion}<br /><Termino id="cron"><code className="text-salvia">{p.cron}</code></Termino> <span className="text-salvia">({p.zona})</span></td>
                 <td className="whitespace-nowrap">{p.activo ? fechaHora(p.proxima) : '—'}</td>
                 <td className="whitespace-nowrap">{fechaHora(p.ultima)}</td>
                 <td className="space-x-1 whitespace-nowrap text-right">
                   <Boton chico variante="secundario" disabled={ejecutar.isPending} onClick={() => ejecutar.mutate(p.id)}>Ejecutar ahora</Boton>
                   <Boton chico variante="fantasma" onClick={() => editar(p)}>Editar</Boton>
                   <Boton chico variante="fantasma" disabled={borrar.isPending}
-                    onClick={() => window.confirm(`¿Borrar la programación «${p.nombre}»?`) && borrar.mutate(p.id)}>Borrar</Boton>
+                    onClick={() => void pedirBorrar(p)}>Borrar</Boton>
                 </td>
               </tr>
             ))}
@@ -139,6 +152,7 @@ function FormProgramacion({ p, listo }: { p: Programacion | null; listo: () => v
         <Campo id="p-cron" etiqueta="Expresión cron" ayuda="minuto hora día-del-mes mes día-de-la-semana (domingo = 0)" error={cal.error?.message}>
           <Entrada id="p-cron" className="font-mono" value={d.cron} onChange={(e) => setD({ ...d, cron: e.target.value })} aria-invalid={!!cal.error} />
         </Campo>
+        <p className="text-xs text-salvia sm:col-span-2">¿Qué es una <Termino id="cron">expresión cron</Termino>?</p>
         {cal.data && (
           <div className="rounded-control bg-fondo p-3 text-sm" aria-live="polite">
             <p className="font-semibold">{cal.data.descripcion} <span className="font-normal text-salvia">({cal.data.zona})</span></p>

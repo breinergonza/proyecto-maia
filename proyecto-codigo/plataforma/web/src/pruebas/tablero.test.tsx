@@ -109,3 +109,27 @@ describe('series de crecimiento del tablero', () => {
     expect(seriesCrecimiento(['peso', 'talla', 'perimetro_cefalico', 'peso_para_talla', 'otra'])).toHaveLength(4)
   })
 })
+
+describe('tablero: claridad y enlaces de revisión', () => {
+  it('el experto ve la cifra de datos por revisar sin enlace a /revision/datos; el admin sí', async () => {
+    api('experto')
+    const { unmount } = montar('/')
+    await screen.findByText('niños con datos')
+    expect(screen.getByText('datos por revisar · 12,5 por mil').closest('a')).toBeNull()
+    expect(cifra('datos por revisar · 12,5 por mil')).toBe('200')
+    unmount()
+    api('admin')
+    montar('/')
+    await screen.findByText('niños con datos')
+    expect(screen.getByText('datos por revisar · 12,5 por mil').closest('a')).toHaveAttribute('href', '/revision/datos')
+  })
+
+  it('los paneles llevan su descripción y botón PNG', async () => {
+    api('admin')
+    montar('/')
+    await screen.findByText('niños con datos')
+    expect(screen.getByText('Niños con riesgo alto en cada desenlace.')).toBeInTheDocument()
+    expect(screen.getByText('Cambios de toda una sede o de todo un trimestre.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Descargar PNG: Crecimiento frente a la OMS' })).toBeInTheDocument()
+  })
+})
