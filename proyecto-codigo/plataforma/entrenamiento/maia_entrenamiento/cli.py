@@ -485,10 +485,19 @@ def exportar(fuente: Fuente = FUENTE,
         metricas = {f'{f["metrica"]}__{f["clave"]}': round(f['valor'], 4)
                     for f in filas_metricas(None, modelos.ficha_clinica, modelos.nombre_a_clave)
                     if f['metrica'] in ('auc', 'top10', 'pr_auc')}
+        try:   # la analítica del modelo clínico, si se calculó al entrenar (agregados; viaja a la web pública)
+            from maia_comun import db
+            with db.sesion() as s:
+                analitica = PQ.analitica_de_registro(s, mvc.name, str(mvc.version))
+        except Exception as e:  # noqa: BLE001  (sin base local no hay analítica que llevar; el paquete sale igual)
+            _decir(f'Aviso: no se pudo leer la analítica del modelo clínico ({type(e).__name__}: {e}).')
+            analitica = []
+        _decir(f'Analítica: {"entrenamiento " + str(analitica[0]["entrenamiento_id"]) if analitica else "no hay"} '
+               f'({len(analitica)} artefactos).')
         ruta = PQ.armar(tmp / PQ.NOMBRE, ca, cc, base, fuente.value, obtener().maia_paquete_clave,
                         {'anomalias': {'registro': mva.name, 'version': str(mva.version), 'run_id': mva.run_id},
                          'clinico': {'registro': mvc.name, 'version': str(mvc.version), 'run_id': mvc.run_id}},
-                        diccionario=dic, metricas=metricas, git_sha=R._git_sha())
+                        diccionario=dic, metricas=metricas, git_sha=R._git_sha(), analitica=analitica)
         manifest = PQ.leer_manifest(ruta)
         version = manifest['version']
         almacen = _almacen()

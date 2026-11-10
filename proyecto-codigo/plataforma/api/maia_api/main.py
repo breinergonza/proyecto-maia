@@ -33,7 +33,19 @@ from maia_api.rutas import (
 )
 from maia_api.semillas import sembrar
 from maia_comun import db
+from maia_comun.atributos import rellenar_faltantes
 from maia_comun.config import obtener
+
+
+def _rellenar_atributos() -> None:
+    """Los cortes cargados antes de la migración 0008 no tienen ``atributos_sujeto``: sin ellos Explorar y las
+    muestras no filtran por ninguna variable. Se rellenan en segundo plano para no demorar el arranque."""
+    try:
+        hechos = rellenar_faltantes(db.motor())
+        if hechos:
+            print('Atributos rellenados:', hechos, flush=True)
+    except Exception as e:  # noqa: BLE001  (un fallo aquí no tumba la API; queda en el registro)
+        print(f'No se pudieron rellenar los atributos: {type(e).__name__}: {e}', flush=True)
 
 
 @asynccontextmanager
@@ -43,6 +55,7 @@ async def ciclo(app: FastAPI):
     with db.fabrica()() as s:
         T.cerrar_interrumpidas(s)
     print('Arranque:', sembrar(cfg), flush=True)
+    threading.Thread(target=_rellenar_atributos, name='atributos', daemon=True).start()
     parar = threading.Event()
     if not cfg.maia_solo_simulado:   # los paquetes que aprueba administración (los arma el programador)
         T.vigilar_aprobados(cfg, parar)

@@ -5,6 +5,7 @@
     ├── anomalias/        la carpeta de ``anomalias.operacion.guardar`` (modelo.pkl, ficha.json, máscara)
     ├── clinico/          la carpeta de ``clinico.modelo.guardar``
     ├── diccionario.xlsx  (solo base real) el diccionario con que se entrenó
+    ├── analitica.json    (si la hay) los artefactos agregados de la analítica del modelo clínico (D7: sin datos por niño)
     └── sevarti_base/     esquema, etapas y quiebres del corte de entrenamiento
 
 Un pickle ejecuta código al leerse: ``verificar`` comprueba la firma HMAC-SHA256 (``MAIA_PAQUETE_CLAVE``), el
@@ -32,6 +33,7 @@ from maia_comun.puntuacion import Modelos
 
 FORMATO = 1
 NOMBRE = 'paquete.tar.gz'
+ARCHIVO_ANALITICA = 'analitica.json'
 
 
 class PaqueteInvalido(ValueError):
@@ -76,7 +78,7 @@ class Contenido:
 
 def armar(destino: Path, carpeta_anomalias: Path, carpeta_clinico: Path, sevarti_base: Path, fuente: str,
           clave: str, modelos: dict, corte: str | None = None, diccionario: Path | None = None,
-          metricas: dict | None = None, git_sha: str = 'desconocido') -> Path:
+          metricas: dict | None = None, git_sha: str = 'desconocido', analitica: list[dict] | None = None) -> Path:
     """Arma, firma y comprime el paquete. ``modelos``: lo que se sabe del registro de cada modelo
     (``{'anomalias': {'registro': ..., 'version': ..., 'run_id': ...}, 'clinico': {...}}``)."""
     if not clave or clave == 'cambiar':
@@ -90,6 +92,8 @@ def armar(destino: Path, carpeta_anomalias: Path, carpeta_clinico: Path, sevarti
         shutil.copytree(sevarti_base, raiz / 'sevarti_base')
         if diccionario is not None:
             shutil.copy2(diccionario, raiz / 'diccionario.xlsx')
+        if analitica:   # JSON, no pickle: viaja firmado con el resto y se importa al activar
+            (raiz / ARCHIVO_ANALITICA).write_text(json.dumps(analitica, ensure_ascii=False), encoding='utf-8')
         hashes = _hashes(raiz)
         corto = hashlib.sha256(''.join(hashes.values()).encode()).hexdigest()[:6]
         ahora = datetime.now(UTC)
@@ -181,3 +185,41 @@ def cargar(contenido: Contenido) -> Modelos:
     anom, ficha_a = OP.cargar(contenido.carpeta / 'anomalias')
     clin, ficha_c = AC.cargar(contenido.carpeta / 'clinico')
     return Modelos(anom, ficha_a, clin, ficha_c, origen=contenido.manifest['version'])
+
+
+# ---------------------------------------------------------------- analítica del modelo (viaja con el paquete)
+# La analítica se calcula al entrenar, en el equipo local, y queda en su Postgres; sin esto, la web pública no tendría
+# ningún entrenamiento que mirar en Analítica. Son solo agregados (D7).
+
+def analitica_de_registro(s, registro: str, version: str) -> list[dict]:
+    """Las filas de ``resultados.analitica`` del último entrenamiento que registró ``registro`` versión ``version``."""
+    from sqlalchemy import select
+
+    from maia_comun.modelos_analitica import Analitica
+    metas = [a for a in s.scalars(select(Analitica).where(Analitica.tipo == 'meta').order_by(Analitica.id.desc()))
+             if (a.datos or {}).get('registro') == registro and str((a.datos or {}).get('version_registro')) == str(version)]
+    if not metas:
+        return []
+    filas = s.scalars(select(Analitica).where(Analitica.entrenamiento_id == metas[0].entrenamiento_id)
+                      .order_by(Analitica.id)).all()
+    return [{'entrenamiento_id': a.entrenamiento_id, 'modelo': a.modelo, 'desenlace': a.desenlace, 'tipo': a.tipo,
+             'datos': a.datos} for a in filas]
+
+
+def importar_analitica(s, contenido: Contenido) -> int | None:
+    """Si el paquete trae analítica, la deja en ``resultados.analitica`` (reemplaza la de ese entrenamiento). Devuelve
+    el número del entrenamiento importado o None si no trae."""
+    from sqlalchemy import delete
+
+    from maia_comun.modelos_analitica import Analitica
+    ruta = contenido.carpeta / ARCHIVO_ANALITICA
+    if not ruta.exists():
+        return None
+    filas = json.loads(ruta.read_text(encoding='utf-8'))
+    if not filas:
+        return None
+    entrenamiento = int(filas[0]['entrenamiento_id'])
+    s.execute(delete(Analitica).where(Analitica.entrenamiento_id == entrenamiento))
+    s.add_all([Analitica(entrenamiento_id=entrenamiento, ejecucion_id=None, modelo=f.get('modelo') or 'clinico',
+                         desenlace=f.get('desenlace'), tipo=f['tipo'], datos=f['datos']) for f in filas])
+    return entrenamiento

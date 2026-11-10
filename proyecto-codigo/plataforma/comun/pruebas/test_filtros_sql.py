@@ -189,6 +189,18 @@ def test_cargar_atributos_es_idempotente(motor, sev, corte_id):
     assert puestas == {'atributos': antes[0][0], 'resumen': len(sev.sujetos)}
 
 
+def test_un_corte_cargado_sin_atributos_se_rellena(motor, sev, corte_id):
+    """El corte de producción se cargó antes de la migración 0008: sin atributos, Explorar no filtra por nada."""
+    with motor.begin() as cx:
+        antes = cx.execute(text('SELECT count(*) FROM sevarti.atributos_sujeto WHERE corte_id = :c'), {'c': corte_id}).scalar()
+        cx.execute(text('DELETE FROM sevarti.atributos_sujeto WHERE corte_id = :c'), {'c': corte_id})
+    assert AT.cortes_sin_atributos(motor) == [corte_id]
+    hechos = AT.rellenar_faltantes(motor)
+    assert hechos[corte_id]['atributos'] == antes
+    assert AT.cortes_sin_atributos(motor) == []
+    assert AT.rellenar_faltantes(motor) == {}, 'con todo cargado no hace nada'
+
+
 def test_cada_categoria_de_edad_gestacional_es_un_tramo_propio(motor, sev, corte_id):
     """Elegir dos categorías separadas no incluye a la del medio (no es un rango continuo)."""
     eg = sev.sujetos.set_index('sujeto').eg_semanas

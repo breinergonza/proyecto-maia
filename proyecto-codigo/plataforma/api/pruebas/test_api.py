@@ -49,6 +49,9 @@ def smtp():
     c.stop()
 
 
+ENTRENAMIENTO_PAQUETE = 1_777_001
+
+
 @pytest.fixture(scope='module')
 def paquetes(tmp_path_factory):
     """Un paquete simulado válido (modelos pequeños), uno de "kmc" y uno alterado."""
@@ -72,8 +75,16 @@ def paquetes(tmp_path_factory):
         base = EN._sevarti_base(sev, tmp / 'sevarti_base')
         modelos = {'anomalias': {'registro': 'maia-anomalias-demo', 'version': '1'},
                    'clinico': {'registro': 'maia-clinico-demo', 'version': '1'}}
+        # la analítica viaja con el paquete: la web pública no tiene la base del equipo donde se entrenó
+        analitica = [{'entrenamiento_id': ENTRENAMIENTO_PAQUETE, 'modelo': 'clinico', 'desenlace': None, 'tipo': 'meta',
+                      'datos': {'fuente': 'simulado', 'registro': 'maia-clinico-demo', 'version_registro': '1',
+                                'corte': '2026-06-30', 'desenlaces': [{'clave': 'readm_3m', 'nombre': 'readmisión',
+                                                                       'momento': '40 sem', 'etiqueta': 'En uso'}],
+                                'submodulos': {'rendimiento': 'ok'}}},
+                     {'entrenamiento_id': ENTRENAMIENTO_PAQUETE, 'modelo': 'clinico', 'desenlace': 'readm_3m',
+                      'tipo': 'rendimiento', 'datos': {'auc_desenlace': {'auc': 0.77}}}]
         valido = PQ.armar(tmp / 'valido' / PQ.NOMBRE, a.carpeta, c.carpeta, base, 'simulado', CLAVE_PAQUETE,
-                          modelos, metricas=c.metricas)
+                          modelos, metricas=c.metricas, analitica=analitica)
         kmc = PQ.armar(tmp / 'kmc' / PQ.NOMBRE, a.carpeta, c.carpeta, base, 'kmc', CLAVE_PAQUETE, modelos)
         alterado = tmp / 'alterado' / PQ.NOMBRE
         alterado.parent.mkdir()
@@ -207,6 +218,15 @@ def test_paquetes(cliente, admin, paquetes):
     assert r.status_code == 200 and r.json()['activo']
     assert cliente.get('/api/salud').json()['paquete'] == version
     assert cliente.get('/api/modelos/activo', headers=admin).json()['version'] == version
+    # al activarlo, su analítica queda en la base y se puede mirar en Analítica
+    ctx = cliente.get('/api/analitica/contexto', params={'entrenamiento': ENTRENAMIENTO_PAQUETE}, headers=admin).json()
+    assert ctx['estado'] == 'ok' and [d['clave'] for d in ctx['desenlaces']] == ['readm_3m']
+    r = cliente.get(f'/api/analitica/{ENTRENAMIENTO_PAQUETE}/rendimiento', params={'desenlace': 'readm_3m'}, headers=admin)
+    assert r.json()['desenlaces']['readm_3m']['auc_desenlace']['auc'] == 0.77
+    r = cliente.post(f'/api/modelos/paquetes/{version}/activar', headers=admin)   # activar dos veces no duplica
+    assert r.status_code == 200
+    ctx = cliente.get('/api/analitica/entrenamientos', headers=admin).json()['entrenamientos']
+    assert sum(1 for e in ctx if e['entrenamiento'] == ENTRENAMIENTO_PAQUETE) == 1
 
 
 def test_notificaciones_config_y_prueba(cliente, admin, smtp):
