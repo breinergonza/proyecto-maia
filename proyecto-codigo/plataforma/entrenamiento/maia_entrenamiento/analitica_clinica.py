@@ -85,6 +85,7 @@ def predicciones(modelo, p) -> dict[str, dict]:
         Xo = X[ok]
         sal[clave] = {
             'r': m.riesgo(Xo), 'y': y[ok].to_numpy().astype(bool),
+            'r_base': m.riesgo(Xo, base=True) if m.base is not None else None,   # la regla de referencia
             'grupos': {k: g.reindex(Xo.index).to_numpy() for k, g in grupos_base.items()},
             'trimestre': trimestres.reindex(Xo.index).to_numpy(),
             'variables': Xo, 'importancias': dict(zip(m.columnas, m.modelo.feature_importance('gain'))),
@@ -104,7 +105,8 @@ def _submuestra(d: dict, semilla: int = 0) -> dict:
     if n <= MAX_FILAS:
         return d
     idx = np.sort(np.random.default_rng(semilla).choice(n, MAX_FILAS, replace=False))
-    return {**d, 'r': d['r'][idx], 'y': d['y'][idx], 'grupos': {k: v[idx] for k, v in d['grupos'].items()},
+    return {**d, 'r': d['r'][idx], 'y': d['y'][idx], 'r_base': None if d.get('r_base') is None else d['r_base'][idx],
+            'grupos': {k: v[idx] for k, v in d['grupos'].items()},
             'trimestre': d['trimestre'][idx], 'variables': d['variables'].iloc[idx]}
 
 
@@ -218,7 +220,8 @@ def calcular(modelo, p) -> tuple[dict[str, dict[str, dict]], list[dict]]:
         resultados[clave] = AN.analizar(
             d['r'], d['y'], grupos={k: pd.Series(v) for k, v in d['grupos'].items()},
             trimestre=pd.Series(d['trimestre']) if hay_trimestres else None,
-            variables=d['variables'], embudo=d['embudo'], importancias=d['importancias'], avisos=avisos)
+            variables=d['variables'], embudo=d['embudo'], importancias=d['importancias'], avisos=avisos,
+            r_base=d.get('r_base'))
         if 'calibracion' in resultados[clave]:      # histograma por desenlace y muestra frente a universo
             resultados[clave].update(AD.artefactos_extra(d['y'], d['r'], d['variables'].index, d.get('universo')))
         des = d['desenlace']

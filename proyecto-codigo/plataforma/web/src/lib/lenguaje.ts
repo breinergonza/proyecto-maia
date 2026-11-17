@@ -170,6 +170,10 @@ export function motivosRiesgo(motivos: string[]): { suben: string[]; faltan: str
   return { suben, faltan }
 }
 
+/** Qué son los motivos de un riesgo: las tres contribuciones TreeSHAP de mayor magnitud positiva. */
+export const AYUDA_MOTIVOS = 'Las tres contribuciones TreeSHAP de mayor magnitud positiva: los datos que más subieron el riesgo ' +
+  'de este niño. Describen asociaciones que aprendió el modelo, no causas, y no justifican por sí solas una decisión clínica.'
+
 /** La frase que separa las dos cifras del riesgo: la probabilidad y la comparación con los demás niños. */
 export const AYUDA_DOS_CIFRAS = 'El porcentaje es la probabilidad estimada de que pase. «N de 10» compara a este niño con ' +
   'los demás niños del programa para ese mismo desenlace: un porcentaje bajo puede ser alto frente a los demás si el ' +

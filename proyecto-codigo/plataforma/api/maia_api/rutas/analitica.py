@@ -295,7 +295,8 @@ def submodulo(entrenamiento: int, submodulo: str, desenlace: str | None = Query(
         if a.tipo in EXTRAS.get(submodulo, ()):
             extras.setdefault(a.desenlace, {})[a.tipo] = a.datos
         elif submodulo == 'resumen' and a.tipo == 'rendimiento':
-            auc[a.desenlace] = (a.datos or {}).get('auc_desenlace') or {}
+            ref = ((a.datos or {}).get('referencia') or {}).get('auc_desenlace') or {}
+            auc[a.desenlace] = {**((a.datos or {}).get('auc_desenlace') or {}), 'auc_ref': ref.get('auc')}
         else:
             filas[a.desenlace] = AI.sanear(a.datos) if submodulo == 'interpretabilidad' else a.datos
     for c, ex in extras.items():      # entrenamientos anteriores no los traen: la pantalla lo avisa
@@ -305,6 +306,7 @@ def submodulo(entrenamiento: int, submodulo: str, desenlace: str | None = Query(
         # semáforos + AUC con IC y tamaño de cada desenlace (lo que muestra la portada de la analítica)
         filas = {c: {'auc': auc.get(c, {}).get('auc'), 'ic_bajo': auc.get(c, {}).get('ic_bajo'),
                      'ic_alto': auc.get(c, {}).get('ic_alto'), 'n': auc.get(c, {}).get('n'),
-                     'casos': auc.get(c, {}).get('casos'), **(filas.get(c) or {})}
+                     'casos': auc.get(c, {}).get('casos'), 'auc_ref': auc.get(c, {}).get('auc_ref'),
+                     **(filas.get(c) or {})}
                  for c in sorted(set(filas) | set(auc))}
     return {'estado': 'ok', **base, 'desenlaces': filas}

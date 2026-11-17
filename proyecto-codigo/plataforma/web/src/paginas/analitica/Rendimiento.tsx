@@ -115,10 +115,18 @@ export default function Rendimiento() {
                 <Panel titulo={dOrd.titulo} descripcion={dOrd.descripcion}>
                   {porDesenlace.length ? (
                     <Bosque etiqueta="Qué tan bien ordena el modelo, por desenlace" nombreValor={jerga(tecnico, 'Ordena', 'AUC')}
-                      puntos={porDesenlace.map(([clave, f]) => ({ etiqueta: nombre(clave).nombre + (nombre(clave).enPrueba ? ' (En prueba)' : ''), valor: f.auc ?? null, bajo: f.ic_bajo ?? null, alto: f.ic_alto ?? null }))} />
+                      puntos={porDesenlace.map(([clave, f]) => ({ etiqueta: nombre(clave).nombre + (nombre(clave).enPrueba ? ' (En prueba)' : ''), valor: f.auc ?? null, bajo: f.ic_bajo ?? null, alto: f.ic_alto ?? null, ref: f.auc_ref ?? null }))} />
                   ) : (
                     <Cifra valor={d.auc_desenlace.auc != null ? dec2(d.auc_desenlace.auc) : '—'}
                       texto={`${jerga(tecnico, 'Qué tan bien ordena a los niños', 'AUC con intervalo de confianza')}: ${ic(d.auc_desenlace)}. ${muestra ?? ''}`} />
+                  )}
+                  {d.referencia && (
+                    <p className="mt-3 text-sm tabular-nums">
+                      <strong>Frente a la regla de referencia</strong> (edad gestacional y pesos al nacer): ordena{' '}
+                      {d.referencia.auc_desenlace.auc != null ? dec2(d.referencia.auc_desenlace.auc) : '—'} ({ic(d.referencia.auc_desenlace)})
+                      contra {d.auc_desenlace.auc != null ? dec2(d.auc_desenlace.auc) : '—'} del modelo
+                      {d.referencia.casos_top10_pct != null && <>; el 10 % de mayor riesgo reúne {d.referencia.casos_top10_pct} % de los casos con la regla.</>}
+                    </p>
                   )}
                 </Panel>
               </div>

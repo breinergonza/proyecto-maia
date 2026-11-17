@@ -6,7 +6,7 @@ import { pedir } from '../api/cliente'
 import type { HistoriaRiesgo, PerfilNino, PerfilProvisional, PrimeraAlerta, PuntoCrecimiento, PuntoHistoria } from '../api/tipos'
 import { cn } from '../lib/cn'
 import { aproximado, dec, edad, indicador, meses, posicion, riesgo, RIESGO_ALTO } from '../lib/formato'
-import { AYUDA_DOS_CIFRAS, AYUDA_OMS, ayudaPosicion, BAJO_EDAD, CAYO, cuantosMenos, desviaciones, familia, frenteDemas, frenteOms,
+import { AYUDA_DOS_CIFRAS, AYUDA_MOTIVOS, AYUDA_OMS, ayudaPosicion, BAJO_EDAD, CAYO, cuantosMenos, desviaciones, familia, frenteDemas, frenteOms,
   motivosRiesgo, nivelAlto, nombreFamilia, RIESGO_MUY_ALTO } from '../lib/lenguaje'
 import { Distribucion, MiniSerie, Muestra, ticksEnteros, type PuntoSerie } from './graficos'
 import { descripcionDe } from '../lib/descripciones'
@@ -49,7 +49,7 @@ export function TarjetaRiesgo({ r, nota }: { r: DatosTarjeta; nota?: string }) {
       </p>
       {suben.length > 0 && (
         <>
-          <p className="mt-3 text-sm font-semibold">Lo que sube el riesgo</p>
+          <p className="mt-3 text-sm font-semibold" title={AYUDA_MOTIVOS}>Lo que sube el riesgo</p>
           <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm">{suben.map((m) => <li key={m}>{m}</li>)}</ul>
         </>
       )}
