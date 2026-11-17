@@ -39,7 +39,11 @@ export function MapaCalor({ columnas, filas, escala = [0.5, 1], etiqueta }: {
   )
 }
 
-export interface PuntoBosque { etiqueta: string; valor: number | null; bajo: number | null; alto: number | null; pequena?: boolean; nota?: string }
+export interface PuntoBosque {
+  etiqueta: string; valor: number | null; bajo: number | null; alto: number | null; pequena?: boolean; nota?: string
+  /** El valor de la regla de referencia para esta fila: se dibuja como círculo vacío y se escribe junto a la cifra. */
+  ref?: number | null
+}
 
 /** Un punto con su intervalo por fila y una línea vertical de referencia (el total). */
 export function Bosque({ puntos, referencia, dominio = [0.4, 1], etiqueta, nombreValor = 'Valor' }: {
@@ -50,7 +54,8 @@ export function Bosque({ puntos, referencia, dominio = [0.4, 1], etiqueta, nombr
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => dominio[0] + t * (dominio[1] - dominio[0]))
   const fmt = (v: number) => v.toFixed(2).replace('.', ',')
   const items = puntos.map((p) => `${p.etiqueta}. ` + (p.pequena ? N_MENOR_QUE_5 : p.valor == null ? (p.nota ?? 'Muy pocos niños para calcularlo')
-    : `${nombreValor} ${fmt(p.valor)}` + (p.bajo != null && p.alto != null ? `, entre ${fmt(p.bajo)} y ${fmt(p.alto)}` : '')))
+    : `${nombreValor} ${fmt(p.valor)}` + (p.bajo != null && p.alto != null ? `, entre ${fmt(p.bajo)} y ${fmt(p.alto)}` : '')
+      + (p.ref != null ? `; referencia ${fmt(p.ref)}` : '')))
   const marcas = [dominio[0], (dominio[0] + dominio[1]) / 2, dominio[1]]
   return (
     <GraficaNavegable etiqueta={etiqueta} resumen={resumenDe('Bosque', puntos.length, ['grupo', 'grupos'])} items={items}>
@@ -60,7 +65,10 @@ export function Bosque({ puntos, referencia, dominio = [0.4, 1], etiqueta, nombr
           <div key={p.etiqueta}>
             <div className="flex items-baseline justify-between gap-3 text-sm leading-tight">
               <span>{p.etiqueta}</span>
-              <span className="shrink-0 font-semibold tabular-nums">{p.pequena || p.valor == null ? '' : fmt(p.valor)}</span>
+              <span className="shrink-0 font-semibold tabular-nums">
+                {p.pequena || p.valor == null ? '' : fmt(p.valor)}
+                {!p.pequena && p.ref != null && <span className="ml-2 font-normal text-salvia">referencia {fmt(p.ref)}</span>}
+              </span>
             </div>
             <div className="relative mt-1 h-4">
               <span className="absolute inset-x-0 top-1/2 h-px bg-linea" />
@@ -72,6 +80,10 @@ export function Bosque({ puntos, referencia, dominio = [0.4, 1], etiqueta, nombr
                 <>
                   {p.bajo != null && p.alto != null && (
                     <span className="absolute top-1/2 h-0.5 -translate-y-1/2 bg-serie-1" style={{ left: pos(p.bajo), width: `calc(${pos(p.alto)} - ${pos(p.bajo)})` }} />
+                  )}
+                  {p.ref != null && (
+                    <span title={`${p.etiqueta}: referencia ${fmt(p.ref)}`} className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-serie-1 bg-papel"
+                      style={{ left: pos(p.ref) }} />
                   )}
                   <span title={`${p.etiqueta}: ${nombreValor} ${fmt(p.valor)}`} className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-papel bg-serie-1"
                     style={{ left: pos(p.valor) }} />

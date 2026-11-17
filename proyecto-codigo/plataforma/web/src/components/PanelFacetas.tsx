@@ -3,7 +3,7 @@
 // filtro». Con menos de 5 niños en una opción solo dice «<5» (D4); con menos de 20 en el grupo no hay cifras (D46); una
 // opción sin niños dice «0» y se atenúa: un cero es un dato, no una cifra oculta. Cada categoría vale por sí sola: elegir
 // «muy prematuro» y «a término» no incluye a los moderados.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { ErrorApi } from '../api/cliente'
 import { useGuardarMuestra, useMuestras } from '../api/exploracion'
@@ -268,12 +268,21 @@ function textoTiempo(t: TiempoJson): string {
   return [t.desde, t.hasta].filter(Boolean).join(' a ') || 'sin límite'
 }
 
-export function PanelFacetas({ facetas, cargando, filtros, esExperto, conTiempo = false }: {
+export function PanelFacetas({ facetas, cargando, filtros, esExperto, conTiempo = false, error = false, reintentar }: {
   facetas?: RespuestaFacetas; cargando?: boolean; filtros: Filtros; esExperto: boolean
   /** Muestra el tiempo y el muestreo (Explorar); el constructor de muestras los trae en su propio formulario. */
   conTiempo?: boolean
+  /** La consulta de opciones falló; con ``reintentar`` se ofrece volver a pedirla. */
+  error?: boolean
+  reintentar?: () => void
 }) {
   const [extra, setExtra] = useState<string[]>([])
+  const [lento, setLento] = useState(false)
+  useEffect(() => {   // si las opciones tardan, se dice (no se queda en «Cargando…» sin explicación)
+    if (!(cargando && !facetas)) { setLento(false); return }
+    const t = setTimeout(() => setLento(true), 20000)
+    return () => clearTimeout(t)
+  }, [cargando, facetas])
   const guardadas = useMuestras(esExperto)
   const todas = facetas?.facetas ?? {}
   const etapas = facetas?.etapas ?? []
@@ -333,7 +342,17 @@ export function PanelFacetas({ facetas, cargando, filtros, esExperto, conTiempo 
             <strong>Ningún niño cumple estos filtros (0).</strong> Quite alguno para volver a ver las opciones.
           </p>
         )}
-        {cargando && !facetas && <p className="text-sm text-salvia" role="status">Cargando opciones…</p>}
+        {cargando && !facetas && (
+          <p className="text-sm text-salvia" role="status">
+            Cargando opciones…{lento && ' Está tardando más de lo normal; las cifras de arriba ya están disponibles.'}
+          </p>
+        )}
+        {error && !facetas && (
+          <p className="rounded-control border border-dashed border-linea px-3 py-2 text-sm" role="alert">
+            <strong>No se pudieron cargar las opciones.</strong>{' '}
+            {reintentar && <button type="button" className="underline" onClick={reintentar}>Reintentar</button>}
+          </p>
+        )}
         {visibles.map((k) => (
           <fieldset key={k} className="min-w-0">
             <legend className="mb-1.5 flex w-full items-center justify-between text-sm font-semibold">

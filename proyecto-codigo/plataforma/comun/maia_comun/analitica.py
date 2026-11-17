@@ -194,14 +194,27 @@ def _precision_promedio(ys_ordenado: np.ndarray) -> float:
     return float(np.mean((aciertos / np.arange(1, len(ys_ordenado) + 1))[ys_ordenado]))
 
 
-def rendimiento(y: np.ndarray, r: np.ndarray, semilla: int = 0) -> dict:
+def referencia(y: np.ndarray, r_base: np.ndarray, semilla: int = 0) -> dict:
+    """La regla de referencia (modelo reducido con edad gestacional y pesos basales): su AUC con intervalo y los casos
+    que reúne el 10 % de mayor riesgo, para ponerlos junto a los del modelo completo."""
+    y = np.asarray(y, dtype=bool)
+    ys = y[_orden(r_base, semilla)]
+    k = max(1, int(np.ceil(0.10 * len(ys))))
+    return {'auc_desenlace': auc_con_ic(y, r_base, semilla),
+            'casos_top10_pct': _r(100 * ys[:k].sum() / max(int(y.sum()), 1), 1)}
+
+
+def rendimiento(y: np.ndarray, r: np.ndarray, semilla: int = 0, r_base: np.ndarray | None = None) -> dict:
     orden = _orden(r, semilla)
     roc, pr = curvas(y, orden)
     tops, percentiles, confusion = metricas_top(y, orden)
-    return {'auc_desenlace': auc_con_ic(y, r, semilla), 'roc': roc, 'pr': pr,
-            'pr_auc': _r(_precision_promedio(np.asarray(y, dtype=bool)[orden])),
-            'metricas_por_top': tops, 'metricas_por_percentil': percentiles, 'confusion_por_top': confusion,
-            'lift': lift(y, orden), 'top_k': top_k(y, orden)}
+    out = {'auc_desenlace': auc_con_ic(y, r, semilla), 'roc': roc, 'pr': pr,
+           'pr_auc': _r(_precision_promedio(np.asarray(y, dtype=bool)[orden])),
+           'metricas_por_top': tops, 'metricas_por_percentil': percentiles, 'confusion_por_top': confusion,
+           'lift': lift(y, orden), 'top_k': top_k(y, orden)}
+    if r_base is not None:
+        out['referencia'] = referencia(y, r_base, semilla)
+    return out
 
 
 # ------------------------------------------------------------------------------------------------ calibración
@@ -416,13 +429,18 @@ def chequeos(rend: dict, cal: dict, equi: dict, est_t: dict | None, est_v: dict 
 def analizar(r: np.ndarray, y: np.ndarray, *, grupos: Mapping[str, pd.Series] | None = None,
              trimestre: pd.Series | None = None, variables: pd.DataFrame | None = None,
              embudo: list[dict] | None = None, importancias: Mapping[str, float] | None = None,
-             avisos: list[str] | None = None, semilla: int = 0) -> dict[str, dict]:
+             avisos: list[str] | None = None, semilla: int = 0, r_base: np.ndarray | None = None) -> dict[str, dict]:
     """Todos los artefactos agregados de un desenlace. Con menos de 20 niños o sin las dos clases queda solo el
-    estado ``insuficiente``. Cada valor es JSON serializable."""
+    estado ``insuficiente``. Cada valor es JSON serializable. ``r_base``: el riesgo de la regla de referencia."""
     r = np.asarray(r, dtype=float)
     y = np.asarray(y, dtype=bool)
     ok = np.isfinite(r)
+    if r_base is not None:
+        r_base = np.asarray(r_base, dtype=float)
+        ok &= np.isfinite(r_base)
     r, y = r[ok], y[ok]
+    if r_base is not None:
+        r_base = r_base[ok]
     if grupos:
         grupos = {k: pd.Series(np.asarray(v, dtype=object)[ok]) for k, v in grupos.items()}
     if trimestre is not None:
@@ -432,7 +450,7 @@ def analizar(r: np.ndarray, y: np.ndarray, *, grupos: Mapping[str, pd.Series] | 
     if len(y) < MIN_DISTRIBUCION or y.sum() == 0 or y.all():
         insuficiente = {'estado': 'insuficiente', 'n': int(len(y))}
         return limpio({'poblacion': poblacion(y, None, embudo), 'chequeos': insuficiente, 'rendimiento': insuficiente})
-    rend = rendimiento(y, r, semilla)
+    rend = rendimiento(y, r, semilla, r_base)
     cal = {**calibracion(y, r), 'decision': decision(y, r)}
     equi = subgrupos(y, r, grupos or {}, semilla)
     est_t = por_trimestre(y, r, trimestre, semilla) if trimestre is not None else None

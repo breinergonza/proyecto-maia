@@ -280,6 +280,10 @@ def facetas(s: Session, corte_id: int, muestra: dict | None, redondear: bool = F
         nombre = v + (M.SUFIJO_ULTIMA if cuando == 'ultima' else '')
         lect = None
         if cuando not in (None, 'primera', 'ultima'):   # alguna / etapa:<x>: no están en atributos_sujeto
+            if v not in por_variable and v not in pedidas:
+                # Leer las mediciones de cada variable «alguna» (millones de filas por 60.000 niños) dentro de esta misma
+                # petición la deja pendiente minutos. Quedan en ``disponibles``: se cuentan al agregarlas al filtro.
+                continue
             try:
                 lect = lecturas(s, corte_id, v, cuando, ids)
             except M.MuestraInvalida as e:

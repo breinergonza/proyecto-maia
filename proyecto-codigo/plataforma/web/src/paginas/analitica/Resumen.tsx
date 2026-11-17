@@ -109,7 +109,7 @@ export default function Resumen() {
 
                 <Panel titulo={dOrd.titulo} descripcion={dOrd.descripcion}>
                   <Bosque etiqueta="Qué tan bien ordena el modelo, por desenlace" nombreValor={jerga(tecnico, 'Ordena', 'AUC')}
-                    puntos={filas.map((f) => ({ etiqueta: nombre(f.clave).nombre + (nombre(f.clave).enPrueba ? ' (En prueba)' : ''), valor: f.auc ?? null, bajo: f.ic_bajo ?? null, alto: f.ic_alto ?? null }))} />
+                    puntos={filas.map((f) => ({ etiqueta: nombre(f.clave).nombre + (nombre(f.clave).enPrueba ? ' (En prueba)' : ''), valor: f.auc ?? null, bajo: f.ic_bajo ?? null, alto: f.ic_alto ?? null, ref: f.auc_ref ?? null }))} />
                 </Panel>
 
                 <Panel titulo={dMue.titulo} descripcion={dMue.descripcion} accion={<IrA submodulo="poblacion">Población</IrA>}>

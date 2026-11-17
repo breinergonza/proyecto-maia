@@ -36,7 +36,8 @@ export default function Explorar() {
       </Encabezado>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <aside className="lg:col-span-4 xl:col-span-3">
-          <PanelFacetas facetas={facetas.data} cargando={facetas.isPending} filtros={filtros} esExperto={esExperto} conTiempo />
+          <PanelFacetas facetas={facetas.data} cargando={facetas.isPending} filtros={filtros} esExperto={esExperto} conTiempo
+            error={facetas.isError} reintentar={() => facetas.refetch()} />
         </aside>
         <div className="flex min-w-0 flex-col gap-4 lg:col-span-8 xl:col-span-9">
           {resumen.isPending ? <Cargando />

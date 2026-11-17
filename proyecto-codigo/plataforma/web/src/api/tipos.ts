@@ -465,6 +465,8 @@ export interface DatosRendimiento {
   confusion_por_top: { top_pct: number; tp: number | null; fp: number | null; fn: number | null; tn: number | null }[]
   lift: { tasa_general: number | null; deciles: { decil: number; niños: number; tasa: number | null; lift: number | null }[]; acumulado: { top_pct: number; lift: number | null }[] }
   top_k: { k: number; casos: number | null; acertadas_pct: number | null; detectados_pct: number | null }[]
+  /** La regla de referencia (edad gestacional y pesos basales); los entrenamientos anteriores no la traen. */
+  referencia?: { auc_desenlace: AucIc; casos_top10_pct: number | null }
 }
 export interface DatosCalibracion {
   estado?: 'insuficiente'; n: number; brier: number | null; ece?: number | null; riesgo_medio: number | null; observado: number | null
@@ -524,7 +526,7 @@ export interface DatosInterpretabilidad {
       celdas: { i: number; j: number; n: number | null; riesgo_medio: number | null }[] }[] } | null
 }
 export interface Semaforo { id: string; nombre: string; estado: 'verde' | 'ambar' | 'rojo' | 'gris'; valor: number | null; detalle: string; umbral: string }
-export interface DatosResumen extends Partial<AucIc> { umbrales?: Record<string, string>; semaforos?: Semaforo[]; estado?: string }
+export interface DatosResumen extends Partial<AucIc> { auc_ref?: number | null; umbrales?: Record<string, string>; semaforos?: Semaforo[]; estado?: string }
 
 // ---- Explorar y muestras (filtros de niños), a mano hasta regenerar esquema.d.ts
 export type ValorFiltro = string | number | boolean | null
