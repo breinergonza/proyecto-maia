@@ -48,6 +48,16 @@ def guardar_servidor(datos: ServidorEntrada, s: Session = Depends(sesion), cfg: 
     return _servidor(f)
 
 
+@ruta.delete('/servidor', status_code=status.HTTP_204_NO_CONTENT)
+def reestablecer_servidor(s: Session = Depends(sesion), admin: Usuario = Depends(ADMIN)) -> None:
+    """Borra el servidor guardado (con su clave cifrada). Es idempotente: sin servidor también responde 204."""
+    f = s.get(ConfigSmtp, 1)
+    if f is not None:
+        auditar(s, admin, 'reestablecer_servidor_correo', None, {'host': f.host})   # sin la clave
+        s.delete(f)
+        s.commit()
+
+
 @ruta.post('/servidor/prueba', status_code=status.HTTP_204_NO_CONTENT)
 def prueba(datos: PruebaCorreo, s: Session = Depends(sesion), cfg: Configuracion = Depends(configuracion),
            admin: Usuario = Depends(ADMIN)) -> None:

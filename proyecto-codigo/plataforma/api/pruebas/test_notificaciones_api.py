@@ -191,3 +191,34 @@ def test_enviar_ahora_por_api_y_auditoria(cliente, admin, paquetes, smtp):
     with db.fabrica()() as s:
         acciones = set(s.execute(text('SELECT accion FROM app.auditoria')).scalars())
     assert {'crear_notificacion', 'enviar_notificacion'} <= acciones
+
+
+def test_reestablecer_servidor(cliente, admin, paquetes, smtp):
+    from sqlalchemy import text
+    puerto, _ = smtp
+    _servidor(cliente, admin, puerto, usuario='u', clave='secreta')
+    n = _crear(cliente, admin, 'Tras reestablecer')
+    assert cliente.get('/api/notificaciones/servidor', headers=admin).json()['configurado'] is True
+    assert cliente.delete('/api/notificaciones/servidor', headers=admin).status_code == 204
+    r = cliente.get('/api/notificaciones/servidor', headers=admin).json()
+    assert r['configurado'] is False and r['clave_guardada'] is False and r['host'] == ''
+    with db.fabrica()() as s:
+        assert s.get(ConfigSmtp, 1) is None
+        filas = s.execute(text("SELECT detalle FROM app.auditoria WHERE accion = 'reestablecer_servidor_correo'")).scalars().all()
+    assert filas and filas[-1] == {'host': '127.0.0.1'} and 'secreta' not in str(filas)
+    # idempotente: sin servidor guardado vuelve a responder 204 y no audita de nuevo
+    assert cliente.delete('/api/notificaciones/servidor', headers=admin).status_code == 204
+    with db.fabrica()() as s:
+        assert len(s.execute(text("SELECT 1 FROM app.auditoria WHERE accion = 'reestablecer_servidor_correo'")).all()) == len(filas)
+    # sin servidor, el envío vuelve a pedir configurarlo
+    r = cliente.post(f"/api/notificaciones/alertas/{n['id']}/enviar", headers=admin)
+    assert r.status_code == 422 and 'Configure el servidor de correo' in r.text
+
+
+def test_solo_el_admin_reestablece_el_servidor(cliente, admin, paquetes, smtp):
+    _servidor(cliente, admin, smtp[0])
+    cliente.post('/api/usuarios', headers=admin, json={'email': 'exp-rest@maia.prueba', 'nombre': 'Exp', 'rol': 'experto',
+                                                       'clave': 'clave-larga-123'})
+    exp = _login(cliente, 'exp-rest@maia.prueba', 'clave-larga-123')
+    assert cliente.delete('/api/notificaciones/servidor', headers=exp).status_code == 403
+    assert cliente.get('/api/notificaciones/servidor', headers=admin).json()['configurado'] is True
