@@ -1650,25 +1650,68 @@
     ]
    }
   },
-  "/api/notificaciones/config": {
+  "/api/notificaciones/servidor": {
    "get": {
     "tags": [
      "notificaciones"
     ],
-    "summary": "Config",
-    "operationId": "config_api_notificaciones_config_get",
+    "summary": "Servidor",
+    "operationId": "servidor_api_notificaciones_servidor_get",
     "responses": {
      "200": {
       "description": "Successful Response",
       "content": {
        "application/json": {
         "schema": {
-         "items": {
-          "additionalProperties": true,
-          "type": "object"
-         },
-         "type": "array",
-         "title": "Response Config Api Notificaciones Config Get"
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Servidor Api Notificaciones Servidor Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   },
+   "put": {
+    "tags": [
+     "notificaciones"
+    ],
+    "summary": "Guardar Servidor",
+    "operationId": "guardar_servidor_api_notificaciones_servidor_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ServidorEntrada"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Guardar Servidor Api Notificaciones Servidor Put"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
         }
        }
       }
@@ -1681,13 +1724,160 @@
     ]
    }
   },
-  "/api/notificaciones/config/{desenlace}": {
+  "/api/notificaciones/servidor/prueba": {
+   "post": {
+    "tags": [
+     "notificaciones"
+    ],
+    "summary": "Prueba",
+    "operationId": "prueba_api_notificaciones_servidor_prueba_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PruebaCorreo"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/notificaciones/alertas/desenlaces": {
+   "get": {
+    "tags": [
+     "notificaciones"
+    ],
+    "summary": "Desenlaces",
+    "operationId": "desenlaces_api_notificaciones_alertas_desenlaces_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "additionalProperties": true,
+          "type": "object"
+         },
+         "type": "array",
+         "title": "Response Desenlaces Api Notificaciones Alertas Desenlaces Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/notificaciones/alertas": {
+   "get": {
+    "tags": [
+     "notificaciones"
+    ],
+    "summary": "Alertas",
+    "operationId": "alertas_api_notificaciones_alertas_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "additionalProperties": true,
+          "type": "object"
+         },
+         "type": "array",
+         "title": "Response Alertas Api Notificaciones Alertas Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   },
+   "post": {
+    "tags": [
+     "notificaciones"
+    ],
+    "summary": "Crear",
+    "operationId": "crear_api_notificaciones_alertas_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/NotificacionEntrada"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Crear Api Notificaciones Alertas Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/notificaciones/alertas/{notificacion_id}": {
    "put": {
     "tags": [
      "notificaciones"
     ],
     "summary": "Guardar",
-    "operationId": "guardar_api_notificaciones_config__desenlace__put",
+    "operationId": "guardar_api_notificaciones_alertas__notificacion_id__put",
     "security": [
      {
       "HTTPBearer": []
@@ -1695,12 +1885,12 @@
     ],
     "parameters": [
      {
-      "name": "desenlace",
+      "name": "notificacion_id",
       "in": "path",
       "required": true,
       "schema": {
-       "type": "string",
-       "title": "Desenlace"
+       "type": "integer",
+       "title": "Notificacion Id"
       }
      }
     ],
@@ -1709,7 +1899,7 @@
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/ConfigNotificacionEntrada"
+        "$ref": "#/components/schemas/NotificacionEntrada"
        }
       }
      }
@@ -1722,7 +1912,94 @@
         "schema": {
          "type": "object",
          "additionalProperties": true,
-         "title": "Response Guardar Api Notificaciones Config  Desenlace  Put"
+         "title": "Response Guardar Api Notificaciones Alertas  Notificacion Id  Put"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "notificaciones"
+    ],
+    "summary": "Borrar",
+    "operationId": "borrar_api_notificaciones_alertas__notificacion_id__delete",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "notificacion_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Notificacion Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/notificaciones/alertas/{notificacion_id}/enviar": {
+   "post": {
+    "tags": [
+     "notificaciones"
+    ],
+    "summary": "Enviar Ahora",
+    "operationId": "enviar_ahora_api_notificaciones_alertas__notificacion_id__enviar_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "notificacion_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Notificacion Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Enviar Ahora Api Notificaciones Alertas  Notificacion Id  Enviar Post"
         }
        }
       }
@@ -1801,45 +2078,6 @@
       }
      }
     }
-   }
-  },
-  "/api/notificaciones/prueba": {
-   "post": {
-    "tags": [
-     "notificaciones"
-    ],
-    "summary": "Prueba",
-    "operationId": "prueba_api_notificaciones_prueba_post",
-    "requestBody": {
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/PruebaCorreo"
-       }
-      }
-     },
-     "required": true
-    },
-    "responses": {
-     "204": {
-      "description": "Successful Response"
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ]
    }
   },
   "/api/administracion/resumen": {
@@ -6085,50 +6323,6 @@
     ],
     "title": "ConexionSalida"
    },
-   "ConfigNotificacionEntrada": {
-    "properties": {
-     "desenlace": {
-      "type": "string",
-      "title": "Desenlace"
-     },
-     "nombre": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Nombre"
-     },
-     "percentil_minimo": {
-      "type": "integer",
-      "maximum": 100.0,
-      "minimum": 0.0,
-      "title": "Percentil Minimo",
-      "default": 95
-     },
-     "destinatarios": {
-      "items": {
-       "type": "string"
-      },
-      "type": "array",
-      "maxItems": 50,
-      "title": "Destinatarios"
-     },
-     "activo": {
-      "type": "boolean",
-      "title": "Activo",
-      "default": false
-     }
-    },
-    "type": "object",
-    "required": [
-     "desenlace"
-    ],
-    "title": "ConfigNotificacionEntrada"
-   },
    "Consulta": {
     "properties": {
      "muestra": {
@@ -7714,6 +7908,50 @@
     ],
     "title": "MuestraNueva"
    },
+   "NotificacionEntrada": {
+    "properties": {
+     "nombre": {
+      "type": "string",
+      "maxLength": 120,
+      "minLength": 1,
+      "title": "Nombre"
+     },
+     "percentil_minimo": {
+      "type": "integer",
+      "maximum": 100.0,
+      "minimum": 0.0,
+      "title": "Percentil Minimo",
+      "default": 95
+     },
+     "destinatarios": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "maxItems": 50,
+      "title": "Destinatarios"
+     },
+     "alertas": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "minItems": 1,
+      "title": "Alertas"
+     },
+     "activo": {
+      "type": "boolean",
+      "title": "Activo",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "nombre",
+     "alertas"
+    ],
+    "title": "NotificacionEntrada"
+   },
    "PaqueteSalida": {
     "properties": {
      "version": {
@@ -8554,6 +8792,62 @@
      "preocupa"
     ],
     "title": "RevisionRiesgoEntrada"
+   },
+   "ServidorEntrada": {
+    "properties": {
+     "host": {
+      "type": "string",
+      "maxLength": 255,
+      "minLength": 1,
+      "title": "Host"
+     },
+     "puerto": {
+      "type": "integer",
+      "maximum": 65535.0,
+      "minimum": 1.0,
+      "title": "Puerto"
+     },
+     "usuario": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 255
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Usuario"
+     },
+     "clave": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 500
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Clave"
+     },
+     "remitente": {
+      "type": "string",
+      "title": "Remitente"
+     },
+     "tls": {
+      "type": "boolean",
+      "title": "Tls",
+      "default": true
+     }
+    },
+    "type": "object",
+    "required": [
+     "host",
+     "puerto",
+     "remitente"
+    ],
+    "title": "ServidorEntrada"
    },
    "SujetoEntrada": {
     "properties": {

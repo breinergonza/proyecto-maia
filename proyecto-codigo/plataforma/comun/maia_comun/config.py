@@ -66,20 +66,12 @@ class Configuracion(BaseSettings):
     maia_url_publica: str = 'http://localhost:8080'
     maia_cors_origenes: list[str] = Field(default_factory=lambda: ['http://localhost:5173'])
 
-    # --- correo
-    smtp_host: str = 'localhost'
-    smtp_port: int = 1025
-    smtp_usuario: str | None = None
-    smtp_clave: str | None = None
-    smtp_remitente: str = 'alertas@maia.local'
-    smtp_tls: bool = False
-
     @field_validator('database_url')
     @classmethod
     def _url(cls, v: str) -> str:
         return normalizar_url_db(v)
 
-    @field_validator('smtp_usuario', 'smtp_clave', 'kmc_pw', 'maia_cifrado_clave', 'mlflow_url_publica',
+    @field_validator('kmc_pw', 'maia_cifrado_clave', 'mlflow_url_publica',
                      'mlflow_tracking_username', 'mlflow_tracking_password', mode='before')
     @classmethod
     def _vacio(cls, v):

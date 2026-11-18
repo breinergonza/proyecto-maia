@@ -10,7 +10,7 @@ from anomalias import modelo as MA
 from anomalias import operacion as OP
 from archivos import libros as LB
 from sevarti import contrato as SV
-from conftest import CONFIG_RAPIDA
+from datos_nucleo import CONFIG_RAPIDA
 
 
 def test_modelo_guardado_puntua_igual_y_trae_su_ficha(modelo, particion, puntuado, tmp_path):

@@ -2,7 +2,7 @@
 // aviso de demostración y contenido (que aparece con una transición corta al cambiar de página).
 import {
   Baby, BookOpen, BrainCircuit, ClipboardCheck, HeartPulse, LayoutDashboard, LogOut, Menu,
-  Package, PanelLeftClose, PanelLeftOpen, Search, Settings, Users, X,
+  BellRing, Mail, Package, PanelLeftClose, PanelLeftOpen, Search, Settings, Users, X,
   Activity, Compass, LineChart, type LucideIcon,
 } from 'lucide-react'
 import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
@@ -45,6 +45,13 @@ const SECCIONES: { titulo: string; enlaces: Enlace[] }[] = [
     ],
   },
   {
+    titulo: 'Notificaciones',
+    enlaces: [
+      { a: '/notificaciones/servidor', texto: 'Servidor de correo', icono: Mail, roles: ['admin'] },
+      { a: '/notificaciones/alertas', texto: 'Alertas', icono: BellRing, roles: ['admin'] },
+    ],
+  },
+  {
     titulo: 'Administración',
     enlaces: [
       { a: '/admin/calidad-datos', texto: 'Calidad de datos', icono: ClipboardCheck, roles: ['admin'] },
@@ -53,7 +60,6 @@ const SECCIONES: { titulo: string; enlaces: Enlace[] }[] = [
         hijos: [
           { a: '/admin/configuracion', texto: 'General' },
           { a: '/admin/programacion', texto: 'Programación' },
-          { a: '/admin/notificaciones', texto: 'Notificaciones' },
         ],
       },
       {

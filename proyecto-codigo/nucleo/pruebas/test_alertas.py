@@ -13,7 +13,7 @@ from clinico import modelo as AC
 from sevarti import contrato as SV
 from sevarti import diccionario as D
 from sevarti import kmc as K
-from conftest import CFG
+from datos_nucleo import CFG
 
 
 # ------------------------------------------------------------------ growth

@@ -20,7 +20,8 @@ const TITULOS: Record<string, string> = {
   '/admin/modelos': 'Modelos',
   '/admin/corridas': 'Corridas',
   '/admin/usuarios': 'Usuarios',
-  '/admin/notificaciones': 'Notificaciones',
+  '/notificaciones/servidor': 'Servidor de correo',
+  '/notificaciones/alertas': 'Alertas por correo',
   '/analitica': 'Analítica',
 }
 

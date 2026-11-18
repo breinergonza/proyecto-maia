@@ -82,7 +82,12 @@ describe('navegación', () => {
     expect(within(menu).queryByRole('link', { name: 'Programación' })).toBeNull() // el grupo está plegado
     await userEvent.click(within(menu).getByRole('button', { name: 'Desplegar Configuración' }))
     expect(within(menu).getByRole('link', { name: 'Programación' })).toHaveAttribute('href', '/admin/programacion')
-    expect(within(menu).getByRole('link', { name: 'Notificaciones' })).toHaveAttribute('href', '/admin/notificaciones')
+    expect(within(menu).queryByRole('link', { name: 'Notificaciones' })).toBeNull()   // ya no es hijo de Configuración
+    expect(within(menu).getByRole('link', { name: 'Servidor de correo' })).toHaveAttribute('href', '/notificaciones/servidor')
+    expect(within(menu).getByRole('link', { name: 'Alertas' })).toHaveAttribute('href', '/notificaciones/alertas')
+    const titulos = Array.from(menu.querySelectorAll('p')).map((p) => p.textContent)
+    expect(titulos.indexOf('Notificaciones')).toBeGreaterThan(titulos.indexOf('Revisión clínica'))
+    expect(titulos.indexOf('Notificaciones')).toBeLessThan(titulos.indexOf('Administración'))
   })
 
   it('el experto no ve los grupos de administración', async () => {
@@ -93,5 +98,15 @@ describe('navegación', () => {
     expect(within(menu).queryByRole('link', { name: 'Modelos y corridas' })).toBeNull()
     expect(within(menu).queryByRole('link', { name: 'Configuración' })).toBeNull()
     expect(within(menu).getByRole('link', { name: 'Mis modelos' })).toBeInTheDocument()
+  })
+
+  it.each(['experto', 'visualizador'] as const)('%s no ve Notificaciones ni entra por la dirección', async (rol) => {
+    api(rol)
+    montar('/notificaciones/servidor')
+    const menu = (await screen.findAllByRole('navigation', { name: 'Secciones' }))[0]
+    expect(within(menu).queryByRole('link', { name: 'Servidor de correo' })).toBeNull()
+    expect(within(menu).queryByRole('link', { name: 'Alertas' })).toBeNull()
+    expect(Array.from(menu.querySelectorAll('p')).map((p) => p.textContent)).not.toContain('Notificaciones')
+    expect(screen.queryByRole('heading', { name: 'Servidor de correo' })).toBeNull()
   })
 })

@@ -155,10 +155,11 @@ Edite `.env` y cambie todo lo que dice `cambiar`:
 | `MAIA_JWT_SECRETO` | Secreto largo (`openssl rand -base64 48`) |
 | `MAIA_ADMIN_EMAIL`, `MAIA_ADMIN_CLAVE` | La cuenta de administración que se crea al arrancar por primera vez |
 | `MAIA_LGBM_DEVICE` | `cuda` en el equipo con GPU, `cpu` en otro |
-| `SMTP_*` | Mailpit por defecto; el servidor de la Fundación cuando se quiera enviar de verdad |
 
 Los valores `postgres`, `minio`, `mlflow` y `mailpit` de las URL son los nombres de los servicios dentro del compose;
 no los cambie.
+
+El servidor de correo se configura en la web, en **Notificaciones › Servidor de correo** (la clave se guarda cifrada y requiere `MAIA_CIFRADO_CLAVE`). Para desarrollo con Mailpit: servidor `mailpit`, puerto `1025`, sin TLS.
 
 ### 2. La clave de la base de la Fundación
 

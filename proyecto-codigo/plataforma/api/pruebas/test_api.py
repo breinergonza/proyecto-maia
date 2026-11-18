@@ -7,7 +7,6 @@ from __future__ import annotations
 import io
 import json
 import re
-import socket
 import tarfile
 import time
 from dataclasses import replace
@@ -22,31 +21,6 @@ pytestmark = [pytest.mark.integracion, pytest.mark.timeout(1800)]
 
 CLAVE_PAQUETE = 'clave-de-paquete-de-prueba'
 ADMIN = ('admin@maia.prueba', 'clave-admin-de-prueba')
-
-
-def _puerto_libre() -> int:
-    with socket.socket() as s:
-        s.bind(('127.0.0.1', 0))
-        return s.getsockname()[1]
-
-
-@pytest.fixture(scope='module')
-def smtp():
-    from aiosmtpd.controller import Controller
-
-    class Buzon:
-        def __init__(self):
-            self.mensajes: list = []
-
-        async def handle_DATA(self, server, session, envelope):
-            self.mensajes.append(envelope)
-            return '250 OK'
-
-    buzon = Buzon()
-    c = Controller(buzon, hostname='127.0.0.1', port=_puerto_libre())
-    c.start()
-    yield c.port, buzon
-    c.stop()
 
 
 ENTRENAMIENTO_PAQUETE = 1_777_001
@@ -101,18 +75,17 @@ def paquetes(tmp_path_factory):
 
 
 @pytest.fixture(scope='module')
-def cliente(url_db_propia, smtp, tmp_path_factory):
+def cliente(url_db_propia, tmp_path_factory):
     from maia_api import estado as E
     from maia_api import seguridad as SG
     from maia_comun import config, db
-    puerto, _ = smtp
     tmp = tmp_path_factory.mktemp('api')
     mp = pytest.MonkeyPatch()
     for k, v in {'DATABASE_URL': url_db_propia, 'MAIA_ENTORNO': 'demo', 'MAIA_SOLO_SIMULADO': 'true',
                  'MAIA_PAQUETE_CLAVE': CLAVE_PAQUETE, 'MAIA_JWT_SECRETO': 'secreto-jwt-de-prueba-con-mas-de-32-caracteres',
                  'MAIA_ADMIN_EMAIL': ADMIN[0], 'MAIA_ADMIN_CLAVE': ADMIN[1], 'MAIA_DIR_PAQUETES': str(tmp / 'paquetes'),
                  'MAIA_DEMO_SUJETOS': '600', 'MAIA_URL_PUBLICA': 'https://maia.prueba',
-                 'SMTP_HOST': '127.0.0.1', 'SMTP_PORT': str(puerto), 'SMTP_TLS': 'false'}.items():
+                 'MAIA_CIFRADO_CLAVE': 'clave-de-cifrado-de-prueba-de-40-caracteres'}.items():
         mp.setenv(k, v)
     mp.chdir(tmp)
     config.obtener.cache_clear()
@@ -229,26 +202,20 @@ def test_paquetes(cliente, admin, paquetes):
     assert sum(1 for e in ctx if e['entrenamiento'] == ENTRENAMIENTO_PAQUETE) == 1
 
 
-def test_notificaciones_config_y_prueba(cliente, admin, smtp):
-    _, buzon = smtp
-    configs = cliente.get('/api/notificaciones/config', headers=admin).json()
-    assert configs, 'al activar el paquete se crea una configuración por desenlace'
-    d = configs[0]['desenlace']
-    r = cliente.put(f'/api/notificaciones/config/{d}', headers=admin,
-                    json={'desenlace': d, 'percentil_minimo': 90, 'destinatarios': [], 'activo': True})
-    assert r.status_code == 422
-    r = cliente.put(f'/api/notificaciones/config/{d}', headers=admin,
-                    json={'desenlace': d, 'percentil_minimo': 90, 'destinatarios': ['Clinica@Maia.Prueba'],
-                          'activo': True})
-    assert r.status_code == 200 and r.json()['destinatarios'] == ['clinica@maia.prueba']
-    antes = len(buzon.mensajes)
-    assert cliente.post('/api/notificaciones/prueba', headers=admin,
-                        json={'destinatario': 'clinica@maia.prueba'}).status_code == 204
-    assert len(buzon.mensajes) == antes + 1
-
-
 @pytest.fixture(scope='module')
-def corrida(cliente, admin, paquetes):
+def corrida(cliente, admin, paquetes, smtp):
+    # el servidor de correo y una notificación activa (con el paquete ya activo) para que la corrida envíe correos
+    puerto, _ = smtp
+    r = cliente.put('/api/notificaciones/servidor', headers=admin,
+                    json={'host': '127.0.0.1', 'puerto': puerto, 'usuario': None, 'remitente': 'alertas@maia.prueba',
+                          'tls': False})
+    assert r.status_code == 200, r.text
+    claves = [d['clave'] for d in cliente.get('/api/notificaciones/alertas/desenlaces', headers=admin).json()]
+    assert claves, 'el paquete activo debe tener desenlaces: sin ellos esta prueba no comprobaría los correos'
+    r = cliente.post('/api/notificaciones/alertas', headers=admin,
+                     json={'nombre': 'Corrida demo', 'percentil_minimo': 0, 'destinatarios': ['clinica@maia.prueba'],
+                           'alertas': claves, 'activo': True})
+    assert r.status_code == 201, r.text
     r = cliente.post('/api/corridas', headers=admin, json={'tipo': 'demo'})
     assert r.status_code == 202, r.text
     cid = r.json()['id']
@@ -285,10 +252,11 @@ def test_corrida_y_tablero(cliente, admin, corrida, smtp):
     assert sum(t['alarmas'] for t in trimestres) == r['alarmas_grupo']
     assert all(set(t) == {'periodo', 'senal', 'alarmas'} and t['alarmas'] > 0 for t in trimestres)
     assert [t['periodo'] for t in trimestres] == sorted(t['periodo'] for t in trimestres)
-    if corrida['resumen'].get('notificaciones', {}).get('correos'):
-        assert len(buzon.mensajes) >= 2   # el de prueba y al menos uno de riesgo alto
-        h = cliente.get('/api/notificaciones/historial', headers=admin).json()
-        assert h['total'] >= 1 and h['items'][0]['estado'] == 'enviado'
+    envio = corrida['resumen']['notificaciones']
+    assert envio['correos'] >= 1 and envio['errores'] == 0 and not envio['sin_servidor'], envio
+    assert len(buzon.mensajes) >= 1
+    h = cliente.get('/api/notificaciones/historial', headers=admin).json()
+    assert h['total'] >= 1 and h['items'][0]['estado'] == 'enviado' and h['items'][0]['notificacion'] == 'Corrida demo'
 
 
 def test_ninos_y_linea_temporal(cliente, admin, corrida):
