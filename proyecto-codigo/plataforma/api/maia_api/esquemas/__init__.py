@@ -147,18 +147,54 @@ class PeticionInferencia(Base):
 
 # ------------------------------------------------------------------ notificaciones
 
-class ConfigNotificacionEntrada(Base):
-    desenlace: str
-    nombre: str | None = None
-    # posición entera de 0 a 100 (95 = el 5 % con más riesgo); 0,95 avisaría de casi todos los niños
+def _correos_unicos(v: list[str]) -> list[str]:
+    vistos: dict[str, None] = {}
+    for x in v:
+        vistos.setdefault(_email(x), None)
+    return list(vistos)
+
+
+class ServidorEntrada(Base):
+    host: str = Field(min_length=1, max_length=255)
+    puerto: int = Field(ge=1, le=65535)
+    usuario: str | None = Field(default=None, max_length=255)
+    clave: str | None = Field(default=None, max_length=500)   # None conserva la guardada; '' la borra
+    remitente: str
+    tls: bool = True
+
+    _r = field_validator('remitente')(_email)
+
+    @field_validator('host')
+    @classmethod
+    def _host(cls, v: str) -> str:
+        v = v.strip()
+        if not v or re.search(r'\s', v):
+            raise ValueError('servidor no válido')
+        return v
+
+
+class NotificacionEntrada(Base):
+    nombre: str = Field(min_length=1, max_length=120)
+    # posición entera de 0 a 100 (95 = el 5 % con más riesgo)
     percentil_minimo: int = Field(default=PERCENTIL_MUY_ALTO, ge=0, le=100)
     destinatarios: list[str] = Field(default_factory=list, max_length=50)
+    alertas: list[str] = Field(min_length=1)
     activo: bool = False
 
-    @field_validator('destinatarios')
+    _d = field_validator('destinatarios')(_correos_unicos)
+
+    @field_validator('nombre')
     @classmethod
-    def _correos(cls, v: list[str]) -> list[str]:
-        return [_email(x) for x in v]
+    def _nombre(cls, v: str) -> str:
+        v = ' '.join(v.split())
+        if not v:
+            raise ValueError('escriba un nombre')
+        return v
+
+    @field_validator('alertas')
+    @classmethod
+    def _alertas(cls, v: list[str]) -> list[str]:
+        return list(dict.fromkeys(v))
 
 
 class PruebaCorreo(Base):

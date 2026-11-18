@@ -73,7 +73,7 @@ describe('Buscar en el menú', () => {
     montar('/tablero')
     await userEvent.type(await campo(), 'program')
     expect((await screen.findAllByRole('link', { name: 'Programación' })).length).toBeGreaterThan(0)
-    expect(enlaces('Notificaciones')).toHaveLength(0)
+    expect(enlaces('Servidor de correo')).toHaveLength(0)
     expect(enlaces('Usuarios')).toHaveLength(0)
   })
 
@@ -81,7 +81,7 @@ describe('Buscar en el menú', () => {
     api('admin')
     montar('/tablero')
     await userEvent.type(await campo(), 'configuracion')
-    expect((await screen.findAllByRole('link', { name: 'Notificaciones' })).length).toBeGreaterThan(0)
+    expect((await screen.findAllByRole('link', { name: 'General' })).length).toBeGreaterThan(0)
     expect(enlaces('Programación').length).toBeGreaterThan(0)
   })
 
@@ -111,7 +111,7 @@ describe('Grupos del menú', () => {
     // el menú de escritorio y el cajón móvil existen a la vez; se prueba el de escritorio (el primero)
     const plegar = (await screen.findAllByRole('button', { name: 'Plegar Configuración' }))[0]
     expect(plegar).toBeEnabled()
-    expect(screen.getAllByRole('link', { name: 'Notificaciones' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('link', { name: 'Programación' }).length).toBeGreaterThan(0)
     await userEvent.click(plegar)
     expect(plegar).toHaveAttribute('aria-expanded', 'false')
     await userEvent.click((await screen.findAllByRole('button', { name: 'Desplegar Configuración' }))[0])

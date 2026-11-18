@@ -59,16 +59,14 @@ railway variables --service api \
   --set 'MAIA_ADMIN_EMAIL=<correo de administración>' \
   --set 'MAIA_ADMIN_CLAVE=<clave generada>' \
   --set 'MAIA_JWT_SECRETO=<secreto generado>' \
-  --set 'MAIA_PAQUETE_CLAVE=<la misma del .env local>' \
-  --set 'SMTP_HOST=<servidor SMTP>' --set 'SMTP_PORT=587' --set 'SMTP_TLS=true' \
-  --set 'SMTP_USUARIO=<usuario>' --set 'SMTP_CLAVE=<clave>' --set 'SMTP_REMITENTE=<remitente>'
+  --set 'MAIA_PAQUETE_CLAVE=<la misma del .env local>'
 railway volume add --service api --mount-path /datos/paquetes
 ```
 
 * `PORT=8000` fija el puerto interno para que la web sepa adónde llamar.
 * `RAILWAY_RUN_UID=0`: la imagen corre sin root, pero los volúmenes de Railway se montan como root; con esta variable
   el proceso puede escribir los paquetes subidos.
-* Sin SMTP la demostración funciona igual; solo fallan los correos (quedan como error en el historial).
+* El servidor de correo se configura en la web, en **Notificaciones › Servidor de correo** (la clave se guarda cifrada y requiere `MAIA_CIFRADO_CLAVE`). Para desarrollo con Mailpit: servidor `mailpit`, puerto `1025`, sin TLS. Sin servidor de correo la demostración funciona igual; solo fallan los correos (quedan como error en el historial).
 
 ### Variables de `web`
 

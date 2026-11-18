@@ -11,7 +11,6 @@ export type UsuarioCambio = S['UsuarioCambio']
 export type Paquete = S['PaqueteSalida']
 export type Corrida = S['CorridaSalida']
 export type PeticionInferencia = S['PeticionInferencia']
-export type ConfigNotificacion = S['ConfigNotificacionEntrada']
 export type Respuesta = S['RevisionDatoEntrada']['es_error']
 export type ResumenAdministracion = S['ResumenAdministracion']
 export type Conexion = S['ConexionSalida']
@@ -25,6 +24,8 @@ export type ProgramacionEntrada = S['ProgramacionEntrada']
 export type Ejecucion = S['EjecucionSalida']
 export type Entrenamiento = S['Entrenamiento']
 export type Entrenamientos = S['Entrenamientos']
+export type ServidorEntrada = S['ServidorEntrada']
+export type NotificacionEntrada = S['NotificacionEntrada']
 
 export interface Pagina<T> {
   total: number
@@ -361,10 +362,7 @@ export interface Notificacion {
   desenlace: string
   percentil: number
   corrida_id: number
-}
-
-export type ConfigNotificacionSalida = Required<Pick<ConfigNotificacion, 'desenlace' | 'percentil_minimo' | 'destinatarios' | 'activo'>> & {
-  nombre: string | null
+  notificacion: string | null
 }
 
 /** Perfil provisional al nacer (D12): categorías, nunca valores numéricos. */
@@ -759,3 +757,13 @@ export interface NinoRiesgoVisita {
 export interface RespuestaRiesgoPorVisita {
   corrida_id: number; desenlace: string; umbral_percentil: number; elegidos_por: 'pedido' | 'mayor_riesgo'; ninos: NinoRiesgoVisita[]
 }
+
+export interface ServidorSalida {
+  configurado: boolean; host: string; puerto: number; usuario: string | null; remitente: string; tls: boolean
+  clave_guardada: boolean; puede_guardar_clave: boolean
+}
+export interface NotificacionConfig {
+  id: number; nombre: string; percentil_minimo: number; destinatarios: string[]; alertas: string[]; activo: boolean
+}
+export interface OpcionAlertaApi { clave: string; nombre: string }
+export interface ResultadoEnvio { correos: number; ninos: number; errores: number; sin_servidor: boolean }

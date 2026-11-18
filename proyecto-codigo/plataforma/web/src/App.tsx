@@ -13,7 +13,8 @@ const AdminConfiguracion = lazy(() => import('./paginas/AdminConfiguracion'))
 const AdminCorridas = lazy(() => import('./paginas/AdminCorridas'))
 const AdminEntrenamientos = lazy(() => import('./paginas/AdminEntrenamientos'))
 const AdminModelos = lazy(() => import('./paginas/AdminModelos'))
-const AdminNotificaciones = lazy(() => import('./paginas/AdminNotificaciones'))
+const NotifServidor = lazy(() => import('./paginas/NotifServidor'))
+const NotifAlertas = lazy(() => import('./paginas/NotifAlertas'))
 const AdminProgramacion = lazy(() => import('./paginas/AdminProgramacion'))
 const AdminUsuarios = lazy(() => import('./paginas/AdminUsuarios'))
 const Diccionario = lazy(() => import('./paginas/Diccionario'))
@@ -68,7 +69,10 @@ export function Rutas() {
         <Route path="admin/modelos" element={<Requiere roles={['admin']}><AdminModelos /></Requiere>} />
         <Route path="admin/corridas" element={<Requiere roles={['admin']}><AdminCorridas /></Requiere>} />
         <Route path="admin/usuarios" element={<Requiere roles={['admin']}><AdminUsuarios /></Requiere>} />
-        <Route path="admin/notificaciones" element={<Requiere roles={['admin']}><AdminNotificaciones /></Requiere>} />
+        <Route path="notificaciones" element={<Requiere roles={['admin']}><Navigate to="/notificaciones/alertas" replace /></Requiere>} />
+        <Route path="notificaciones/servidor" element={<Requiere roles={['admin']}><NotifServidor /></Requiere>} />
+        <Route path="notificaciones/alertas" element={<Requiere roles={['admin']}><NotifAlertas /></Requiere>} />
+        <Route path="admin/notificaciones" element={<Requiere roles={['admin']}><Navigate to="/notificaciones/alertas" replace /></Requiere>} />
         <Route path="analitica" element={<Requiere roles={['admin', 'experto', 'visualizador']}><AnaliticaLayout /></Requiere>}>
           <Route index element={<ARresumen />} />
           <Route path=":submodulo" element={<SubmoduloAnalitica />} />

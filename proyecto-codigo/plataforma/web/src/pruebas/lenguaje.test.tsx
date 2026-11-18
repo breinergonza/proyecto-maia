@@ -129,15 +129,16 @@ const sinProblema = { ...fila, sujeto: 's2', percentil_max: 40, n_bajo_2de: 0, n
   ultima_fecha: '2026-04-15', ultima_edad_corregida: null }
 const sinDato = { ...fila, sujeto: 's3', percentil_max: 20, n_bajo_2de: 0, n_caida_1de: 0, n_crecimiento: 0, ultima_visita: null,
   ultima_fecha: null, ultima_edad_corregida: null }
-const notificaciones = [{ desenlace: 'readm', nombre: 'readmisión a los 3 meses', percentil_minimo: 95, destinatarios: ['a@maia.prueba'], activo: true }]
+const notificaciones = [{ id: 1, nombre: 'readmisión a los 3 meses', percentil_minimo: 95, destinatarios: ['a@maia.prueba'], alertas: ['readm'], activo: true }]
 const aviso = { id: 1, destinatario: 'a@maia.prueba', estado: 'enviado', error: null, enviado_en: '2026-07-01T10:00:00Z', sujeto: 's1',
-  desenlace: 'readmisión a los 3 meses', percentil: 93, corrida_id: 3 }
+  desenlace: 'readmisión a los 3 meses', percentil: 93, corrida_id: 3, notificacion: null }
 const datoRevision = { ...alertaDato, sujeto: 's1', unidad: 'g', etapa_nombre: '3 meses', fecha: '2026-03-01', fuerza: 9, es_error: null, comentario: null, serie: [] }
 
 function api(rol: 'admin' | 'experto' = 'experto') {
   simularApi((url) => {
     if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario(rol) } }
-    if (url === '/api/notificaciones/config') return { cuerpo: notificaciones }
+    if (url === '/api/notificaciones/alertas') return { cuerpo: notificaciones }
+    if (url === '/api/notificaciones/alertas/desenlaces') return { cuerpo: [{ clave: 'readm', nombre: 'readmisión a los 3 meses' }] }
     if (url.startsWith('/api/notificaciones/historial')) return { cuerpo: { total: 1, pagina: 1, tamano: 20, items: [aviso] } }
     if (url === '/api/tablero/resumen') return { cuerpo: resumen }
     if (url === '/api/tablero/alarmas-grupo') return { cuerpo: [{ grupo: null, periodo: '2026Q1', variable: 'peso_3m', etiqueta: 'Peso a los 3 meses', senal: 'cusum', valor: 1, referencia: 0, estadistico: 9, que_paso: 'subió de golpe en todo el programa' }] }
@@ -171,10 +172,10 @@ describe('pantallas del equipo clínico sin términos técnicos', () => {
 
   it('notificaciones (administración)', async () => {
     api('admin')
-    montar('/admin/notificaciones')
+    montar('/notificaciones/alertas')
     expect(await screen.findByText('Alto')).toBeInTheDocument()   // el aviso de posición 93, dicho como en el resto de la web
-    expect(screen.getByLabelText('Riesgo mínimo')).toHaveValue(95)
-    expect(screen.getByText('Con 95 se avisa del 5 % de niños con más riesgo.')).toBeInTheDocument()
+    expect(screen.getByText('1 correo')).toBeInTheDocument()
+    expect(screen.getByText(/Con 95 se avisa del 5 % de niños con más riesgo\./)).toBeInTheDocument()
     expect(document.querySelector('main')?.textContent).not.toMatch(PROHIBIDO)
   })
 

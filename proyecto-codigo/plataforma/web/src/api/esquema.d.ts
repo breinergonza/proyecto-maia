@@ -539,15 +539,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/notificaciones/config": {
+    "/api/notificaciones/servidor": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Config */
-        get: operations["config_api_notificaciones_config_get"];
+        /** Servidor */
+        get: operations["servidor_api_notificaciones_servidor_get"];
+        /** Guardar Servidor */
+        put: operations["guardar_servidor_api_notificaciones_servidor_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notificaciones/servidor/prueba": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Prueba */
+        post: operations["prueba_api_notificaciones_servidor_prueba_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notificaciones/alertas/desenlaces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Desenlaces */
+        get: operations["desenlaces_api_notificaciones_alertas_desenlaces_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -556,7 +591,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/notificaciones/config/{desenlace}": {
+    "/api/notificaciones/alertas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Alertas */
+        get: operations["alertas_api_notificaciones_alertas_get"];
+        put?: never;
+        /** Crear */
+        post: operations["crear_api_notificaciones_alertas_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notificaciones/alertas/{notificacion_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -565,8 +618,26 @@ export interface paths {
         };
         get?: never;
         /** Guardar */
-        put: operations["guardar_api_notificaciones_config__desenlace__put"];
+        put: operations["guardar_api_notificaciones_alertas__notificacion_id__put"];
         post?: never;
+        /** Borrar */
+        delete: operations["borrar_api_notificaciones_alertas__notificacion_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notificaciones/alertas/{notificacion_id}/enviar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enviar Ahora */
+        post: operations["enviar_ahora_api_notificaciones_alertas__notificacion_id__enviar_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -584,23 +655,6 @@ export interface paths {
         get: operations["historial_api_notificaciones_historial_get"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/notificaciones/prueba": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Prueba */
-        post: operations["prueba_api_notificaciones_prueba_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1997,25 +2051,6 @@ export interface components {
             /** Actualizado En */
             actualizado_en?: string | null;
         };
-        /** ConfigNotificacionEntrada */
-        ConfigNotificacionEntrada: {
-            /** Desenlace */
-            desenlace: string;
-            /** Nombre */
-            nombre?: string | null;
-            /**
-             * Percentil Minimo
-             * @default 95
-             */
-            percentil_minimo: number;
-            /** Destinatarios */
-            destinatarios?: string[];
-            /**
-             * Activo
-             * @default false
-             */
-            activo: boolean;
-        };
         /** Consulta */
         Consulta: {
             /** Muestra */
@@ -2510,6 +2545,25 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** NotificacionEntrada */
+        NotificacionEntrada: {
+            /** Nombre */
+            nombre: string;
+            /**
+             * Percentil Minimo
+             * @default 95
+             */
+            percentil_minimo: number;
+            /** Destinatarios */
+            destinatarios?: string[];
+            /** Alertas */
+            alertas: string[];
+            /**
+             * Activo
+             * @default false
+             */
+            activo: boolean;
+        };
         /** PaqueteSalida */
         PaqueteSalida: {
             /** Version */
@@ -2789,6 +2843,24 @@ export interface components {
             preocupa: "si" | "no" | "no_se";
             /** Comentario */
             comentario?: string | null;
+        };
+        /** ServidorEntrada */
+        ServidorEntrada: {
+            /** Host */
+            host: string;
+            /** Puerto */
+            puerto: number;
+            /** Usuario */
+            usuario?: string | null;
+            /** Clave */
+            clave?: string | null;
+            /** Remitente */
+            remitente: string;
+            /**
+             * Tls
+             * @default true
+             */
+            tls: boolean;
         };
         /** SujetoEntrada */
         SujetoEntrada: {
@@ -3888,7 +3960,95 @@ export interface operations {
             };
         };
     };
-    config_api_notificaciones_config_get: {
+    servidor_api_notificaciones_servidor_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    guardar_servidor_api_notificaciones_servidor_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServidorEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    prueba_api_notificaciones_servidor_prueba_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PruebaCorreo"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    desenlaces_api_notificaciones_alertas_desenlaces_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -3910,20 +4070,139 @@ export interface operations {
             };
         };
     };
-    guardar_api_notificaciones_config__desenlace__put: {
+    alertas_api_notificaciones_alertas_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+        };
+    };
+    crear_api_notificaciones_alertas_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificacionEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    guardar_api_notificaciones_alertas__notificacion_id__put: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                desenlace: string;
+                notificacion_id: number;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ConfigNotificacionEntrada"];
+                "application/json": components["schemas"]["NotificacionEntrada"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    borrar_api_notificaciones_alertas__notificacion_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notificacion_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enviar_ahora_api_notificaciones_alertas__notificacion_id__enviar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notificacion_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -3969,37 +4248,6 @@ export interface operations {
                         [key: string]: unknown;
                     };
                 };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    prueba_api_notificaciones_prueba_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PruebaCorreo"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             /** @description Validation Error */
             422: {

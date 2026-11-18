@@ -12,7 +12,7 @@ import time
 import numpy as np
 import pytest
 from sqlalchemy import text
-from test_api import ADMIN, _login, _subir, admin, cliente, corrida, paquetes, smtp  # noqa: F401
+from test_api import ADMIN, _login, _subir, admin, cliente, corrida, paquetes  # noqa: F401
 
 pytestmark = [pytest.mark.integracion, pytest.mark.timeout(1800)]
 

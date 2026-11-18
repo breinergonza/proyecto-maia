@@ -22,8 +22,7 @@ def entorno(url_db, s3, tmp_path_factory):
     mp = pytest.MonkeyPatch()
     for k, v in {'MINIO_URL': s3, 'MINIO_ACCESS_KEY': 'prueba', 'MINIO_SECRET_KEY': 'prueba-secreta',
                  'DATABASE_URL': url_db, 'MLFLOW_TRACKING_URI': f'sqlite:///{tmp}/mlflow.db',
-                 'MAIA_PAQUETE_CLAVE': 'clave-de-prueba-larga', 'MAIA_RAIZ': str(tmp / 'raiz'),
-                 'SMTP_HOST': '127.0.0.1', 'SMTP_PORT': '1'}.items():
+                 'MAIA_PAQUETE_CLAVE': 'clave-de-prueba-larga', 'MAIA_RAIZ': str(tmp / 'raiz')}.items():
         mp.setenv(k, v)
     mp.setattr(CA, 'PROYECTO', Carpetas(tmp / 'raiz'))
     mp.chdir(tmp)
