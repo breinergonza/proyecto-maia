@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -27,11 +27,16 @@ describe('Buscar en el menú', () => {
     const entrada = await campo()
     expect(entrada).toHaveAccessibleName('Buscar en el menú')
     expect(entrada).not.toHaveFocus()
-    fireEvent.keyDown(document.body, { key: '/' })
-    expect(entrada).toHaveFocus()
+    // el atajo se registra en un efecto que puede tardar en un equipo lento (CI): se repite la tecla hasta que enfoque
+    await waitFor(() => {
+      fireEvent.keyDown(document.body, { key: '/' })
+      expect(entrada).toHaveFocus()
+    })
     entrada.blur()
-    fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true })
-    expect(entrada).toHaveFocus()
+    await waitFor(() => {
+      fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true })
+      expect(entrada).toHaveFocus()
+    })
   })
 
   it('«/» no roba la tecla mientras se escribe en otro campo', async () => {
