@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { pedir } from '../api/cliente'
 import type { ServidorSalida } from '../api/tipos'
+import { useConfirmar } from '../components/Confirmar'
 import { Aviso, Boton, Campo, Cargando, Encabezado, Entrada, Insignia, Panel } from '../components/ui'
 import { esCorreo } from '../lib/correos'
 
@@ -16,7 +17,8 @@ export default function NotifServidor() {
       </Encabezado>
       {q.isPending ? <Cargando /> : q.error ? <Aviso>{q.error.message}</Aviso> : (
         <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
-          <Formulario s={q.data} />
+          {/* key: al reestablecer, el formulario se monta de nuevo y su estado vuelve a los valores vacíos del GET */}
+          <Formulario key={q.data.configurado ? 'cfg' : 'vacio'} s={q.data} />
           <Prueba activo={q.data.configurado} />
         </div>
       )}
@@ -53,6 +55,20 @@ function Formulario({ s }: { s: ServidorSalida }) {
       void cliente.invalidateQueries({ queryKey: ['notificaciones', 'servidor'] })
     },
   })
+  const { confirmar, dialogo } = useConfirmar()
+  const reestablecer = useMutation({
+    mutationFn: () => pedir('/notificaciones/servidor', { metodo: 'DELETE' }),
+    onSuccess: () => void cliente.invalidateQueries({ queryKey: ['notificaciones', 'servidor'] }),
+  })
+  async function pedirReestablecer() {
+    const ok = await confirmar({
+      titulo: 'Reestablecer el servidor de correo',
+      mensaje: `Se borrarán el servidor «${s.host}», el usuario y la clave guardada.`,
+      efecto: 'Mientras no se configure de nuevo, no saldrá ningún correo de alertas.',
+      reversible: false, textoConfirmar: 'Reestablecer', tono: 'peligro',
+    })
+    if (ok) reestablecer.mutate()
+  }
   return (
     <Panel titulo={<div className="flex items-center gap-2"><h2 className="text-base">Datos del servidor</h2>
       {s.configurado ? <Insignia tono="teal">Configurado</Insignia> : <Insignia tono="ocre">Sin configurar</Insignia>}</div>}>
@@ -96,26 +112,38 @@ function Formulario({ s }: { s: ServidorSalida }) {
             <Aviso>Falta MAIA_CIFRADO_CLAVE en el servidor: sin ella no se puede guardar la clave.</Aviso>
           </div>
         )}
-        {guardar.error && <div className="sm:col-span-2"><Aviso>{guardar.error.message}</Aviso></div>}
+        {(guardar.error || reestablecer.error) && <div className="sm:col-span-2"><Aviso>{(guardar.error ?? reestablecer.error)?.message}</Aviso></div>}
         <div className="flex items-center justify-end gap-3 sm:col-span-2">
           {guardar.isSuccess && <span className="text-sm text-teal" role="status">Guardado.</span>}
+          {s.configurado && (
+            <Boton chico type="button" variante="atencion" disabled={reestablecer.isPending} onClick={() => void pedirReestablecer()}>
+              Reestablecer
+            </Boton>
+          )}
           <Boton chico type="submit" disabled={guardar.isPending || hayError}>Guardar</Boton>
         </div>
       </form>
+      {dialogo}
     </Panel>
   )
 }
 
+/** Máscara del correo de prueba: minúscula, sin espacios y, si se pegan varios (separados por coma, punto y coma o línea), solo el primero. */
+const normalizarCorreo = (x: string) => x.toLowerCase().split(/[,;\n]/)[0].replace(/\s+/g, '')
+
 function Prueba({ activo }: { activo: boolean }) {
   const [correo, setCorreo] = useState('')
-  const m = useMutation({ mutationFn: () => pedir('/notificaciones/servidor/prueba', { cuerpo: { destinatario: correo.trim() } }) })
+  const invalido = correo !== '' && !esCorreo(correo)
+  const m = useMutation({ mutationFn: () => pedir('/notificaciones/servidor/prueba', { cuerpo: { destinatario: correo } }) })
   return (
     <Panel titulo="Probar el correo">
-      <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); m.mutate() }}>
+      <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); if (activo && esCorreo(correo)) m.mutate() }}>
         <Campo id="prueba" etiqueta="Enviar un correo de prueba a"
+          error={invalido ? 'Escriba un correo válido, por ejemplo nombre@dominio.org.' : undefined}
           ayuda={activo ? undefined : 'Guarde primero los datos del servidor.'}>
           <div className="flex gap-2">
-            <Entrada id="prueba" type="email" value={correo} onChange={(e) => setCorreo(e.target.value)} />
+            <Entrada id="prueba" type="email" value={correo} placeholder="nombre@dominio.org" aria-invalid={invalido}
+              onChange={(e) => setCorreo(normalizarCorreo(e.target.value))} />
             <Boton type="submit" variante="secundario" className="shrink-0" disabled={!activo || !esCorreo(correo) || m.isPending}>Enviar</Boton>
           </div>
         </Campo>

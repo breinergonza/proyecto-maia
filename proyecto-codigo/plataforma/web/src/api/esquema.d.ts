@@ -551,7 +551,11 @@ export interface paths {
         /** Guardar Servidor */
         put: operations["guardar_servidor_api_notificaciones_servidor_put"];
         post?: never;
-        delete?: never;
+        /**
+         * Reestablecer Servidor
+         * @description Borra el servidor guardado (con su clave cifrada). Es idempotente: sin servidor también responde 204.
+         */
+        delete: operations["reestablecer_servidor_api_notificaciones_servidor_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4014,6 +4018,24 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    reestablecer_servidor_api_notificaciones_servidor_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

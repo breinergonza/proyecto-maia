@@ -63,6 +63,93 @@ describe('Servidor de correo', () => {
   })
 })
 
+describe('Reestablecer el servidor', () => {
+  it('no aparece si no hay servidor guardado', async () => {
+    api(() => undefined, SERVIDOR_VACIO)
+    montar('/notificaciones/servidor')
+    expect(await screen.findByText('Sin configurar')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reestablecer' })).toBeNull()
+  })
+  it('aparece si está configurado, pide confirmar y al confirmar borra y vuelve a «Sin configurar»', async () => {
+    const u = userEvent.setup()
+    let borrado = false
+    const llamadas = api((url, init) => {
+      if (url === '/api/notificaciones/servidor' && init?.method === 'DELETE') { borrado = true; return { estado: 204 } }
+      if (url === '/api/notificaciones/servidor' && borrado) return { cuerpo: SERVIDOR_VACIO }
+      return undefined
+    })
+    montar('/notificaciones/servidor')
+    expect(await screen.findByDisplayValue('smtp.maia.prueba')).toBeInTheDocument()
+    await u.click(screen.getByRole('button', { name: 'Reestablecer' }))
+    const d = await screen.findByRole('alertdialog')
+    expect(within(d).getByText(/No se puede deshacer/)).toBeInTheDocument()
+    expect(within(d).getByText(/no saldrá ningún correo de alertas/)).toBeInTheDocument()
+    expect(llamadas.some((l) => l.init?.method === 'DELETE')).toBe(false)   // todavía no: falta confirmar
+    await u.click(within(d).getByRole('button', { name: 'Reestablecer' }))
+    expect(await screen.findByText('Sin configurar')).toBeInTheDocument()
+    expect(llamadas.some((l) => l.url === '/api/notificaciones/servidor' && l.init?.method === 'DELETE')).toBe(true)
+    expect(screen.getByLabelText('Servidor (host)')).toHaveValue('')
+    expect(screen.getByLabelText('Correo remitente')).toHaveValue('')
+    expect(screen.getByLabelText('Usuario')).toHaveValue('')
+    expect(screen.getByLabelText('Clave')).toHaveValue('')
+    expect(screen.getByRole('checkbox', { name: /TLS/ })).toBeChecked()
+    expect(screen.queryByRole('button', { name: 'Reestablecer' })).toBeNull()
+    expect(screen.getByText('Guarde primero los datos del servidor.')).toBeInTheDocument()
+  })
+  it('cancelar no borra nada', async () => {
+    const u = userEvent.setup()
+    const llamadas = api()
+    montar('/notificaciones/servidor')
+    await u.click(await screen.findByRole('button', { name: 'Reestablecer' }))
+    await u.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Cancelar' }))
+    expect(llamadas.some((l) => l.init?.method === 'DELETE')).toBe(false)
+    expect(screen.getByDisplayValue('smtp.maia.prueba')).toBeInTheDocument()
+  })
+})
+
+describe('Probar el correo', () => {
+  it('normaliza lo escrito: sin espacios y en minúscula', async () => {
+    const u = userEvent.setup()
+    api()
+    montar('/notificaciones/servidor')
+    const campo = await screen.findByLabelText('Enviar un correo de prueba a')
+    await u.type(campo, ' Ana @Maia.Prueba ')
+    expect(campo).toHaveValue('ana@maia.prueba')
+  })
+  it('con un correo inválido muestra el error y no deja enviar', async () => {
+    const u = userEvent.setup()
+    const llamadas = api()
+    montar('/notificaciones/servidor')
+    const campo = await screen.findByLabelText('Enviar un correo de prueba a')
+    expect(screen.queryByText(/Escriba un correo válido, por ejemplo/)).toBeNull()
+    await u.type(campo, 'ana@maia')
+    expect(screen.getByText('Escriba un correo válido, por ejemplo nombre@dominio.org.')).toBeInTheDocument()
+    expect(campo).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByRole('button', { name: 'Enviar' })).toBeDisabled()
+    await u.type(campo, '{Enter}')
+    expect(llamadas.some((l) => l.url.endsWith('/servidor/prueba'))).toBe(false)
+  })
+  it('con un correo válido habilita «Enviar» y envía el correo normalizado', async () => {
+    const u = userEvent.setup()
+    const llamadas = api((url, init) => url === '/api/notificaciones/servidor/prueba' && init?.method === 'POST' ? { estado: 204 } : undefined)
+    montar('/notificaciones/servidor')
+    const campo = await screen.findByLabelText('Enviar un correo de prueba a')
+    await u.type(campo, 'Ana@Maia.Prueba')
+    expect(screen.queryByText(/Escriba un correo válido, por ejemplo/)).toBeNull()
+    await u.click(screen.getByRole('button', { name: 'Enviar' }))
+    await waitFor(() => expect(cuerpoDe(llamadas, 'POST')).toEqual({ destinatario: 'ana@maia.prueba' }))
+  })
+  it('al pegar varios correos se queda con el primero', async () => {
+    const u = userEvent.setup()
+    api()
+    montar('/notificaciones/servidor')
+    const campo = await screen.findByLabelText('Enviar un correo de prueba a')
+    await u.click(campo)
+    await u.paste('Ana@maia.prueba, otro@maia.prueba')
+    expect(campo).toHaveValue('ana@maia.prueba')
+  })
+})
+
 describe('Alertas', () => {
   it('lista las notificaciones con sus alertas y la cantidad de correos', async () => {
     api()

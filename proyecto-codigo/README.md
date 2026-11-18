@@ -159,7 +159,7 @@ Edite `.env` y cambie todo lo que dice `cambiar`:
 Los valores `postgres`, `minio`, `mlflow` y `mailpit` de las URL son los nombres de los servicios dentro del compose;
 no los cambie.
 
-El servidor de correo se configura en la web, en **Notificaciones › Servidor de correo** (la clave se guarda cifrada y requiere `MAIA_CIFRADO_CLAVE`). Para desarrollo con Mailpit: servidor `mailpit`, puerto `1025`, sin TLS.
+El servidor de correo se configura en la web, en **Notificaciones › Servidor de correo** (la clave se guarda cifrada y requiere `MAIA_CIFRADO_CLAVE`). Para desarrollo con Mailpit: servidor `mailpit`, puerto `1025`, sin TLS. El botón **Reestablecer** borra el servidor guardado (host, usuario y clave) y los avisos dejan de salir hasta configurarlo de nuevo; el correo de prueba solo se envía si es un correo válido (se escribe en minúscula y sin espacios).
 
 ### 2. La clave de la base de la Fundación
 

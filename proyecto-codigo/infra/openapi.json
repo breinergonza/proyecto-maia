@@ -1722,6 +1722,24 @@
       "HTTPBearer": []
      }
     ]
+   },
+   "delete": {
+    "tags": [
+     "notificaciones"
+    ],
+    "summary": "Reestablecer Servidor",
+    "description": "Borra el servidor guardado (con su clave cifrada). Es idempotente: sin servidor también responde 204.",
+    "operationId": "reestablecer_servidor_api_notificaciones_servidor_delete",
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
    }
   },
   "/api/notificaciones/servidor/prueba": {
