@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass, field
 
 import pandas as pd
 from fastapi import HTTPException, status
@@ -13,7 +14,7 @@ from sqlalchemy.orm import Session
 from maia_api.consultas import etapas
 from maia_comun import muestra as M
 from maia_comun import perfiles as PF
-from maia_comun.filtros_sql import esquema_de_db, ids_muestra, lecturas
+from maia_comun.filtros_sql import Fragmento, entrada_en_sql, esquema_de_db, fragmento, ids_muestra, lecturas
 from maia_comun.modelos_db import Corte
 from maia_comun.sevarti_db import corte_vigente
 from sevarti import contrato as SV
@@ -168,36 +169,69 @@ def disponibles(esquema: pd.DataFrame, ofrecidas: Sequence[str]) -> list[dict]:
 
 # ---------------------------------------------------------------- facetas
 
-def _lista_sede(s: Session, c: int, ids: list[str]) -> dict:
-    filas = s.execute(text('SELECT grupo, count(*) FILTER (WHERE sujeto = ANY(:i)) AS n '
+@dataclass
+class _Grupo:
+    """Los niños que cumplen una muestra. Si todos sus filtros se resuelven en SQL se usa como subconsulta
+    (``sujeto IN (...)``) y no se descargan ni se vuelven a enviar decenas de miles de ids a Postgres en cada faceta;
+    si no (``alguna``/``etapa``), se cae a la lista de ids."""
+    s: Session
+    corte_id: int
+    muestra: dict
+    frag: Fragmento | None = None
+    _ids: list[str] | None = field(default=None, repr=False)
+
+    def __post_init__(self):
+        if all(entrada_en_sql(e) for e in self.muestra['y']):
+            self.frag = fragmento({**self.muestra, 'muestreo': {}}, self.corte_id, prefijo='g')
+
+    def ids(self) -> list[str]:
+        if self._ids is None:
+            self._ids = ids_de(self.s, self.corte_id, self.muestra, muestreo=False)
+        return self._ids
+
+    def cond(self, col: str = 'sujeto') -> tuple[str, dict]:
+        if self.frag is not None:
+            return f'{col} IN ({self.frag.sql})', dict(self.frag.params)
+        return f'{col} = ANY(:i)', {'i': self.ids()}
+
+    def n(self) -> int:
+        if self.frag is not None:
+            return self.s.execute(text(f'SELECT count(*) FROM ({self.frag.sql}) q'), self.frag.params).scalar_one()
+        return len(self.ids())
+
+def _lista_sede(s: Session, c: int, g: _Grupo) -> dict:
+    cond, p = g.cond('sujeto')
+    filas = s.execute(text(f'SELECT grupo, count(*) FILTER (WHERE {cond}) AS n '
                            'FROM sevarti.sujetos WHERE corte_id = :c AND grupo IS NOT NULL GROUP BY grupo'),
-                      {'c': c, 'i': ids}).all()
-    return {'opciones': sorted(({'valor': M.canonico(g), 'etiqueta': M.canonico(g), 'n': n} for g, n in filas),
+                      {'c': c, **p}).all()
+    return {'opciones': sorted(({'valor': M.canonico(x), 'etiqueta': M.canonico(x), 'n': n} for x, n in filas),
                                key=lambda o: (len(o['valor']), o['valor']))}
 
 
-def _semanas(s: Session, c: int, ids: list[str]) -> list[float]:
+def _semanas(s: Session, c: int, g: _Grupo) -> list[float]:
+    cond, p = g.cond('sujeto')
     return [float(eg) for (eg,) in s.execute(text('SELECT eg_semanas FROM sevarti.sujetos WHERE corte_id = :c '
-                                                  'AND sujeto = ANY(:i) AND eg_semanas IS NOT NULL'), {'c': c, 'i': ids})]
+                                                  f'AND {cond} AND eg_semanas IS NOT NULL'), {'c': c, **p})]
 
 
-def _lista_eg(s: Session, c: int, ids: list[str]) -> dict:
+def _lista_eg(s: Session, c: int, g: _Grupo) -> dict:
     cuenta: dict[str, int] = {}
-    for eg in _semanas(s, c, ids):
+    for eg in _semanas(s, c, g):
         cat = M.categoria_eg(eg)
         cuenta[cat] = cuenta.get(cat, 0) + 1
     return {'opciones': [{'valor': cat, 'etiqueta': PF.ETIQUETAS_EG[cat], 'rango': [lo, hi], 'n': cuenta.get(cat, 0)}
                          for cat, lo, hi in CATEGORIAS_EG]}
 
 
-def _lista_atributo(s: Session, c: int, v: str, nombre: str, ids: list[str], tipo: str, etiquetas: dict,
+def _lista_atributo(s: Session, c: int, v: str, nombre: str, g: _Grupo, tipo: str, etiquetas: dict,
                     lect: pd.DataFrame | None = None) -> dict | None:
     """Conteos por opción. Con ``lect`` (las lecturas de ``alguna`` o de una etapa) se cuenta cada niño una vez por
     opción; sin ella, se cuenta en Postgres sobre ``atributos_sujeto`` (primera o última medición)."""
     if lect is None:
-        filas = s.execute(text('SELECT valor, valor_num, count(*) FILTER (WHERE sujeto = ANY(:i)) AS n '
+        cond, p = g.cond('sujeto')
+        filas = s.execute(text(f'SELECT valor, valor_num, count(*) FILTER (WHERE {cond}) AS n '
                                'FROM sevarti.atributos_sujeto WHERE corte_id = :c AND variable = :v '
-                               'GROUP BY valor, valor_num'), {'c': c, 'v': nombre, 'i': ids}).all()
+                               'GROUP BY valor, valor_num'), {'c': c, 'v': nombre, **p}).all()
     else:
         g = lect.drop_duplicates(['sujeto', 'txt']).groupby(['txt', 'num'], dropna=False).size()
         filas = [(txt, None if pd.isna(num) else float(num), int(n)) for (txt, num), n in g.items()]
@@ -230,13 +264,14 @@ def _resumen_numerico(valores: list[float], ninos: int, redondear: bool) -> dict
             'bins': [{'desde': b['desde'], 'hasta': b['hasta'], **cifra(b['n'], redondear)} for b in r['bins']]}
 
 
-def _numerica(s: Session, c: int, nombre: str, ids: list[str], redondear: bool, lect: pd.DataFrame | None = None) -> dict:
+def _numerica(s: Session, c: int, nombre: str, g: _Grupo, redondear: bool, lect: pd.DataFrame | None = None) -> dict:
     if lect is not None:
         v = lect.dropna(subset=['num'])
         return _resumen_numerico(list(v.num.astype(float)), int(v.sujeto.nunique()), redondear)
+    cond, p = g.cond('sujeto')
     valores = [x for (x,) in s.execute(text('SELECT valor_num FROM sevarti.atributos_sujeto WHERE corte_id = :c '
-                                            'AND variable = :v AND valor_num IS NOT NULL AND sujeto = ANY(:i)'),
-                                       {'c': c, 'v': nombre, 'i': ids})]
+                                            f'AND variable = :v AND valor_num IS NOT NULL AND {cond}'),
+                                       {'c': c, 'v': nombre, **p})]
     return _resumen_numerico(valores, len(valores), redondear)
 
 
@@ -261,13 +296,13 @@ def facetas(s: Session, corte_id: int, muestra: dict | None, redondear: bool = F
     pedidas = {str(e['variable']): e['cuando'] for e in (extra or []) if e.get('variable') and e.get('cuando')}
     # edad gestacional en categorías y en semanas son la misma dimensión: elegir una no quita las opciones de la otra
     misma = {'eg_semanas': 'eg_categoria', 'eg_categoria': 'eg_semanas'}
-    cache: dict[str | None, list[str]] = {}
+    cache: dict[str | None, _Grupo] = {}
 
-    def cumplen(excluidas: tuple[str, ...]) -> list[str]:
+    def cumplen(excluidas: tuple[str, ...]) -> _Grupo:
         clave = excluidas or None
         if clave not in cache:
             y = [e for e in m['y'] if e['variable'] not in excluidas]
-            cache[clave] = ids_de(s, corte_id, {**m, 'y': y}, muestreo=False)
+            cache[clave] = _Grupo(s, corte_id, {**m, 'y': y})
         return cache[clave]
 
     salida: dict[str, dict] = {}
@@ -285,7 +320,7 @@ def facetas(s: Session, corte_id: int, muestra: dict | None, redondear: bool = F
                 # petición la deja pendiente minutos. Quedan en ``disponibles``: se cuentan al agregarlas al filtro.
                 continue
             try:
-                lect = lecturas(s, corte_id, v, cuando, ids)
+                lect = lecturas(s, corte_id, v, cuando, ids.ids())
             except M.MuestraInvalida as e:
                 raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, ' '.join(e.errores)) from None
         if v == 'sede':
@@ -305,7 +340,7 @@ def facetas(s: Session, corte_id: int, muestra: dict | None, redondear: bool = F
             o.update(cifra(o['n'], redondear))
         salida[v] = {'etiqueta': etiqueta_de(filas, v), 'tipo': tipo, 'cuando': cuando, 'reglas': reglas_de(filas, v),
                      'destacada': v in FACETAS_POR_DEFECTO or (v in filas and _marcada(filas[v])), **r}
-    return {'n': len(cumplen(())), 'facetas': salida, **meta(s, corte_id, esq, filas, list(salida))}
+    return {'n': cumplen(()).n(), 'facetas': salida, **meta(s, corte_id, esq, filas, list(salida))}
 
 
 def meta(s: Session, corte_id: int, esq: pd.DataFrame, filas: dict, mostradas: list[str]) -> dict:
