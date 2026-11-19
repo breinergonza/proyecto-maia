@@ -3,6 +3,7 @@
 ``sevarti.atributos_sujeto``; no se leen las mediciones."""
 from __future__ import annotations
 
+import time
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
@@ -169,6 +170,18 @@ def disponibles(esquema: pd.DataFrame, ofrecidas: Sequence[str]) -> list[dict]:
 
 # ---------------------------------------------------------------- facetas
 
+class _Reloj:
+    """Cuánto tarda cada fase de ``facetas`` (se informa en la cabecera ``Server-Timing`` de la respuesta)."""
+    def __init__(self, destino: dict[str, float] | None):
+        self.destino, self.t = destino, time.perf_counter()
+
+    def __call__(self, fase: str) -> None:
+        ahora = time.perf_counter()
+        if self.destino is not None:
+            self.destino[fase] = round((ahora - self.t) * 1000, 1)
+        self.t = ahora
+
+
 @dataclass
 class _Grupo:
     """Los niños que cumplen una muestra. Si todos sus filtros se resuelven en SQL se usa como subconsulta
@@ -302,12 +315,14 @@ def _regla_de(filas: dict, v: str, entrada: dict | None, pedidas: dict[str, str]
 
 
 def facetas(s: Session, corte_id: int, muestra: dict | None, redondear: bool = False,
-            extra: Sequence[dict] | None = None) -> dict:
+            extra: Sequence[dict] | None = None, tiempos: dict[str, float] | None = None) -> dict:
     """Conteos por opción de cada faceta aplicando los demás filtros pero no el propio (D35). D4: opciones con 1 a 4
     niños salen como «<5»; con ``redondear`` (visualizador) los conteos menores de 100 van de 5 en 5 (D46). Una opción
     sin niños sale con ``n`` 0 y texto «0»: es un cero real, no un dato oculto. ``extra``: variables que se pidieron
     además de las de siempre, ``[{"variable", "cuando"}]``; las que ya están en el filtro se agregan solas."""
+    marca = _Reloj(tiempos)
     esq = esquema_de_db(s, corte_id)
+    marca('esquema')
     filas = {str(r['variable']): r for r in esq.to_dict('records')}
     etiquetas = SV.etiquetas_categoria(esq)
     m = M.exigir(muestra or {'version': M.VERSION}, esq)
@@ -326,7 +341,9 @@ def facetas(s: Session, corte_id: int, muestra: dict | None, redondear: bool = F
 
     salida: dict[str, dict] = {}
     pedir = list(dict.fromkeys([*por_variable, *(str(e['variable']) for e in (extra or []) if e.get('variable'))]))
+    marca('validar')
     elegidas = elegir_facetas(esq, len(sedes(s, corte_id)) > 1, pedir)
+    marca('elegir')
 
     def excluidas_de(v: str) -> tuple[str, ...]:
         return ((v, misma[v]) if v in misma and (v in por_variable or misma[v] in por_variable) else
@@ -341,6 +358,7 @@ def facetas(s: Session, corte_id: int, muestra: dict | None, redondear: bool = F
         if cuando in (None, 'primera', 'ultima'):
             lote.setdefault(excluidas_de(v), []).append(v + (M.SUFIJO_ULTIMA if cuando == 'ultima' else ''))
     precargado = {k: _conteos_en_lote(s, corte_id, cumplen(k), nombres) for k, nombres in lote.items()}
+    marca('lote')
     for v in elegidas:
         ids = cumplen(excluidas_de(v))
         tipo = tipo_de(filas, v)
@@ -373,7 +391,12 @@ def facetas(s: Session, corte_id: int, muestra: dict | None, redondear: bool = F
             o.update(cifra(o['n'], redondear))
         salida[v] = {'etiqueta': etiqueta_de(filas, v), 'tipo': tipo, 'cuando': cuando, 'reglas': reglas_de(filas, v),
                      'destacada': v in FACETAS_POR_DEFECTO or (v in filas and _marcada(filas[v])), **r}
-    return {'n': cumplen(()).n(), 'facetas': salida, **meta(s, corte_id, esq, filas, list(salida))}
+    marca('variables')
+    n = cumplen(()).n()
+    marca('n')
+    resto = meta(s, corte_id, esq, filas, list(salida))
+    marca('meta')
+    return {'n': n, 'facetas': salida, **resto}
 
 
 def meta(s: Session, corte_id: int, esq: pd.DataFrame, filas: dict, mostradas: list[str]) -> dict:

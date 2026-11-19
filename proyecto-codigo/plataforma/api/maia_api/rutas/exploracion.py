@@ -6,7 +6,9 @@ menores de 100 se redondean a múltiplos de 5. Cada consulta queda en la auditor
 número de niños, sin valores clínicos."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import time
+
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -138,9 +140,11 @@ def resumen(consulta: Consulta, s: Session = Depends(sesion), u: Usuario = Depen
 
 
 @ruta.post('/facetas')
-def facetas(consulta: Consulta, s: Session = Depends(sesion), u: Usuario = Depends(CUALQUIERA)) -> dict:
+def facetas(consulta: Consulta, respuesta: Response, s: Session = Depends(sesion), u: Usuario = Depends(CUALQUIERA)) -> dict:
     """Las opciones de filtro con cuántos niños tendría cada una (los demás filtros puestos). Con menos de 20 niños en
     el grupo no se dan cifras: quedan las opciones para poder quitar o cambiar filtros. Con 0 niños se dice (``vacio``)."""
+    t0 = time.perf_counter()
+    tiempos: dict[str, float] = {}
     try:
         corte = corrida_de(s, consulta.corrida_id).corte_id
     except HTTPException:
@@ -149,10 +153,12 @@ def facetas(consulta: Consulta, s: Session = Depends(sesion), u: Usuario = Depen
         corte = P.corte_actual(s).id
     red = u.rol == 'visualizador'
     try:
+        tiempos['previo'] = round((time.perf_counter() - t0) * 1000, 1)
         r = P.facetas(s, corte, _definicion(s, consulta), redondear=red,
-                      extra=[v.model_dump() for v in consulta.variables or []])
+                      extra=[v.model_dump() for v in consulta.variables or []], tiempos=tiempos)
     except M.MuestraInvalida as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, ' '.join(e.errores)) from None
+    respuesta.headers['Server-Timing'] = ', '.join(f'{k};dur={v}' for k, v in tiempos.items())
     vacio = r['n'] == 0
     insuficiente = r['n'] < P.MIN_NINOS
     if insuficiente:
