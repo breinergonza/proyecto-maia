@@ -357,9 +357,9 @@ export function PanelFacetas({ facetas, cargando, filtros, esExperto, conTiempo 
           <fieldset key={k} className="min-w-0">
             <legend className="mb-1.5 flex w-full items-center justify-between text-sm font-semibold">
               <span>{todas[k].etiqueta}</span>
-              {agregadas.has(k) && !porVariable.has(k) && (
+              {!BASICAS.includes(k) && !todas[k].destacada && (   // las que se agregaron a mano se pueden retirar, con su filtro
                 <button type="button" aria-label={`Quitar variable ${todas[k].etiqueta}`} className="text-xs font-normal text-teal underline"
-                  onClick={() => filtros.ponerExtra(k, null)}>Quitar</button>
+                  onClick={() => { setExtra((x) => x.filter((v) => v !== k)); filtros.quitarVariable(k) }}>Quitar</button>
               )}
             </legend>
             {!!todas[k].reglas?.length && <ReglaDeLectura faceta={todas[k]} etapas={etapas} cambiar={(c) => filtros.ponerRegla(k, c)} />}

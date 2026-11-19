@@ -151,9 +151,14 @@ export function useFiltros() {
     }
   }, [actual, escribir, ponerExtra])
 
+  /** Quita una variable agregada del panel junto con su filtro, en un solo cambio. */
+  const quitarVariable = useCallback((variable: string) => escribir({
+    ...actual, entradas: actual.entradas.filter((e) => e.variable !== variable), extras: actual.extras.filter((x) => x.variable !== variable),
+  }, null), [actual, escribir])
+
   const limpiar = useCallback(() => escribir({ entradas: [], tiempo: null, muestreo: null, extras: [] }, null), [escribir])
 
-  return { entradas, tiempo, muestreo, extras, muestra, guardada, poner, ponerTodas, ponerTiempo, ponerMuestreo, ponerExtra, ponerRegla, limpiar }
+  return { entradas, tiempo, muestreo, extras, muestra, guardada, poner, ponerTodas, ponerTiempo, ponerMuestreo, ponerExtra, ponerRegla, quitarVariable, limpiar }
 }
 
 export type Filtros = ReturnType<typeof useFiltros>
