@@ -41,7 +41,8 @@ export const ayudaPosicion = (p: number | null | undefined) =>
 // ------------------------------------------------------------------ crecimiento frente a la OMS (puntaje z)
 
 export const AYUDA_OMS = 'Comparado con las curvas de la OMS para la edad corregida. Bajo para la edad: por debajo de ' +
-  '−2 desviaciones estándar (DE). Cayó: bajó más de 1 DE desde el control anterior.'
+  '−2 desviaciones estándar (DE). Cayó: bajó más de 1 DE desde el control anterior. El peso para la talla se ' +
+  'compara con la talla medida, no con la edad.'
 export const BAJO_EDAD = 'Bajo para la edad'
 export const CAYO = 'Cayó desde el último control'
 
@@ -53,6 +54,17 @@ export function frenteOms(z: number | null | undefined): string {
 }
 
 export const ayudaZ = (z: number | null | undefined) => (z == null ? '' : `Puntaje z frente a la OMS: ${dec2(z)}`)
+
+/** Un puntaje z dicho sin la palabra técnica: «1,2 desviaciones por debajo», «0,4 por encima», «justo en lo esperado». */
+export function desviaciones(z: number): string {
+  const a = Math.abs(z)
+  if (a < 0.05) return 'justo en lo esperado'
+  const n = `${dec2(Math.round(a * 10) / 10)} ${a >= 0.95 && a < 1.05 ? 'desviación' : 'desviaciones'}`
+  return `${n} ${z < 0 ? 'por debajo' : 'por encima'}`
+}
+
+/** La comparación con los demás niños para un texto visible (sin «posición»): «Más riesgo que 9 de cada 10 niños». */
+export const frenteDemas = (p: number) => `Más riesgo que ${cuantosMenos(p)} de cada 10 niños`
 
 // ------------------------------------------------------------------ alertas de datos (capas del modelo de anomalías)
 
@@ -83,12 +95,43 @@ export function motivo(texto: string | null | undefined): string {
   return frase(texto.split(';').map((m) => m.trim()).filter(Boolean).map((m) => MOTIVOS[m] ?? m).join('; '))
 }
 
+// las señales de las alarmas de grupo (nucleo/anomalias), dichas para el equipo clínico
+const SENALES: Record<string, string> = {
+  redondeo: 'Más valores redondeados',
+  'datos faltantes': 'Más datos faltantes',
+  'residuo del contexto': 'Valores que no cuadran con el resto',
+}
+export const senal = (s: string) => SENALES[s] ?? frase(s)
+
+/** «2021 T3» → año y trimestre; null si el periodo tiene otra forma. */
+export function trimestre(periodo: string): { anio: number; t: number } | null {
+  const m = periodo.match(/^(\d{4}) T([1-4])$/)
+  return m ? { anio: Number(m[1]), t: Number(m[2]) } : null
+}
+
+/** Todos los trimestres entre el primero y el último dados (los que no tuvieron alarma también cuentan en el eje). */
+export function trimestresSeguidos(periodos: string[]): string[] {
+  const ts = periodos.map(trimestre).filter((t): t is { anio: number; t: number } => t != null)
+  if (ts.length !== periodos.length || !ts.length) return [...new Set(periodos)].sort()
+  const indice = (t: { anio: number; t: number }) => t.anio * 4 + t.t - 1
+  const [desde, hasta] = [Math.min(...ts.map(indice)), Math.max(...ts.map(indice))]
+  return Array.from({ length: hasta - desde + 1 }, (_, i) => `${Math.floor((desde + i) / 4)} T${((desde + i) % 4) + 1}`)
+}
+
+// los motivos que solo repiten el tipo de alerta (la etiqueta ya lo dice)
+const REPITEN_ALERTA = new Set(['valor atípico', 'lejos de lo esperado para este caso', 'cambio atípico para el tiempo transcurrido'])
+
+/** Lo que el motivo agrega a las etiquetas del tipo de alerta (unidad, código especial, fecha), o '' si solo las repite. */
+export const motivoExtra = (texto: string | null | undefined) =>
+  motivo((texto ?? '').split(';').map((m) => m.trim()).filter((m) => m && !REPITEN_ALERTA.has(m)).join('; '))
+
 /** Lo que más pesó en un riesgo (lo escribe el modelo clínico: «etiqueta (código) = valor»), sin códigos internos:
  * se quita el código entre paréntesis, «quiebre_X = 1» es nacer después de ese cambio y «z_peso_… = −2,3» se dice
  * frente a la OMS. */
 export function peso(texto: string): string {
   const [nombre, ...resto] = texto.split(' = ')
   const valor = resto.join(' = ')
+  if (esFalta(valor)) return nombreDato(nombre)
   const quiebre = nombre.match(/^quiebre_(.+)$/)
   if (quiebre) {
     const cambio = quiebre[1].replaceAll('_', ' ')
@@ -99,12 +142,114 @@ export function peso(texto: string): string {
     const numero = Number(valor.replace(',', '.'))
     return `${indicador(z[1])} a ${z[2].replaceAll('_', ' ')}: ${Number.isFinite(numero) ? frenteOms(numero).toLowerCase() : valor}`
   }
-  const limpio = nombre.replace(/\s*\([a-z0-9_]+\)\s*$/, '')
+  const limpio = nombreDato(nombre)
   return valor ? `${limpio}: ${valor}` : limpio
 }
 const INDICADOR_Z = new Set(['peso', 'talla', 'perimetro_cefalico', 'peso_para_talla'])
+
+/** El nombre de un dato del modelo sin su código interno: «Peso al nacer (peso_rn)» → «Peso al nacer»;
+ * «z_talla_3m» → «Talla para la edad a 3m». */
+function nombreDato(nombre: string): string {
+  const z = nombre.match(/^z_([a-z]+(?:_[a-z]+)*?)_(.+)$/)
+  if (z && INDICADOR_Z.has(z[1])) return `${indicador(z[1])} a ${z[2].replaceAll('_', ' ')}`
+  return nombre.replace(/\s*\([a-z0-9_]+\)\s*$/, '')
+}
+
+/** El modelo escribe «sin dato» (o la etiqueta «No hay dato» de un código) cuando falta el valor. */
+const esFalta = (valor: string) => /^(sin dato|no hay dato)\b/i.test(valor.trim())   // la API puede agregar la unidad: «sin dato cm»
+
+/** Lo que más pesó en un riesgo, separado en lo que sube el riesgo por su valor y los datos que faltan (que también
+ * lo suben: el modelo aprendió que la falta de ese dato acompaña a más casos). */
+export function motivosRiesgo(motivos: string[]): { suben: string[]; faltan: string[] } {
+  const suben: string[] = []
+  const faltan: string[] = []
+  for (const m of motivos) {
+    const [, ...resto] = m.split(' = ')
+    ;(esFalta(resto.join(' = ')) ? faltan : suben).push(peso(m))
+  }
+  return { suben, faltan }
+}
+
+/** Qué son los motivos de un riesgo: las tres contribuciones TreeSHAP de mayor magnitud positiva. */
+export const AYUDA_MOTIVOS = 'Las tres contribuciones TreeSHAP de mayor magnitud positiva: los datos que más subieron el riesgo ' +
+  'de este niño. Describen asociaciones que aprendió el modelo, no causas, y no justifican por sí solas una decisión clínica.'
+
+/** La frase que separa las dos cifras del riesgo: la probabilidad y la comparación con los demás niños. */
+export const AYUDA_DOS_CIFRAS = 'El porcentaje es la probabilidad estimada de que pase. «N de 10» compara a este niño con ' +
+  'los demás niños del programa para ese mismo desenlace: un porcentaje bajo puede ser alto frente a los demás si el ' +
+  'desenlace es poco frecuente.'
+
+// ------------------------------------------------------------------ familias de desenlaces (trayectoria de riesgo)
+
+/** Desenlaces que son el mismo evento visto desde distintas visitas: «readm_3m» y «readm_6m» son «readm»;
+ * «talla_baja_12m_desde_3» es «talla_baja_12m»; «readm_6m_desde_pmc» (desde la entrada al programa), «readm_6m». */
+export const familia = (clave: string) => clave.replace(/_(desde_[0-9a-z]+|\d+[a-z]*)$/, '')
+
+const SUELTAS = new Set(['a', 'al', 'la', 'las', 'los', 'el', 'de', 'del', 'entre', 'antes', 'desde', 'en', 'y'])
+
+/** El nombre común de una familia: lo que comparten las frases de sus desenlaces, sin la visita ni preposiciones sueltas
+ * al final («readmisión antes de las 40 semanas» y «readmisión entre los 3 y los 6 meses» → «Readmisión»). */
+export function nombreFamilia(desenlaces: string[]): string {
+  const frases = [...new Set(desenlaces.map((d) => d.replace(/\s*\([^()]*\)\s*$/, '')))]
+  if (frases.length === 1) return frase(frases[0])
+  const palabras = frases.map((f) => f.split(/\s+/))
+  const comun: string[] = []
+  for (let i = 0; palabras.every((p) => i < p.length && p[i] === palabras[0][i]); i++) comun.push(palabras[0][i])
+  while (comun.length && SUELTAS.has(comun[comun.length - 1].toLowerCase())) comun.pop()
+  return comun.length ? frase(comun.join(' ')) : frase(desenlaces[0])
+}
 
 // ------------------------------------------------------------------ cortes y corridas
 
 /** «Datos al 30 de jun de 2026»: el corte, dicho sin la palabra técnica. */
 export const datosAl = (corte: string | null | undefined) => `Datos al ${fecha(corte)}`
+
+// ------------------------------------------------------------------ analítica de los modelos (entradas nuevas)
+
+/** Término técnico → cómo se dice en la pantalla clínica. El modo técnico muestra la jerga. */
+export const GLOSARIO_ANALITICA: Record<string, string> = {
+  AUC: 'Qué tan bien ordena a los niños',
+  ROC: 'Aciertos frente a falsas alarmas',
+  PR: 'Alertas acertadas frente a casos detectados',
+  sensibilidad: 'Casos detectados',
+  VPP: 'Alertas acertadas',
+  especificidad: 'Niños sin falsa alarma',
+  umbral: 'A cuántos niños se alerta',
+  calibración: 'Si el porcentaje de riesgo es el real',
+  Brier: 'Error del porcentaje de riesgo',
+  PSI: 'Cambio frente al entrenamiento',
+  lift: 'Qué tanto ayuda revisar a los primeros',
+}
+
+/** Jerga o palabra clínica según el modo técnico. */
+export const jerga = (tecnico: boolean, clinico: string, tecnicoTexto: string) => (tecnico ? tecnicoTexto : clinico)
+
+export const N_MENOR_QUE_5 = 'n menor que 5'
+
+/** El nombre clínico del estado de un semáforo. */
+export const SEMAFORO: Record<string, string> = { verde: 'Confiable', ambar: 'Mirar con cuidado', rojo: 'No confiable', gris: 'Sin datos para decidir' }
+
+// ------------------------------------------------------------------ nombres de variables del modelo
+// Los artefactos de analítica traen el código de cada variable; la pantalla muestra su nombre clínico. Mientras no
+// haya un servicio con las etiquetas del Diccionario para todas las variables del modelo, se traducen los códigos
+// conocidos y el resto se vuelve legible (guiones bajos a espacios, «z_» como «frente a la OMS»). El modo técnico
+// sigue mostrando el código.
+const NOMBRES_VARIABLE: Record<string, string> = {
+  ingreso_hogar: 'Ingreso del hogar', personas_hogar: 'Personas en el hogar', edad_madre: 'Edad de la madre',
+  controles_prenatales: 'Controles prenatales', eg_semanas: 'Edad gestacional', sexo: 'Sexo', dias_uci: 'Días en UCI',
+  peso_nacer: 'Peso al nacer', talla_nacer: 'Talla al nacer', peso_salida: 'Peso al salir', hematocrito: 'Hematocrito',
+  peso_40: 'Peso a las 40 semanas', talla_40: 'Talla a las 40 semanas', pc_40: 'Perímetro cefálico a las 40 semanas',
+  z_peso_40_sem: 'Peso a las 40 semanas frente a la OMS', z_talla_40_sem: 'Talla a las 40 semanas frente a la OMS',
+  z_perimetro_cefalico_40_sem: 'Perímetro cefálico a las 40 semanas frente a la OMS',
+  quiebre_cambio_de_sistema_2022: 'Cambio de sistema de registro (2022)', oxigeno_salida: 'Oxígeno al salir',
+}
+export function nombreVariable(codigo: string): string {
+  if (NOMBRES_VARIABLE[codigo]) return NOMBRES_VARIABLE[codigo]
+  if (!/^[a-z0-9_]+$/.test(codigo)) return codigo   // ya es un nombre legible
+  const oms = codigo.startsWith('z_')
+  const base = (oms ? codigo.slice(2) : codigo).replace(/_(\d+)(_sem)?$/, ' a las $1 semanas').replaceAll('_', ' ')
+  const texto = base.charAt(0).toUpperCase() + base.slice(1)
+  return oms ? `${texto} frente a la OMS` : texto
+}
+/** El nombre de la variable y, en modo técnico, su código entre paréntesis. */
+export const variable = (tecnico: boolean, codigo: string) => (tecnico ? `${nombreVariable(codigo)} (${codigo})` : nombreVariable(codigo))

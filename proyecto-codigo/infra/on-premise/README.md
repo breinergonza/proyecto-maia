@@ -68,9 +68,10 @@ y sirve la aplicación. El archivo es [`docker-compose.on-premise.yml`](../../do
    | `MLFLOW_URL_PUBLICA` | Enlace a MLflow desde **Administración › Entrenamientos** (por defecto `http://localhost:5000`, el túnel SSH) |
    | `MAIA_ZONA_HORARIA` | Zona de los horarios programados en la web (por defecto `America/Bogota`) |
    | `MAIA_ENTORNO`, `MAIA_SOLO_SIMULADO` | Ver la tabla de modos (por defecto `produccion` / `false`) |
-   | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USUARIO`, `SMTP_CLAVE`, `SMTP_REMITENTE`, `SMTP_TLS` | Servidor de correo de la Fundación. Sin ellos, la app funciona, pero los correos quedan con error |
    | `MLFLOW_PUERTO`, `MINIO_CONSOLA_PUERTO` | Solo si 5000 o 9001 ya están ocupados en el servidor |
    | `MLFLOW_USUARIO` | Usuario administrador de MLflow (por defecto `admin`); su clave es `SERVICE_PASSWORD_MLFLOWADMIN` |
+
+   El servidor de correo se configura en la web, en **Notificaciones › Servidor de correo** (la clave se guarda cifrada y requiere `MAIA_CIFRADO_CLAVE`). Para desarrollo con Mailpit: servidor `mailpit`, puerto `1025`, sin TLS. Sin servidor de correo, la app funciona, pero los correos quedan con error.
 
    La clave del administrador es `SERVICE_PASSWORD_ADMIN` (cópiela del panel). Si define `KMC_PW` aquí, queda guardada
    en la base del orquestador y en el `.env` que este escribe en el servidor: proteja el acceso SSH y el panel.

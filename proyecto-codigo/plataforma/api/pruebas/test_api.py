@@ -5,8 +5,8 @@ Entorno ``demo`` (como Railway): cookies seguras, solo paquetes simulados y una 
 from __future__ import annotations
 
 import io
+import json
 import re
-import socket
 import tarfile
 import time
 from dataclasses import replace
@@ -23,29 +23,7 @@ CLAVE_PAQUETE = 'clave-de-paquete-de-prueba'
 ADMIN = ('admin@maia.prueba', 'clave-admin-de-prueba')
 
 
-def _puerto_libre() -> int:
-    with socket.socket() as s:
-        s.bind(('127.0.0.1', 0))
-        return s.getsockname()[1]
-
-
-@pytest.fixture(scope='module')
-def smtp():
-    from aiosmtpd.controller import Controller
-
-    class Buzon:
-        def __init__(self):
-            self.mensajes: list = []
-
-        async def handle_DATA(self, server, session, envelope):
-            self.mensajes.append(envelope)
-            return '250 OK'
-
-    buzon = Buzon()
-    c = Controller(buzon, hostname='127.0.0.1', port=_puerto_libre())
-    c.start()
-    yield c.port, buzon
-    c.stop()
+ENTRENAMIENTO_PAQUETE = 1_777_001
 
 
 @pytest.fixture(scope='module')
@@ -71,8 +49,16 @@ def paquetes(tmp_path_factory):
         base = EN._sevarti_base(sev, tmp / 'sevarti_base')
         modelos = {'anomalias': {'registro': 'maia-anomalias-demo', 'version': '1'},
                    'clinico': {'registro': 'maia-clinico-demo', 'version': '1'}}
+        # la analítica viaja con el paquete: la web pública no tiene la base del equipo donde se entrenó
+        analitica = [{'entrenamiento_id': ENTRENAMIENTO_PAQUETE, 'modelo': 'clinico', 'desenlace': None, 'tipo': 'meta',
+                      'datos': {'fuente': 'simulado', 'registro': 'maia-clinico-demo', 'version_registro': '1',
+                                'corte': '2026-06-30', 'desenlaces': [{'clave': 'readm_3m', 'nombre': 'readmisión',
+                                                                       'momento': '40 sem', 'etiqueta': 'En uso'}],
+                                'submodulos': {'rendimiento': 'ok'}}},
+                     {'entrenamiento_id': ENTRENAMIENTO_PAQUETE, 'modelo': 'clinico', 'desenlace': 'readm_3m',
+                      'tipo': 'rendimiento', 'datos': {'auc_desenlace': {'auc': 0.77}}}]
         valido = PQ.armar(tmp / 'valido' / PQ.NOMBRE, a.carpeta, c.carpeta, base, 'simulado', CLAVE_PAQUETE,
-                          modelos, metricas=c.metricas)
+                          modelos, metricas=c.metricas, analitica=analitica)
         kmc = PQ.armar(tmp / 'kmc' / PQ.NOMBRE, a.carpeta, c.carpeta, base, 'kmc', CLAVE_PAQUETE, modelos)
         alterado = tmp / 'alterado' / PQ.NOMBRE
         alterado.parent.mkdir()
@@ -89,18 +75,17 @@ def paquetes(tmp_path_factory):
 
 
 @pytest.fixture(scope='module')
-def cliente(url_db_propia, smtp, tmp_path_factory):
+def cliente(url_db_propia, tmp_path_factory):
     from maia_api import estado as E
     from maia_api import seguridad as SG
     from maia_comun import config, db
-    puerto, _ = smtp
     tmp = tmp_path_factory.mktemp('api')
     mp = pytest.MonkeyPatch()
     for k, v in {'DATABASE_URL': url_db_propia, 'MAIA_ENTORNO': 'demo', 'MAIA_SOLO_SIMULADO': 'true',
                  'MAIA_PAQUETE_CLAVE': CLAVE_PAQUETE, 'MAIA_JWT_SECRETO': 'secreto-jwt-de-prueba-con-mas-de-32-caracteres',
                  'MAIA_ADMIN_EMAIL': ADMIN[0], 'MAIA_ADMIN_CLAVE': ADMIN[1], 'MAIA_DIR_PAQUETES': str(tmp / 'paquetes'),
                  'MAIA_DEMO_SUJETOS': '600', 'MAIA_URL_PUBLICA': 'https://maia.prueba',
-                 'SMTP_HOST': '127.0.0.1', 'SMTP_PORT': str(puerto), 'SMTP_TLS': 'false'}.items():
+                 'MAIA_CIFRADO_CLAVE': 'clave-de-cifrado-de-prueba-de-40-caracteres'}.items():
         mp.setenv(k, v)
     mp.chdir(tmp)
     config.obtener.cache_clear()
@@ -206,28 +191,31 @@ def test_paquetes(cliente, admin, paquetes):
     assert r.status_code == 200 and r.json()['activo']
     assert cliente.get('/api/salud').json()['paquete'] == version
     assert cliente.get('/api/modelos/activo', headers=admin).json()['version'] == version
-
-
-def test_notificaciones_config_y_prueba(cliente, admin, smtp):
-    _, buzon = smtp
-    configs = cliente.get('/api/notificaciones/config', headers=admin).json()
-    assert configs, 'al activar el paquete se crea una configuración por desenlace'
-    d = configs[0]['desenlace']
-    r = cliente.put(f'/api/notificaciones/config/{d}', headers=admin,
-                    json={'desenlace': d, 'percentil_minimo': 90, 'destinatarios': [], 'activo': True})
-    assert r.status_code == 422
-    r = cliente.put(f'/api/notificaciones/config/{d}', headers=admin,
-                    json={'desenlace': d, 'percentil_minimo': 90, 'destinatarios': ['Clinica@Maia.Prueba'],
-                          'activo': True})
-    assert r.status_code == 200 and r.json()['destinatarios'] == ['clinica@maia.prueba']
-    antes = len(buzon.mensajes)
-    assert cliente.post('/api/notificaciones/prueba', headers=admin,
-                        json={'destinatario': 'clinica@maia.prueba'}).status_code == 204
-    assert len(buzon.mensajes) == antes + 1
+    # al activarlo, su analítica queda en la base y se puede mirar en Analítica
+    ctx = cliente.get('/api/analitica/contexto', params={'entrenamiento': ENTRENAMIENTO_PAQUETE}, headers=admin).json()
+    assert ctx['estado'] == 'ok' and [d['clave'] for d in ctx['desenlaces']] == ['readm_3m']
+    r = cliente.get(f'/api/analitica/{ENTRENAMIENTO_PAQUETE}/rendimiento', params={'desenlace': 'readm_3m'}, headers=admin)
+    assert r.json()['desenlaces']['readm_3m']['auc_desenlace']['auc'] == 0.77
+    r = cliente.post(f'/api/modelos/paquetes/{version}/activar', headers=admin)   # activar dos veces no duplica
+    assert r.status_code == 200
+    ctx = cliente.get('/api/analitica/entrenamientos', headers=admin).json()['entrenamientos']
+    assert sum(1 for e in ctx if e['entrenamiento'] == ENTRENAMIENTO_PAQUETE) == 1
 
 
 @pytest.fixture(scope='module')
-def corrida(cliente, admin, paquetes):
+def corrida(cliente, admin, paquetes, smtp):
+    # el servidor de correo y una notificación activa (con el paquete ya activo) para que la corrida envíe correos
+    puerto, _ = smtp
+    r = cliente.put('/api/notificaciones/servidor', headers=admin,
+                    json={'host': '127.0.0.1', 'puerto': puerto, 'usuario': None, 'remitente': 'alertas@maia.prueba',
+                          'tls': False})
+    assert r.status_code == 200, r.text
+    claves = [d['clave'] for d in cliente.get('/api/notificaciones/alertas/desenlaces', headers=admin).json()]
+    assert claves, 'el paquete activo debe tener desenlaces: sin ellos esta prueba no comprobaría los correos'
+    r = cliente.post('/api/notificaciones/alertas', headers=admin,
+                     json={'nombre': 'Corrida demo', 'percentil_minimo': 0, 'destinatarios': ['clinica@maia.prueba'],
+                           'alertas': claves, 'activo': True})
+    assert r.status_code == 201, r.text
     r = cliente.post('/api/corridas', headers=admin, json={'tipo': 'demo'})
     assert r.status_code == 202, r.text
     cid = r.json()['id']
@@ -259,10 +247,16 @@ def test_corrida_y_tablero(cliente, admin, corrida, smtp):
     alarmas = cliente.get('/api/tablero/alarmas-grupo', headers=admin).json()
     assert isinstance(alarmas, list) and len(alarmas) <= 100   # lo que la web lista; el total está en el resumen
     assert len(alarmas) == min(r['alarmas_grupo'], 100)
-    if corrida['resumen'].get('notificaciones', {}).get('correos'):
-        assert len(buzon.mensajes) >= 2   # el de prueba y al menos uno de riesgo alto
-        h = cliente.get('/api/notificaciones/historial', headers=admin).json()
-        assert h['total'] >= 1 and h['items'][0]['estado'] == 'enviado'
+    # la serie por trimestre cuenta todas las alarmas de la corrida, no solo las 100 que se listan
+    trimestres = cliente.get('/api/tablero/alarmas-por-trimestre', headers=admin).json()
+    assert sum(t['alarmas'] for t in trimestres) == r['alarmas_grupo']
+    assert all(set(t) == {'periodo', 'senal', 'alarmas'} and t['alarmas'] > 0 for t in trimestres)
+    assert [t['periodo'] for t in trimestres] == sorted(t['periodo'] for t in trimestres)
+    envio = corrida['resumen']['notificaciones']
+    assert envio['correos'] >= 1 and envio['errores'] == 0 and not envio['sin_servidor'], envio
+    assert len(buzon.mensajes) >= 1
+    h = cliente.get('/api/notificaciones/historial', headers=admin).json()
+    assert h['total'] >= 1 and h['items'][0]['estado'] == 'enviado' and h['items'][0]['notificacion'] == 'Corrida demo'
 
 
 def test_ninos_y_linea_temporal(cliente, admin, corrida):
@@ -286,20 +280,115 @@ def test_ninos_y_linea_temporal(cliente, admin, corrida):
     codigos = [i['sujeto'] for i in desc['items']]
     assert codigos == sorted(codigos, reverse=True)
     assert cliente.get('/api/ninos', headers=admin, params={'orden': 'columna_inexistente'}).status_code == 422
+    # el último control es la última visita con algún dato, la misma que cierra la ficha; ordena por visita
+    ultimo = cliente.get('/api/ninos', headers=admin, params={'orden': 'ultimo_control', 'dir': 'desc', 'tamano': 50}).json()
+    for i in ultimo['items']:
+        assert i['n_crecimiento'] >= i['n_bajo_2de']
+    con = [i for i in ultimo['items'] if i['ultima_visita'] is not None]
+    assert con
+    for i in con[:3]:
+        ficha = cliente.get(f'/api/ninos/{i["sujeto"]}/linea-temporal', headers=admin).json()
+        final = ficha['visitas'][-1]
+        assert i['ultima_visita'] == final['nombre'] and i['ultima_edad_corregida'] == final['edad_corregida']
+    rango = list(ficha['nombre_etapa'].values())
+    posiciones = [rango.index(i['ultima_visita']) for i in con]
+    assert posiciones == sorted(posiciones, reverse=True)
+
+
+def test_ficha_riesgo_medio_historia_y_perfil(cliente, admin, corrida):
+    r = cliente.get('/api/ninos', headers=admin, params={'orden': 'percentil_max', 'tamano': 1}).json()
+    sujeto = r['items'][0]['sujeto']
+    assert r['items'][0]['percentil_max'] is not None
+    lt = cliente.get(f'/api/ninos/{sujeto}/linea-temporal', headers=admin).json()
+    guardados = [x for v in lt['visitas'] for x in v['riesgos']]
+    # el riesgo promedio de cada desenlace es el mismo del tablero
+    medio = {d['clave']: d['riesgo_medio'] for d in cliente.get('/api/tablero/resumen', headers=admin).json()['riesgos_por_desenlace']}
+    assert guardados and all(x['riesgo_medio'] == pytest.approx(medio[x['clave']]) for x in guardados)
+    # cada medida de crecimiento lleva la unidad en que se registró (el valor no se convierte)
+    puntos = [p for ps in lt['crecimiento'].values() for p in ps]
+    assert puntos and all(p['unidad'] for p in puntos)
+
+    h = cliente.get(f'/api/ninos/{sujeto}/historia-riesgo', headers=admin)
+    assert h.status_code == 200, h.text
+    h = h.json()
+    assert h['paquete'] == h['paquete_corrida'] and h['puntos']
+    assert [p['orden'] for p in h['puntos']] == sorted(p['orden'] for p in h['puntos'])
+    assert all(0 <= p['riesgo'] <= 1 and 0 <= p['percentil'] <= 100 and 'motivos' not in p for p in h['puntos'])
+    # la última visita, calculada de nuevo con el mismo paquete, da lo mismo que guardó la corrida
+    for x in guardados:
+        mismo = [p for p in h['puntos'] if p['clave'] == x['clave'] and p['momento'] == x['momento']]
+        assert len(mismo) == 1 and mismo[0]['riesgo'] == pytest.approx(x['riesgo'], abs=1e-6), x['clave']
+    assert cliente.get('/api/ninos/no-existe/historia-riesgo', headers=admin).status_code == 404
+
+    pf = cliente.get(f'/api/ninos/{sujeto}/perfil', headers=admin)
+    assert pf.status_code == 200, pf.text
+    filas = pf.json()['variables']
+    assert filas[0]['variable'] == 'eg_semanas' and filas[0]['unidad'] == 'semanas'
+    assert any(f['variable'] != 'eg_semanas' for f in filas)   # el peso al nacer del simulado tiene concepto
+    for f in filas:
+        q = f['cuantiles']
+        assert q['p5'] <= q['p25'] <= q['p50'] <= q['p75'] <= q['p95'] and f['ninos'] >= 20
+        assert f['posicion'] is None or 0 <= f['posicion'] <= 100
+        # de la cohorte solo salen agregados
+        assert set(f) == {'variable', 'etiqueta', 'unidad', 'ninos', 'cuantiles', 'valor', 'posicion'}
+    assert cliente.get('/api/ninos/no-existe/perfil', headers=admin).status_code == 404
+
+
+def test_perfil_un_valor_por_nino_y_sin_codigos_de_no_se_hizo(cliente, admin, corrida, url_db_propia):
+    """Medidas repetidas de un niño no cuentan como más niños ni llenan los cuantiles (con 20 repeticiones de uno solo
+    los cuantiles dirían su valor), y un código de «no se hizo» del diccionario no es una medida."""
+    from sqlalchemy import create_engine, text
+
+    from maia_api.rutas import ninos as N
+    sujeto = cliente.get('/api/ninos', headers=admin, params={'tamano': 1}).json()['items'][0]['sujeto']
+
+    def perfil():
+        N._COHORTE.clear()
+        return {f['variable']: f for f in cliente.get(f'/api/ninos/{sujeto}/perfil', headers=admin).json()['variables']}
+
+    antes = perfil()
+    variable, fila = next((v, f) for v, f in antes.items() if v != 'eg_semanas' and f['valor'] is not None)
+    motor = create_engine(url_db_propia)
+    with motor.begin() as cx:
+        corte = cx.execute(text('SELECT corte_id FROM sevarti.sujetos WHERE sujeto = :s'), {'s': sujeto}).scalar_one()
+        datos_antes = cx.execute(text('SELECT datos FROM sevarti.esquema WHERE corte_id = :c AND variable = :v'),
+                                 {'c': corte, 'v': variable}).scalar_one()
+        desde = cx.execute(text('SELECT max(id) FROM sevarti.mediciones WHERE corte_id = :c'), {'c': corte}).scalar_one() + 1
+        cx.execute(text('INSERT INTO sevarti.mediciones (corte_id, id, sujeto, variable, valor) VALUES (:c, :i, :s, :v, :x)'),
+                   [{'c': corte, 'i': desde + i, 's': sujeto, 'v': variable, 'x': '1234.5'} for i in range(40)])
+    try:
+        repetido = perfil()[variable]
+        assert repetido['ninos'] == fila['ninos'] and repetido['cuantiles'] == fila['cuantiles']
+        assert repetido['valor'] == fila['valor']   # su primer valor, no el repetido
+        # su valor pasa a ser un código de «no se hizo»: no cuenta como medida y se toma su siguiente valor válido (el niño
+        # sigue contando una sola vez)
+        with motor.begin() as cx:
+            cx.execute(text("UPDATE sevarti.esquema SET datos = jsonb_set(datos, '{codigos_especiales}', to_jsonb(CAST(:cod AS text))) "
+                            'WHERE corte_id = :c AND variable = :v'), {'c': corte, 'v': variable, 'cod': f'{fila["valor"]:g}'})
+        con_codigo = perfil()[variable]
+        assert con_codigo['valor'] == 1234.5 and con_codigo['ninos'] == fila['ninos']
+    finally:
+        with motor.begin() as cx:
+            cx.execute(text('DELETE FROM sevarti.mediciones WHERE corte_id = :c AND id >= :d'), {'c': corte, 'd': desde})
+            cx.execute(text('UPDATE sevarti.esquema SET datos = CAST(:d AS jsonb) WHERE corte_id = :c AND variable = :v'),
+                       {'c': corte, 'v': variable, 'd': json.dumps(datos_antes)})
+        N._COHORTE.clear()
+        motor.dispose()
 
 
 def test_revision(cliente, admin, corrida):
     experta = _login(cliente, 'experta@maia.prueba', 'clave-larga-123')
-    cola = cliente.get('/api/revision/datos', headers=experta).json()
+    assert cliente.get('/api/revision/datos', headers=experta).status_code == 403   # la calidad de datos es de la administración
+    cola = cliente.get('/api/revision/datos', headers=admin).json()
     if cola['items']:
         a = cola['items'][0]
-        assert cliente.post(f'/api/revision/datos/{a["id"]}', headers=experta, json={'es_error': 'si'}).status_code == 204
-        assert cliente.post(f'/api/revision/datos/{a["id"]}', headers=experta,
+        assert cliente.post(f'/api/revision/datos/{a["id"]}', headers=admin, json={'es_error': 'si'}).status_code == 204
+        assert cliente.post(f'/api/revision/datos/{a["id"]}', headers=admin,
                             json={'es_error': 'no', 'comentario': 'Lo confirmé'}).status_code == 204
-        revisados = cliente.get('/api/revision/datos', headers=experta, params={'estado': 'revisado'}).json()
+        revisados = cliente.get('/api/revision/datos', headers=admin, params={'estado': 'revisado'}).json()
         assert revisados['total'] == 1 and revisados['items'][0]['es_error'] == 'no'
-        assert cola['total'] - 1 == cliente.get('/api/revision/datos', headers=experta).json()['total']
-    assert cliente.post('/api/revision/datos/999999999', headers=experta, json={'es_error': 'si'}).status_code == 404
+        assert cola['total'] - 1 == cliente.get('/api/revision/datos', headers=admin).json()['total']
+    assert cliente.post('/api/revision/datos/999999999', headers=admin, json={'es_error': 'si'}).status_code == 404
     muestra = cliente.get('/api/revision/riesgos', headers=experta).json()['items']
     assert len(muestra) <= 40
     # lo que ve el médico: sin ".0" y con la etiqueta de cada categoría, no su código
@@ -308,6 +397,7 @@ def test_revision(cliente, admin, corrida):
     oxigeno = [x for x in lineas if x.startswith('Oxígeno')]
     assert oxigeno and all(x.rsplit(': ', 1)[1] in ('displasia broncopulmonar', 'sin diagnóstico') for x in oxigeno), oxigeno
     assert all('riesgo' not in m and 'percentil' not in m for m in muestra), 'la revisión es ciega'
+    assert all(isinstance(m['crecimiento'], dict) for m in muestra), 'el crecimiento del niño viene en cada caso'
     if muestra:
         assert cliente.post(f'/api/revision/riesgos/{muestra[0]["id"]}', headers=experta,
                             json={'preocupa': 'si'}).status_code == 204
@@ -316,6 +406,71 @@ def test_revision(cliente, admin, corrida):
     if muestra:
         assert sum(g['respuestas'] for g in res['riesgos_por_grupo']) == 1
 
+
+def test_revision_datos_trae_la_serie_del_concepto(cliente, admin, corrida):
+    """Cada dato por revisar trae las medidas del mismo niño y el mismo concepto (p. ej. su peso en cada visita), en orden
+    de visita, con el dato marcado; un dato sin concepto en el diccionario no trae serie."""
+    items = cliente.get('/api/revision/datos', headers=admin, params={'estado': 'todos', 'tamano': 200}).json()['items']
+    assert [d for d in items if len(d['serie']) >= 2], 'algún dato de crecimiento trae su serie'
+    for d in items:
+        ordenes = [p['orden'] for p in d['serie']]
+        assert ordenes == sorted(ordenes)
+        assert all(set(p) == {'variable', 'etapa_nombre', 'orden', 'valor', 'es_este'} for p in d['serie'])
+        propios = [p for p in d['serie'] if p['es_este']]
+        assert len(propios) <= 1
+        if propios:
+            assert propios[0]['variable'] == d['variable'] and propios[0]['valor'] == pytest.approx(float(d['valor']))
+        assert not d['serie'] or len({p['variable'] for p in d['serie']}) == len(d['serie'])
+
+
+
+def test_serie_de_revision_en_la_unidad_del_dato_y_sin_codigos(cliente, admin, corrida, url_db_propia):
+    """El punto marcado es el valor de la alerta (no otro registro de la misma variable); las demás visitas se pasan a
+    la unidad del dato revisado, una unidad que no se sabe convertir no se dibuja, y un código de «no se hizo» no es
+    una medida."""
+    from sqlalchemy import create_engine, text
+
+
+    def items():
+        return cliente.get('/api/revision/datos', headers=admin, params={'estado': 'todos', 'tamano': 200}).json()['items']
+
+    d = next(d for d in items() if len(d['serie']) >= 2 and any(p['es_este'] for p in d['serie']))
+    otro = next(p for p in d['serie'] if not p['es_este'])
+
+    def serie():
+        return {p['variable']: p for p in next(x for x in items() if x['id'] == d['id'])['serie']}
+
+    motor = create_engine(url_db_propia)
+    with motor.begin() as cx:
+        corte = cx.execute(text('SELECT corte_id FROM sevarti.sujetos WHERE sujeto = :s'), {'s': d['sujeto']}).scalar_one()
+        antes = {v: cx.execute(text('SELECT datos FROM sevarti.esquema WHERE corte_id = :c AND variable = :v'),
+                               {'c': corte, 'v': v}).scalar_one() for v in (d['variable'], otro['variable'])}
+        valor_antes = cx.execute(text('SELECT valor FROM resultados.alertas_dato WHERE id = :i'), {'i': d['id']}).scalar_one()
+
+    def cambiar(variable: str, clave: str, valor: str):
+        with motor.begin() as cx:
+            cx.execute(text('UPDATE sevarti.esquema SET datos = jsonb_set(datos, CAST(:k AS text[]), to_jsonb(CAST(:x AS text))) '
+                            'WHERE corte_id = :c AND variable = :v'), {'c': corte, 'v': variable, 'k': [clave], 'x': valor})
+    try:
+        with motor.begin() as cx:
+            cx.execute(text("UPDATE resultados.alertas_dato SET valor = '7777' WHERE id = :i"), {'i': d['id']})
+        assert serie()[d['variable']]['valor'] == 7777
+        # el dato en cm y la otra visita en mm: se divide entre 10; en g no se sabe pasar a cm y no se dibuja
+        cambiar(d['variable'], 'unidad', 'cm')
+        cambiar(otro['variable'], 'unidad', 'mm')
+        assert serie()[otro['variable']]['valor'] == pytest.approx(otro['valor'] / 10)
+        cambiar(otro['variable'], 'unidad', 'g')
+        assert otro['variable'] not in serie()
+        # el valor de la alerta es un código de «no se hizo»: no hay punto para él
+        cambiar(d['variable'], 'codigos_especiales', '7777')
+        assert d['variable'] not in serie()
+    finally:
+        with motor.begin() as cx:
+            for v, datos in antes.items():
+                cx.execute(text('UPDATE sevarti.esquema SET datos = CAST(:d AS jsonb) WHERE corte_id = :c AND variable = :v'),
+                           {'c': corte, 'v': v, 'd': json.dumps(datos)})
+            cx.execute(text('UPDATE resultados.alertas_dato SET valor = :x WHERE id = :i'), {'i': d['id'], 'x': valor_antes})
+        motor.dispose()
 
 def test_inferencia(cliente, admin, corrida):
     ej = cliente.get('/api/inferencia/ejemplo', headers=admin)
@@ -434,3 +589,49 @@ def test_entrenamientos_sin_la_comparacion_con_la_regla_simple(cliente, admin, m
     assert r.status_code == 200, r.text
     for e in r.json()['clinico'] + r.json()['anomalias']:
         assert e['metricas'] == {'auc__muerte': 0.81, 'top10__muerte': 0.4}
+
+
+def test_ficha_lleva_perfil_sin_numeros(cliente, admin, corrida):
+    sujeto = cliente.get('/api/ninos', headers=admin, params={'tamano': 1}).json()['items'][0]['sujeto']
+    lt = cliente.get(f'/api/ninos/{sujeto}/linea-temporal', headers=admin).json()
+    p = lt['perfil']
+    assert set(p) == {'eg', 'eg_etiqueta', 'lubchenco', 'lubchenco_etiqueta', 'visita', 'etiqueta_corta'}
+    assert p['etiqueta_corta'] and not any(ch.isdigit() for ch in p['etiqueta_corta'])
+
+
+def test_primera_alerta_es_la_primera_visita_en_riesgo_alto(cliente, admin, corrida):
+    sujeto = cliente.get('/api/ninos', headers=admin, params={'orden': 'percentil_max', 'tamano': 1}).json()['items'][0]['sujeto']
+    h = cliente.get(f'/api/ninos/{sujeto}/historia-riesgo', headers=admin).json()
+    claves = {p['clave'] for p in h['puntos']}
+    assert set(h['primera_alerta']) == claves
+    for clave, primera in h['primera_alerta'].items():
+        altos = [p for p in h['puntos'] if p['clave'] == clave and p['percentil'] >= 90]
+        if altos:
+            assert primera['orden'] == min(p['orden'] for p in altos)
+            assert primera['momento'] in {p['momento'] for p in altos}
+        else:
+            assert primera is None
+
+
+def test_riesgo_por_visita_marca_la_primera_alerta_y_solo_lo_ve_el_experto(cliente, admin, corrida):
+    claves = [x['clave'] for x in cliente.get('/api/tablero/resumen', headers=admin).json()['riesgos_por_desenlace']]
+    desenlace = claves[0]
+    sin_pedir = cliente.get('/api/analitica/riesgo-por-visita', headers=admin, params={'desenlace': desenlace, 'n': 2})
+    assert sin_pedir.status_code == 200, sin_pedir.text
+    cuerpo = sin_pedir.json()
+    assert cuerpo['elegidos_por'] == 'mayor_riesgo' and cuerpo['umbral_percentil'] == 90 and 1 <= len(cuerpo['ninos']) <= 2
+    nino = cuerpo['ninos'][0]
+    assert nino['puntos'] and {p['clave'] for p in nino['puntos']} == {desenlace}
+    ordenes = [p['orden'] for p in nino['puntos']]
+    assert ordenes == sorted(ordenes)
+    altos = [p for p in nino['puntos'] if p['percentil'] >= 90]
+    assert (nino['primera_alerta'] is None) == (not altos)
+    if altos:
+        assert nino['primera_alerta']['orden'] == min(p['orden'] for p in altos)
+    pedido = cliente.get('/api/analitica/riesgo-por-visita', headers=admin,
+                         params={'desenlace': desenlace, 'sujetos': f'{nino["sujeto"]},no-existe'}).json()
+    assert pedido['elegidos_por'] == 'pedido' and pedido['ninos'][0]['puntos'] == nino['puntos']
+    assert 'error' in pedido['ninos'][1]
+    visor = _login(cliente, 'visor@maia.prueba', 'clave-larga-123')
+    assert cliente.get('/api/analitica/riesgo-por-visita', headers=visor, params={'desenlace': desenlace}).status_code == 403
+    assert cliente.get('/api/analitica/riesgo-por-visita', params={'desenlace': desenlace}).status_code == 401

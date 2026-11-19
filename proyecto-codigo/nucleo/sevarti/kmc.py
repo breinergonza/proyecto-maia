@@ -324,11 +324,17 @@ def esquema_sevarti(meta: pd.DataFrame) -> pd.DataFrame:
     return out.reset_index(drop=True)
 
 
+# "Usar como filtro" in the first dictionary: sex at birth and Lubchenco (the experts change it afterwards). The
+# gestational age and the site are attributes of the child, not rows of this sheet: the platform always offers them.
+FILTROS_POR_DEFECTO = ('ern_sexo', 'ern_lubchencofenton')
+
+
 def borrador(meta: pd.DataFrame) -> D.Diccionario:
     """The first dictionary, and the suggestion for each variable the source brings: today's rules
     written as dictionary rows, all marked "Lista"."""
     esq = esquema_sevarti(meta)
-    variables = esq.assign(estado=D.LISTA, edad_variable=esq.variable.map(EDAD_PROPIA), nota=np.nan)
+    variables = esq.assign(estado=D.LISTA, edad_variable=esq.variable.map(EDAD_PROPIA), nota=np.nan,
+                           usar_como_filtro=esq.variable.isin(FILTROS_POR_DEFECTO))
     visitas = ETAPAS_SEVARTI.assign(
         fecha_variables=ETAPAS_SEVARTI.etapa.map(lambda e: ';'.join(FECHA_ETAPA.get(e, ()))),
         edad_variable=ETAPAS_SEVARTI.etapa.map(EDAD_ETAPA), edad_fija=ETAPAS_SEVARTI.etapa.map(EDAD_FIJA))
@@ -362,6 +368,36 @@ def _evento(clave: str, nombre: str, etapa: str, variable: str, codigos: str = '
             'entonces.' if cambio_2022 else None)
     return _desenlace(clave, nombre, D.EN_PRUEBA, 'en_codigos', momento or _ANTERIOR[etapa], variable, codigos,
                       negativos, solo_desde=_CAMBIO_2022 if cambio_2022 else None, nota=nota)
+
+
+# Anticipation (D20): the same outcome predicted from the other visits that come before the one where it is
+# recorded, to measure how early the model can warn. Each row is a copy of an "En uso" outcome with another
+# "Se predice en" and the key ``<clave>_desde_<visit>`` (``pmc`` for the entry to the program, else the leading
+# number of the visit: ``40``, ``3``...). They are "En prueba": they are trained only when asked for
+# (``MAIA_ANTICIPACION`` in the platform, ``clinico experimento`` here), so they never raise alerts by themselves.
+# The outcome of a base row keeps the row itself as one more starting visit of its family.
+VISITAS_CLINICAS = ('entrada PMC', '40 sem', '3 m EC', '6 m EC', '9 m EC', '12 m EC')
+# outcome -> the visit where it is recorded (the families of D20: readmission, oxygen and low development)
+EVENTO_EN = {'readm_3m': '3 m EC', 'readm_6m': '6 m EC', 'readm_9m': '9 m EC', 'readm_12m': '12 m EC',
+             'oxigeno_3m': '3 m EC', 'oxigeno_12m': '12 m EC', 'desarrollo_6m': '6 m EC', 'desarrollo_12m': '12 m EC'}
+
+
+def etiqueta_visita(momento: str) -> str:
+    """``entrada PMC`` -> ``pmc``; ``3 m EC`` -> ``3``; ``40 sem`` -> ``40``."""
+    return 'pmc' if momento == VISITAS_CLINICAS[0] else momento.split()[0]
+
+
+def _anticipacion(filas: list[dict]) -> list[dict]:
+    base = {f['clave']: f for f in filas}
+    nuevas = []
+    for clave, evento in EVENTO_EN.items():
+        fila = base[clave]
+        for momento in VISITAS_CLINICAS[:VISITAS_CLINICAS.index(evento)]:
+            if momento != fila['momento']:
+                nuevas.append({**fila, 'clave': f'{clave}_desde_{etiqueta_visita(momento)}',
+                               'nombre': f"{fila['nombre']} (riesgo calculado a {momento})",
+                               'estado': D.EN_PRUEBA, 'momento': momento})
+    return nuevas
 
 
 def _desenlaces() -> pd.DataFrame:
@@ -415,7 +451,7 @@ def _desenlaces() -> pd.DataFrame:
                                         ('perimetro_cefalico', 'perimetro_bajo', 'perímetro cefálico bajo para la edad'))
           for momento in ('40 sem', '3 m EC', '6 m EC', '9 m EC')),
     ]
-    return pd.DataFrame(filas)
+    return pd.DataFrame(filas + _anticipacion(filas))
 
 
 def borrador_clinico() -> D.Diccionario:

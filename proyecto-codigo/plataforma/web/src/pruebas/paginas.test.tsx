@@ -71,25 +71,94 @@ describe('ingreso y permisos', () => {
   })
 })
 
-describe('revisión de datos', () => {
-  it('guarda la respuesta del experto', async () => {
+describe('calidad de datos', () => {
+  const aciertos = { corrida_id: 1, serie: [{ k: 50, respondidas: 4, precision: 50 }, { k: 100, respondidas: 6, precision: 66.7 }], respondidas: 6, confirmadas_error_pct: 66.7 }
+  const concentracion = {
+    corrida_id: 1, hay_sede: true, minimo_celda: 5, por_variable: [{ variable: 'peso', etiqueta: 'Peso', alertas: 30 }],
+    otras_variables: 2, celdas: [{ grupo: 'Sede A', variable: 'peso', etiqueta: 'Peso', alertas: 20 }], otras_celdas: 3,
+  }
+  const resumen = { datos_revisar: 120, alertas_por_1000: 12.5, alarmas_grupo: 3, alertas_por_capa: { '1': 50, '2': 90 } }
+
+  it('el experto no ve el enlace ni entra a la página; el administrador sí', async () => {
+    simularApi((url) => {
+      if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('experto') } }
+      if (url === '/api/tablero/resumen') return { estado: 404, cuerpo: { detail: 'x' } }
+    })
+    const { unmount } = montar('/admin/calidad-datos')
+    expect(await screen.findByRole('heading', { name: 'Sin permiso' })).toBeInTheDocument()
+    expect(screen.queryAllByRole('link', { name: 'Calidad de datos' })).toHaveLength(0)
+    expect(screen.queryAllByRole('link', { name: 'Datos por revisar' })).toHaveLength(0)
+    unmount()
+    simularApi((url) => {
+      if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('admin') } }
+      if (url === '/api/tablero/resumen') return { estado: 404, cuerpo: { detail: 'x' } }
+    })
+    montar('/')
+    expect((await screen.findAllByRole('link', { name: 'Calidad de datos' })).length).toBeGreaterThan(0)
+  })
+
+  it('muestra las cifras y los tres paneles con su frase', async () => {
+    simularApi((url) => {
+      if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('admin') } }
+      if (url === '/api/tablero/resumen') return { cuerpo: resumen }
+      if (url === '/api/revision/datos/aciertos') return { cuerpo: aciertos }
+      if (url === '/api/revision/datos/concentracion') return { cuerpo: concentracion }
+      if (url.startsWith('/api/revision/datos?')) return { cuerpo: { total: 0, pagina: 1, tamano: 12, items: [] } }
+    })
+    montar('/admin/calidad-datos')
+    expect(await screen.findByRole('heading', { name: 'Calidad de datos' })).toBeInTheDocument()
+    for (const t of ['Alertas por tipo', 'Aciertos frente a la revisión', 'Dónde se concentran']) {
+      expect(await screen.findByRole('heading', { name: t })).toBeInTheDocument()
+    }
+    expect(screen.getByText('Cuántos datos raros encontró cada revisión.')).toBeInTheDocument()
+    expect(screen.getByText('Cuántas alertas confirmó el equipo al revisar las primeras.')).toBeInTheDocument()
+    expect(screen.getByText('Sede y dato con más alertas.')).toBeInTheDocument()
+    expect(await screen.findByText('datos por revisar')).toBeInTheDocument()
+    expect(await screen.findByText('66,7 %')).toBeInTheDocument()
+    expect(await screen.findByText('Sede A · 20 alertas')).toBeInTheDocument()
+    expect(screen.getByText(/Otras: 3 alertas/)).toBeInTheDocument()
+  })
+
+  it('la dirección vieja lleva a la nueva', async () => {
+    simularApi((url) => {
+      if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('admin') } }
+      if (url.startsWith('/api/revision/datos?')) return { cuerpo: { total: 0, pagina: 1, tamano: 12, items: [] } }
+      if (url === '/api/revision/datos/aciertos') return { cuerpo: aciertos }
+      if (url === '/api/revision/datos/concentracion') return { cuerpo: concentracion }
+      return { cuerpo: {} }
+    })
+    montar('/revision/datos')
+    expect(await screen.findByRole('heading', { name: 'Calidad de datos' })).toBeInTheDocument()
+  })
+
+  it('guarda la respuesta del administrador', async () => {
     const dato = {
       id: 7, prioridad: 1, sujeto: 's1', variable: 'peso_40', etiqueta: 'Peso a 40 sem', unidad: 'g', etapa: 's40',
       etapa_nombre: '40 semanas', fecha: '2026-01-01', valor: '9999', esperado: 2800, rango_bajo: 2000, rango_alto: 3500,
       capas: ['1', '2'], motivo: 'valor atípico', fuerza: 9, es_error: null, comentario: null,
+      serie: [
+        { variable: 'peso_nacer', etapa_nombre: 'Nacimiento', orden: 0, valor: 1500, es_este: false },
+        { variable: 'peso_40', etapa_nombre: '40 semanas', orden: 2, valor: 9999, es_este: true },
+      ],
     }
     const enviados: unknown[] = []
     simularApi((url, init) => {
-      if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('experto') } }
+      if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('admin') } }
       if (url.startsWith('/api/revision/datos?')) return { cuerpo: { total: 1, pagina: 1, tamano: 10, items: [dato] } }
+      if (url === '/api/revision/datos/aciertos') return { cuerpo: aciertos }
+      if (url === '/api/revision/datos/concentracion') return { cuerpo: concentracion }
       if (url === '/api/revision/datos/7') {
         enviados.push(JSON.parse(String(init?.body)))
         return { estado: 204 }
       }
       return { cuerpo: {} }
     })
-    montar('/revision/datos')
+    montar('/admin/calidad-datos')
     expect(await screen.findByText(/Para este niño se esperaba entre/)).toBeInTheDocument()
+    // la serie del niño para ese concepto, y sin el motivo que solo repite la etiqueta «Valor fuera de lo esperado»
+    expect(screen.getByRole('figure', { name: 'Peso a 40 sem de este niño en cada visita: Nacimiento, 1.500 g; 40 semanas, 9.999 g' }))
+      .toBeInTheDocument()
+    expect(screen.queryByText(/Valor muy distinto/)).not.toBeInTheDocument()
     await userEvent.type(screen.getByLabelText('Comentario'), 'La báscula estaba dañada')
     await userEvent.click(screen.getByRole('button', { name: 'Sí' }))
     await waitFor(() => expect(enviados).toEqual([{ es_error: 'si', comentario: 'La báscula estaba dañada' }]))

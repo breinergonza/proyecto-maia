@@ -9,6 +9,7 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from maia_comun.modelos_db import Corrida, Esquema, Etapa
+from sevarti import contrato as SV
 
 
 def corrida_de(s: Session, corrida_id: int | None = None) -> Corrida:
@@ -91,6 +92,13 @@ def _sin_tildes(texto: str) -> str:
     return ''.join(c for c in unicodedata.normalize('NFD', texto.lower()) if unicodedata.category(c) != 'Mn')
 
 
+def unidades_crecimiento(esq: dict) -> dict[tuple[str, str | None], str | None]:
+    """(concepto, etapa) → la unidad en que se registró esa medida de crecimiento. El crecimiento guarda el valor tal
+    como se midió (p. ej. en kilos si el diccionario dice kg), así que su unidad sale de aquí y no de una tabla fija."""
+    return {(d['concepto'], d.get('etapa')): (str(d.get('unidad') or '').strip() or None)
+            for d in esq.values() if isinstance(d.get('concepto'), str) and d['concepto']}
+
+
 def unidad_mostrada(d: dict) -> str | None:
     """La unidad que acompaña a un valor: ninguna para una categoría o un sí/no (su etiqueta ya lo dice), ni cuando la
     etiqueta de la variable ya la nombra ("Número de controles: 1", no "1 controles")."""
@@ -117,3 +125,21 @@ def motivo_legible(motivo: str, esq: dict) -> str:
     valor = valor_legible(d, m['valor']) if d.get('tipo') in ('categorical', 'boolean') else m['valor']
     unidad = unidad_mostrada(d)
     return f"{m['texto']} = {valor}{f' {unidad}' if unidad else ''}"
+
+
+_NUMERO_SQL = "valor ~ '^-?[0-9]+([.][0-9]+)?$'"
+
+
+def medidas_numericas(s: Session, corte_id: int, variables: list[str], esq: dict, sujetos: list[str] | None = None):
+    """(sujeto, variable, valor): el primer valor numérico de cada niño en cada variable, sin los códigos de «no se
+    hizo» que declara el diccionario (un −1 no es un peso). Sin ``sujetos``, de toda la cohorte."""
+    filtro = ' AND sujeto = ANY(:s)' if sujetos is not None else ''
+    codigos = {v: SV.codigos_declarados(esq.get(v, {}).get('codigos_especiales')) for v in variables}
+    vistos: set[tuple[str, str]] = set()
+    for suj, variable, valor in s.execute(text(
+            f'SELECT sujeto, variable, valor FROM sevarti.mediciones WHERE corte_id = :c AND variable = ANY(:v) '
+            f'AND {_NUMERO_SQL}{filtro} ORDER BY sujeto, variable, id'), {'c': corte_id, 'v': variables, 's': sujetos}):
+        x = float(valor)
+        if (suj, variable) not in vistos and x not in codigos[variable]:
+            vistos.add((suj, variable))
+            yield suj, variable, x

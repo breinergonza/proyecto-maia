@@ -4,6 +4,8 @@
    el ocre, para el crecimiento por debajo de -2 DE. Todo lo demás vive en la gama del verde azulado, sobre
    superficies claras y casi sin bordes: la información manda, el marco se retira. */
 @theme {
+  --text-xs: 0.8rem; /* mínimo legible, 12,8 px (el 0,75rem de Tailwind queda por debajo) */
+  --text-xs--line-height: 1.375;
   --font-sans: 'Atkinson Hyperlegible Next', 'Atkinson Hyperlegible', ui-sans-serif, system-ui, sans-serif;
 
   --color-teal: #1f4e52;
@@ -11,12 +13,13 @@
   --color-teal-medio: #2e6b70;
   --color-teal-tinte: #e8f1f0;
   --color-coral: #d9694c;
-  --color-coral-hondo: #b5502f;
+  --color-coral-hondo: #a8472a;
   --color-coral-tinte: #fbeae5;
   --color-ocre: #b8862b;
   --color-ocre-tinte: #f7eed9;
+  --color-ocre-hondo: #7a5712; /* ocre para texto: 5,6:1 o más sobre las superficies claras */
   --color-tinta: #14262a;
-  --color-salvia: #5b716d;
+  --color-salvia: #4d6561;
   --color-fondo: #f6f8f8;
   --color-papel: #ffffff;
   --color-linea: #e3e9e8;
@@ -25,6 +28,7 @@
   --color-serie-1: #008f99;
   --color-serie-2: #a97a10;
   --color-serie-3: #7f5cb5;
+  --color-serie-4: #b03a5b;
   --color-referencia: #8a9b98;
 
   --radius-control: 10px;
@@ -112,7 +116,7 @@
   /* el título arriba y el valor debajo: sirve igual para un número que para una celda con varios párrafos */
   .tabla-apilada tbody td::before {
     content: attr(data-etiqueta); display: block; margin-bottom: 0.125rem;
-    font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--color-salvia);
+    font-size: 0.8rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-salvia);
   }
   /* la celda de acciones (encabezado vacío o con data-acciones) va sin título, con los botones en línea */
   .tabla-apilada tbody td[data-etiqueta='']::before, .tabla-apilada tbody td[data-ancha]::before { content: none; }
@@ -121,4 +125,30 @@
   .tabla-apilada tbody td[data-etiqueta=''] > div { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; }
   /* una fila de detalle (colSpan) va pegada a su tarjeta, a lo ancho y sin título */
   .tabla-apilada tbody td[data-ancha] { display: block; text-align: left; }
+}
+
+/* ---- Impresión (ficha de un niño): solo el contenido, en blanco y negro sobre papel, sin navegación ni botones ---- */
+.solo-imprimir { display: none; }
+@media print {
+  @page { margin: 14mm 12mm 18mm; }
+  html, body { background: #fff !important; color: #000 !important; height: auto !important; }
+  body { font-size: 11pt; }
+  /* fuera lo que no sirve en papel: menú lateral, barra superior, aviso de demostración, pie de la app y acciones */
+  .no-imprimir, aside, header, footer, nav[aria-label='Secciones'], [role='dialog'], [role='status'] { display: none !important; }
+  /* el marco se desplaza por dentro en pantalla: en papel fluye a lo ancho y alto completo */
+  #raiz > div, #raiz > div > div { display: block !important; height: auto !important; min-height: 0 !important; }
+  main { overflow: visible !important; height: auto !important; padding: 0 !important; width: 100% !important; }
+  main * { box-shadow: none !important; text-shadow: none !important; animation: none !important; transition: none !important; }
+  main, main h1, main h2, main h3, main p, main td, main th, main li, main span { color: #000 !important; }
+  main section, main table, main figure, main svg, main li, main tr { break-inside: avoid; page-break-inside: avoid; }
+  main h1, main h2, main h3 { break-after: avoid; }
+  main section { border: 0.5pt solid #555 !important; background: #fff !important; }
+  main [class*='border'] { border-color: #777 !important; border-width: 0.5pt; }
+  main a { color: inherit !important; text-decoration: none; }
+  main [class*='overflow-x'] { overflow: visible !important; }
+  main [class*='grid-cols'] { grid-template-columns: minmax(0, 1fr) !important; }
+  .solo-imprimir {
+    display: block; position: fixed; left: 0; right: 0; bottom: 0; padding-top: 3mm;
+    border-top: 0.5pt solid #555; font-size: 9.6pt; color: #000; text-align: center; background: #fff;
+  }
 }

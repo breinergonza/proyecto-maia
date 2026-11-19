@@ -6,6 +6,7 @@ import { Fragment, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { pedir } from '../api/cliente'
 import type { Ejecucion, Entrenamiento, Entrenamientos } from '../api/tipos'
+import { useConfirmar } from '../components/Confirmar'
 import { EntrenarAhora } from '../components/EntrenarAhora'
 import { Aviso, Boton, Cargando, Encabezado, Insignia, Panel, Selector, Tabla, Vacio } from '../components/ui'
 import { cn } from '../lib/cn'
@@ -46,6 +47,16 @@ export default function AdminEntrenamientos() {
   const aprobacion = useMutation({
     mutationFn: () => pedir<Ejecucion>('/entrenamientos/aprobar', { cuerpo: { fuente, anomalias: aprobar.anomalias, clinico: aprobar.clinico } }),
   })
+  const { confirmar, dialogo } = useConfirmar()
+  const aprobarVersiones = async () => {
+    const ok = await confirmar({
+      titulo: 'Aprobar y activar en la solución',
+      mensaje: `Se usarán anomalías v${aprobar.anomalias} y alertas clínicas v${aprobar.clinico} (${FUENTES[fuente]}).`,
+      efecto: 'El alias produccion pasa a estas versiones y la API activa el paquete: lo usarán el tablero, las corridas y el cálculo de un niño, para todos los usuarios.',
+      reversible: true, textoConfirmar: 'Activar en la solución',
+    })
+    if (ok) aprobacion.mutate()
+  }
   const cambiarFuente = (f: Fuente) => {
     setFuente(f)
     setComparar({ anomalias: [], clinico: [] })
@@ -87,9 +98,10 @@ export default function AdminEntrenamientos() {
             {aprobacion.error && <div className="mt-3"><Aviso>{aprobacion.error.message}</Aviso></div>}
             {aprobacion.data && <div className="mt-3"><Aviso tono="teal">Aprobación en cola (ejecución n.º {aprobacion.data.id}). Siga su avance en <Link className="underline" to="/admin/programacion">Programación</Link>.</Aviso></div>}
             <Boton className="mt-3" disabled={!aprobar.anomalias || !aprobar.clinico || aprobacion.isPending || !!aprobacion.data}
-              onClick={() => window.confirm(`¿Usar anomalías v${aprobar.anomalias} y clínico v${aprobar.clinico} (${FUENTES[fuente]}) en la solución?`) && aprobacion.mutate()}>
+              onClick={aprobarVersiones}>
               Aprobar y activar
             </Boton>
+            {dialogo}
           </Panel>
         </div>
       )}

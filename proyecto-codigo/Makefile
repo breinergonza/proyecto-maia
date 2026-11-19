@@ -13,7 +13,7 @@ SIN_GPU ?= 0
 ifeq ($(SIN_GPU),1)
 PG_CLAVE := $(shell grep -E '^POSTGRES_PASSWORD=' .env 2>/dev/null | cut -d= -f2 | awk '{print $$1}')
 TRAINER := DATABASE_URL=postgresql+psycopg://maia:$(PG_CLAVE)@127.0.0.1:5432/maia \
-           MLFLOW_TRACKING_URI=http://127.0.0.1:5000 MINIO_URL=http://127.0.0.1:9000 SMTP_HOST=127.0.0.1 \
+           MLFLOW_TRACKING_URI=http://127.0.0.1:5000 MINIO_URL=http://127.0.0.1:9000 \
            MAIA_RAIZ=$(CURDIR)/nucleo MAIA_LGBM_DEVICE=cpu MLFLOW_DISABLE_AGENT_HINT=1 uv run --env-file .env maia
 WEB_LOCAL := http://localhost:8080
 else

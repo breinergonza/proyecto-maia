@@ -128,7 +128,7 @@ def tabla_crecimiento(c: pd.DataFrame, p: AC.Preparado, corrida_id: int) -> pd.D
     c = c.join(p.datos[['t']], how='left')
     return pd.DataFrame({
         'corrida_id': corrida_id, 'sujeto': c.sujeto.astype(str), 'etapa': c.etapa.map(_texto),
-        'indicador': c.concepto.astype(str), 'fecha': _fecha(c.t), 'edad_corregida': pd.to_numeric(c.ec_dias),
+        'indicador': c.concepto.astype(str), 'variable': c.variable.map(_texto), 'fecha': _fecha(c.t), 'edad_corregida': pd.to_numeric(c.ec_dias),
         'valor': pd.to_numeric(p.x.reindex(c.index), errors='coerce'), 'z': pd.to_numeric(c.z),
         'bajo_2de': c.bajo.fillna(False).astype(bool), 'caida_1de': c.cae.fillna(False).astype(bool),
         'improbable': c.improbable.fillna(False).astype(bool),
@@ -292,3 +292,11 @@ def inferir(sev: Sevarti, modelos: Modelos) -> dict[str, pd.DataFrame]:
     return {'alertas_dato': tabla_alertas(cola, 0).drop(columns='corrida_id'),
             'riesgos': tabla_riesgos(riesgos, 0, False).drop(columns=['corrida_id', 'silencio']),
             'crecimiento': tabla_crecimiento(crec, p, 0).drop(columns='corrida_id')}
+
+
+def historia_riesgo(sev: Sevarti, modelos: Modelos) -> pd.DataFrame:
+    """El riesgo de cada desenlace en cada visita a la que fue el niño, cada uno con lo medido hasta su visita: la
+    trayectoria de la ficha. La corrida guarda solo la última visita; esto no se guarda. Sin motivos (lo caro)."""
+    p = modelos.clinico.preparar(sev)
+    riesgos = modelos.clinico.riesgos(p, solo_ultima_visita=False, con_motivos=False, solo_pendientes=False)
+    return tabla_riesgos(riesgos, 0, False).drop(columns=['corrida_id', 'silencio', 'motivos'])

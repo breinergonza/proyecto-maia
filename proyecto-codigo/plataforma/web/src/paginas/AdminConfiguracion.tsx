@@ -7,6 +7,7 @@ import { Link } from 'react-router'
 import { pedir } from '../api/cliente'
 import type { Conexion, ConexionEntrada, Hiperparametros, PruebaConexion, ResumenAdministracion } from '../api/tipos'
 import { CampoHiperparametro } from '../components/CampoHiperparametro'
+import { useConfirmar } from '../components/Confirmar'
 import { Aviso, Boton, Campo, Cargando, Encabezado, Entrada, Insignia, Panel, Selector } from '../components/ui'
 import { conPunto, fechaHora, MODELOS } from '../lib/formato'
 
@@ -174,14 +175,20 @@ function PanelModelo({ h }: { h: Hiperparametros }) {
   })
   // un valor guardado igual al del núcleo no es un ajuste
   const ajustados = h.campos.filter((c) => c.valor != null && c.valor !== c.defecto).length
-  const volver = () => {
-    if (window.confirm(`¿Volver a los valores del núcleo en ${MODELOS[h.modelo]}? Se borran los ajustes guardados.`)) {
-      guardar.mutate(Object.fromEntries(h.campos.map((c) => [c.nombre, ''])))
-    }
+  const { confirmar, dialogo } = useConfirmar()
+  const volver = async () => {
+    const ok = await confirmar({
+      titulo: `Volver a los valores del núcleo en ${MODELOS[h.modelo]}`,
+      mensaje: ajustados > 0 ? `Hoy hay ${ajustados} hiperparámetro(s) con un valor propio.` : 'Se borran los valores guardados para este modelo.',
+      efecto: 'Se borran los ajustes guardados y el próximo entrenamiento de este modelo usa los valores del núcleo. Afecta a todo el equipo.',
+      reversible: false, textoConfirmar: 'Volver a los del núcleo', tono: 'peligro',
+    })
+    if (ok) guardar.mutate(Object.fromEntries(h.campos.map((c) => [c.nombre, ''])))
   }
   return (
     <Panel titulo={<>Hiperparámetros · {MODELOS[h.modelo]} {ajustados > 0 && <Insignia tono="ocre" className="ml-1">{ajustados} ajustado(s)</Insignia>}</>}>
       <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); guardar.mutate(v) }}>
+        {dialogo}
         <p className="text-sm text-salvia">
           Vacío = el valor del núcleo (en gris). Aplican al próximo entrenamiento y MLflow registra los valores usados.
           {h.actualizado_en && <> Último cambio: {conPunto(fechaHora(h.actualizado_en))}</>}

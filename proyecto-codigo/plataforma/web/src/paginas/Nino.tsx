@@ -1,17 +1,16 @@
 // La historia de un niño: sus visitas en orden, lo que se midió en cada una, los datos por revisar, el riesgo
-// calculado y su crecimiento frente a la OMS.
+// calculado (y cómo fue cambiando visita a visita), su crecimiento frente a la OMS y cómo nació frente a los demás.
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Printer } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { CartesianGrid, Legend, Line, LineChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { pedir } from '../api/cliente'
 import type { AlertaDato, LineaTemporal, Visita } from '../api/tipos'
-import { Aviso, Cargando, Insignia, Panel, Tabla, Vacio } from '../components/ui'
+import { CrecimientoOms, PerfilCohorte, PerfilDelNino, TarjetaRiesgo, TrayectoriaRiesgo } from '../components/ficha'
+import { Aviso, Boton, Cargando, Insignia, Panel, Tabla, Vacio } from '../components/ui'
 import { cn } from '../lib/cn'
-import { HEX_SERIES } from '../lib/consultas'
-import { aproximado, dec, edad, fecha, indicador, riesgo, RIESGO_ALTO } from '../lib/formato'
-import { alerta, AYUDA_OMS, ayudaAlerta, ayudaPosicion, ayudaZ, cuantosMenos, datosAl, frenteOms, motivo, nivelAlto, peso } from '../lib/lenguaje'
+import { aproximado, dec, edad, fecha, indicador, RIESGO_ALTO } from '../lib/formato'
+import { alerta, AYUDA_DOS_CIFRAS, AYUDA_OMS, ayudaAlerta, ayudaZ, datosAl, frenteOms, motivo } from '../lib/lenguaje'
 
 export default function Nino() {
   const { sujeto = '' } = useParams()
@@ -34,7 +33,7 @@ export default function Nino() {
 
   return (
     <>
-      <Link to="/ninos" className="mb-2 inline-flex items-center gap-1 text-sm text-teal hover:underline">
+      <Link to="/ninos" className="no-imprimir mb-2 inline-flex items-center gap-1 text-sm text-teal hover:underline">
         <ArrowLeft size={16} aria-hidden /> Todos los niños
       </Link>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
@@ -46,41 +45,26 @@ export default function Nino() {
             {n.grupo && <>. Grupo {n.grupo}</>}. {datosAl(n.corte)}.
           </p>
         </div>
+        <Boton variante="secundario" className="no-imprimir" onClick={() => window.print()}>
+          <Printer size={16} aria-hidden /> Imprimir ficha
+        </Boton>
       </div>
 
       <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
       <div className="space-y-4">
       {riesgos.length > 0 && (
-        <section aria-label="Riesgo calculado" className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-1">
-          {riesgos.map((r) => (
-            <article key={r.id} className={cn('rounded-panel border bg-papel p-4 shadow-suave',
-              r.percentil >= RIESGO_ALTO ? 'border-coral/50 shadow-[inset_4px_0_0_var(--color-coral)]' : 'border-linea')}>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-base">{r.desenlace}</h2>
-                  <p className="text-sm text-salvia">Calculado con lo medido hasta {r.visita}</p>
-                </div>
-                <div className="shrink-0 text-right" title={ayudaPosicion(r.percentil)}>
-                  {nivelAlto(r.percentil) && <Insignia tono="coral" className="mb-1">{nivelAlto(r.percentil)}</Insignia>}
-                  <p className={cn('text-2xl font-bold leading-none', r.percentil >= RIESGO_ALTO ? 'text-coral-hondo' : 'text-teal')}>
-                    {cuantosMenos(r.percentil)} de 10
-                  </p>
-                  <p className="text-xs text-salvia">niños tienen menos riesgo</p>
-                </div>
-              </div>
-              <p className="mt-3 text-sm">Riesgo estimado: <strong>{riesgo(r.riesgo)}</strong></p>
-              {r.motivos.length > 0 && (
-                <>
-                  <p className="mt-3 text-sm font-semibold">Lo que más pesó</p>
-                  <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm">{r.motivos.map((m) => <li key={m} title={m}>{peso(m)}</li>)}</ul>
-                </>
-              )}
-            </article>
-          ))}
+        <section aria-label="Riesgo calculado" className="space-y-3">
+          <p className="text-sm">{AYUDA_DOS_CIFRAS}</p>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-1">
+            {riesgos.map((r) => <TarjetaRiesgo key={r.id} r={r} nota={`Calculado con lo medido hasta ${r.visita}`} />)}
+          </div>
         </section>
       )}
 
-      <Crecimiento datos={n} />
+      <PerfilDelNino perfil={n.perfil} />
+      <TrayectoriaRiesgo sujeto={n.sujeto} />
+      <CrecimientoOms crecimiento={n.crecimiento} />
+      <PerfilCohorte sujeto={n.sujeto} />
       </div>
 
       <Panel titulo="Visitas">
@@ -92,6 +76,9 @@ export default function Nino() {
         )}
       </Panel>
       </div>
+      <p className="solo-imprimir">
+        Impreso el {fecha(new Date().toISOString())} · Observatorio Canguro · Documento de apoyo clínico: no reemplaza el criterio médico
+      </p>
     </>
   )
 }
@@ -215,49 +202,5 @@ function DetalleVisita({ visita }: { visita: Visita }) {
         )}
       </div>
     </div>
-  )
-}
-
-function Crecimiento({ datos }: { datos: LineaTemporal }) {
-  const indicadores = Object.keys(datos.crecimiento)
-  const filas = useMemo(() => {
-    const porEdad = new Map<number, Record<string, number | null> & { edad: number }>()
-    for (const [k, puntos] of Object.entries(datos.crecimiento)) {
-      for (const p of puntos) {
-        if (p.edad_corregida == null || p.z == null || p.improbable) continue
-        const e = Math.round(p.edad_corregida)
-        const f = porEdad.get(e) ?? { edad: e }
-        f[k] = p.z
-        porEdad.set(e, f)
-      }
-    }
-    return [...porEdad.values()].sort((a, b) => a.edad - b.edad)
-  }, [datos])
-
-  if (!filas.length) return null
-  return (
-    <Panel titulo="Crecimiento frente a la OMS"
-      accion={<span className="text-xs text-salvia" title={AYUDA_OMS}>0 = lo esperado para la edad corregida · franja: bajo para la edad</span>}>
-      <div className="h-64">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={filas} margin={{ left: 0, right: 16, top: 8 }}>
-            <CartesianGrid stroke="#e4ebea" vertical={false} />
-            <ReferenceArea y1={-10} y2={-2} fill="#b8862b" fillOpacity={0.12} ifOverflow="hidden" />
-            <ReferenceLine y={0} stroke="#8a9b98" />
-            <ReferenceLine y={-2} stroke="#b8862b" strokeDasharray="4 3" />
-            <XAxis dataKey="edad" type="number" domain={['dataMin', 'dataMax']} tickFormatter={(v: number) => edad(v)}
-              stroke="#56736d" fontSize={12} />
-            <YAxis domain={[(m: number) => Math.min(-3, Math.floor(m)), (m: number) => Math.max(2, Math.ceil(m))]}
-              allowDataOverflow stroke="#56736d" fontSize={12} width={36} />
-            <Tooltip labelFormatter={(v) => `${edad(Number(v))} de edad corregida`} formatter={(v, nombre) => [frenteOms(Number(v)), nombre]} />
-            <Legend verticalAlign="top" height={28} />
-            {indicadores.map((k, i) => (
-              <Line key={k} dataKey={k} name={indicador(k)} stroke={HEX_SERIES[i % HEX_SERIES.length]} strokeWidth={2}
-                dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} activeDot={{ r: 6 }} connectNulls isAnimationActive={false} />
-            ))}
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-    </Panel>
   )
 }

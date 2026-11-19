@@ -10,6 +10,8 @@ interface Sesion {
   cargando: boolean
   ingresar: (email: string, clave: string) => Promise<void>
   salir: () => Promise<void>
+  /** Suelta la sesión local (sin llamar a la API) para volver a ingresar; la ruta se conserva en la redirección. */
+  descartar: () => void
 }
 
 const Contexto = createContext<Sesion | null>(null)
@@ -41,7 +43,12 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const valor = useMemo(() => ({ usuario, cargando, ingresar, salir }), [usuario, cargando, ingresar, salir])
+  const descartar = useCallback(() => {
+    fijarAcceso(null)
+    setUsuario(null)
+  }, [])
+
+  const valor = useMemo(() => ({ usuario, cargando, ingresar, salir, descartar }), [usuario, cargando, ingresar, salir, descartar])
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>
 }
 

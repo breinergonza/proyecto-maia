@@ -182,7 +182,9 @@ def entrenar(tipo: Tipo, fuente: Fuente = FUENTE,
              sin_registro: bool = typer.Option(False, '--sin-registro', help='no registrar en MLflow'),
              hiperparametros: str | None = typer.Option(
                  None, help='JSON con los hiperparámetros de este entrenamiento (los de la web); mandan sobre los '
-                            'guardados en Administración')) -> None:
+                            'guardados en Administración'),
+             muestra: int | None = typer.Option(None, help='id de una muestra guardada: se entrena solo con sus niños')
+             ) -> None:
     """Valida, entrena con todos los datos, guarda en MAIA_RAIZ/interno y registra en MLflow con alias candidato."""
     from maia_comun import hiperparametros as HP
     from maia_entrenamiento import datos as D
@@ -199,6 +201,16 @@ def entrenar(tipo: Tipo, fuente: Fuente = FUENTE,
         except (ValueError, TypeError) as e:
             raise typer.BadParameter(f'--hiperparametros: {e}') from None
     _decir(f'Corte {info.fecha} ({info.filas["sujetos"]:,} niños).')
+    uso = None
+    if muestra is not None:     # después de cargar el corte y antes de entrenar: solo los niños de la muestra
+        from maia_entrenamiento import con_muestra as CM
+        try:
+            sev, uso = CM.aplicar(_motor(), muestra, sev, fuente.value, info.fecha)
+        except CM.MuestraNoUsable as e:
+            raise typer.BadParameter(str(e), param_hint='--muestra') from None
+        _decir(f'Muestra «{uso.titulo}»: {uso.n:,} de {uso.n_base:,} niños.')
+        for aviso in uso.avisos:
+            _decir(aviso)
     if tipo == Tipo.anomalias:
         if config:   # el archivo manda sobre los ajustes de administración
             try:
@@ -211,7 +223,7 @@ def entrenar(tipo: Tipo, fuente: Fuente = FUENTE,
         else:
             cfg, ajustes = HP.leer_y_aplicar(E.config_anomalias(None), 'anomalias')
         r = E.entrenar_anomalias(sev, fuente.value, cfg, validar=not sin_validacion, registrar=not sin_registro,
-                                 extraccion=extraccion, ajustes=ajustes)
+                                 extraccion=extraccion, ajustes=ajustes, muestra=uso)
     else:
         if config:
             raise typer.BadParameter('La configuración clínica sale del diccionario de variables, no de --config.')
@@ -220,7 +232,7 @@ def entrenar(tipo: Tipo, fuente: Fuente = FUENTE,
         else:
             cfg, ajustes = HP.leer_y_aplicar(D.config_clinica(fuente.value), 'clinico')
         r = E.entrenar_clinico(sev, fuente.value, cfg, validar=not sin_validacion, registrar=not sin_registro,
-                               extraccion=extraccion, ajustes=ajustes)
+                               extraccion=extraccion, ajustes=ajustes, muestra=uso)
     if ajustes:
         _decir(f'Hiperparámetros ajustados: {json.dumps(ajustes)}')
     _decir(f'\nModelo {tipo.value} {r.version_modelo} ({r.minutos:.1f} min) en {r.carpeta}')
@@ -473,10 +485,19 @@ def exportar(fuente: Fuente = FUENTE,
         metricas = {f'{f["metrica"]}__{f["clave"]}': round(f['valor'], 4)
                     for f in filas_metricas(None, modelos.ficha_clinica, modelos.nombre_a_clave)
                     if f['metrica'] in ('auc', 'top10', 'pr_auc')}
+        try:   # la analítica del modelo clínico, si se calculó al entrenar (agregados; viaja a la web pública)
+            from maia_comun import db
+            with db.sesion() as s:
+                analitica = PQ.analitica_de_registro(s, mvc.name, str(mvc.version))
+        except Exception as e:  # noqa: BLE001  (sin base local no hay analítica que llevar; el paquete sale igual)
+            _decir(f'Aviso: no se pudo leer la analítica del modelo clínico ({type(e).__name__}: {e}).')
+            analitica = []
+        _decir(f'Analítica: {"entrenamiento " + str(analitica[0]["entrenamiento_id"]) if analitica else "no hay"} '
+               f'({len(analitica)} artefactos).')
         ruta = PQ.armar(tmp / PQ.NOMBRE, ca, cc, base, fuente.value, obtener().maia_paquete_clave,
                         {'anomalias': {'registro': mva.name, 'version': str(mva.version), 'run_id': mva.run_id},
                          'clinico': {'registro': mvc.name, 'version': str(mvc.version), 'run_id': mvc.run_id}},
-                        diccionario=dic, metricas=metricas, git_sha=R._git_sha())
+                        diccionario=dic, metricas=metricas, git_sha=R._git_sha(), analitica=analitica)
         manifest = PQ.leer_manifest(ruta)
         version = manifest['version']
         almacen = _almacen()

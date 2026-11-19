@@ -31,7 +31,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, CITEXT, JSONB, UUID
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 CONVENCION = {
     'ix': 'ix_%(table_name)s_%(column_0_N_name)s',
@@ -188,6 +188,45 @@ class ConfigNotificacion(Base):
     percentil_minimo: Mapped[float] = mapped_column(Float, server_default=text(str(PERCENTIL_MUY_ALTO)))
     destinatarios: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default=text("'{}'"))
     activo: Mapped[bool] = mapped_column(Boolean, server_default=text('false'))
+
+
+class ConfigSmtp(Base):
+    """Servidor de correo editable en pantalla: una sola fila (id = 1). La clave va cifrada (maia_comun.cifrado)."""
+    __tablename__ = 'config_smtp'
+    __table_args__ = (CheckConstraint('id = 1', name='unica'), {'schema': 'app'})
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    host: Mapped[str] = mapped_column(Text)
+    puerto: Mapped[int] = mapped_column(Integer)
+    usuario: Mapped[str | None] = mapped_column(Text)
+    clave_cifrada: Mapped[str | None] = mapped_column(Text)
+    remitente: Mapped[str] = mapped_column(Text)
+    tls: Mapped[bool] = mapped_column(Boolean, server_default=text('false'))
+    actualizado_por: Mapped[uuid.UUID | None] = mapped_column(ForeignKey('app.usuarios.id', ondelete='SET NULL'))
+    actualizado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class NotificacionConfig(Base):
+    """Una notificación: un nombre, su lista de correos y una o varias alertas (desenlaces)."""
+    __tablename__ = 'notificaciones_config'
+    __table_args__ = {'schema': 'app'}
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    nombre: Mapped[str] = mapped_column(Text, unique=True)
+    percentil_minimo: Mapped[float] = mapped_column(Float, server_default=text(str(PERCENTIL_MUY_ALTO)))
+    destinatarios: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default=text("'{}'"))
+    activo: Mapped[bool] = mapped_column(Boolean, server_default=text('false'))
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    alertas: Mapped[list[NotificacionAlerta]] = relationship(
+        cascade='all, delete-orphan', lazy='selectin', order_by='NotificacionAlerta.desenlace')
+
+
+class NotificacionAlerta(Base):
+    __tablename__ = 'notificaciones_config_alertas'
+    __table_args__ = {'schema': 'app'}
+    notificacion_id: Mapped[int] = mapped_column(
+        ForeignKey('app.notificaciones_config.id', ondelete='CASCADE',
+                   name='fk_notif_config_alertas_notificacion_id'),   # nombre corto: Postgres corta a 63 caracteres
+        primary_key=True)
+    desenlace: Mapped[str] = mapped_column(Text, primary_key=True)   # clave del desenlace (Riesgo.clave)
 
 
 class Auditoria(Base):
@@ -380,6 +419,7 @@ class Crecimiento(Base):
     sujeto: Mapped[str] = mapped_column(Text)
     etapa: Mapped[str | None] = mapped_column(Text)
     indicador: Mapped[str] = mapped_column(Text)
+    variable: Mapped[str | None] = mapped_column(Text)       # variable de origen: de ella sale la unidad del valor
     fecha: Mapped[date | None] = mapped_column(Date)
     edad_corregida: Mapped[float | None] = mapped_column(Float)
     valor: Mapped[float | None] = mapped_column(Float)
@@ -433,9 +473,14 @@ class Notificacion(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     riesgo_id: Mapped[int] = mapped_column(ForeignKey('resultados.riesgos.id', ondelete='CASCADE'))
     destinatario: Mapped[str] = mapped_column(Text)
+    notificacion_config_id: Mapped[int | None] = mapped_column(
+        ForeignKey('app.notificaciones_config.id', ondelete='SET NULL'))
     estado: Mapped[str] = mapped_column(Text)
     error: Mapped[str | None] = mapped_column(Text)
     enviado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 ESQUEMAS = ('sevarti', 'resultados', 'app')
+import maia_comun.modelos_analitica  # noqa: E402,F401  (registra la tabla de analítica en la metadata)
+import maia_comun.modelos_muestras  # noqa: E402,F401  (registra las tablas de muestras en la metadata)
+import maia_comun.prediccion_modelos  # noqa: E402,F401  (registra las tablas de Predicción en la metadata)

@@ -16,6 +16,7 @@ from anomalias import operacion as OP
 from archivos import carpetas as CA
 from clinico import modelo as AC
 from maia_comun import hiperparametros as HP
+from maia_entrenamiento import analitica_clinica as AL
 from maia_entrenamiento import datos as D
 from maia_entrenamiento import registro as R
 from sevarti import contrato as SV
@@ -50,13 +51,18 @@ def _sevarti_base(sev: Sevarti, destino: Path) -> Path:
     destino.mkdir(parents=True, exist_ok=True)
     for t in ('esquema', 'etapas', 'quiebres'):
         getattr(sev, t).to_parquet(destino / f'{t}.parquet', index=False)
+    # los niños con que se entrena: Predicción compara su muestra con esta lista para avisar de la fuga (solo códigos)
+    pd.DataFrame({'sujeto': sorted(sev.sujetos.sujeto.astype(str).unique())}).to_parquet(
+        destino / 'ninos_entrenamiento.parquet', index=False)
     (destino / 'corte.json').write_text(json.dumps({'corte': None if sev.corte is None else str(sev.corte.date())}),
                                         encoding='utf-8')
     return destino
 
 
-def _artefactos(sev: Sevarti, tmp: Path, fuente: str) -> dict[str, Path]:
+def _artefactos(sev: Sevarti, tmp: Path, fuente: str, muestra=None) -> dict[str, Path]:
     art = {'sevarti_base': _sevarti_base(sev, tmp / 'sevarti_base')}
+    if muestra is not None:     # la definición y el embudo de la muestra con que se entrenó
+        art.update(muestra.artefactos(tmp))
     if fuente == 'kmc' and (dic := D.ruta_diccionario()):
         art['diccionario'] = dic
     return art
@@ -82,7 +88,7 @@ def _etiqueta_ajustes(ajustes: dict | None) -> dict[str, str]:
 
 def entrenar_anomalias(sev: Sevarti, fuente: str, cfg: MA.Config, validar: bool = True,
                        registrar: bool = True, *, extraccion: dict[str, str] | None = None,
-                       ajustes: dict | None = None) -> Entrenado:
+                       ajustes: dict | None = None, muestra=None) -> Entrenado:
     MA.DISPOSITIVOS_USADOS.clear()
     t0 = time.time()
     validacion = None
@@ -99,34 +105,39 @@ def entrenar_anomalias(sev: Sevarti, fuente: str, cfg: MA.Config, validar: bool 
     if registrar:
         with tempfile.TemporaryDirectory() as tmp:
             mv = R.registrar('anomalias', fuente, carpeta, cfg, metricas,
-                             {**_etiquetas_dispositivo(cfg.dispositivo), **_etiqueta_ajustes(ajustes)}, nombre,
-                             _artefactos(sev, Path(tmp), fuente), extraccion=extraccion)
+                             {**_etiquetas_dispositivo(cfg.dispositivo), **_etiqueta_ajustes(ajustes),
+                              **(muestra.etiquetas() if muestra else {})}, nombre,
+                             _artefactos(sev, Path(tmp), fuente, muestra), extraccion=extraccion)
         numero = mv.version
     return Entrenado('anomalias', modelo.version, nombre, numero, carpeta, metricas, _dispositivos(),
                      (time.time() - t0) / 60)
 
 
-def validar_clinico(sev: Sevarti, cfg: AC.ConfigClinica, tardias: list[str]
+def validar_clinico(sev: Sevarti, cfg: AC.ConfigClinica, tardias: list[str], retener: dict | None = None
                     ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame], dict[str, str]]:
-    """Entrena con los nacidos antes y mide con los más recientes (como ``python -m clinico entrenar``)."""
+    """Entrena con los nacidos antes y mide con los más recientes (como ``python -m clinico entrenar``). Con
+    ``retener`` deja ahí el modelo de validación y lo preparado, para la analítica."""
     tr, _, te, _ = MA.dividir_por_tiempo(sev, (0.85, 0.0, 0.15))
     modelo = AC.ModeloClinico(cfg).ajustar(tr, progreso=True, tardias=tardias)
-    tabla, calibraciones, _ = AC.evaluar(modelo, te)
+    tabla, calibraciones, preparado = AC.evaluar(modelo, te)
+    if retener is not None:
+        retener.update(modelo=modelo, preparado=preparado)
     return tabla, calibraciones, modelo.omitidos
 
 
 def entrenar_clinico(sev: Sevarti, fuente: str, cfg: AC.ConfigClinica, validar: bool = True,
                      registrar: bool = True, *, extraccion: dict[str, str] | None = None,
-                     ajustes: dict | None = None) -> Entrenado:
+                     ajustes: dict | None = None, muestra=None) -> Entrenado:
     MA.DISPOSITIVOS_USADOS.clear()
     t0 = time.time()
     tardias = AC.ModeloClinico(cfg).detectar_tardias(sev)
     if tardias:
         print(f'Variables que la base llena con retraso (no se usan): {", ".join(tardias)}', flush=True)
     tabla = calibraciones = None
+    retenido: dict = {}
     if validar:
         print('Validando las alertas clínicas (entrena con los nacidos antes y mide con los más recientes)...', flush=True)
-        tabla, calibraciones, _ = validar_clinico(sev, cfg, tardias)
+        tabla, calibraciones, _ = validar_clinico(sev, cfg, tardias, retenido)
     print('Entrenando las alertas clínicas con todos los datos...', flush=True)
     modelo = AC.ModeloClinico(cfg).ajustar(sev, progreso=True, tardias=tardias)
     carpeta = AC.guardar(modelo, CA.PROYECTO.modelos_clinicos, sev, tabla)
@@ -139,9 +150,15 @@ def entrenar_clinico(sev: Sevarti, fuente: str, cfg: AC.ConfigClinica, validar: 
         with tempfile.TemporaryDirectory() as tmp:
             mv = R.registrar('clinico', fuente, carpeta, cfg, metricas,
                              {**_etiquetas_dispositivo(getattr(cfg, 'dispositivo', 'cpu')), **_etiqueta_ajustes(ajustes),
-                              'omitidos': json.dumps(modelo.omitidos, ensure_ascii=False)[:5000]},
-                             nombre, _artefactos(sev, Path(tmp), fuente), extraccion=extraccion)
+                              'omitidos': json.dumps(modelo.omitidos, ensure_ascii=False)[:5000],
+                              **(muestra.etiquetas() if muestra else {})},
+                             nombre, _artefactos(sev, Path(tmp), fuente, muestra), extraccion=extraccion)
         numero = mv.version
+    if retenido:   # analítica agregada de la validación (un fallo suyo no rompe el entrenamiento)
+        AL.analizar_y_guardar(retenido['modelo'], retenido['preparado'],
+                              {'fuente': fuente, 'registro': nombre, 'version_registro': str(numero),
+                               'version_modelo': modelo.version, 'corte': None if sev.corte is None else str(sev.corte.date()),
+                               **({'embudo': muestra.embudo} if muestra else {})})
     return Entrenado('clinico', modelo.version, nombre, numero, carpeta, metricas, _dispositivos(),
                      (time.time() - t0) / 60)
 

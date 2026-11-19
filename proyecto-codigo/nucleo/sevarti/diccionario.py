@@ -34,7 +34,7 @@ ESTADOS = (LISTA, POR_CLASIFICAR, NO_USAR)
 COLUMNAS = dict(
     variables=('variable', 'estado', 'etiqueta', 'tema', 'tipo', 'unidad', 'rol', 'etapa', 'concepto', 'ventana',
                'no_decreciente', 'tolerancia', 'edad_variable', 'codigos_especiales', 'categorias', 'rango_min',
-               'rango_max', 'nota'),
+               'rango_max', 'usar_como_filtro', 'nota'),
     visitas=('etapa', 'nombre', 'orden', 'edad_min', 'edad_max', 'base', 'fecha_variables', 'edad_variable',
              'edad_fija'),
     episodios=('tipo', 'duracion_variables'),
@@ -78,12 +78,13 @@ _INDICADOR = {'peso': 'Peso para la edad', 'talla': 'Talla para la edad',
               'perimetro_cefalico': 'Perímetro cefálico para la edad', 'peso_para_talla': 'Peso para la talla'}
 _UNIDAD = {'g': 'g', 'kg': 'kg', 'cm': 'cm', 'mm': 'mm'}
 _CERRADAS = {
-    'Variables': {'estado': _ESTADO, 'tipo': _TIPO, 'rol': _ROL, 'ventana': _SI_NO, 'no_decreciente': _SI_NO},
+    'Variables': {'estado': _ESTADO, 'tipo': _TIPO, 'rol': _ROL, 'ventana': _SI_NO, 'no_decreciente': _SI_NO,
+                  'usar_como_filtro': _SI_NO},
     'Visitas': {'base': _BASE},
     'Desenlaces': {'estado': _ESTADO_CLINICO, 'regla': _REGLA, 'medida': _INDICADOR},
     'Crecimiento': {'indicador': _INDICADOR, 'unidad': _UNIDAD, 'estado': _ESTADO_CLINICO},
 }
-_DEFECTO_SI_NO = {'ventana': True, 'no_decreciente': False}   # a blank answer
+_DEFECTO_SI_NO = {'ventana': True, 'no_decreciente': False, 'usar_como_filtro': False}   # a blank answer
 _OBLIGATORIAS = {'Variables': ('variable', 'estado', 'tipo'), 'Visitas': ('etapa', 'orden', 'base'),
                  'Episodios': ('tipo', 'duracion_variables'), 'Quiebres': ('quiebre', 'fecha'),
                  'Desenlaces': ('clave', 'nombre', 'estado', 'regla', 'momento'),
@@ -93,7 +94,7 @@ _NUMEROS = {'Variables': ('tolerancia', 'rango_min', 'rango_max'),
             'Visitas': ('orden', 'edad_min', 'edad_max', 'edad_fija'),
             'Desenlaces': ('percentil',), 'Crecimiento': ('z_bajo', 'caida', 'z_improbable_min', 'z_improbable_max')}
 # columns added after the first dictionaries: a file without them reads them as empty (the default)
-_OPCIONALES = {'Crecimiento': ('z_improbable_min', 'z_improbable_max')}
+_OPCIONALES = {'Crecimiento': ('z_improbable_min', 'z_improbable_max'), 'Variables': ('usar_como_filtro',)}
 _FECHAS = {'Quiebres': ('fecha',)}
 
 # ---------------------------------------------------------------- the workbook
@@ -164,6 +165,10 @@ LIBRO = LB.Libro(
                '1=buena;2=regular.', 34, largo=True),
             LB.Columna('rango_min', 'Rango desde', 'Valor más bajo esperado. Solo informa: no descarta datos.', 10),
             LB.Columna('rango_max', 'Rango hasta', 'Valor más alto esperado. Solo informa: no descarta datos.', 10),
+            LB.Columna('usar_como_filtro', 'Usar como filtro', 'Sí: la variable se ofrece como filtro al armar una '
+                       'muestra y en Explorar, por ejemplo sexo al nacer, edad gestacional o Lubchenco. Vacío es No. '
+                       'Si ninguna variable lo tiene, se ofrecen las de siempre.', 12, opciones=_opciones(_SI_NO),
+                       texto=True, opcional=True),
             _t('nota', 'Nota', 'Lo que quieran anotar. El sistema escribe aquí el aviso de las variables nuevas.', 44,
                largo=True),
         )),

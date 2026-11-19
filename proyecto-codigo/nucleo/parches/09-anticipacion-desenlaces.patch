@@ -1,0 +1,104 @@
+--- a/sevarti/kmc.py
++++ b/sevarti/kmc.py
+@@ -362,8 +362,38 @@
+             'entonces.' if cambio_2022 else None)
+     return _desenlace(clave, nombre, D.EN_PRUEBA, 'en_codigos', momento or _ANTERIOR[etapa], variable, codigos,
+                       negativos, solo_desde=_CAMBIO_2022 if cambio_2022 else None, nota=nota)
++
++
++# Anticipation (D20): the same outcome predicted from the other visits that come before the one where it is
++# recorded, to measure how early the model can warn. Each row is a copy of an "En uso" outcome with another
++# "Se predice en" and the key ``<clave>_desde_<visit>`` (``pmc`` for the entry to the program, else the leading
++# number of the visit: ``40``, ``3``...). They are "En prueba": they are trained only when asked for
++# (``MAIA_ANTICIPACION`` in the platform, ``clinico experimento`` here), so they never raise alerts by themselves.
++# The outcome of a base row keeps the row itself as one more starting visit of its family.
++VISITAS_CLINICAS = ('entrada PMC', '40 sem', '3 m EC', '6 m EC', '9 m EC', '12 m EC')
++# outcome -> the visit where it is recorded (the families of D20: readmission, oxygen and low development)
++EVENTO_EN = {'readm_3m': '3 m EC', 'readm_6m': '6 m EC', 'readm_9m': '9 m EC', 'readm_12m': '12 m EC',
++             'oxigeno_3m': '3 m EC', 'oxigeno_12m': '12 m EC', 'desarrollo_6m': '6 m EC', 'desarrollo_12m': '12 m EC'}
++
++
++def etiqueta_visita(momento: str) -> str:
++    """``entrada PMC`` -> ``pmc``; ``3 m EC`` -> ``3``; ``40 sem`` -> ``40``."""
++    return 'pmc' if momento == VISITAS_CLINICAS[0] else momento.split()[0]
+ 
+ 
++def _anticipacion(filas: list[dict]) -> list[dict]:
++    base = {f['clave']: f for f in filas}
++    nuevas = []
++    for clave, evento in EVENTO_EN.items():
++        fila = base[clave]
++        for momento in VISITAS_CLINICAS[:VISITAS_CLINICAS.index(evento)]:
++            if momento != fila['momento']:
++                nuevas.append({**fila, 'clave': f'{clave}_desde_{etiqueta_visita(momento)}',
++                               'nombre': f"{fila['nombre']} (riesgo calculado a {momento})",
++                               'estado': D.EN_PRUEBA, 'momento': momento})
++    return nuevas
++
++
+ def _desenlaces() -> pd.DataFrame:
+     uso = D.EN_USO
+     filas = [
+@@ -415,7 +445,7 @@
+                                         ('perimetro_cefalico', 'perimetro_bajo', 'perímetro cefálico bajo para la edad'))
+           for momento in ('40 sem', '3 m EC', '6 m EC', '9 m EC')),
+     ]
+-    return pd.DataFrame(filas)
++    return pd.DataFrame(filas + _anticipacion(filas))
+ 
+ 
+ def borrador_clinico() -> D.Diccionario:
+--- a/pruebas/test_alertas.py
++++ b/pruebas/test_alertas.py
+@@ -556,7 +556,7 @@
+     dic = replace(clinico, variables=variables, visitas=K.ETAPAS_SEVARTI, quiebres=K.QUIEBRES)
+     en_uso, prueba = CF.leer(dic), CF.leer(dic, prueba=True)
+     assert not en_uso.descartados and not prueba.descartados
+-    assert (len(en_uso.desenlaces), len(prueba.desenlaces)) == (14, 52)
++    assert (len(en_uso.desenlaces), len(prueba.desenlaces)) == (14, 73)   # 52 + the 21 anticipation rows (parche 09)
+     assert set(en_uso.desenlaces) < set(prueba.desenlaces)
+     assert {d.regla for d in prueba.desenlaces} <= set(AC.REGLAS)
+     assert all(d.negativos for d in prueba.desenlaces if d.regla == 'en_codigos')   # "no hay dato" is unknown
+--- a/pruebas/test_anticipacion.py
++++ b/pruebas/test_anticipacion.py
+@@ -0,0 +1,40 @@
++"""Anticipation (D20): the draft of the dictionary brings the same outcome predicted from the other visits, for the
++three families of the platform (readmission, oxygen and low development). Nothing connects to the real base."""
++from clinico import configuracion as CF
++from sevarti import diccionario as D
++from sevarti import kmc as K
++
++
++def _filas():
++    return K.borrador_clinico().desenlaces.set_index('clave')
++
++
++def test_las_filas_de_anticipacion_son_en_prueba_y_con_clave_nueva():
++    filas = _filas()
++    nuevas = filas[filas.index.str.match(r'^(?:readm|oxigeno|desarrollo)_\d+m_desde_')]
++    assert len(nuevas) == 21 and not filas.index.duplicated().any()
++    assert set(nuevas.estado) == {D.EN_PRUEBA}
++    assert 'readm_6m_desde_pmc' in nuevas.index and 'oxigeno_3m_desde_40' in nuevas.index
++    assert 'readm_40s_desde_pmc' not in filas.index, 'readm_40s ya se predice desde la primera visita'
++
++
++def test_cada_fila_copia_la_regla_de_su_desenlace_y_se_predice_antes_de_que_ocurra():
++    filas = _filas()
++    orden = {v: i for i, v in enumerate(K.VISITAS_CLINICAS)}
++    for clave, evento in K.EVENTO_EN.items():
++        propias = filas[filas.index.str.startswith(f'{clave}_desde_')]
++        assert len(propias), clave
++        for c, f in propias.iterrows():
++            assert f.regla == filas.at[clave, 'regla'] and f.variable == filas.at[clave, 'variable']
++            assert orden[f.momento] < orden[evento] and f.momento != filas.at[clave, 'momento'], c
++            assert c == f'{clave}_desde_{K.etiqueta_visita(f.momento)}'
++
++
++def test_la_configuracion_clinica_las_lee_sin_descartar_ninguna(meta):
++    dic = K.borrador(meta)
++    base = CF.leer(dic)   # en uso: sin las nuevas
++    todo = CF.leer(dic, prueba=True)
++    claves = {d.clave for d in todo.desenlaces}
++    assert not any('_desde_' in d.clave and d.clave.startswith(('readm', 'oxigeno', 'desarrollo')) for d in base.desenlaces)
++    assert {'readm_12m_desde_pmc', 'readm_12m_desde_6', 'oxigeno_12m_desde_9', 'desarrollo_12m_desde_9'} <= claves
++    assert not [c for c, _ in todo.descartados if c.startswith(('readm', 'oxigeno', 'desarrollo'))]

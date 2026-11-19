@@ -42,6 +42,7 @@ class Columna:
     numero: bool = False             # values stored as text (a datum as recorded) shown as numbers when they are
     lista: str = ''                  # the answers are the cells of this range (e.g. another sheet's first column)
     texto: bool = False              # read back as text even if it is not a column to fill (codes such as '9')
+    opcional: bool = False           # a file made before the column was added may lack it
 
     @property
     def para_llenar(self) -> bool:
@@ -219,7 +220,8 @@ def leer(libro: Libro, ruta: Path, nombre: str) -> pd.DataFrame:
             raise ValueError(f'{ruta.name} no tiene la hoja "{nombre}": no es un archivo que haya generado '
                              'este sistema. Hay que generarlo de nuevo con "muestra".')
         tabla = archivo.parse(nombre, dtype={c.titulo: str for c in hoja.columnas if c.para_llenar or c.texto})
-    faltan = [c.titulo for c in hoja.columnas if (c.para_llenar or c.texto or c.clave == 'id') and c.titulo not in tabla]
+    faltan = [c.titulo for c in hoja.columnas
+              if (c.para_llenar or c.texto or c.clave == 'id') and not c.opcional and c.titulo not in tabla]
     if faltan:
         raise ValueError(f'La hoja "{nombre}" de {ruta.name} no tiene las columnas {faltan}: '
                          'puede que hayan cambiado los encabezados.')

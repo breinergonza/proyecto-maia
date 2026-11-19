@@ -83,8 +83,6 @@ describe('administración de las ejecuciones', () => {
         : url === '/api/administracion/conexion' ? { cuerpo: conexion }
           : url.startsWith('/api/administracion/hiperparametros') ? { cuerpo: anomalias }
             : undefined))
-    const confirmar = vi.fn(() => false)
-    vi.stubGlobal('confirm', confirmar)
     montar('/admin/configuracion')
     const alpha = await screen.findByLabelText('Meta de falsas alertas por dato (capa 2)')
     expect(screen.getByText(/0,005 = 5 por cada 1\.000 datos/)).toBeInTheDocument()
@@ -97,7 +95,10 @@ describe('administración de las ejecuciones', () => {
     expect(screen.getByText(/0,05 = 50 por cada 1\.000 datos/)).toBeInTheDocument()
     expect(screen.queryByText(/veces (más|menos) que el valor del núcleo/)).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Volver a los del núcleo' }))
-    expect(confirmar).toHaveBeenCalled()
+    const d = await screen.findByRole('alertdialog')
+    expect(d).toHaveTextContent('No se puede deshacer')
+    await userEvent.click(within(d).getByRole('button', { name: 'Cancelar' }))
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     expect(llamadas.some((l) => l.init?.method === 'PUT')).toBe(false)     // no confirmó: no guarda
   })
 
@@ -107,16 +108,18 @@ describe('administración de las ejecuciones', () => {
       url === '/api/usuarios' ? { cuerpo: [{ ...usuario('admin'), ultimo_ingreso: null }, otra] }
         : url === `/api/usuarios/${otra.id}` && init?.method === 'PATCH' ? { cuerpo: { ...otra, rol: 'visualizador' } }
           : undefined))
-    const confirmar = vi.fn(() => false)
-    vi.stubGlobal('confirm', confirmar)
     montar('/admin/usuarios')
     const perfil = await screen.findByLabelText('Perfil de Ana Pérez')
     await userEvent.selectOptions(perfil, 'Consulta')
-    expect(confirmar).toHaveBeenCalledWith('¿Cambiar el perfil de Ana Pérez de Experto clínico a Consulta?')
+    const d = await screen.findByRole('alertdialog')
+    expect(d).toHaveTextContent('Ana Pérez')
+    expect(d).toHaveTextContent('Experto clínico')
+    expect(d).toHaveTextContent('Se puede deshacer')
+    await userEvent.click(within(d).getByRole('button', { name: 'Cancelar' }))
     expect(llamadas.some((l) => l.init?.method === 'PATCH')).toBe(false)
     expect(perfil).toHaveValue('experto')
-    confirmar.mockReturnValue(true)
     await userEvent.selectOptions(perfil, 'Consulta')
+    await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Cambiar perfil' }))
     await waitFor(() => expect(llamadas.some((l) => l.init?.method === 'PATCH')).toBe(true))
   })
 
@@ -158,7 +161,6 @@ describe('administración de las ejecuciones', () => {
         ? { cuerpo: { mlflow_url: null, anomalias: [anom], clinico: [run('c2', '5', '800', 0.83, ['candidato']), run('c1', '4', '600', 0.8, ['produccion'])] } }
         : url === '/api/entrenamientos/aprobar' ? { estado: 202, cuerpo: { id: 9 } }
           : undefined))
-    vi.stubGlobal('confirm', () => true)
     montar('/admin/entrenamientos')
     const clinico = (await screen.findByText('Alertas clínicas')).closest('section')!
     expect(within(clinico).getByText('produccion')).toBeInTheDocument()
@@ -173,6 +175,7 @@ describe('administración de las ejecuciones', () => {
     await userEvent.click(within(clinico).getByLabelText('Aprobar v5'))
     await userEvent.click(screen.getByLabelText('Aprobar v2'))
     await userEvent.click(screen.getByRole('button', { name: 'Aprobar y activar' }))
+    await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Activar en la solución' }))
     expect(await screen.findByText(/Aprobación en cola \(ejecución n\.º 9\)/)).toBeInTheDocument()
     const post = llamadas.find((l) => l.url === '/api/entrenamientos/aprobar')!
     expect(JSON.parse(String(post.init!.body))).toEqual({ fuente: 'kmc', anomalias: '2', clinico: '5' })

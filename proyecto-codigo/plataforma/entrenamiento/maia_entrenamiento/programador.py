@@ -47,6 +47,31 @@ USAN_DICCIONARIO = ('corrida', 'entrenamiento')
 NOMBRES_MODELO = {'anomalias': 'anomalías', 'clinico': 'clínico'}   # en los mensajes de la web
 
 Lanzador = Callable[[list[str], dict[str, str], Callable[[str], None]], int]
+BorrarModelo = Callable[[str, str], bool]
+LectorMetricas = Callable[[str, str], dict[str, float]]
+CADA_PURGAR = 3600.0   # segundos entre revisiones del borrado de modelos personales sin uso
+
+
+def borrar_en_mlflow(registro: str, version: str) -> bool:
+    from maia_entrenamiento import registro as R
+    R.configurar()
+    return R.borrar_version(registro, version)
+
+
+def metricas_en_mlflow(registro: str, version: str) -> dict[str, float]:
+    from maia_entrenamiento import registro as R
+    # las métricas son un adorno: no esperar a MLflow; se restauran para no contagiar a los procesos ``maia``
+    previo = {k: os.environ.get(k) for k in ('MLFLOW_HTTP_REQUEST_MAX_RETRIES', 'MLFLOW_HTTP_REQUEST_TIMEOUT')}
+    os.environ.update({'MLFLOW_HTTP_REQUEST_MAX_RETRIES': '0', 'MLFLOW_HTTP_REQUEST_TIMEOUT': '5'})
+    try:
+        R.configurar()
+        return R.metricas_de(registro, version)
+    finally:
+        for k, v in previo.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
 
 
 class FalloEjecucion(RuntimeError):
@@ -112,6 +137,9 @@ class Programador:
     cfg: Configuracion = field(default_factory=obtener)
     intervalo: float = 30.0
     diccionario: Path | None = None   # donde lo lee maia; por defecto MAIA_RAIZ/entradas/diccionario.xlsx
+    borrar_modelo: BorrarModelo = borrar_en_mlflow
+    leer_metricas: LectorMetricas = metricas_en_mlflow
+    _purgado: float = field(default=-CADA_PURGAR, repr=False)
 
     def __post_init__(self) -> None:
         self.motor = self.motor or db.motor()
@@ -131,6 +159,7 @@ class Programador:
             for e in EJ.vencer(s):
                 print(f'Programación {e.programacion_id}: ejecución {e.id} encolada.', flush=True)
             s.commit()
+        self.purgar()
         with Session(self.motor, expire_on_commit=False) as s:
             e = EJ.tomar(s)
             s.commit()
@@ -139,6 +168,23 @@ class Programador:
         print(f'Ejecución {e.id} ({e.tipo}, {e.fuente}) iniciada.', flush=True)
         self.atender(e)
         return e.id
+
+    def purgar(self, forzar: bool = False) -> list[int]:
+        """Borra los modelos personales descartados o con más de 90 días sin uso (a lo sumo una vez por hora). Nunca
+        hace fallar el ciclo."""
+        if not forzar and time.monotonic() - self._purgado < CADA_PURGAR:
+            return []
+        self._purgado = time.monotonic()
+        try:
+            with Session(self.motor) as s:
+                ids = EJ.purgar(s, self.borrar_modelo)
+                s.commit()
+        except Exception:   # MLflow caído o sin la migración: se reintenta en la próxima revisión
+            traceback.print_exc()
+            return []
+        if ids:
+            print(f'Modelos personales borrados (descartados o sin uso): {ids}.', flush=True)
+        return ids
 
     def bucle(self, parar: threading.Event | None = None) -> None:
         parar = parar or threading.Event()
@@ -236,6 +282,12 @@ class Programador:
         env.update({'MAIA_EJECUCION_ID': str(e.id), 'PYTHONUNBUFFERED': '1'})
         if e.programacion_id:
             env['MAIA_PROGRAMACION_ID'] = str(e.programacion_id)
+        # dueño y etiqueta Personal/Oficial en todo lo que se registra: quedan como tags en MLflow (corrida programada
+        # = oficial sin dueño; entrenamiento de la web = visibilidad y dueño de quien lo pidió)
+        env['MAIA_VISIBILIDAD'] = (e.parametros or {}).get('visibilidad') or 'oficial'
+        env.pop('MAIA_PROPIETARIO', None)
+        if e.solicitada_por:
+            env['MAIA_PROPIETARIO'] = str(e.solicitada_por)
         extrae = e.tipo == 'corrida' or (e.tipo == 'entrenamiento' and (e.parametros or {}).get('extraer'))
         if e.fuente == 'kmc' and extrae:
             with Session(self.motor) as s:
@@ -322,6 +374,8 @@ class Programador:
             args = ['entrenar', tipo, '--fuente', e.fuente]
             if fecha:
                 args += ['--fecha', fecha]
+            if p.get('muestra_id'):
+                args += ['--muestra', str(p['muestra_id'])]
             hp = (p.get('hiperparametros') or {}).get(tipo)
             if hp:
                 args += ['--hiperparametros', json.dumps(hp, sort_keys=True)]
@@ -332,8 +386,25 @@ class Programador:
                 fecha = m[1]
             hechos.append(paso)
         versiones = ' · '.join(f'{NOMBRES_MODELO.get(t, t)} v{v["version"]}' for t, v in modelos.items())
-        return {'paso': 'entrenado', 'hechos': hechos, 'modelos': modelos, 'corte': fecha,
+        metricas = self._metricas(modelos)
+        extra = {'metricas': metricas, **({'auc': metricas['clinico']['auc']}
+                                          if metricas.get('clinico', {}).get('auc') is not None else {})}
+        return {'paso': 'entrenado', 'hechos': hechos, 'modelos': modelos, 'corte': fecha, **extra,
                 'mensaje': f'Entrenado ({versiones}); quedó como candidato en MLflow. Apruébelo para usarlo.'}
+
+    def _metricas(self, modelos: dict[str, dict]) -> dict[str, dict[str, float]]:
+        """Las métricas principales de cada modelo entrenado (AUC del clínico, etc.) para el banco; si MLflow no las
+        entrega, el entrenamiento igual termina bien y el banco las deja vacías."""
+        from maia_comun.metricas import principales
+        salida: dict[str, dict[str, float]] = {}
+        for tipo, m in modelos.items():
+            try:
+                p = principales(tipo, self.leer_metricas(m['registro'], m['version']))
+            except Exception:
+                continue
+            if p:
+                salida[tipo] = p
+        return salida
 
     def _aprobacion(self, e: Ejecucion, al_linea: Callable[[str], None]) -> dict:
         p, env = e.parametros or {}, self._entorno(e)

@@ -17,12 +17,6 @@ x-maia: &maia
   MAIA_URL_PUBLICA: ${SERVICE_URL_WEB}
   MAIA_CIFRADO_CLAVE: ${SERVICE_BASE64_64_CIFRADO}    # cifra la clave de la base de la entidad guardada desde la web
   MAIA_ZONA_HORARIA: ${MAIA_ZONA_HORARIA:-America/Bogota}
-  SMTP_HOST: ${SMTP_HOST:-localhost}
-  SMTP_PORT: ${SMTP_PORT:-587}
-  SMTP_USUARIO: ${SMTP_USUARIO:-}
-  SMTP_CLAVE: ${SMTP_CLAVE:-}
-  SMTP_REMITENTE: ${SMTP_REMITENTE:-alertas@maia.local}
-  SMTP_TLS: ${SMTP_TLS:-true}
 
 x-mlflow-cliente: &mlflow-cliente                 # MLflow con autenticación nativa: trainer y API entran como el admin
   MLFLOW_TRACKING_URI: http://mlflow:5000
@@ -117,6 +111,8 @@ services:
       postgres: {condition: service_healthy}
       minio-init: {condition: service_completed_successfully}
       mlflow: {condition: service_started}
+      # solo la API aplica las migraciones al arrancar: sin esperarla, el trainer podría usar un esquema desactualizado
+      api: {condition: service_healthy}
     exclude_from_hc: true
     restart: unless-stopped
 

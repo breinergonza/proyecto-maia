@@ -13,7 +13,7 @@ from clinico import modelo as AC
 from sevarti import contrato as SV
 from sevarti import diccionario as D
 from sevarti import kmc as K
-from conftest import CFG
+from datos_nucleo import CFG
 
 
 # ------------------------------------------------------------------ growth
@@ -556,7 +556,7 @@ def test_el_borrador_clinico_de_kmc_trae_los_desenlaces_en_uso_y_en_prueba_y_tod
     dic = replace(clinico, variables=variables, visitas=K.ETAPAS_SEVARTI, quiebres=K.QUIEBRES)
     en_uso, prueba = CF.leer(dic), CF.leer(dic, prueba=True)
     assert not en_uso.descartados and not prueba.descartados
-    assert (len(en_uso.desenlaces), len(prueba.desenlaces)) == (14, 52)
+    assert (len(en_uso.desenlaces), len(prueba.desenlaces)) == (14, 73)   # 52 + the 21 anticipation rows (parche 09)
     assert set(en_uso.desenlaces) < set(prueba.desenlaces)
     assert {d.regla for d in prueba.desenlaces} <= set(AC.REGLAS)
     assert all(d.negativos for d in prueba.desenlaces if d.regla == 'en_codigos')   # "no hay dato" is unknown
