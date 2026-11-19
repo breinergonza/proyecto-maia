@@ -208,17 +208,25 @@ class _Grupo:
             return f'{col} IN ({self.frag.sql})', dict(self.frag.params)
         return f'{col} = ANY(:i)', {'i': self.ids()}
 
+    def union(self, col: str) -> tuple[str, dict]:
+        """``JOIN`` con el grupo: Postgres lo resuelve como un semi-join con hash. ``col IN (subconsulta)`` dentro de un
+        ``FILTER`` se evalúa fila por fila y, con decenas de miles de niños, tarda segundos."""
+        if self.frag is not None:
+            return f'JOIN ({self.frag.sql}) g ON g.sujeto = {col}', dict(self.frag.params)
+        return f'JOIN unnest(CAST(:i AS text[])) AS g(sujeto) ON g.sujeto = {col}', {'i': self.ids()}
+
     def n(self) -> int:
         if self.frag is not None:
             return self.s.execute(text(f'SELECT count(*) FROM ({self.frag.sql}) q'), self.frag.params).scalar_one()
         return len(self.ids())
 
 def _lista_sede(s: Session, c: int, g: _Grupo) -> dict:
-    cond, p = g.cond('sujeto')
-    filas = s.execute(text(f'SELECT grupo, count(*) FILTER (WHERE {cond}) AS n '
-                           'FROM sevarti.sujetos WHERE corte_id = :c AND grupo IS NOT NULL GROUP BY grupo'),
-                      {'c': c, **p}).all()
-    return {'opciones': sorted(({'valor': M.canonico(x), 'etiqueta': M.canonico(x), 'n': n} for x, n in filas),
+    union, p = g.union('u.sujeto')
+    cuentan = dict(s.execute(text(f'SELECT u.grupo, count(*) FROM sevarti.sujetos u {union} '
+                                  'WHERE u.corte_id = :c AND u.grupo IS NOT NULL GROUP BY u.grupo'), {'c': c, **p}).all())
+    todas = [x for (x,) in s.execute(text('SELECT DISTINCT grupo FROM sevarti.sujetos WHERE corte_id = :c AND grupo IS NOT NULL'),
+                                     {'c': c})]
+    return {'opciones': sorted(({'valor': M.canonico(x), 'etiqueta': M.canonico(x), 'n': cuentan.get(x, 0)} for x in todas),
                                key=lambda o: (len(o['valor']), o['valor']))}
 
 
@@ -238,20 +246,26 @@ def _lista_eg(s: Session, c: int, g: _Grupo) -> dict:
 
 
 def _conteos_en_lote(s: Session, c: int, g: _Grupo, nombres: Sequence[str]) -> dict[str, list[tuple]]:
-    """Una sola lectura de ``atributos_sujeto`` para las variables de lista de un mismo grupo: ``{nombre: [(valor,
-    valor_num, n)]}``. Las de texto libre (muchos valores distintos, que no son facetas) y las que no tienen datos no
-    aparecen en el resultado."""
+    """Conteos por opción de las variables de lista de un mismo grupo, con dos lecturas de ``atributos_sujeto``:
+    ``{nombre: [(valor, valor_num, n)]}``. Las opciones salen de todo el corte (una sin niños queda con ``n`` 0) y los
+    conteos de un ``JOIN`` con el grupo. Las de texto libre (muchos valores distintos, que no son facetas) y las que no
+    tienen datos no aparecen en el resultado."""
     if not nombres:
         return {}
-    cond, p = g.cond('sujeto')
-    filas = s.execute(text(
-        f'SELECT variable, valor, valor_num, count(*) FILTER (WHERE {cond}) AS n FROM sevarti.atributos_sujeto '
-        'WHERE corte_id = :c AND variable IN (SELECT variable FROM sevarti.atributos_sujeto WHERE corte_id = :c '
-        '  AND variable = ANY(:vs) GROUP BY variable HAVING count(DISTINCT valor) <= :tope) '
-        'GROUP BY variable, valor, valor_num'), {'c': c, 'vs': list(nombres), 'tope': 4 * MAX_OPCIONES, **p}).all()
+    opciones = s.execute(text(
+        'SELECT variable, valor, valor_num FROM sevarti.atributos_sujeto WHERE corte_id = :c AND variable = ANY(:vs) '
+        'AND variable IN (SELECT variable FROM sevarti.atributos_sujeto WHERE corte_id = :c AND variable = ANY(:vs) '
+        '                 GROUP BY variable HAVING count(DISTINCT valor) <= :tope) '
+        'GROUP BY variable, valor, valor_num'), {'c': c, 'vs': list(nombres), 'tope': 4 * MAX_OPCIONES}).all()
+    validas = sorted({v for v, _, _ in opciones})
+    union, p = g.union('a.sujeto')
+    cuentan = {(v, va, nu): n for v, va, nu, n in s.execute(text(
+        f'SELECT a.variable, a.valor, a.valor_num, count(*) FROM sevarti.atributos_sujeto a {union} '
+        'WHERE a.corte_id = :c AND a.variable = ANY(:vs) GROUP BY a.variable, a.valor, a.valor_num'),
+        {'c': c, 'vs': validas, **p})} if validas else {}
     salida: dict[str, list[tuple]] = {}
-    for var, valor, num, n in filas:
-        salida.setdefault(var, []).append((valor, num, n))
+    for v, va, nu in opciones:
+        salida.setdefault(v, []).append((va, nu, cuentan.get((v, va, nu), 0)))
     return salida
 
 
@@ -304,10 +318,7 @@ def _lista_atributo(s: Session, c: int, v: str, nombre: str, g: _Grupo, tipo: st
     if lect is None and pre is not None:
         filas = pre
     elif lect is None:
-        cond, p = g.cond('sujeto')
-        filas = s.execute(text(f'SELECT valor, valor_num, count(*) FILTER (WHERE {cond}) AS n '
-                               'FROM sevarti.atributos_sujeto WHERE corte_id = :c AND variable = :v '
-                               'GROUP BY valor, valor_num'), {'c': c, 'v': nombre, **p}).all()
+        filas = _conteos_en_lote(s, c, g, [nombre]).get(nombre, [])
     else:
         g = lect.drop_duplicates(['sujeto', 'txt']).groupby(['txt', 'num'], dropna=False).size()
         filas = [(txt, None if pd.isna(num) else float(num), int(n)) for (txt, num), n in g.items()]
