@@ -114,6 +114,18 @@ describe('analítica: estados', () => {
   })
 })
 
+describe('analítica: anticipación sin datos', () => {
+  it('pendiente muestra el motivo que manda la API y, a quien administra, el enlace a Entrenamientos', async () => {
+    api('admin', (url) => (url.startsWith('/api/analitica/7/anticipacion')
+      ? { cuerpo: { estado: 'pendiente', entrenamiento: 7, submodulo: 'anticipacion', mensaje: 'Sin desenlaces desde varias visitas.', desenlaces: {} } }
+      : undefined))
+    montar('/analitica/anticipacion?entrenamiento=7')
+    expect(await screen.findByText('Este análisis estará disponible pronto')).toBeInTheDocument()
+    expect(screen.getByText('Sin desenlaces desde varias visitas.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Ir a Entrenamientos' })).toHaveAttribute('href', '/admin/entrenamientos')
+  })
+})
+
 describe('analítica: a cuántos niños se alerta', () => {
   it('empieza en 10 % y el control deslizante recalcula las cifras en el navegador', async () => {
     const llamadas = api('experto')
