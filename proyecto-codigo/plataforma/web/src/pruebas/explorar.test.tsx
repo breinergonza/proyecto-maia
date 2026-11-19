@@ -217,6 +217,19 @@ describe('explorar', () => {
     await waitFor(() => expect(screen.getByTestId('ubicacion')).toHaveTextContent(/^$/))
   })
 
+  it('una variable agregada con «+ Agregar variable» se puede retirar, con su filtro', async () => {
+    api('experto')
+    montar('/explorar?f=peso_nacer|numero|1000|2000', <Ubicacion />)
+    expect(await screen.findByRole('button', { name: 'Quitar variable Peso al nacer' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar variable Peso al nacer' }))
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Quitar variable Peso al nacer' })).not.toBeInTheDocument())
+    expect(screen.getByTestId('ubicacion')).not.toHaveTextContent('peso_nacer')
+    // una variable agregada sin filtro también se retira
+    fireEvent.change(screen.getByLabelText('Agregar variable'), { target: { value: 'peso_nacer' } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Quitar variable Peso al nacer' }))
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Quitar variable Peso al nacer' })).not.toBeInTheDocument())
+  })
+
   it('con menos de 20 niños dice que no hay cifras y no dibuja nada', async () => {
     api('visualizador', { insuficiente: true, ninos: null, minimo: 20 })
     montar('/explorar?f=sexo|lista|F')

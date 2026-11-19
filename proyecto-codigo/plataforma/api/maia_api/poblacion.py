@@ -223,11 +223,26 @@ def _lista_eg(s: Session, c: int, g: _Grupo) -> dict:
                          for cat, lo, hi in CATEGORIAS_EG]}
 
 
+def _conteos_en_lote(s: Session, c: int, g: _Grupo, nombres: Sequence[str]) -> dict[str, list[tuple]]:
+    """Una sola lectura de ``atributos_sujeto`` para todas las variables de un mismo grupo: ``{nombre: [(valor,
+    valor_num, n)]}``. Pedirlas de a una (decenas de consultas sobre millones de filas) era lo que tardaba."""
+    cond, p = g.cond('sujeto')
+    filas = s.execute(text(f'SELECT variable, valor, valor_num, count(*) FILTER (WHERE {cond}) AS n '
+                           'FROM sevarti.atributos_sujeto WHERE corte_id = :c AND variable = ANY(:vs) '
+                           'GROUP BY variable, valor, valor_num'), {'c': c, 'vs': list(nombres), **p}).all()
+    salida: dict[str, list[tuple]] = {n: [] for n in nombres}
+    for var, valor, num, n in filas:
+        salida[var].append((valor, num, n))
+    return salida
+
+
 def _lista_atributo(s: Session, c: int, v: str, nombre: str, g: _Grupo, tipo: str, etiquetas: dict,
-                    lect: pd.DataFrame | None = None) -> dict | None:
+                    lect: pd.DataFrame | None = None, pre: list[tuple] | None = None) -> dict | None:
     """Conteos por opción. Con ``lect`` (las lecturas de ``alguna`` o de una etapa) se cuenta cada niño una vez por
     opción; sin ella, se cuenta en Postgres sobre ``atributos_sujeto`` (primera o última medición)."""
-    if lect is None:
+    if lect is None and pre is not None:
+        filas = pre
+    elif lect is None:
         cond, p = g.cond('sujeto')
         filas = s.execute(text(f'SELECT valor, valor_num, count(*) FILTER (WHERE {cond}) AS n '
                                'FROM sevarti.atributos_sujeto WHERE corte_id = :c AND variable = :v '
@@ -264,10 +279,14 @@ def _resumen_numerico(valores: list[float], ninos: int, redondear: bool) -> dict
             'bins': [{'desde': b['desde'], 'hasta': b['hasta'], **cifra(b['n'], redondear)} for b in r['bins']]}
 
 
-def _numerica(s: Session, c: int, nombre: str, g: _Grupo, redondear: bool, lect: pd.DataFrame | None = None) -> dict:
+def _numerica(s: Session, c: int, nombre: str, g: _Grupo, redondear: bool, lect: pd.DataFrame | None = None,
+              pre: list[tuple] | None = None) -> dict:
     if lect is not None:
         v = lect.dropna(subset=['num'])
         return _resumen_numerico(list(v.num.astype(float)), int(v.sujeto.nunique()), redondear)
+    if pre is not None:
+        valores = [float(num) for _, num, n in pre if num is not None for _ in range(n)]
+        return _resumen_numerico(valores, len(valores), redondear)
     cond, p = g.cond('sujeto')
     valores = [x for (x,) in s.execute(text('SELECT valor_num FROM sevarti.atributos_sujeto WHERE corte_id = :c '
                                             f'AND variable = :v AND valor_num IS NOT NULL AND {cond}'),
@@ -307,9 +326,23 @@ def facetas(s: Session, corte_id: int, muestra: dict | None, redondear: bool = F
 
     salida: dict[str, dict] = {}
     pedir = list(dict.fromkeys([*por_variable, *(str(e['variable']) for e in (extra or []) if e.get('variable'))]))
-    for v in elegir_facetas(esq, len(sedes(s, corte_id)) > 1, pedir):
-        ids = cumplen((v, misma[v]) if v in misma and (v in por_variable or misma[v] in por_variable) else
-                      (v,) if v in por_variable else ())
+    elegidas = elegir_facetas(esq, len(sedes(s, corte_id)) > 1, pedir)
+
+    def excluidas_de(v: str) -> tuple[str, ...]:
+        return ((v, misma[v]) if v in misma and (v in por_variable or misma[v] in por_variable) else
+                (v,) if v in por_variable else ())
+
+    # las variables que se leen de ``atributos_sujeto`` y comparten grupo de niños se cuentan en una sola consulta
+    lote: dict[tuple[str, ...], list[str]] = {}
+    for v in elegidas:
+        if v in M.VIRTUALES:
+            continue
+        cuando = _regla_de(filas, v, por_variable.get(v), pedidas)
+        if cuando in (None, 'primera', 'ultima'):
+            lote.setdefault(excluidas_de(v), []).append(v + (M.SUFIJO_ULTIMA if cuando == 'ultima' else ''))
+    precargado = {k: _conteos_en_lote(s, corte_id, cumplen(k), nombres) for k, nombres in lote.items()}
+    for v in elegidas:
+        ids = cumplen(excluidas_de(v))
         tipo = tipo_de(filas, v)
         cuando = _regla_de(filas, v, por_variable.get(v), pedidas)
         nombre = v + (M.SUFIJO_ULTIMA if cuando == 'ultima' else '')
@@ -331,9 +364,9 @@ def facetas(s: Session, corte_id: int, muestra: dict | None, redondear: bool = F
             sem = _semanas(s, corte_id, ids)
             r = _resumen_numerico(sem, len(sem), redondear)
         elif tipo == 'numero':
-            r = _numerica(s, corte_id, nombre, ids, redondear, lect)
+            r = _numerica(s, corte_id, nombre, ids, redondear, lect, precargado.get(excluidas_de(v), {}).get(nombre))
         else:
-            r = _lista_atributo(s, corte_id, v, nombre, ids, tipo, etiquetas, lect)
+            r = _lista_atributo(s, corte_id, v, nombre, ids, tipo, etiquetas, lect, precargado.get(excluidas_de(v), {}).get(nombre))
             if r is None:
                 continue
         for o in r.get('opciones', []):
