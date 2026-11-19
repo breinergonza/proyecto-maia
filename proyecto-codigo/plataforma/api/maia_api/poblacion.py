@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import time
+from contextlib import contextmanager
+from contextvars import ContextVar
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
@@ -171,6 +173,21 @@ def disponibles(esquema: pd.DataFrame, ofrecidas: Sequence[str]) -> list[dict]:
 
 # ---------------------------------------------------------------- facetas
 
+_FASES: ContextVar[dict | None] = ContextVar('fases_facetas', default=None)
+
+
+@contextmanager
+def _medir(fase: str):
+    """Suma lo que tarda una consulta en ``tiempos`` (la misma cabecera ``Server-Timing`` de ``facetas``)."""
+    t0 = time.perf_counter()
+    try:
+        yield
+    finally:
+        d = _FASES.get()
+        if d is not None:
+            d[fase] = round(d.get(fase, 0) + (time.perf_counter() - t0) * 1000, 1)
+
+
 class _Reloj:
     """Cuánto tarda cada fase de ``facetas`` (se informa en la cabecera ``Server-Timing`` de la respuesta)."""
     def __init__(self, destino: dict[str, float] | None):
@@ -252,14 +269,16 @@ def _conteos_en_lote(s: Session, c: int, g: _Grupo, nombres: Sequence[str]) -> d
     tienen datos no aparecen en el resultado."""
     if not nombres:
         return {}
-    opciones = s.execute(text(
+    with _medir('cat_opciones'):
+      opciones = s.execute(text(
         'SELECT variable, valor, valor_num FROM sevarti.atributos_sujeto WHERE corte_id = :c AND variable = ANY(:vs) '
         'AND variable IN (SELECT variable FROM sevarti.atributos_sujeto WHERE corte_id = :c AND variable = ANY(:vs) '
         '                 GROUP BY variable HAVING count(DISTINCT valor) <= :tope) '
         'GROUP BY variable, valor, valor_num'), {'c': c, 'vs': list(nombres), 'tope': 4 * MAX_OPCIONES}).all()
     validas = sorted({v for v, _, _ in opciones})
     union, p = g.union('a.sujeto')
-    cuentan = {(v, va, nu): n for v, va, nu, n in s.execute(text(
+    with _medir('cat_conteo'):
+      cuentan = {(v, va, nu): n for v, va, nu, n in s.execute(text(
         f'SELECT a.variable, a.valor, a.valor_num, count(*) FROM sevarti.atributos_sujeto a {union} '
         'WHERE a.corte_id = :c AND a.variable = ANY(:vs) GROUP BY a.variable, a.valor, a.valor_num'),
         {'c': c, 'vs': validas, **p})} if validas else {}
@@ -276,7 +295,8 @@ def _numericas_en_lote(s: Session, c: int, g: _Grupo, nombres: Sequence[str]) ->
         return {}
     cond, p = g.cond('a.sujeto')
     base = {'c': c, 'vs': list(nombres), **p}
-    lim = {v: (lo, hi, n) for v, lo, hi, n in s.execute(text(
+    with _medir('num_limites'):
+      lim = {v: (lo, hi, n) for v, lo, hi, n in s.execute(text(
         'SELECT a.variable, min(a.valor_num), max(a.valor_num), count(a.valor_num) FROM sevarti.atributos_sujeto a '
         f'WHERE a.corte_id = :c AND a.variable = ANY(:vs) AND a.valor_num IS NOT NULL AND {cond} GROUP BY a.variable'), base)}
     anchas = [v for v, (lo, hi, _) in lim.items() if lo != hi]
@@ -290,11 +310,13 @@ def _numericas_en_lote(s: Session, c: int, g: _Grupo, nombres: Sequence[str]) ->
         for i, v in enumerate(anchas):
             params[f'v{i}'], params[f't{i}'] = v, [float(x) for x in bordes[v][1:-1]]
             casos.append(f'WHEN :v{i} THEN width_bucket(a.valor_num, CAST(:t{i} AS float8[]))')
-        for v, cub, n in s.execute(text(
+        with _medir('num_histograma'):
+          filas_h = list(s.execute(text(
                 f'SELECT a.variable, CASE a.variable {" ".join(casos)} END AS cub, count(*) '
                 'FROM sevarti.atributos_sujeto a '
                 f'WHERE a.corte_id = :c AND a.variable = ANY(:bv) AND a.valor_num IS NOT NULL AND {cond} GROUP BY 1, 2'),
-                params):
+                params))
+        for v, cub, n in filas_h:
             cuentas[v][int(cub) + 1] = n
     salida = {}
     for v in nombres:
@@ -382,6 +404,7 @@ def facetas(s: Session, corte_id: int, muestra: dict | None, redondear: bool = F
     sin niños sale con ``n`` 0 y texto «0»: es un cero real, no un dato oculto. ``extra``: variables que se pidieron
     además de las de siempre, ``[{"variable", "cuando"}]``; las que ya están en el filtro se agregan solas."""
     marca = _Reloj(tiempos)
+    _FASES.set(tiempos)
     esq = esquema_de_db(s, corte_id)
     marca('esquema')
     filas = {str(r['variable']): r for r in esq.to_dict('records')}

@@ -448,7 +448,7 @@ export interface AnaliticaContexto {
   entrenamientos: { entrenamiento: number; creada?: string | null; version_registro?: string | number | null }[]
 }
 export interface RespuestaAnalitica<T = Record<string, unknown>> {
-  estado: 'ok' | 'pendiente' | 'sin_artefactos'; entrenamiento: number; submodulo: string
+  estado: 'ok' | 'pendiente' | 'sin_artefactos'; entrenamiento: number; submodulo: string; mensaje?: string
   meta?: AnaliticaMeta; desenlaces?: Record<string, T>
 }
 export interface AucIc { auc: number | null; ic_bajo: number | null; ic_alto: number | null; n: number; casos: number | null }

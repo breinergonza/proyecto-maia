@@ -77,10 +77,17 @@ export function Guia({ children }: { children: ReactNode }) {
 }
 
 // ------------------------------------------------------------------ estados de la respuesta
-export function EstadoVacio({ estado }: { estado: 'sin_artefactos' | 'pendiente' }) {
+export function EstadoVacio({ estado, mensaje }: { estado: 'sin_artefactos' | 'pendiente'; mensaje?: string }) {
   const { usuario } = useSesion()
   if (estado === 'pendiente') {
-    return <Vacio titulo="Este análisis estará disponible pronto">Todavía no se calcula para este modelo. Cuando esté listo aparecerá aquí.</Vacio>
+    return (
+      <Vacio titulo="Este análisis estará disponible pronto">
+        <p>{mensaje ?? 'Todavía no se calcula para este modelo. Cuando esté listo aparecerá aquí.'}</p>
+        {mensaje && puede(usuario, ['admin']) && (
+          <p className="mt-2"><Link to="/admin/entrenamientos" className="font-semibold text-teal underline">Ir a Entrenamientos</Link></p>
+        )}
+      </Vacio>
+    )
   }
   return (
     <Vacio titulo="Este entrenamiento es anterior a la analítica">
@@ -95,7 +102,7 @@ export function Resultado<T>({ consulta, children }: { consulta: UseQueryResult<
   if (consulta.isPending) return consulta.fetchStatus === 'idle' ? <Cargando texto="Buscando el entrenamiento…" /> : <Cargando />
   if (consulta.isError) return <Aviso>No se pudo cargar este análisis. Intente de nuevo en un momento.</Aviso>
   const r = consulta.data
-  if (r.estado !== 'ok') return <EstadoVacio estado={r.estado} />
+  if (r.estado !== 'ok') return <EstadoVacio estado={r.estado} mensaje={r.estado === 'pendiente' ? r.mensaje : undefined} />
   return <>{children(r)}</>
 }
 
