@@ -4,9 +4,9 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
-from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 import numpy as np
