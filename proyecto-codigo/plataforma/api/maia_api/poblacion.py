@@ -7,6 +7,7 @@ import time
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
+import numpy as np
 import pandas as pd
 from fastapi import HTTPException, status
 from sqlalchemy import text
@@ -237,15 +238,62 @@ def _lista_eg(s: Session, c: int, g: _Grupo) -> dict:
 
 
 def _conteos_en_lote(s: Session, c: int, g: _Grupo, nombres: Sequence[str]) -> dict[str, list[tuple]]:
-    """Una sola lectura de ``atributos_sujeto`` para todas las variables de un mismo grupo: ``{nombre: [(valor,
-    valor_num, n)]}``. Pedirlas de a una (decenas de consultas sobre millones de filas) era lo que tardaba."""
+    """Una sola lectura de ``atributos_sujeto`` para las variables de lista de un mismo grupo: ``{nombre: [(valor,
+    valor_num, n)]}``. Las de texto libre (muchos valores distintos, que no son facetas) y las que no tienen datos no
+    aparecen en el resultado."""
+    if not nombres:
+        return {}
     cond, p = g.cond('sujeto')
-    filas = s.execute(text(f'SELECT variable, valor, valor_num, count(*) FILTER (WHERE {cond}) AS n '
-                           'FROM sevarti.atributos_sujeto WHERE corte_id = :c AND variable = ANY(:vs) '
-                           'GROUP BY variable, valor, valor_num'), {'c': c, 'vs': list(nombres), **p}).all()
-    salida: dict[str, list[tuple]] = {n: [] for n in nombres}
+    filas = s.execute(text(
+        f'SELECT variable, valor, valor_num, count(*) FILTER (WHERE {cond}) AS n FROM sevarti.atributos_sujeto '
+        'WHERE corte_id = :c AND variable IN (SELECT variable FROM sevarti.atributos_sujeto WHERE corte_id = :c '
+        '  AND variable = ANY(:vs) GROUP BY variable HAVING count(DISTINCT valor) <= :tope) '
+        'GROUP BY variable, valor, valor_num'), {'c': c, 'vs': list(nombres), 'tope': 4 * MAX_OPCIONES, **p}).all()
+    salida: dict[str, list[tuple]] = {}
     for var, valor, num, n in filas:
-        salida[var].append((valor, num, n))
+        salida.setdefault(var, []).append((valor, num, n))
+    return salida
+
+
+def _numericas_en_lote(s: Session, c: int, g: _Grupo, nombres: Sequence[str]) -> dict[str, dict]:
+    """Resumen (mínimo, máximo y histograma de ``MAX_BINS`` tramos) de cada variable numérica del grupo, calculado en
+    Postgres: no se traen las decenas de miles de valores por variable. Mismos tramos que ``muestra._numerica``."""
+    if not nombres:
+        return {}
+    cond, p = g.cond('a.sujeto')
+    base = {'c': c, 'vs': list(nombres), **p}
+    lim = {v: (lo, hi, n) for v, lo, hi, n in s.execute(text(
+        'SELECT a.variable, min(a.valor_num), max(a.valor_num), count(a.valor_num) FROM sevarti.atributos_sujeto a '
+        f'WHERE a.corte_id = :c AND a.variable = ANY(:vs) AND a.valor_num IS NOT NULL AND {cond} GROUP BY a.variable'), base)}
+    anchas = [v for v, (lo, hi, _) in lim.items() if lo != hi]
+    bordes = {v: np.linspace(float(lim[v][0]), float(lim[v][1]), M.MAX_BINS + 1) for v in anchas}
+    cuentas: dict[str, dict[int, int]] = {v: {} for v in anchas}
+    if anchas:
+        # los mismos bordes que ``np.histogram`` (tramos [a, b), el último cerrado): ``width_bucket`` con la lista de
+        # bordes interiores da el tramo 0..N-1 y no se parte distinto un valor que cae justo en un borde
+        params: dict = {**base, 'bv': anchas}
+        casos = []
+        for i, v in enumerate(anchas):
+            params[f'v{i}'], params[f't{i}'] = v, [float(x) for x in bordes[v][1:-1]]
+            casos.append(f'WHEN :v{i} THEN width_bucket(a.valor_num, CAST(:t{i} AS float8[]))')
+        for v, cub, n in s.execute(text(
+                f'SELECT a.variable, CASE a.variable {" ".join(casos)} END AS cub, count(*) '
+                'FROM sevarti.atributos_sujeto a '
+                f'WHERE a.corte_id = :c AND a.variable = ANY(:bv) AND a.valor_num IS NOT NULL AND {cond} GROUP BY 1, 2'),
+                params):
+            cuentas[v][int(cub) + 1] = n
+    salida = {}
+    for v in nombres:
+        if v not in lim:
+            salida[v] = {'n': 0, 'min': None, 'max': None, 'bins': []}
+            continue
+        lo, hi, n = float(lim[v][0]), float(lim[v][1]), int(lim[v][2])
+        if lo == hi:
+            salida[v] = {'n': n, 'min': lo, 'max': hi, 'bins': [{'desde': lo, 'hasta': hi, 'n': n}]}
+            continue
+        salida[v] = {'n': n, 'min': lo, 'max': hi, 'bins': [
+            {'desde': float(a), 'hasta': float(b), 'n': cuentas[v].get(i + 1, 0)}
+            for i, (a, b) in enumerate(zip(bordes[v][:-1], bordes[v][1:]))]}
     return salida
 
 
@@ -286,20 +334,22 @@ def _lista_atributo(s: Session, c: int, v: str, nombre: str, g: _Grupo, tipo: st
     return {'opciones': opciones}
 
 
-def _resumen_numerico(valores: list[float], ninos: int, redondear: bool) -> dict:
-    r = M._numerica(pd.Series(valores, dtype=float))
+def _resumen_de(r: dict, ninos: int, redondear: bool) -> dict:
     return {'cifra': cifra(ninos, redondear), 'min': r['min'], 'max': r['max'],
             'bins': [{'desde': b['desde'], 'hasta': b['hasta'], **cifra(b['n'], redondear)} for b in r['bins']]}
 
 
+def _resumen_numerico(valores: list[float], ninos: int, redondear: bool) -> dict:
+    return _resumen_de(M._numerica(pd.Series(valores, dtype=float)), ninos, redondear)
+
+
 def _numerica(s: Session, c: int, nombre: str, g: _Grupo, redondear: bool, lect: pd.DataFrame | None = None,
-              pre: list[tuple] | None = None) -> dict:
+              pre: dict | None = None) -> dict:
     if lect is not None:
         v = lect.dropna(subset=['num'])
         return _resumen_numerico(list(v.num.astype(float)), int(v.sujeto.nunique()), redondear)
     if pre is not None:
-        valores = [float(num) for _, num, n in pre if num is not None for _ in range(n)]
-        return _resumen_numerico(valores, len(valores), redondear)
+        return _resumen_de(pre, pre['n'], redondear)
     cond, p = g.cond('sujeto')
     valores = [x for (x,) in s.execute(text('SELECT valor_num FROM sevarti.atributos_sujeto WHERE corte_id = :c '
                                             f'AND variable = :v AND valor_num IS NOT NULL AND {cond}'),
@@ -351,13 +401,16 @@ def facetas(s: Session, corte_id: int, muestra: dict | None, redondear: bool = F
 
     # las variables que se leen de ``atributos_sujeto`` y comparten grupo de niños se cuentan en una sola consulta
     lote: dict[tuple[str, ...], list[str]] = {}
+    lote_num: dict[tuple[str, ...], list[str]] = {}
     for v in elegidas:
         if v in M.VIRTUALES:
             continue
         cuando = _regla_de(filas, v, por_variable.get(v), pedidas)
         if cuando in (None, 'primera', 'ultima'):
-            lote.setdefault(excluidas_de(v), []).append(v + (M.SUFIJO_ULTIMA if cuando == 'ultima' else ''))
+            nombre = v + (M.SUFIJO_ULTIMA if cuando == 'ultima' else '')
+            (lote_num if tipo_de(filas, v) == 'numero' else lote).setdefault(excluidas_de(v), []).append(nombre)
     precargado = {k: _conteos_en_lote(s, corte_id, cumplen(k), nombres) for k, nombres in lote.items()}
+    precargado_num = {k: _numericas_en_lote(s, corte_id, cumplen(k), nombres) for k, nombres in lote_num.items()}
     marca('lote')
     for v in elegidas:
         ids = cumplen(excluidas_de(v))
@@ -382,9 +435,12 @@ def facetas(s: Session, corte_id: int, muestra: dict | None, redondear: bool = F
             sem = _semanas(s, corte_id, ids)
             r = _resumen_numerico(sem, len(sem), redondear)
         elif tipo == 'numero':
-            r = _numerica(s, corte_id, nombre, ids, redondear, lect, precargado.get(excluidas_de(v), {}).get(nombre))
+            r = _numerica(s, corte_id, nombre, ids, redondear, lect, precargado_num.get(excluidas_de(v), {}).get(nombre))
         else:
-            r = _lista_atributo(s, corte_id, v, nombre, ids, tipo, etiquetas, lect, precargado.get(excluidas_de(v), {}).get(nombre))
+            pre = precargado.get(excluidas_de(v), {}).get(nombre) if lect is None else None
+            if lect is None and pre is None:   # texto libre o sin datos: no es una faceta
+                continue
+            r = _lista_atributo(s, corte_id, v, nombre, ids, tipo, etiquetas, lect, pre)
             if r is None:
                 continue
         for o in r.get('opciones', []):
