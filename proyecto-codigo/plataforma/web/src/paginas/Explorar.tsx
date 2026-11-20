@@ -13,6 +13,7 @@ import { Grafica } from '../components/grafica'
 import { cuerpoDeFacetas, cuerpoDeFiltros, GrupoActivo } from '../components/GrupoActivo'
 import { PanelFacetas } from '../components/PanelFacetas'
 import { Aviso, Boton, Cargando, Encabezado, Vacio } from '../components/ui'
+import { PanelPestana, Pestanas, usePestanaEnUrl } from '../components/ui/Pestanas'
 import { descripcionDe } from '../lib/descripciones'
 import { datosAl } from '../lib/lenguaje'
 import { num, pct } from '../lib/formato'
@@ -68,7 +69,16 @@ function Error({ error }: { error: Error }) {
   return <Aviso>{error.message}</Aviso>
 }
 
+const GRAFICAS = [
+  { clave: 'riesgo', texto: 'Riesgo' },
+  { clave: 'crecimiento', texto: 'Crecimiento' },
+  { clave: 'quienes', texto: 'Quiénes son' },
+] as const
+const CLAVES = GRAFICAS.map((g) => g.clave)
+
 function Cifras({ r, aproximado, filtros }: { r: ExplorarResumen; aproximado: boolean; filtros: number }) {
+  // una gráfica por pestaña: apiladas, la página (o la columna) se desplazaba casi tres pantallas
+  const [ver, elegir] = usePestanaEnUrl('ver', CLAVES)
   const muestra = `${filtros ? 'Grupo elegido' : 'Todos los niños'}: ${num(r.ninos)} niños de ${num(r.ninos_total)}`
   return (
     <>
@@ -86,21 +96,26 @@ function Cifras({ r, aproximado, filtros }: { r: ExplorarResumen; aproximado: bo
         </p>
       )}
       {aproximado && <p className="text-xs text-salvia">Para proteger a los niños, las cifras menores de 100 se aproximan de 5 en 5.</p>}
-      {/* en pantallas anchas las dos de barras van lado a lado (cada una a su tamaño natural) y la de líneas ocupa todo el ancho debajo */}
-      <div className="grid gap-4 2xl:grid-cols-2 [&>*]:min-w-0">
-        <Grafica titulo={descripcionDe('explorar_riesgo').titulo} descripcion={descripcionDe('explorar_riesgo').descripcion}
-          exportar={{ nombre: 'explorar-riesgo', muestra, unidad: 'Niños con riesgo alto (percentil 90 o más) de los niños del grupo con riesgo calculado desde esa visita: el denominador está junto a cada barra' }}>
-          <RiesgoGrupo filas={r.riesgos_por_desenlace} />
-        </Grafica>
-        <Grafica titulo={descripcionDe('explorar_quienes').titulo} descripcion={descripcionDe('explorar_quienes').descripcion}
-          exportar={{ nombre: 'explorar-quienes', muestra, unidad: '% de los niños con el dato, en el grupo y en todos' }}>
-          <QuienesSon distribuciones={r.distribuciones} />
-        </Grafica>
-        <Grafica className="2xl:col-span-2" titulo={descripcionDe('explorar_crecimiento').titulo} descripcion={descripcionDe('explorar_crecimiento').descripcion}
-          exportar={{ nombre: 'explorar-crecimiento', muestra, unidad: '% de las medidas del grupo en cada visita con z menor que −2 frente a la OMS: cada punto dice cuántos datos usa' }}>
-          <CrecimientoGrupo filas={r.crecimiento_por_etapa} />
-        </Grafica>
-      </div>
+      <Pestanas prefijo="explorar" etiqueta="Qué ver del grupo" pestanas={GRAFICAS} activa={ver} elegir={elegir} />
+      {/* la gráfica llena lo que queda de alto; una lista larga (riesgo de muchos desenlaces) se desplaza dentro de ella */}
+      <PanelPestana prefijo="explorar" activa={ver} className="flex min-h-0 flex-1 flex-col [&>*]:min-w-0">
+        {ver === 'riesgo' ? (
+          <Grafica llenar titulo={descripcionDe('explorar_riesgo').titulo} descripcion={descripcionDe('explorar_riesgo').descripcion}
+            exportar={{ nombre: 'explorar-riesgo', muestra, unidad: 'Niños con riesgo alto (percentil 90 o más) de los niños del grupo con riesgo calculado desde esa visita: el denominador está junto a cada barra' }}>
+            <RiesgoGrupo filas={r.riesgos_por_desenlace} />
+          </Grafica>
+        ) : ver === 'crecimiento' ? (
+          <Grafica llenar titulo={descripcionDe('explorar_crecimiento').titulo} descripcion={descripcionDe('explorar_crecimiento').descripcion}
+            exportar={{ nombre: 'explorar-crecimiento', muestra, unidad: '% de las medidas del grupo en cada visita con z menor que −2 frente a la OMS: cada punto dice cuántos datos usa' }}>
+            <CrecimientoGrupo filas={r.crecimiento_por_etapa} />
+          </Grafica>
+        ) : (
+          <Grafica llenar titulo={descripcionDe('explorar_quienes').titulo} descripcion={descripcionDe('explorar_quienes').descripcion}
+            exportar={{ nombre: 'explorar-quienes', muestra, unidad: '% de los niños con el dato, en el grupo y en todos' }}>
+            <QuienesSon distribuciones={r.distribuciones} />
+          </Grafica>
+        )}
+      </PanelPestana>
     </>
   )
 }

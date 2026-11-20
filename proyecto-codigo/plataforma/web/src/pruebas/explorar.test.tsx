@@ -66,11 +66,24 @@ describe('explorar', () => {
     expect(cifra('niños con algún riesgo alto')).toBe('25')
     expect(cifra('datos registrados de los niños del grupo')).toBe('4.800')
     expect(cifra('de los datos de crecimiento, bajos frente a la OMS')).toBe('12,5 %')
-    for (const t of ['Riesgo del grupo elegido', 'Crecimiento del grupo elegido', 'Quiénes son los niños del grupo']) {
-      expect(screen.getByRole('heading', { name: t })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: `Descargar PNG: ${t}` })).toBeInTheDocument()
+    // una gráfica por pestaña, para que la página no se desplace: el riesgo primero
+    expect(screen.getByRole('tab', { name: 'Riesgo', selected: true })).toBeInTheDocument()
+    for (const [pestana, t] of [['Riesgo', 'Riesgo del grupo elegido'], ['Crecimiento', 'Crecimiento del grupo elegido'],
+      ['Quiénes son', 'Quiénes son los niños del grupo']]) {
+      fireEvent.click(screen.getByRole('tab', { name: pestana }))
+      const panel = screen.getByRole('tabpanel', { name: pestana })
+      expect(within(panel).getByRole('heading', { name: t })).toBeInTheDocument()
+      expect(within(panel).getByRole('button', { name: `Descargar PNG: ${t}` })).toBeInTheDocument()
     }
     expect(screen.getByText('Cómo se reparte el grupo elegido frente a todos los niños.')).toBeInTheDocument()
+  })
+
+  it('la pestaña se lee de la dirección y no pisa el filtro', async () => {
+    api('experto')
+    montar('/explorar?ver=crecimiento')
+    expect(await screen.findByRole('tab', { name: 'Crecimiento', selected: true })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Crecimiento del grupo elegido' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Riesgo del grupo elegido' })).not.toBeInTheDocument()
   })
 
   it('el filtro se lee de la dirección y se manda en la consulta', async () => {
