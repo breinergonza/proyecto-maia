@@ -143,6 +143,10 @@ describe('comparar entrenamientos: intervalos y Aprobar B', () => {
     expect(llamadas.some((l) => l.url === '/api/analitica/comparar?a=6&b=7&desenlace=des_a')).toBe(true)
     expect(await screen.findByText('sexo: femenino')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Aprobar B/ })).not.toBeInTheDocument()
+    // en el teléfono cada fila de métricas, grupos y muestra se vuelve una tarjeta: B y la diferencia no quedan fuera de la vista
+    const tablas = screen.getAllByRole('table').filter((t) => !t.closest('figure'))
+    expect(tablas.length).toBeGreaterThanOrEqual(3)
+    for (const t of tablas) expect(t.parentElement).toHaveClass('tabla-apilada')
   })
 
   const registro = {

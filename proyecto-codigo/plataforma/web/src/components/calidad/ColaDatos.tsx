@@ -20,7 +20,7 @@ const ACCION: Record<Respuesta, { boton: string; estado: string }> = {
   no_se: { boton: 'No sé', estado: 'Sin saber' },
 }
 const TIPOS_ALERTA = ['1', '2', '3'] as const
-const COLUMNAS = 8
+const COLUMNAS = 5
 
 export const FILTROS_INICIALES: FiltrosCola = { estado: 'pendiente', capa: '', variable: '', etapa: '', pagina: 1 }
 
@@ -76,8 +76,7 @@ export function ColaDatos({ resumen }: { resumen: ResumenCalidad | undefined }) 
               <Tabla densa apilar>
                 <thead>
                   <tr>
-                    <th>Niño</th><th>Visita</th><th>Medición</th><th>Valor registrado</th><th>Por qué es dudosa</th>
-                    <th>Detectado por</th><th>Estado</th><th>Acción</th>
+                    <th>Niño</th><th>Medición</th><th>Valor registrado</th><th>Por qué es dudosa</th><th>Revisión</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -117,8 +116,10 @@ function FilaDato({ dato }: { dato: DatoRevision }) {
         <td className="whitespace-nowrap font-semibold">
           <Link className="text-teal underline-offset-2 hover:underline" to={`/ninos/${encodeURIComponent(dato.sujeto)}`}>{dato.sujeto}</Link>
         </td>
-        <td>{dato.etapa_nombre ?? '—'}{dato.fecha && <span className="block text-xs">{fecha(dato.fecha)}</span>}</td>
-        <td>{nombre}</td>
+        <td>
+          <span className="font-semibold">{nombre}</span>
+          <span className="block text-xs">{dato.etapa_nombre ?? 'Visita sin nombre'}{dato.fecha && <>, {fecha(dato.fecha)}</>}</span>
+        </td>
         <td className="whitespace-nowrap font-semibold tabular-nums text-coral-hondo">{medida(dato.valor)}{unidad}</td>
         <td className="min-w-[12rem]">
           {rango && (
@@ -129,18 +130,17 @@ function FilaDato({ dato }: { dato: DatoRevision }) {
           )}
           {extra && <p>{frase(extra)}.</p>}
           {!rango && !extra && <p>El modelo de anomalías lo marcó como raro para este niño.</p>}
+          <p className="mt-1 text-xs">
+            Detectado por:{' '}
+            {dato.capas.map((c, i) => <span key={c} title={ayudaAlerta(c)}>{i > 0 && ', '}{alerta(c)}</span>)}
+          </p>
           <button type="button" aria-expanded={contexto} onClick={() => setContexto(!contexto)}
             className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-teal hover:underline">
             Ver en el tiempo<ChevronDown size={14} aria-hidden className={cn('transition-transform', contexto && 'rotate-180')} />
           </button>
         </td>
-        <td>
-          <div className="flex flex-wrap gap-1">
-            {dato.capas.map((c) => <span key={c} title={ayudaAlerta(c)}>{alerta(c)}{dato.capas.length > 1 && c !== dato.capas[dato.capas.length - 1] ? ',' : ''}</span>)}
-          </div>
-        </td>
-        <td><Estado respuesta={elegida} /></td>
-        <td className="min-w-[10rem]">
+        <td className="min-w-[11rem]">
+          <p className="mb-1.5"><Estado respuesta={elegida} /></p>
           <div role="group" aria-label={`¿Es un error de registro? ${nombre} de ${dato.sujeto}`} className="flex flex-wrap gap-1.5">
             {(['si', 'no', 'no_se'] as Respuesta[]).map((r) => (
               <Boton key={r} chico className="whitespace-nowrap" variante={elegida === r ? 'primario' : 'secundario'} aria-pressed={elegida === r}

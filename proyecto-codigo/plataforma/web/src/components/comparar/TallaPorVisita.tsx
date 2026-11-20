@@ -78,15 +78,20 @@ export function TallaPorVisita({ r }: { r: GruposClinicoOk }) {
           <Tabla densa>
             <caption className="sr-only">Niños con dato en cada visita</caption>
             <thead>
-              <tr><th>Niños con dato</th>{filas.map((f) => <th key={f.x}>{f.x}</th>)}</tr>
+              <tr>
+                <th>Visita</th>
+                {[SERIE_A, SERIE_B].map((s) => (
+                  <th key={s.clave}>
+                    <span aria-hidden className="mr-1.5 inline-block size-2.5 rounded-sm" style={{ background: SERIES_COLOR[s.color] }} />{s.nombre}
+                  </th>
+                ))}
+              </tr>
             </thead>
             <tbody>
-              {[{ s: SERIE_A, n: (f: Fila) => f.nA }, { s: SERIE_B, n: (f: Fila) => f.nB }].map(({ s, n }) => (
-                <tr key={s.clave}>
-                  <td className="whitespace-nowrap font-semibold">
-                    <span aria-hidden className="mr-1.5 inline-block size-2.5 rounded-sm" style={{ background: SERIES_COLOR[s.color] }} />{s.nombre}
-                  </td>
-                  {filas.map((f) => <td key={f.x} className="tabular-nums">{n(f) == null ? MENOS_DE_5 : num(n(f))}</td>)}
+              {filas.map((f) => (
+                <tr key={f.x}>
+                  <td className="whitespace-nowrap font-semibold">{f.x}</td>
+                  {[f.nA, f.nB].map((n, i) => <td key={i} className="tabular-nums">{n == null ? MENOS_DE_5 : num(n)}</td>)}
                 </tr>
               ))}
             </tbody>

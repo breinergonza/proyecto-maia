@@ -63,19 +63,19 @@ describe('calidad de datos: cifras y encabezado', () => {
 })
 
 describe('calidad de datos: la cola', () => {
-  it('muestra niño, visita, medición, valor, por qué es dudosa, detectado por, estado y acción', async () => {
+  it('muestra niño, medición con su visita, valor, por qué es dudosa con quién lo detectó, y la revisión con su estado y acción', async () => {
     api()
     montar('/admin/calidad-datos')
     const tabla = (await screen.findByRole('table')).closest('table')!
-    for (const t of ['Niño', 'Visita', 'Medición', 'Valor registrado', 'Por qué es dudosa', 'Detectado por', 'Estado', 'Acción']) {
-      expect(within(tabla).getByRole('columnheader', { name: t })).toBeInTheDocument()
-    }
+    // cinco columnas: la cola cabe junto al menú sin desplazarse de lado (la acción no queda fuera de la vista)
+    expect(within(tabla).getAllByRole('columnheader').map((c) => c.textContent)).toEqual(
+      ['Niño', 'Medición', 'Valor registrado', 'Por qué es dudosa', 'Revisión'])
     const fila = within(tabla).getByRole('link', { name: 'S-02210' }).closest('tr')!
     expect(fila).toHaveTextContent('6 m')
     expect(fila).toHaveTextContent('Talla')
     expect(fila).toHaveTextContent('58 cm')
     expect(within(fila).getByText(/Para este niño se esperaba entre 62 y 70/)).toBeInTheDocument()
-    expect(within(fila).getByText('Valor fuera de lo esperado')).toBeInTheDocument()
+    expect(fila).toHaveTextContent('Detectado por: Valor fuera de lo esperado')
     expect(within(fila).getByText('Por revisar')).toBeInTheDocument()
     expect(within(fila).getByRole('button', { name: 'Es un error' })).toBeInTheDocument()
     // en el teléfono cada fila se vuelve una tarjeta

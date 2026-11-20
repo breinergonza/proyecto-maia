@@ -152,7 +152,7 @@ function ComparaEntrenamientos() {
                     exportar={{ nombre: 'comparar-metricas', muestra: c ? `A: ${num(c.a?.n)} niños, ${num(c.a?.casos)} casos · B: ${num(c.b?.n)} niños, ${num(c.b?.casos)} casos` : undefined,
                       filas: medidas.map((m) => ({ medida: m.texto, A: m.valor(datoA), B: m.valor(datoB), diferencia: intervalos.get(m.id)?.diferencia ?? null, ic_bajo: intervalos.get(m.id)?.ic_bajo ?? null, ic_alto: intervalos.get(m.id)?.ic_alto ?? null, clara: intervalos.get(m.id)?.clara ? 'sí' : 'no' })) }}>
                     {c && <p className="mb-2 text-sm text-salvia">A: {num(c.a?.n)} niños y {num(c.a?.casos)} casos · B: {num(c.b?.n)} niños y {num(c.b?.casos)} casos</p>}
-                    <Tabla densa>
+                    <Tabla densa apilar>
                       <thead><tr><th>Medida</th><th>A (entrenamiento {a})</th><th>B (entrenamiento {b})</th><th>Diferencia de B frente a A</th><th>Certeza</th></tr></thead>
                       <tbody>
                         {medidas.map((m) => (
@@ -180,7 +180,7 @@ function ComparaEntrenamientos() {
                   {c && (c.por_grupo ?? []).length > 0 && (
                     <TablaDatos titulo={dGrp.titulo} descripcion={dGrp.descripcion}
                       exportar={{ nombre: 'comparar-por-grupo', filas: (c.por_grupo ?? []).map((g) => ({ variable: g.variable, grupo: g.grupo, auc_a: g.a, auc_b: g.b, diferencia: g.diferencia, ic_bajo: g.ic_bajo, ic_alto: g.ic_alto, n_a: g.n_a, n_b: g.n_b })) }}>
-                      <Tabla densa>
+                      <Tabla densa apilar>
                         <thead><tr><th>Grupo</th><th>Niños en A</th><th>Niños en B</th><th>AUC en A</th><th>AUC en B</th><th>Diferencia de B frente a A</th></tr></thead>
                         <tbody>
                           {(c.por_grupo ?? []).map((g) => (
@@ -198,7 +198,7 @@ function ComparaEntrenamientos() {
                   {c?.a && c.b && (
                     <TablaDatos titulo={dMu.titulo} descripcion={dMu.descripcion}
                       exportar={{ nombre: 'comparar-muestra', filas: [c.a, c.b].map((x, i) => ({ entrenamiento: i ? 'B' : 'A', numero: x.entrenamiento, ninos: x.n, casos: x.casos, corte: x.corte ?? null, datos: x.fuente ?? null, version: x.version_registro ?? null })) }}>
-                      <Tabla densa>
+                      <Tabla densa apilar>
                         <thead><tr><th>Entrenamiento</th><th>Niños evaluados</th><th>Casos</th><th>Corte de datos</th><th>Datos</th><th>Versión del modelo</th></tr></thead>
                         <tbody>
                           {[{ nombre: 'A', l: c.a }, { nombre: 'B', l: c.b }].map(({ nombre, l }) => (

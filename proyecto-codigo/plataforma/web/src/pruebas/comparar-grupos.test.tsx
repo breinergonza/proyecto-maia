@@ -17,6 +17,7 @@ const talla: DesenlaceComparado = {
   definicion: 'Talla para la edad con puntaje z menor que −2 frente a la referencia de la OMS, medido a los 12 m EC.',
   a: { casos: 52, con_dato: 397, sin_dato: 101, pct: 13.1 }, b: { casos: 41, con_dato: 223, sin_dato: 89, pct: 18.4 },
   dif: { valor: 5.3, ic_bajo: -0.8, ic_alto: 11.4, clara: false },
+  riesgo_con_modelo: true,
   riesgo: [
     { momento: '40 sem', momento_nombre: '40 semanas', clave: 'talla_baja_12m_desde_40', estado: 'en_prueba',
       a: { calculados: 400, en_alerta: 40, pct_en_alerta: 10 }, b: { calculados: 250, en_alerta: 30, pct_en_alerta: 12 } },
@@ -30,6 +31,7 @@ const desarrollo: DesenlaceComparado = {
   definicion: 'Desarrollo psicomotor entre el 10 % más bajo de los niños con que se entrenó el modelo.',
   a: { casos: 20, con_dato: 200, sin_dato: 298, pct: 10 }, b: null,
   dif: { valor: null, ic_bajo: null, ic_alto: null, clara: null },
+  riesgo_con_modelo: true,
   riesgo: [{ momento: '40 sem', momento_nombre: '40 semanas', clave: 'desarrollo_12m', estado: 'en_uso',
     a: { calculados: 450, en_alerta: 45, pct_en_alerta: 10 }, b: { calculados: 280, en_alerta: 28, pct_en_alerta: 10 } }],
 }
@@ -154,11 +156,11 @@ describe('comparar grupos', () => {
     expect(within(panel).getByText(/Umbral de talla baja \(−2\)/)).toBeInTheDocument()
     expect(within(panel).getByText(/Unidad: puntaje z/)).toBeInTheDocument()
     const tabla = within(panel).getByRole('table', { name: /Niños con dato en cada visita/ })
-    for (const v of ['40 sem', '3 m EC', '6 m EC', '12 m EC']) expect(within(tabla).getByRole('columnheader', { name: v })).toBeInTheDocument()
-    const a = within(tabla).getByRole('row', { name: /Grupo A/ })
-    expect(within(a).getAllByRole('cell').slice(1).map((c) => c.textContent)).toEqual(['472', '450', '431', '397'])
-    const b = within(tabla).getByRole('row', { name: /Grupo B/ })
-    expect(within(b).getAllByRole('cell').slice(1).map((c) => c.textContent)).toEqual(['298', '271', 'n menor que 5', '223'])
+    // una fila por visita (como la tabla de faltantes): tres columnas que caben en el teléfono
+    expect(within(tabla).getAllByRole('columnheader').map((c) => c.textContent)).toEqual(['Visita', 'Grupo A', 'Grupo B'])
+    const celdas = (v: string) => within(within(tabla).getByRole('row', { name: new RegExp(v) })).getAllByRole('cell').map((c) => c.textContent)
+    expect(['40 sem', '3 m EC', '6 m EC', '12 m EC'].map(celdas)).toEqual([
+      ['40 sem', '472', '298'], ['3 m EC', '450', '271'], ['6 m EC', '431', 'n menor que 5'], ['12 m EC', '397', '223']])
   })
 
   it('«¿Les pasa algo distinto?»: lo observado de los dos desenlaces con denominadores y sin dato, y el riesgo estimado rotulado aparte', async () => {

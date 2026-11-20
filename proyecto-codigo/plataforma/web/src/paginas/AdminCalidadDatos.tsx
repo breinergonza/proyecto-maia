@@ -43,7 +43,8 @@ export default function AdminCalidadDatos() {
               reintentar={() => void resumen.refetch()} />
           </div>
         ) : <Cifras r={resumen.data} />}
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,23rem)] [&>*]:min-w-0">
+      {/* la cola es la tarea: junto al panel de completitud solo cuando hay ancho para que su acción quede a la vista */}
+      <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_minmax(0,23rem)] [&>*]:min-w-0">
         <ColaDatos resumen={resumen.data} />
         {resumen.data && <CompletitudPorVisita completitud={resumen.data.completitud} />}
       </div>
