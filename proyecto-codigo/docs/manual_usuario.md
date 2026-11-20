@@ -250,7 +250,7 @@ submódulos, como fichas arriba (en el teléfono se deslizan): **Resumen**, **Re
   resultados de analítica, aparece **Sin analítica** y la opción de reentrenar (no se recalcula en silencio). Una ficha con
   «pronto» o un análisis **pendiente** todavía no se calcula para ese modelo (por ejemplo Anticipación, si no hay
   desenlaces entrenados desde varias visitas).
-* Un grupo o una celda con 1 a 4 niños dice cuántos son. **sin cifra** es lo que no se puede calcular: un promedio o un AUC
+* Un grupo o una celda con 1 a 4 niños dice cuántos son. **sin cifra** es lo que no se puede calcular: un desvío, unos cuartiles o un AUC
   piden 20 niños o más, y el intervalo del AUC pide además 5 niños con el desenlace y 5 sin él (es un límite estadístico, no de
   privacidad).
 * **Perfiles** son provisionales: edad gestacional y clasificación de Lubchenco; ningún experto los ha aprobado todavía.

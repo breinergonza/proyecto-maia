@@ -1,6 +1,6 @@
 // Un conteo de 1 a 4 niños se dice con su cifra: ninguna gráfica ni tabla lo reemplaza por «<5» ni por «n menor que 5»
 // (decisión del 2026-11-20, que reemplaza a D4). Un cero verdadero dice 0. Lo que no se calcula dice «sin cifra» y su
-// motivo (un mínimo de 20 niños para un promedio o un AUC, no de privacidad).
+// motivo (un mínimo de 20 niños para un desvío o un AUC, no de privacidad).
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { BarrasAgrupadas } from '../components/graficos/distribuciones'

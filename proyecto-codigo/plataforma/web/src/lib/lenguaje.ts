@@ -246,7 +246,7 @@ export const GLOSARIO_ANALITICA: Record<string, string> = {
 export const jerga = (tecnico: boolean, clinico: string, tecnicoTexto: string) => (tecnico ? tecnicoTexto : clinico)
 
 /** Lo que dice una celda sin cifra. Ningún conteo se oculta por ser de pocos niños (1 a 4 se dicen con su número): sin
- *  cifra es lo que no se pudo calcular (un promedio o un intervalo pide 20 niños; el intervalo de un AUC, 5 de cada
+ *  cifra es lo que no se pudo calcular (un desvío o un intervalo pide 20 niños; el intervalo de un AUC, 5 de cada
  *  clase) o lo que un entrenamiento anterior no guardó. */
 export const SIN_CIFRA = 'sin cifra'
 
