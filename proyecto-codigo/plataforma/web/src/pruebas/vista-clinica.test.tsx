@@ -175,7 +175,7 @@ describe('vista clínica', () => {
     ])
     // el denominador se explica: solo los niños que siguen en seguimiento a esa visita tienen riesgo calculado
     expect(within(panel).getByText(/siguen en seguimiento/)).toBeInTheDocument()
-    expect(within(panel).getByText(/10 % con más riesgo/)).toBeInTheDocument()
+    expect(within(panel).getByText(/En alerta: riesgo entre el 10 % más alto de los niños más recientes con desenlace conocido, con quienes se calibró el modelo\. Por eso, en un grupo pueden ser más o menos del 10 %\./)).toBeInTheDocument()
     expect(within(panel).getAllByText(/En prueba/)).toHaveLength(1)
   })
 

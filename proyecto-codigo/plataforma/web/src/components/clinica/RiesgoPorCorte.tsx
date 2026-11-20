@@ -4,7 +4,7 @@
 // dice en vez de dejar el panel vacío.
 import type { RiesgoCorte } from '../../api/tipos'
 import { frase, num, pct } from '../../lib/formato'
-import { sinRiesgoEstimado } from '../../lib/lenguaje'
+import { definicionAlerta, sinRiesgoEstimado } from '../../lib/lenguaje'
 import { Insignia, Panel } from '../ui'
 
 /** «40 sem» → «las 40 semanas»; «3 m EC» → «los 3 meses»; «hospitalización» → «la hospitalización»; lo demás, tal cual. */
@@ -36,7 +36,7 @@ export function RiesgoPorCorte({ filas, conModelo, alertaPercentil, className }:
   const marca = marcaEnPrueba(filas)
   return (
     <Panel className={className} titulo="Riesgo estimado" accion={marca && <Insignia tono="ocre">{marca}</Insignia>}
-      descripcion={filas.length ? `Solo tienen riesgo calculado los niños del grupo que siguen en seguimiento. En alerta: entre el ${100 - alertaPercentil} % con más riesgo.` : undefined}>
+      descripcion={filas.length ? `Solo tienen riesgo calculado los niños del grupo que siguen en seguimiento. ${definicionAlerta(alertaPercentil)}` : undefined}>
       {filas.length === 0 ? (
         <p className="text-sm">{sinRiesgoEstimado(conModelo, 'del grupo')}</p>
       ) : (

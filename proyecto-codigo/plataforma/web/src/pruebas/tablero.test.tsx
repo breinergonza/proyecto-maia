@@ -159,7 +159,7 @@ describe('tablero: claridad y enlaces de revisión', () => {
     expect(within(panel).getByText('Visita: 3 meses EC')).toBeInTheDocument()
     expect(within(panel).queryByText(/riesgo calculado a/)).not.toBeInTheDocument()
     // «alto» dicho una vez, con el mismo 10 % que usa el resto de la web
-    expect(within(panel).getByText('Alto: el 10 % de niños con más riesgo en ese desenlace')).toBeInTheDocument()
+    expect(within(panel).getByText('Alto: entre el 10 % más alto de los niños con que se calibró cada modelo')).toBeInTheDocument()
   })
 
   it('cada panel dice una sola vez qué muestra: sin la frase repetida de crecimiento ni la de alarmas', async () => {

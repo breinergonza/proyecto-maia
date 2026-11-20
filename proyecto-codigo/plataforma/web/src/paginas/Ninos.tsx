@@ -10,7 +10,7 @@ import { Boton, Cargando, Encabezado, Entrada, Insignia, Paginador, Selector, Va
 import { ErrorConReintento } from '../components/ErrorConReintento'
 import { cn } from '../lib/cn'
 import { dec, edad, fecha, num, RIESGO_ALTO } from '../lib/formato'
-import { ayudaPosicion, AYUDA_OMS, BAJO_EDAD, CAYO, esAlto, nivelCorto, RIESGO_MUY_ALTO } from '../lib/lenguaje'
+import { ayudaPosicion, AYUDA_OMS, BAJO_EDAD, CAYO, definicionAlto, esAlto, nivelCorto, RIESGO_MUY_ALTO } from '../lib/lenguaje'
 
 const TAMANOS = [10, 25, 50, 100]
 const TAMANO = 25
@@ -158,7 +158,7 @@ export default function Ninos() {
   return (
     <div className="flex flex-col lg:h-full">
       <Encabezado titulo="Niños">
-        Alto: el {100 - RIESGO_ALTO} % de niños con más riesgo en su desenlace; muy alto: el {100 - RIESGO_MUY_ALTO} %. Los códigos están seudonimizados.
+        {definicionAlto(RIESGO_ALTO, RIESGO_MUY_ALTO)}. Los códigos están seudonimizados.
       </Encabezado>
 
       <div className="mb-4 grid grid-cols-1 shrink-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_16rem_14rem_auto]">

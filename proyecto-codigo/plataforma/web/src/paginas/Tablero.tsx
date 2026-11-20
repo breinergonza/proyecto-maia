@@ -16,7 +16,7 @@ import { cn } from '../lib/cn'
 import { descripcionDe } from '../lib/descripciones'
 import { usePorClasificar } from '../lib/diccionario'
 import { dec, fecha, indicador, INDICADORES, num, pct, riesgo } from '../lib/formato'
-import { alerta, AYUDA_OMS, AYUDA_RIESGO_ALTO, ayudaAlerta, datosAl, senal, trimestre, trimestresSeguidos } from '../lib/lenguaje'
+import { alerta, AYUDA_OMS, AYUDA_RIESGO_ALTO, ayudaAlerta, datosAl, definicionAlto, senal, trimestre, trimestresSeguidos } from '../lib/lenguaje'
 
 /** Alto de las gráficas: con una ventana baja (1366×768) se achican para que el panel quepa sin cortarlas. */
 const altoVentana = () => window.innerHeight
@@ -97,7 +97,7 @@ export default function Tablero() {
         <div className="flex flex-col gap-4 lg:col-span-8 lg:min-h-0">
           <TablaDatos llenar titulo={descripcionDe('riesgo_por_desenlace').titulo} descripcion={descripcionDe('riesgo_por_desenlace').descripcion}
             exportar={{ nombre: 'riesgo-por-desenlace', filas: filasRiesgo }} className="max-lg:max-h-[26rem] lg:min-h-0 lg:flex-1"
-            accion={<span className="text-xs text-salvia" title={AYUDA_RIESGO_ALTO}>Alto: el {100 - r.percentil_alto} % de niños con más riesgo en ese desenlace</span>}>
+            accion={<span className="text-xs text-salvia" title={AYUDA_RIESGO_ALTO}>{definicionAlto(r.percentil_alto)}</span>}>
             {r.riesgos_por_desenlace.length === 0 ? (
               <p className="text-sm text-salvia">
                 Ningún niño tiene una visita con riesgo calculado con estos datos. El riesgo se calcula en la visita en que se

@@ -14,8 +14,23 @@ export const sinRiesgoEstimado = (conModelo: boolean, quienes: string) => conMod
   ? `Ningún niño ${quienes} tiene riesgo estimado ahora: se calcula solo para los niños que siguen en seguimiento, y con menos de 5 no se da la cifra.`
   : `El paquete de modelos activo aún no calcula este desenlace: no hay riesgo estimado ${quienes}.`
 
-export const AYUDA_RIESGO_ALTO = `Riesgo alto: estar entre el ${100 - RIESGO_ALTO} % de niños con más riesgo para ese desenlace. Es una ` +
-  'comparación entre los niños del programa, no un umbral clínico.'
+/** Contra quiénes se ordena el riesgo de cada niño: los niños con que se calibró el modelo de ese desenlace (los más
+ *  recientes con desenlace conocido), no el grupo que se está mirando. Por eso un grupo puede tener más o menos del 10 %
+ *  en alerta. */
+export const REFERENCIA_RIESGO = 'los niños más recientes con desenlace conocido, con quienes se calibró el modelo'
+
+export const AYUDA_RIESGO_ALTO = `Riesgo alto: entre el ${100 - RIESGO_ALTO} % más alto de ${REFERENCIA_RIESGO}; en un grupo pueden ser ` +
+  `más o menos del ${100 - RIESGO_ALTO} %. Es una comparación, no un umbral clínico.`
+
+/** «En alerta» con su referencia, para el panel que cuenta los niños en alerta de un grupo. */
+export const definicionAlerta = (percentil: number) =>
+  `En alerta: riesgo entre el ${100 - percentil} % más alto de ${REFERENCIA_RIESGO}. ` +
+  `Por eso, en un grupo pueden ser más o menos del ${100 - percentil} %.`
+
+/** «Alto» (y «muy alto») en una línea, para listas que mezclan desenlaces: cada uno con su modelo. */
+export const definicionAlto = (alto: number, muyAlto?: number) =>
+  `Alto: entre el ${100 - alto} % más alto de los niños con que se calibró cada modelo` +
+  (muyAlto == null ? '' : `; muy alto: el ${100 - muyAlto} %`)
 
 export const esAlto = (p: number | null | undefined) => p != null && p >= RIESGO_ALTO
 

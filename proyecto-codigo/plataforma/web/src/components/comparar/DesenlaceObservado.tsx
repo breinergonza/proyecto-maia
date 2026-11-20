@@ -6,7 +6,7 @@ import { useId } from 'react'
 import type { DesenlaceComparado, GruposClinicoOk, RiesgoDeCorte } from '../../api/comparar'
 import { cn } from '../../lib/cn'
 import { num } from '../../lib/formato'
-import { sinRiesgoEstimado } from '../../lib/lenguaje'
+import { definicionAlerta, sinRiesgoEstimado } from '../../lib/lenguaje'
 import { Insignia, Panel, Tabla } from '../ui'
 import { BarrasObservado, FichaDelDato, MENOS_DE_5, poblacionAB, porcentaje, variableDe, Veredicto } from './comun'
 
@@ -17,7 +17,7 @@ export const vistaDe = (v: string | null): Vista => (v === 'riesgo' ? 'riesgo' :
 const ESTADO = { en_prueba: { texto: 'En prueba', tono: 'ocre' }, en_uso: { texto: 'En uso', tono: 'teal' } } as const
 
 const explicaRiesgo = (alerta: number) =>
-  `lo estima el modelo con los datos hasta cada corte; no es lo que pasó a los 12 meses. En alerta: estar entre el ${100 - alerta} % de niños con más riesgo.`
+  `lo estima el modelo con los datos hasta cada corte; no es lo que pasó a los 12 meses. ${definicionAlerta(alerta)}`
 
 /** El conmutador «Observado | Riesgo estimado» de «¿Les pasa algo distinto?», con lo que muestra la vista elegida. */
 export function ElegirVista({ vista, elegir, alerta }: { vista: Vista; elegir: (v: Vista) => void; alerta: number }) {
@@ -101,7 +101,7 @@ export function DesenlaceObservado({ d, r, vista = 'observado', ancho = false }:
       <RiesgoEstimado d={d} />
       <FichaDelDato items={{
         variable: `riesgo estimado de ${variableDe(d, r.trayectoria.umbral)} a los 12 meses`,
-        unidad: `% en alerta (entre el ${100 - r.alerta_percentil} % con más riesgo)`,
+        unidad: `% en alerta (riesgo entre el ${100 - r.alerta_percentil} % más alto de los niños con que se calibró el modelo)`,
         momento: 'cada corte, con los datos hasta esa visita', poblacion,
         validos: 'niños con riesgo calculado en cada corte (el denominador)',
       }} />

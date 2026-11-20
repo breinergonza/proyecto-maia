@@ -200,7 +200,7 @@ describe('niños: lista', () => {
     api()
     montar('/ninos')
     const subtitulo = (await screen.findByRole('heading', { name: 'Niños' })).nextElementSibling!
-    expect(subtitulo.textContent).toMatch(/Alto: el 10 % de niños con más riesgo en su desenlace; muy alto: el 5 %/)
+    expect(subtitulo.textContent).toMatch(/Alto: entre el 10 % más alto de los niños con que se calibró cada modelo; muy alto: el 5 %/)
     expect(subtitulo.textContent).toMatch(/seudonimizados/)
     expect(subtitulo.textContent!.length).toBeLessThan(170)
   })

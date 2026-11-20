@@ -3,7 +3,7 @@
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { alerta, ayudaMinimo, cuantosMenos, desviaciones, familia, frenteDemas, frenteOms, motivo, motivoExtra, motivosRiesgo, nivelAlto, nivelCorto, nombreFamilia, peso, senal, trimestresSeguidos } from '../lib/lenguaje'
+import { alerta, AYUDA_RIESGO_ALTO, ayudaMinimo, definicionAlerta, cuantosMenos, desviaciones, familia, frenteDemas, frenteOms, motivo, motivoExtra, motivosRiesgo, nivelAlto, nivelCorto, nombreFamilia, peso, senal, trimestresSeguidos } from '../lib/lenguaje'
 import { montar, simularApi, usuario } from './util'
 import { fecha } from '../lib/formato'
 
@@ -19,6 +19,12 @@ describe('glosario clínico', () => {
     expect(nivelCorto(97)).toBe('Muy alto')
     expect(nivelAlto(50)).toBeNull()
     expect(nivelAlto(90)).toBe('Riesgo alto')
+  })
+
+  it('«en alerta» y «alto» dicen contra quién se compara el riesgo: los niños con que se calibró el modelo, no el grupo', () => {
+    expect(definicionAlerta(90)).toBe('En alerta: riesgo entre el 10 % más alto de los niños más recientes con desenlace conocido, con quienes se calibró el modelo. Por eso, en un grupo pueden ser más o menos del 10 %.')
+    expect(AYUDA_RIESGO_ALTO).toBe('Riesgo alto: entre el 10 % más alto de los niños más recientes con desenlace conocido, con quienes se calibró el modelo; en un grupo pueden ser más o menos del 10 %. ' +
+      'Es una comparación, no un umbral clínico.')
   })
 
   it('dice el mínimo de las notificaciones como la parte de niños con más riesgo', () => {
