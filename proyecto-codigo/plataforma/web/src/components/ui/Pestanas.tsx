@@ -66,6 +66,28 @@ export function PanelPestana({ prefijo, activa, children, className, ocupado }: 
   )
 }
 
+/** Los paneles de unas pestañas, todos montados: lo que se abrió o se escribió en uno sobrevive al cambiar de pestaña, y
+ *  al imprimir salen todos, no solo el de la pestaña elegida. En pantalla se ve uno; solo ese lleva el rol y el id que
+ *  enlazan con su pestaña. Un panel que cambia de elegido a no elegido sigue siendo el mismo elemento. */
+export function PanelesPestana<K extends string>({ prefijo, activa, paneles, className }: {
+  prefijo: string
+  activa: K
+  paneles: readonly { clave: K; contenido: ReactNode }[]
+  /** Clases de cada panel (los no elegidos suman `hidden print:block`). */
+  className?: string
+}) {
+  return paneles.map((p) => {
+    const elegido = p.clave === activa
+    return (
+      <div key={p.clave} role={elegido ? 'tabpanel' : undefined} id={elegido ? idPanel(prefijo) : undefined}
+        aria-labelledby={elegido ? idPestana(prefijo, p.clave) : undefined}
+        className={cn(className, !elegido && 'hidden print:block')}>
+        {p.contenido}
+      </div>
+    )
+  })
+}
+
 /** La pestaña elegida en `?<param>=`: sin el parámetro o con uno que no existe, la primera. Cambiarla reemplaza la
  *  entrada del historial (Atrás vuelve a la página anterior, no a la pestaña anterior) y conserva los demás parámetros. */
 export function usePestanaEnUrl<K extends string>(param: string, claves: readonly K[]) {
