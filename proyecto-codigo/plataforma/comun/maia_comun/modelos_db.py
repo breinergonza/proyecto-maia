@@ -411,6 +411,19 @@ class Riesgo(Base):
     silencio: Mapped[bool] = mapped_column(Boolean, server_default=text('false'))
 
 
+class DesenlaceObservado(Base):
+    """Si el desenlace de una familia ocurrió, por niño (``puntuacion.tabla_observados``). Solo hay fila cuando se
+    sabe: el que no tiene dato no aparece."""
+    __tablename__ = 'desenlaces_observados'
+    __table_args__ = (Index(None, 'corrida_id', 'familia'), Index(None, 'corrida_id', 'sujeto'),
+                      {'schema': 'resultados'})
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    corrida_id: Mapped[int] = mapped_column(_fk_corrida())
+    sujeto: Mapped[str] = mapped_column(Text)
+    familia: Mapped[str] = mapped_column(Text)               # clave del desenlace sin ``_desde_<visita>``
+    valor: Mapped[bool] = mapped_column(Boolean)
+
+
 class Crecimiento(Base):
     __tablename__ = 'crecimiento'
     __table_args__ = (Index(None, 'corrida_id', 'sujeto'), {'schema': 'resultados'})

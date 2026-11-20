@@ -7,13 +7,14 @@ Las funciones del núcleo hacen todo el cálculo; aquí solo se traduce a las ta
 * ``alarmas_grupo``  las alarmas de la capa 4, con su frase legible
 * ``riesgos``        ``clinico.modelo.ModeloClinico.riesgos``, con los tres motivos como lista
 * ``crecimiento``    todos los puntajes z de la OMS, con las banderas de -2 DE, caída de 1 DE y dato improbable
+* ``desenlaces_observados``  si cada desenlace (por familia) ocurrió en cada niño, para la vista clínica
 * ``metricas_modelo`` las métricas de validación de las fichas
 """
 from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -26,6 +27,7 @@ from anomalias import modelo as MA
 from anomalias import operacion as OP
 from archivos import libros as LB
 from clinico import modelo as AC
+from maia_comun import clinica as CL
 from maia_comun.metricas import filas_metricas
 from maia_comun.modelos_db import Corrida, MetricaModelo
 from maia_comun.sevarti_db import copiar
@@ -135,6 +137,24 @@ def tabla_crecimiento(c: pd.DataFrame, p: AC.Preparado, corrida_id: int) -> pd.D
     })
 
 
+def tabla_observados(clinico: AC.ModeloClinico, p: AC.Preparado, corrida_id: int) -> pd.DataFrame:
+    """Por niño y familia de desenlaces, si el desenlace ocurrió (solo donde se sabe). Lo lee el submodelo representante
+    de la familia, con la población de la primera visita clínica y no la de su corte: así no queda limitado a quienes
+    asistieron a esa visita. La regla ``no_vuelve`` no es un desenlace de salud y se omite."""
+    columnas = ['corrida_id', 'sujeto', 'familia', 'valor']
+    if not clinico.modelos:
+        return pd.DataFrame(columns=columnas)
+    inicial = CL.primera_visita((m.desenlace.momento for m in clinico.modelos.values()), p.sev.etapas)
+    filas = []
+    for familia, m in CL.representantes(clinico.modelos).items():
+        if m.desenlace.regla == 'no_vuelve':
+            continue
+        y = clinico.etiqueta(p, replace(m.desenlace, momento=inicial), m.corte_variable).dropna()
+        filas.append(pd.DataFrame({'corrida_id': corrida_id, 'sujeto': y.index.astype(str), 'familia': familia,
+                                   'valor': y.to_numpy() > 0}))
+    return pd.concat(filas, ignore_index=True) if filas else pd.DataFrame(columns=columnas)
+
+
 def tabla_grupos(res: MA.Resultado, sev: Sevarti, cfg: MA.Config, corrida_id: int,
                  desde: pd.Timestamp | None) -> pd.DataFrame:
     grupo = res.grupo
@@ -189,6 +209,8 @@ def correr(motor: Engine, sev: Sevarti, modelos: Modelos, corrida_id: int, silen
         _guardar(motor, 'resultados.riesgos', tabla_riesgos(riesgos, corrida_id, silencio))
         crec = modelos.clinico.crecimiento(p)
         _guardar(motor, 'resultados.crecimiento', tabla_crecimiento(crec, p, corrida_id))
+        observados = tabla_observados(modelos.clinico, p, corrida_id)
+        _guardar(motor, 'resultados.desenlaces_observados', observados)
 
         filas = filas_metricas(modelos.ficha_anomalias, modelos.ficha_clinica, modelos.nombre_a_clave)
         if filas:
@@ -204,6 +226,7 @@ def correr(motor: Engine, sev: Sevarti, modelos: Modelos, corrida_id: int, silen
             'alarmas_grupo': int(len(grupos)), 'rechazados': int(len(res.rechazos)),
             'riesgos': int(len(riesgos)), 'ninos_con_riesgo': int(riesgos.sujeto.nunique()) if len(riesgos) else 0,
             'datos_crecimiento': int(len(crec)),
+            'desenlaces_observados': int(len(observados)),
             'crecimiento_bajo_2de': int(crec.bajo.fillna(False).sum()) if len(crec) else 0,
             'crecimiento_caida_1de': int(crec.cae.fillna(False).sum()) if len(crec) else 0,
             'crecimiento_improbable': int(crec.improbable.fillna(False).sum()) if len(crec) else 0,
