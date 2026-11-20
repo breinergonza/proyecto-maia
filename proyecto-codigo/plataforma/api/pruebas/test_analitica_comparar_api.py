@@ -207,6 +207,8 @@ def test_clinico_observado_a_los_12_meses_por_lado_con_diferencia(cliente, token
         v = obs[obs.sujeto.isin(ids)]
         assert talla[lado]['casos'] == int(v.valor.sum()) and talla[lado]['con_dato'] == len(v)
         assert talla[lado]['sin_dato'] == len(ids) - len(v)
+        # el porcentaje sin dato sale de los conteos exactos: el visualizador recibe los conteos redondeados
+        assert talla[lado]['pct_sin_dato'] == round(100 * (len(ids) - len(v)) / len(ids), 1)
         assert talla[lado]['pct'] == pytest.approx(_p(v.valor.mean()), abs=0.06)   # entre quienes tienen dato
     dif = talla['dif']
     assert dif['valor'] == pytest.approx(talla['b']['pct'] - talla['a']['pct'], abs=0.01)

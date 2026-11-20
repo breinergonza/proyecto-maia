@@ -12,6 +12,8 @@ from sqlalchemy import select
 # la API, los usuarios y el corte simulado son los de las pruebas de muestras
 from test_muestras_api import _muestra, _y, cliente, corte, sev, tokens  # noqa: F401
 
+from maia_api.rutas.clinica import NINOS_LISTADOS
+
 pytestmark = pytest.mark.integracion
 
 ALTO = 90
@@ -111,7 +113,7 @@ def test_contrato(cliente, tokens, corrida, datos):  # noqa: F811
 
     obs = datos['observados'][datos['observados'].familia == 'talla_baja_12m']
     esperado = {'casos': int(obs.valor.sum()), 'con_dato': len(obs), 'sin_dato': n - len(obs),
-                'pct': round(100 * int(obs.valor.sum()) / len(obs), 1)}
+                'pct': round(100 * int(obs.valor.sum()) / len(obs), 1), 'pct_sin_dato': round(100 * (n - len(obs)) / n, 1)}
     assert r['observado']['grupo'] == esperado == r['observado']['poblacion']   # sin filtro, el grupo es la población
 
     tr = r['trayectoria']
@@ -132,9 +134,9 @@ def test_contrato(cliente, tokens, corrida, datos):  # noqa: F811
         filas = ri[ri.clave == f['clave']]
         assert f['calculados'] == len(filas) and f['en_alerta'] == int((filas.percentil >= ALTO).sum())
 
-    # los 5 niños con más riesgo de la familia, cada uno con su percentil más alto
+    # los NINOS_LISTADOS niños con más riesgo de la familia, cada uno con su percentil más alto
     top = ri[ri.clave.str.startswith('talla_baja_12m')].sort_values(['percentil', 'sujeto'], ascending=[False, True])
-    top = top.drop_duplicates('sujeto').head(5)
+    top = top.drop_duplicates('sujeto').head(NINOS_LISTADOS)
     assert [x['sujeto'] for x in r['ninos']] == top.sujeto.tolist()
     primero = r['ninos'][0]
     assert set(primero) == {'sujeto', 'semanas', 'momento', 'riesgo', 'percentil', 'ultima_z'}
@@ -162,7 +164,8 @@ def test_un_filtro_cambia_cada_bloque(cliente, tokens, corrida, datos):  # noqa:
     obs = datos['observados']
     obs = obs[(obs.familia == 'talla_baja_12m') & obs.sujeto.isin(ids)]
     assert v['observado']['grupo'] == {'casos': int(obs.valor.sum()), 'con_dato': len(obs), 'sin_dato': len(ids) - len(obs),
-                                       'pct': round(100 * int(obs.valor.sum()) / len(obs), 1)}
+                                       'pct': round(100 * int(obs.valor.sum()) / len(obs), 1),
+                                       'pct_sin_dato': round(100 * (len(ids) - len(obs)) / len(ids), 1)}
     assert v['observado']['poblacion'] == todos['observado']['poblacion']   # la población de referencia no cambia
     z = _z(datos, 'talla', ids)
     for e, antes in zip(v['trayectoria']['etapas'], todos['trayectoria']['etapas']):
@@ -199,7 +202,7 @@ def test_menos_de_20_ninos_no_hay_cifras(cliente, tokens, corrida):  # noqa: F81
 def test_el_visualizador_no_ve_ninos_y_ve_conteos_redondeados(cliente, tokens, corrida, sev):  # noqa: F811
     from maia_comun import muestra as M
     for rol in ('admin', 'experto'):
-        assert len(_resumen(cliente, tokens, rol, corrida_id=corrida).json()['ninos']) == 5
+        assert len(_resumen(cliente, tokens, rol, corrida_id=corrida).json()['ninos']) == NINOS_LISTADOS == 25   # la lista se desplaza dentro de su panel
     vis = _resumen(cliente, tokens, 'visualizador', corrida_id=corrida)
     assert vis.status_code == 200 and vis.json()['ninos'] is None
     # un grupo de 20 a 99 niños: sus conteos van en múltiplos de 5 para quien solo consulta
@@ -244,4 +247,4 @@ def test_quedan_en_la_auditoria(cliente, tokens, corrida):  # noqa: F811
     consultas = [f for f in filas if f.accion == 'clinica.consultar']
     ninos = [f for f in filas if f.accion == 'clinica.ninos']
     assert consultas and ninos and len(ninos) < len(consultas)   # el visualizador consulta, pero no lista niños
-    assert ninos[-1].detalle == {'familia': 'talla_baja_12m', 'ninos': 5}   # códigos contados, sin valores clínicos
+    assert ninos[-1].detalle == {'familia': 'talla_baja_12m', 'ninos': NINOS_LISTADOS}   # códigos contados, sin valores clínicos

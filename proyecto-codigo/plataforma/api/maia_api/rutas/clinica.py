@@ -30,7 +30,7 @@ from sevarti import diccionario as D
 
 ruta = APIRouter(prefix='/clinica', tags=['clinica'])
 
-NINOS_LISTADOS = 5
+NINOS_LISTADOS = 25
 INDICADOR_POR_DEFECTO = 'talla'
 UNIDAD = 'puntaje z (desviaciones estándar)'
 _SUFIJO = re.compile(r'\s*\(riesgo calculado a [^)]*\)\s*$')
@@ -131,8 +131,8 @@ def _filas(s: Session, sql: str, **p) -> list[dict]:
 
 
 def observado_de(s: Session, corrida: int, familia: str, ids: list[str] | None, n: int, red: bool) -> dict | None:
-    """Casos, niños con dato y sin dato de ``n`` niños (``ids``; ``None`` es todo el corte), y el porcentaje de casos
-    entre quienes tienen dato, de los conteos exactos (los conteos se redondean para quien solo consulta; dividir los
+    """Casos, niños con dato y sin dato de ``n`` niños (``ids``; ``None`` es todo el corte), el porcentaje de casos
+    entre quienes tienen dato y el de niños sin dato entre los ``n``, de los conteos exactos (los conteos se redondean para quien solo consulta; dividir los
     redondeados daría otro porcentaje). Con menos de 5 con dato, nada."""
     de = ' AND sujeto = ANY(:ids)' if ids is not None else ''
     p = {'c': corrida, 'f': familia, **({'ids': ids} if ids is not None else {})}
@@ -141,8 +141,10 @@ def observado_de(s: Session, corrida: int, familia: str, ids: list[str] | None, 
         WHERE corrida_id = :c AND familia = :f{de}"""), p).one()
     if con_dato < P.MIN_OPCION:
         return None
+    sin_dato = max(n - con_dato, 0)
     return {'casos': P.proteger(casos, red), 'con_dato': P.proteger(con_dato, red),
-            'sin_dato': P.proteger(max(n - con_dato, 0), red), 'pct': round(100 * casos / con_dato, 1)}
+            'sin_dato': P.proteger(sin_dato, red), 'pct': round(100 * casos / con_dato, 1),
+            'pct_sin_dato': round(100 * sin_dato / n, 1) if n else None}
 
 
 def trayectoria_de(s: Session, corrida: int, corte_id: int, indicador: str, ids: list[str] | None,
