@@ -36,7 +36,7 @@ describe('tablero', () => {
     api('admin')
     montar('/tablero')
     expect(await screen.findByText('niños con datos')).toBeInTheDocument()
-    const encabezado = screen.getByRole('heading', { name: 'Resumen del programa' }).parentElement!.textContent ?? ''
+    const encabezado = screen.getByRole('heading', { name: 'Resumen' }).parentElement!.textContent ?? ''
     expect(encabezado).toMatch(/Datos al 30 de jun/)
     expect(encabezado).not.toMatch(/Paquete|corrida|—/i)
   })
@@ -45,7 +45,7 @@ describe('tablero', () => {
     api('admin', 'p1')
     montar('/tablero')
     expect(await screen.findByText('niños con datos')).toBeInTheDocument()
-    const encabezado = screen.getByRole('heading', { name: 'Resumen del programa' }).parentElement!.textContent ?? ''
+    const encabezado = screen.getByRole('heading', { name: 'Resumen' }).parentElement!.textContent ?? ''
     expect(encabezado).toMatch(/Paquete p1/)
     expect(encabezado).not.toMatch(/corrida/i)
   })

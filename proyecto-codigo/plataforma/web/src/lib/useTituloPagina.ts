@@ -7,7 +7,7 @@ export const NOMBRE_APP = 'Observatorio Canguro'
 
 const TITULOS: Record<string, string> = {
   '/': 'Vista clínica',
-  '/tablero': 'Resumen del programa',
+  '/tablero': 'Resumen',
   '/comparar': 'Comparar grupos',
   '/explorar': 'Explorar',
   '/ninos': 'Niños',

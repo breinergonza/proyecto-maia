@@ -21,7 +21,7 @@ const casos = [
   { pagina: 'Niños', ruta: '/ninos?desenlace=talla_baja_12m', caida: '/api/ninos?', contexto: 'desenlace=talla_baja_12m' },
   { pagina: 'Ficha de un niño', ruta: '/ninos/N-7', caida: '/api/ninos/N-7/linea-temporal', contexto: 'N-7' },
   { pagina: 'Revisión de riesgos', ruta: '/revision/riesgos', caida: '/api/revision/riesgos', contexto: '/api/revision/riesgos' },
-  { pagina: 'Resumen del programa', ruta: '/tablero', caida: '/api/tablero/resumen', contexto: '/api/tablero/resumen' },
+  { pagina: 'Resumen', ruta: '/tablero', caida: '/api/tablero/resumen', contexto: '/api/tablero/resumen' },
 ]
 
 describe('una falla de red se explica y se puede reintentar sin perder lo elegido', () => {

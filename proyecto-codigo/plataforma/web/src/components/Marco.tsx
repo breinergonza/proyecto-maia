@@ -54,7 +54,7 @@ const SECCIONES: { titulo: string; enlaces: Enlace[] }[] = [
       MODELOS,
       { a: '/admin/calidad-datos', texto: 'Calidad de datos', icono: ClipboardCheck, roles: ROLES_ADMIN },
       { a: '/diccionario', texto: 'Diccionario', icono: BookOpen, roles: ROLES_CLINICOS },
-      { a: '/tablero', texto: 'Resumen del programa', icono: Gauge, roles: ROLES_CONSULTA },
+      { a: '/tablero', texto: 'Resumen', icono: Gauge, roles: ROLES_CONSULTA },
     ],
   },
   {

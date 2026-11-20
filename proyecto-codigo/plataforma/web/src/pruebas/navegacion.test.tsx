@@ -82,7 +82,7 @@ describe('navegación', () => {
     expect(nombrePagina('/ninos/ABC-1')).toBe('Niño ABC-1')
     expect(nombrePagina('/admin/corridas/')).toBe('Corridas')
     expect(nombrePagina('/')).toBe('Vista clínica')
-    expect(nombrePagina('/tablero')).toBe('Resumen del programa')
+    expect(nombrePagina('/tablero')).toBe('Resumen')
     expect(nombrePagina('/comparar')).toBe('Comparar grupos')
     expect(nombrePagina('/prediccion')).toBe('Calcular un niño')
     expect(tituloDocumento('/x/y')).toBe('No existe esa página · Observatorio Canguro')
@@ -133,7 +133,7 @@ describe('navegación', () => {
     montar('/ninos')
     const menu = await menuDe()
     expect(seccion(menu, 'Clínica')).toEqual(['Vista clínica', 'Niños', 'Comparar grupos', 'Revisión de riesgos', 'Calcular un niño'])
-    expect(seccion(menu, 'Técnica')).toEqual(['Modelos', 'Calidad de datos', 'Diccionario', 'Resumen del programa'])
+    expect(seccion(menu, 'Técnica')).toEqual(['Modelos', 'Calidad de datos', 'Diccionario', 'Resumen'])
     // Calidad de datos salió de Administración; Explorar y Tablero ya no están en el menú con esos nombres
     expect(seccion(menu, 'Administración')).not.toContain('Calidad de datos')
     expect(within(menu).queryByRole('link', { name: 'Explorar' })).toBeNull()
@@ -141,7 +141,7 @@ describe('navegación', () => {
     expect(within(menu).getByRole('link', { name: 'Vista clínica' })).toHaveAttribute('href', '/')
     expect(within(menu).getByRole('link', { name: 'Comparar grupos' })).toHaveAttribute('href', '/comparar')
     expect(within(menu).getByRole('link', { name: 'Calidad de datos' })).toHaveAttribute('href', '/admin/calidad-datos')
-    expect(within(menu).getByRole('link', { name: 'Resumen del programa' })).toHaveAttribute('href', '/tablero')
+    expect(within(menu).getByRole('link', { name: 'Resumen' })).toHaveAttribute('href', '/tablero')
     // Modelos es el grupo de la analítica, con Mis modelos entre sus opciones
     await userEvent.click(within(menu).getByRole('button', { name: 'Desplegar Modelos' }))
     expect(within(menu).getByRole('link', { name: 'Rendimiento' })).toHaveAttribute('href', '/analitica/rendimiento')
@@ -153,7 +153,7 @@ describe('navegación', () => {
     montar('/ninos')
     const menu = await menuDe()
     expect(seccion(menu, 'Clínica')).toEqual(['Vista clínica', 'Niños', 'Comparar grupos', 'Revisión de riesgos', 'Calcular un niño'])
-    expect(seccion(menu, 'Técnica')).toEqual(['Modelos', 'Diccionario', 'Resumen del programa'])
+    expect(seccion(menu, 'Técnica')).toEqual(['Modelos', 'Diccionario', 'Resumen'])
   })
 
   it('quien solo consulta ve vista clínica, niños, comparar, modelos y el resumen; no lo que cambia o calcula', async () => {
@@ -161,10 +161,10 @@ describe('navegación', () => {
     montar('/ninos')
     const menu = await menuDe()
     expect(seccion(menu, 'Clínica')).toEqual(['Vista clínica', 'Niños', 'Comparar grupos'])
-    expect(seccion(menu, 'Técnica')).toEqual(['Modelos', 'Resumen del programa'])
+    expect(seccion(menu, 'Técnica')).toEqual(['Modelos', 'Resumen'])
   })
 
-  it('«/» abre la vista clínica y el tablero de antes queda en «/tablero» como «Resumen del programa»', async () => {
+  it('«/» abre la vista clínica y el tablero de antes queda en «/tablero» como «Resumen»', async () => {
     simularApi((url) => {
       if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('experto') } }
       if (url === '/api/tablero/resumen') return { estado: 404, cuerpo: { detail: 'x' } }
@@ -175,8 +175,8 @@ describe('navegación', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Vista clínica' })).toBeInTheDocument()
     unmount()
     montar('/tablero')
-    expect(await screen.findByRole('heading', { level: 1, name: 'Resumen del programa' })).toBeInTheDocument()
-    await waitFor(() => expect(document.title).toBe('Resumen del programa · Observatorio Canguro'))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Resumen' })).toBeInTheDocument()
+    await waitFor(() => expect(document.title).toBe('Resumen · Observatorio Canguro'))
   })
 
   it('«/comparar» abre «Comparar grupos» con el grupo A y un atajo para elegir el B', async () => {

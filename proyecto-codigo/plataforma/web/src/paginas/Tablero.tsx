@@ -1,4 +1,4 @@
-// Resumen del programa (antes «Tablero»): en escritorio cabe entero en la ventana. Las cifras van en una franja y los cuatro paneles en una grilla
+// Resumen (antes «Tablero» y «Resumen»): en escritorio cabe entero en la ventana. Las cifras van en una franja y los cuatro paneles en una grilla
 // que llena el resto del alto; cada panel desplaza su contenido por dentro si no le alcanza el espacio. La validación
 // técnica de los modelos no va aquí: está en Administración › Modelos.
 import { useQuery } from '@tanstack/react-query'
@@ -26,7 +26,7 @@ export default function Tablero() {
     if (resumen.error instanceof ErrorApi && resumen.error.estado === 404) {
       return (
         <>
-          <Encabezado titulo="Resumen del programa" />
+          <Encabezado titulo="Resumen" />
           <Vacio titulo="Todavía no hay resultados">
             {puede(usuario, ['admin'])
               ? <>Active un paquete de modelos y ejecute una corrida en <Link className="text-teal underline" to="/admin/corridas">Corridas</Link>.</>
@@ -37,7 +37,7 @@ export default function Tablero() {
     }
     return (
       <>
-        <Encabezado titulo="Resumen del programa" />
+        <Encabezado titulo="Resumen" />
         <ErrorConReintento error={resumen.error} que="el resumen del programa" reintentando={resumen.isFetching} reintentar={() => void resumen.refetch()} />
       </>
     )
@@ -48,7 +48,7 @@ export default function Tablero() {
 
   return (
     <div className="flex flex-col gap-4 lg:h-full">
-      <Encabezado titulo="Resumen del programa">
+      <Encabezado titulo="Resumen">
         {datosAl(r.corte)}, actualizados el {fecha(r.corrida.terminada)}.
         {puede(usuario, ['admin']) && r.paquete && <> Paquete {r.paquete}.</>}
       </Encabezado>
