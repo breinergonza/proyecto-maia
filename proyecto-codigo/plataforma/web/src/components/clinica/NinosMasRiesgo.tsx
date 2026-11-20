@@ -13,7 +13,7 @@ export function NinosMasRiesgo({ ninos, medida }: { ninos: NinoEnAlerta[]; medid
       {ninos.length === 0 ? (
         <p className="text-sm">Ningún niño del grupo está en alerta con los cálculos de ahora.</p>
       ) : (
-        <Tabla densa>
+        <Tabla densa apilar>
           <thead>
             <tr>
               <th>Niño</th>

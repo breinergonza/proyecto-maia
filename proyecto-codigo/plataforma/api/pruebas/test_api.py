@@ -534,9 +534,11 @@ def test_el_nino_de_ejemplo_llena_las_variables_principales_del_paquete(cliente,
     f = cliente.get('/api/inferencia/formulario', headers=admin).json()
     ej = cliente.get('/api/inferencia/ejemplo', headers=admin).json()
     llenas = {m['variable'] for m in ej['mediciones']}
-    # cada visita va completa (un valor en cada campo principal) o vacía, y las llenas son las primeras
+    # cada visita va completa (un valor en cada campo principal) o vacía, y las llenas son las primeras; un campo se
+    # puede llenar si es una medida de crecimiento (mediana OMS), una lista, un sí/no o un número con rango
     principales = [{c['variable'] for c in v['campos'] if c['principal'] and (
-        c['opciones'] or c['tipo'] == 'si_no' or (c['minimo'] is not None and c['maximo'] is not None))}
+        c['crecimiento'] or c['opciones'] or c['tipo'] == 'si_no'
+        or (c['minimo'] is not None and c['maximo'] is not None))}
         for v in f['visitas']]
     principales = [p for p in principales if p]
     llena = [p <= llenas for p in principales]

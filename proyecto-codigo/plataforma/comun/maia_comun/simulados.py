@@ -75,7 +75,9 @@ def _simular_base(n: int, semilla: int, corte: str) -> Sevarti:
     rng = np.random.default_rng(semilla)
     sujeto = np.array([f's{i:05d}' for i in range(n)])
     grupo = rng.choice([1, 2, 3], size=n, p=[0.45, 0.2, 0.35])
-    nac = pd.Timestamp('2012-01-01') + pd.to_timedelta(rng.integers(0, 365 * 14, n), unit='D')
+    # births in the 14 years before the extraction date, as in the real base: the youngest children are still
+    # waiting for their next visit, so the run has risks calculated at 40 weeks
+    nac = pd.Timestamp(corte) - pd.Timedelta(days=365 * 14) + pd.to_timedelta(rng.integers(0, 365 * 14, n), unit='D')
     eg = np.clip(np.round(rng.normal(33, 3, n)), 24, 40)
     sexo = rng.choice(['M', 'F'], n)
     ingreso = np.exp(rng.normal(np.log(1.2e6) + np.select([grupo == 2], [0.5], 0), 0.5))

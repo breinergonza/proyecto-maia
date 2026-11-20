@@ -334,8 +334,9 @@ def test_variables_de_medicion_con_su_regla_de_lectura(cliente, tokens, corrida,
         if esperado is not None:
             assert {str(o['valor']): o['n'] for o in fa['opciones']} == {k: v for k, v in esperado.items()}
         assert sum(o['n'] for o in fa['opciones']) > 0
-    # filtrada con «alguna»: el filtro, el conteo del grupo y la faceta usan la misma regla
-    m = _muestra(_y('oxigeno_3m', 'lista', ['1'], 'alguna'))
+    # filtrada con «alguna»: el filtro, el conteo del grupo y la faceta usan la misma regla (con el código frecuente,
+    # para que el grupo pase el mínimo de niños que se muestran)
+    m = _muestra(_y('oxigeno_3m', 'lista', ['9'], 'alguna'))
     ids = M.ids(sev, m)
     f = _facetas(cliente, tokens, muestra=m)
     assert f['n'] == len(ids) > 0 and f['facetas']['oxigeno_3m']['cuando'] == 'alguna'
