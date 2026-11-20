@@ -4,8 +4,11 @@ Es una copia del simulador del núcleo (nucleo/pruebas/simulador_sevarti.py), co
 base real a propósito (códigos especiales, errores de unidad, redondeo desde el cambio de 2022...), más:
 
 * etiquetas legibles para cada variable, para que el tablero no muestre códigos;
-* tres desenlaces con causa conocida (readmisión, oxígeno y desarrollo), como en nucleo/pruebas/conftest.py;
-* CONFIG_CLINICA_DEMO: la configuración clínica de esos desenlaces, que en la base real sale del diccionario.
+* tres desenlaces con causa conocida (readmisión, oxígeno y desarrollo), como en nucleo/pruebas/conftest.py, más el
+  desarrollo a los 12 meses;
+* CONFIG_CLINICA_DEMO: la configuración clínica de esos desenlaces, que en la base real sale del diccionario;
+* EN_PRUEBA_DEMO: la talla baja a los 12 meses calculada desde visitas anteriores, «En prueba» como en el
+  Diccionario: solo se entrena con la anticipación (``MAIA_ANTICIPACION=1``).
 
 simular(n, semilla) es lo único que usan el trainer (maia simular) y la API (semillas de la demo).
 """
@@ -157,7 +160,7 @@ ETIQUETAS = {
     'ingreso_hogar': 'Ingreso del hogar', 'personas_hogar': 'Personas en el hogar', 'hematocrito': 'Hematocrito',
     'dias_uci': 'Días en UCI', 'peso_salida': 'Peso a la salida del hospital',
     'readm_3m': 'Readmisiones 40 sem - 3 meses', 'oxigeno_3m': 'Oxígeno a los 3 meses',
-    'desarrollo_6m': 'Puntaje de desarrollo a los 6 meses',
+    'desarrollo_6m': 'Puntaje de desarrollo a los 6 meses', 'desarrollo_12m': 'Puntaje de desarrollo a los 12 meses',
 }
 for _etapa, _suf in (('40 sem', '40'), ('3 m EC', '3m'), ('6 m EC', '6m'), ('12 m EC', '12m')):
     ETIQUETAS |= {f'peso_{_suf}': f'Peso a {_etapa}', f'talla_{_suf}': f'Talla a {_etapa}',
@@ -176,6 +179,8 @@ CONFIG_CLINICA_DEMO = AC.ConfigClinica(
                      codigos=(1.0,), negativos=(9.0,), comparar=REGLA_SIMPLE),
         AC.Desenlace('desarrollo_6m', 'desarrollo psicomotor bajo a los 6 meses', '3 m EC', 'percentil_bajo',
                      'desarrollo_6m', comparar=REGLA_SIMPLE),
+        AC.Desenlace('desarrollo_12m', 'desarrollo psicomotor bajo a los 12 meses', '6 m EC', 'percentil_bajo',
+                     'desarrollo_12m', comparar=REGLA_SIMPLE),
     ),
     sexo='sexo', codigos_sexo=(('M', 1), ('F', 2)),
     medidas=(CR.Medida('peso', 'peso', factor=0.001, restringido=True), CR.Medida('talla', 'talla'),
@@ -183,6 +188,14 @@ CONFIG_CLINICA_DEMO = AC.ConfigClinica(
     etapas_crecimiento=('40 sem', '3 m EC', '6 m EC', '12 m EC'),
     rondas=300, min_casos=20,
 )
+
+# The Fundación's growth question (talla baja a los 12 meses, z < -2 OMS), predicted from earlier visits. As in the
+# Diccionario it has only «_desde_» rows and is «En prueba», so it is trained only with anticipation.
+EN_PRUEBA_DEMO = tuple(
+    AC.Desenlace(f'talla_baja_12m_desde_{momento.split()[0]}',
+                 f'talla baja para la edad a los 12 meses (riesgo calculado a {momento})', momento, 'z_bajo',
+                 concepto='talla', etapa='12 m EC', comparar=REGLA_SIMPLE)
+    for momento in ('40 sem', '3 m EC', '6 m EC'))
 
 
 def _con_desenlaces(sev: Sevarti, semilla: int) -> Sevarti:
@@ -200,12 +213,18 @@ def _con_desenlaces(sev: Sevarti, semilla: int) -> Sevarti:
     readm = rng.random(len(s)) < 1 / (1 + np.exp(-(-2.2 + 1.4 * pobreza)))
     oxi = rng.random(len(s)) < 1 / (1 + np.exp(-(-3.5 + 0.15 * uci.reindex(s).fillna(0).to_numpy())))
     desarrollo = 100 + 3 * (eg.reindex(visita6.index).to_numpy() - 33) + rng.normal(0, 6, len(visita6))
+    # its own generator, so the earlier outcomes keep the values they always had
+    rng12 = np.random.default_rng(semilla + 2000)
+    visita12 = datos[datos.etapa == '12 m EC'].groupby('sujeto')[['t', 'edad_dias']].first()
+    desarrollo12 = 100 + 3 * (eg.reindex(visita12.index).to_numpy() - 33) + rng12.normal(0, 6, len(visita12))
     filas = [
         (dict(variable='readm_3m', tipo='numeric', rol='medicion', etapa='3 m EC'), s, readm.astype(float), visita),
         (dict(variable='oxigeno_3m', tipo='categorical', rol='medicion', etapa='3 m EC',
               categorias='1=displasia broncopulmonar;9=sin diagnóstico'), s, np.where(oxi, 1.0, 9.0), visita),
         (dict(variable='desarrollo_6m', tipo='numeric', rol='medicion', etapa='6 m EC'), visita6.index,
          np.round(desarrollo), visita6),
+        (dict(variable='desarrollo_12m', tipo='numeric', rol='medicion', etapa='12 m EC'), visita12.index,
+         np.round(desarrollo12), visita12),
     ]
     for fila, quien, valores, v in filas:
         nuevos = pd.DataFrame({'sujeto': quien, 'variable': fila['variable'], 'valor': valores,

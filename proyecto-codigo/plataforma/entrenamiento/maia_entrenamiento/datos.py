@@ -74,7 +74,9 @@ def config_clinica(fuente: str, prueba: bool = False, anticipacion: bool | None 
     filas ``_desde_`` «En prueba» del Diccionario. Sin pedirla, nada cambia."""
     anticipar = ANT.activa() if anticipacion is None else anticipacion
     if fuente == 'simulado':
-        return ANT.con_anticipacion(simulados.CONFIG_CLINICA_DEMO) if anticipar else simulados.CONFIG_CLINICA_DEMO
+        if anticipar:
+            return ANT.con_anticipacion(simulados.CONFIG_CLINICA_DEMO, en_prueba=simulados.EN_PRUEBA_DEMO)
+        return simulados.CONFIG_CLINICA_DEMO
     if anticipar and not prueba:
         return ANT.con_anticipacion_del_diccionario(CF.cargar(), CF.cargar(prueba=True))
     return CF.cargar(prueba=prueba)

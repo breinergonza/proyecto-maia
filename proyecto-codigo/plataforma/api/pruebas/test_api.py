@@ -366,7 +366,13 @@ def test_perfil_un_valor_por_nino_y_sin_codigos_de_no_se_hizo(cliente, admin, co
             cx.execute(text("UPDATE sevarti.esquema SET datos = jsonb_set(datos, '{codigos_especiales}', to_jsonb(CAST(:cod AS text))) "
                             'WHERE corte_id = :c AND variable = :v'), {'c': corte, 'v': variable, 'cod': f'{fila["valor"]:g}'})
         con_codigo = perfil()[variable]
-        assert con_codigo['valor'] == 1234.5 and con_codigo['ninos'] == fila['ninos']
+        # the code applies to everyone: another child whose only value was that same number has no measure left
+        with motor.begin() as cx:
+            sin_medida = cx.execute(text(
+                r"SELECT count(*) FROM (SELECT sujeto FROM sevarti.mediciones WHERE corte_id = :c AND variable = :v "
+                r"AND sujeto <> :s AND valor ~ '^-?[0-9]+(\.[0-9]+)?$' GROUP BY sujeto HAVING bool_and(valor::float = :x)) t"),
+                {'c': corte, 'v': variable, 's': sujeto, 'x': fila['valor']}).scalar_one()
+        assert con_codigo['valor'] == 1234.5 and con_codigo['ninos'] == fila['ninos'] - sin_medida
     finally:
         with motor.begin() as cx:
             cx.execute(text('DELETE FROM sevarti.mediciones WHERE corte_id = :c AND id >= :d'), {'c': corte, 'd': desde})

@@ -23,7 +23,7 @@ _SI = ('1', 'true', 'si', 'sí', 'yes', 'on')
 
 # Simulador (pocas visitas): dónde se registra cada desenlace de demostración, y las visitas desde las que se predice.
 # «hospitalización» hace de entrada al programa (la primera visita de la lista).
-EVENTOS_SIMULADO = {'readm_3m': '3 m EC', 'oxigeno_3m': '3 m EC', 'desarrollo_6m': '6 m EC'}
+EVENTOS_SIMULADO = {'readm_3m': '3 m EC', 'oxigeno_3m': '3 m EC', 'desarrollo_6m': '6 m EC', 'desarrollo_12m': '12 m EC'}
 VISITAS_SIMULADO = ('hospitalización', '40 sem', '3 m EC', '6 m EC', '12 m EC')
 
 
@@ -53,9 +53,10 @@ def variantes(cfg: ConfigClinica, eventos: Mapping[str, str], visitas: Sequence[
 
 
 def con_anticipacion(cfg: ConfigClinica, eventos: Mapping[str, str] = EVENTOS_SIMULADO,
-                     visitas: Sequence[str] = VISITAS_SIMULADO) -> ConfigClinica:
-    """``cfg`` con las variantes de anticipación de sus desenlaces."""
-    return replace(cfg, desenlaces=cfg.desenlaces + variantes(cfg, eventos, visitas))
+                     visitas: Sequence[str] = VISITAS_SIMULADO, en_prueba: Sequence[Desenlace] = ()) -> ConfigClinica:
+    """``cfg`` con las variantes de anticipación de sus desenlaces y las filas «En prueba» que ya vienen como
+    ``_desde_`` (``en_prueba``, como la talla baja a los 12 meses del Diccionario)."""
+    return replace(cfg, desenlaces=cfg.desenlaces + variantes(cfg, eventos, visitas) + tuple(en_prueba))
 
 
 def con_anticipacion_del_diccionario(en_uso: ConfigClinica, con_prueba: ConfigClinica) -> ConfigClinica:
