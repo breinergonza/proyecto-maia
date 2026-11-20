@@ -1,11 +1,14 @@
 // Predicción: las tres pestañas, el CSV solo para administración y la reserva de cifras con pocos niños.
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Usuario } from '../api/tipos'
 import { montar, simularApi, usuario } from './util'
 
 afterEach(() => vi.unstubAllGlobals())
+
+const Ubicacion = () => <p>dirección: {useLocation().search}</p>
 
 const modelo = { version: 'p1', version_modelo: 'x', corte: '2026-06-30', corte_anterior: false, corte_vigente: '2026-06-30' }
 const base = {
@@ -67,6 +70,9 @@ function api(rol: Usuario['rol'], trabajo: unknown = trabajoOk) {
       return { estado: 201, cuerpo: { id: 3, tipo: 'nino', titulo: JSON.parse(String(init.body)).titulo, visita: 'nacimiento', perfil: 'extremo',
         cambios: {}, dueno: 'Persona experto', propio: true, descripcion: null, modelo: 'p1', eg_semanas: 26, creada: null } }
     }
+    if (url === '/api/prediccion/nino' && init?.method === 'POST') {
+      return { cuerpo: { modelo, visita: 'nacimiento', guardado: false, nota: 'Ejemplo.', insuficiente: true, minimo: 20, n: 5, mensaje: 'Con menos de 20 niños no se da un ejemplo.' } }
+    }
     if (url === '/api/prediccion/ninos-nuevos') return { cuerpo: [] }
   })
 }
@@ -89,6 +95,7 @@ describe('predicción', () => {
     const { unmount } = montar('/prediccion?vista=grupo')
     await userEvent.click(await screen.findByRole('tab', { name: 'Todo el universo' }))
     await userEvent.click(screen.getByRole('button', { name: 'Calcular el riesgo' }))
+    await userEvent.click(await screen.findByRole('tab', { name: 'Niños con más riesgo' }))
     expect(await screen.findByRole('button', { name: /Exportar CSV/ })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'N-001' })).toHaveAttribute('href', '/ninos/N-001')
     unmount()
@@ -96,6 +103,7 @@ describe('predicción', () => {
     montar('/prediccion?vista=grupo')
     await userEvent.click(await screen.findByRole('tab', { name: 'Todo el universo' }))
     await userEvent.click(screen.getByRole('button', { name: 'Calcular el riesgo' }))
+    await userEvent.click(await screen.findByRole('tab', { name: 'Niños con más riesgo' }))
     expect(await screen.findByRole('link', { name: 'N-001' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Exportar CSV/ })).not.toBeInTheDocument()
   })
@@ -127,9 +135,11 @@ describe('predicción', () => {
     montar('/prediccion?vista=grupo')
     await userEvent.click(await screen.findByRole('tab', { name: 'Todo el universo' }))
     await userEvent.click(screen.getByRole('button', { name: 'Calcular el riesgo' }))
+    await userEvent.click(await screen.findByRole('tab', { name: 'Por visita' }))
+    expect(await screen.findByRole('heading', { name: 'Riesgo alto en cada visita' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: 'Niños con más riesgo' }))
     expect(await screen.findByRole('link', { name: 'N-001' })).toBeInTheDocument()
     expect(screen.getByText(/Página 1 de 3/)).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Riesgo alto en cada visita' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Siguiente' }))
     expect(await screen.findByRole('link', { name: 'N-002' })).toBeInTheDocument()
     expect(llamadas.some((l) => l.url === '/api/prediccion/trabajos/7/tabla?pagina=2')).toBe(true)
@@ -182,5 +192,75 @@ describe('predicción', () => {
     api('visualizador')
     montar('/prediccion?vista=grupo')
     expect(await screen.findByRole('heading', { name: 'Sin permiso' })).toBeInTheDocument()
+  })
+})
+
+describe('predicción en pestañas', () => {
+  it('«Un niño» y «Un grupo de niños» son pestañas compartidas: la dirección elige la pestaña y la conserva', async () => {
+    api('experto')
+    montar('/prediccion?vista=grupo&modo=universo', <Ubicacion />)
+    const vistas = await screen.findByRole('tablist', { name: 'Qué desea predecir' })
+    expect(within(vistas).getByRole('tab', { name: 'Un grupo de niños' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Todo el universo' })).toHaveAttribute('aria-selected', 'true')
+    await userEvent.click(within(vistas).getByRole('tab', { name: 'Un niño' }))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Calcular un niño' })).toBeInTheDocument()
+    expect(screen.getByText(/^dirección:/)).toHaveTextContent('vista=nino')
+  })
+
+  it('los tres modos viven en la dirección (?modo=) sin perder ?vista=grupo', async () => {
+    api('experto')
+    montar('/prediccion?vista=grupo', <Ubicacion />)
+    const modos = await screen.findByRole('tablist', { name: 'Qué calcular' })
+    expect(within(modos).getByRole('tab', { name: 'Muestra' })).toHaveAttribute('aria-selected', 'true')
+    await userEvent.click(within(modos).getByRole('tab', { name: 'Niño nuevo desde un perfil' }))
+    expect(screen.getByText(/^dirección:/)).toHaveTextContent('vista=grupo')
+    expect(screen.getByText(/^dirección:/)).toHaveTextContent('modo=nino')
+    await userEvent.click(within(modos).getByRole('tab', { name: 'Todo el universo' }))
+    expect(screen.getByText(/^dirección:/)).toHaveTextContent('modo=universo')
+  })
+
+  it('el resultado de un grupo se reparte en pestañas: lo principal primero y la tabla por niño conserva su página', async () => {
+    api('experto')
+    montar('/prediccion?vista=grupo&modo=universo')
+    await userEvent.click(await screen.findByRole('button', { name: 'Calcular el riesgo' }))
+    const lista = await screen.findByRole('tablist', { name: 'Qué ver del grupo' })
+    expect(within(lista).getAllByRole('tab').map((t) => t.textContent)).toEqual(['Resumen', 'Por desenlace', 'Por visita', 'Niños con más riesgo'])
+    // el resumen: las cifras y la distribución, sin la tabla por niño
+    expect(await screen.findByText('niños con el riesgo calculado')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Cómo se reparte el riesgo' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'N-001' })).not.toBeInTheDocument()
+    await userEvent.click(within(lista).getByRole('tab', { name: 'Por desenlace' }))
+    expect(screen.getByRole('cell', { name: 'desarrollo psicomotor bajo' })).toBeInTheDocument()
+    await userEvent.click(within(lista).getByRole('tab', { name: 'Por visita' }))
+    expect(screen.getByRole('heading', { name: 'Riesgo alto en cada visita' })).toBeInTheDocument()
+    await userEvent.click(within(lista).getByRole('tab', { name: 'Niños con más riesgo' }))
+    expect(await screen.findByRole('link', { name: 'N-001' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Siguiente' }))
+    expect(await screen.findByRole('link', { name: 'N-002' })).toBeInTheDocument()
+    await userEvent.click(within(lista).getByRole('tab', { name: 'Resumen' }))
+    await userEvent.click(within(lista).getByRole('tab', { name: 'Niños con más riesgo' }))
+    expect(await screen.findByRole('link', { name: 'N-002' })).toBeInTheDocument()
+    expect(screen.getByText(/Página 2 de 3/)).toBeInTheDocument()
+  })
+
+  it('el niño nuevo va por pestañas: perfil, datos, resultado, riesgo por visita y guardar; elegir pasa a los datos y calcular al resultado', async () => {
+    api('experto')
+    montar('/prediccion?vista=grupo&modo=nino')
+    const lista = await screen.findByRole('tablist', { name: 'Qué hacer con el niño nuevo' })
+    expect(within(lista).getAllByRole('tab').map((t) => t.textContent)).toEqual(['Perfil y visita', 'Niño de ejemplo', 'Resultado', 'Riesgo por visita', 'Guardar y reutilizar'])
+    expect(within(lista).getByRole('tab', { name: 'Perfil y visita' })).toHaveAttribute('aria-selected', 'true')
+    await userEvent.click(await screen.findByRole('button', { name: 'Nacimiento' }))
+    await userEvent.click(await screen.findByRole('button', { name: /Prematuro extremo/ }))
+    expect(await screen.findByRole('tab', { name: 'Niño de ejemplo', selected: true })).toBeInTheDocument()
+    const peso = await screen.findByLabelText(/Peso al nacer/)
+    await userEvent.clear(peso)
+    await userEvent.type(peso, '1100')
+    // «Calcular el riesgo» está junto al título del editor, a la vista
+    await userEvent.click(screen.getByRole('button', { name: 'Calcular el riesgo' }))
+    expect(await screen.findByRole('tab', { name: 'Resultado', selected: true })).toBeInTheDocument()
+    expect(within(document.getElementById('nino-nuevo-panel')!).getByText(/Con menos de 20 niños no se da un ejemplo/)).toBeInTheDocument()
+    // lo escrito sobrevive al cambiar de pestaña
+    await userEvent.click(within(lista).getByRole('tab', { name: 'Niño de ejemplo' }))
+    expect(screen.getByLabelText(/Peso al nacer/)).toHaveValue(1100)
   })
 })

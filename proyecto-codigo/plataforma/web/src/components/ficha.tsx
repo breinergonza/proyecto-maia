@@ -122,15 +122,27 @@ export function PerfilDelNino({ perfil }: { perfil?: PerfilProvisional }) {
   )
 }
 
-/** `excluir`: familias de desenlaces que la ficha ya cuenta con su riesgo por visita (no se repiten aquí). */
-export function TrayectoriaRiesgo({ sujeto, excluir }: { sujeto: string; excluir?: ReadonlySet<string> }) {
-  const q = useQuery({
+/** El riesgo del niño en cada visita, de todos sus desenlaces. La ficha lo pide para saber si tiene algo que mostrar, y la
+ * gráfica lo comparte (misma consulta). */
+export function useHistoriaRiesgo(sujeto: string) {
+  return useQuery({
     queryKey: ['nino', sujeto, 'historia-riesgo'],
     queryFn: () => pedir<HistoriaRiesgo>(`/ninos/${encodeURIComponent(sujeto)}/historia-riesgo`),
     staleTime: 5 * 60_000,
   })
+}
+
+/** `excluir`: familias de desenlaces que la ficha ya cuenta con su riesgo por visita (no se repiten aquí). */
+export const familiasSinExcluidas = (puntos: PuntoHistoria[] | undefined, excluir?: ReadonlySet<string>) =>
+  familiasDeRiesgo(puntos ?? []).filter((f) => !excluir?.has(f.clave))
+
+/** `grilla` es la distribución de las gráficas; por defecto, la de una columna angosta. */
+export function TrayectoriaRiesgo({ sujeto, excluir, grilla = 'sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2' }: {
+  sujeto: string; excluir?: ReadonlySet<string>; grilla?: string
+}) {
+  const q = useHistoriaRiesgo(sujeto)
   const [todas, setTodas] = useState(false)
-  const familias = useMemo(() => familiasDeRiesgo(q.data?.puntos ?? []).filter((f) => !excluir?.has(f.clave)), [q.data, excluir])
+  const familias = useMemo(() => familiasSinExcluidas(q.data?.puntos, excluir), [q.data, excluir])
   const visitas = useMemo(() => {
     const m = new Map<number, string>()
     for (const p of q.data?.puntos ?? []) m.set(p.orden, p.momento_nombre)
@@ -158,7 +170,7 @@ export function TrayectoriaRiesgo({ sujeto, excluir }: { sujeto: string; excluir
           Calculado con los modelos vigentes; las tarjetas de arriba se calcularon con modelos anteriores y pueden no coincidir.
         </p>
       )}
-      <ul className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+      <ul className={cn('grid grid-cols-1 gap-x-6 gap-y-4', grilla)}>
         {mostradas.map((f) => {
           const primera = ordenPrimeraAlerta(f, q.data.primera_alerta)
           return (
@@ -288,12 +300,18 @@ export function CrecimientoOms({ crecimiento, grilla = 'sm:grid-cols-3 xl:grid-c
  * empates la frase sigue siendo cierta. */
 export const frentePerfil = (p: number) => `${Math.round(p)} de cada 100 niños tienen menos`
 
-export function PerfilCohorte({ sujeto }: { sujeto: string }) {
-  const q = useQuery({
+/** Cómo nació el niño frente a los demás: la ficha lo pide para saber si hay algo que mostrar, y la gráfica lo comparte. */
+export function usePerfilCohorte(sujeto: string) {
+  return useQuery({
     queryKey: ['nino', sujeto, 'perfil'],
     queryFn: () => pedir<PerfilNino>(`/ninos/${encodeURIComponent(sujeto)}/perfil`),
     staleTime: 5 * 60_000,
   })
+}
+
+/** `grilla` es la distribución de las variables; por defecto, una por fila. */
+export function PerfilCohorte({ sujeto, grilla }: { sujeto: string; grilla?: string }) {
+  const q = usePerfilCohorte(sujeto)
   if (q.isPending) return <Panel titulo={descripcionDe('al_nacer').titulo}><Cargando /></Panel>
   if (q.error) return <Panel titulo={descripcionDe('al_nacer').titulo}><Aviso>{q.error.message}</Aviso></Panel>
   if (!q.data.variables.length) return null
@@ -304,7 +322,7 @@ export function PerfilCohorte({ sujeto }: { sujeto: string }) {
         <Muestra tipo="franja">la mitad de los niños</Muestra>
         <Muestra tipo="marcado">este niño</Muestra>
       </span>}>
-      <ul className="space-y-4">
+      <ul className={cn('grid grid-cols-1 gap-x-8 gap-y-4', grilla)}>
         {q.data.variables.map((v) => {
           const formato = (x: number) => `${v.unidad === 'semanas' ? dec(x) : aproximado(x)}${v.unidad ? ` ${v.unidad}` : ''}`
           return (

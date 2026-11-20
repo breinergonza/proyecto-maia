@@ -2,6 +2,7 @@
 // opcional y el avance. No muestra el riesgo ni la posición, para que la opinión sea independiente; al comparar con el
 // modelo se sabe si los niños de riesgo alto preocupan más que el resto. La administración ve además el resumen.
 // En escritorio la página no se desplaza: lo que se desplaza es la evidencia (datos y crecimiento) y las respuestas quedan fijas.
+// La administración tiene dos pestañas: revisar niños (lo de siempre) y los resultados de todos los expertos.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, useSyncExternalStore } from 'react'
 import { pedir } from '../api/cliente'
@@ -9,6 +10,7 @@ import type { Respuesta, ResumenRevision, RiesgoRevision } from '../api/tipos'
 import { useSesion, puede } from '../auth/sesion'
 import { CrecimientoOms } from '../components/ficha'
 import { Aviso, Boton, Cargando, Encabezado, Panel, Tabla, Texto, Vacio } from '../components/ui'
+import { PanelPestana, Pestanas, usePestanaEnUrl } from '../components/ui/Pestanas'
 import { ErrorConReintento } from '../components/ErrorConReintento'
 import { cn } from '../lib/cn'
 import { fecha, num, pct } from '../lib/formato'
@@ -37,15 +39,24 @@ export function altoGraficas(ancho: number, alto: number, medidas: number): numb
   return Math.round(Math.min(460, Math.max(130, (alto - 520) / filas - 40)))
 }
 
+/** Lo que ocupan las pestañas de la administración: la evidencia del caso se dibuja con ese alto de menos. */
+const ALTO_PESTANAS = 48
+
 const OPCIONES: { valor: Respuesta; texto: string }[] = [
   { valor: 'si', texto: 'Sí, me preocupa' },
   { valor: 'no', texto: 'No me preocupa' },
   { valor: 'no_se', texto: 'No lo sé' },
 ]
 
+const VISTAS = [
+  { clave: 'revisar', texto: 'Revisar niños' },
+  { clave: 'resultados', texto: 'Resultados' },
+] as const
+
 export default function RevisionRiesgos() {
   const { usuario } = useSesion()
   const admin = puede(usuario, ['admin'])
+  const [vista, elegirVista] = usePestanaEnUrl('ver', VISTAS.map((v) => v.clave))
   const q = useQuery({ queryKey: ['revision', 'riesgos'], queryFn: () => pedir<{ corrida_id: number; items: RiesgoRevision[] }>('/revision/riesgos') })
   const [elegido, setElegido] = useState<number | null>(null)
   const items = q.data?.items ?? []
@@ -62,6 +73,22 @@ export default function RevisionRiesgos() {
     setElegido(despues >= 0 ? despues : Math.min(actual + 1, total - 1))
   }
 
+  const revisar = q.isPending ? <Cargando /> : q.error ? (
+    <ErrorConReintento error={q.error} que="los niños por revisar" reintentando={q.isFetching} reintentar={() => void q.refetch()} />
+  ) : total === 0 ? (
+    <Vacio titulo="No hay niños con riesgo calculado con los datos más recientes" />
+  ) : (
+    <>
+      {terminado && <Aviso tono="teal">Respondió a todos los niños. Gracias; puede volver a cualquiera para cambiar su respuesta.</Aviso>}
+      <Caso key={items[actual].id} caso={items[actual]} numero={actual + 1} total={total} alResponder={siguiente} claseAlto="lg:min-h-0 lg:flex-initial"
+        ancho={ancho} altoGrafica={(c) => altoGraficas(ancho, altoVentana - (admin ? ALTO_PESTANAS : 0), c)} />
+      <nav className="flex shrink-0 justify-between lg:mt-auto" aria-label="Moverse entre niños">
+        <Boton chico variante="secundario" disabled={actual === 0} onClick={() => setElegido(actual - 1)}>Anterior</Boton>
+        <Boton chico variante="secundario" disabled={actual >= total - 1} onClick={() => setElegido(actual + 1)}>Siguiente</Boton>
+      </nav>
+    </>
+  )
+
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 lg:h-full lg:max-w-none">
       <Encabezado titulo="Revisión de riesgos"
@@ -77,20 +104,16 @@ export default function RevisionRiesgos() {
         Diga si el niño le preocupa, con su criterio clínico. No se muestra el riesgo calculado, a propósito, para que su
         opinión sea independiente.
       </Encabezado>
-      {q.isPending ? <Cargando /> : q.error ? <ErrorConReintento error={q.error} que="los niños por revisar" reintentando={q.isFetching} reintentar={() => void q.refetch()} /> : total === 0 ? (
-        <Vacio titulo="No hay niños con riesgo calculado con los datos más recientes" />
-      ) : (
+      {admin ? (
         <>
-          {terminado && <Aviso tono="teal">Respondió a todos los niños. Gracias; puede volver a cualquiera para cambiar su respuesta.</Aviso>}
-          <Caso key={items[actual].id} caso={items[actual]} numero={actual + 1} total={total} alResponder={siguiente} claseAlto={admin ? 'lg:min-h-[32rem] lg:flex-none' : 'lg:min-h-0 lg:flex-initial'}
-            ancho={ancho} altoGrafica={(c) => altoGraficas(ancho, altoVentana, c)} />
-          <nav className="flex shrink-0 justify-between lg:mt-auto" aria-label="Moverse entre niños">
-            <Boton chico variante="secundario" disabled={actual === 0} onClick={() => setElegido(actual - 1)}>Anterior</Boton>
-            <Boton chico variante="secundario" disabled={actual >= total - 1} onClick={() => setElegido(actual + 1)}>Siguiente</Boton>
-          </nav>
+          <Pestanas prefijo="revision" etiqueta="Qué ver de la revisión" pestanas={VISTAS} activa={vista} elegir={elegirVista} />
+          <PanelPestana prefijo="revision" activa={vista} className="flex flex-col gap-3 lg:min-h-0 lg:flex-1">
+            {vista === 'resultados' ? <Resultados /> : revisar}
+          </PanelPestana>
         </>
+      ) : (
+        <div className="flex flex-col gap-3 lg:min-h-0 lg:flex-1">{revisar}</div>
       )}
-      {admin && <Resultados />}
     </div>
   )
 }
@@ -165,7 +188,7 @@ function Resultados() {
   const q = useQuery({ queryKey: ['revision', 'resumen'], queryFn: () => pedir<ResumenRevision>('/revision/resumen') })
   const vacio = !q.data || (!q.data.datos_por_capa.length && !q.data.riesgos_por_grupo.length)
   return (
-    <Panel llenar titulo="Lo que va de la revisión" className="xl:self-stretch"
+    <Panel llenar titulo="Lo que va de la revisión" className="lg:max-h-full"
       accion={<span className="text-xs text-salvia">todos los expertos</span>}>
       {q.isPending ? <Cargando /> : vacio ? (
         <p className="text-sm text-salvia">Todavía no hay respuestas. Aquí verá qué parte de lo marcado era un error y si el riesgo alto preocupa más.</p>

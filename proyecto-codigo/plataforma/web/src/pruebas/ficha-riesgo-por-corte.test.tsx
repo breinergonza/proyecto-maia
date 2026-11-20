@@ -1,6 +1,6 @@
 // La ficha del niño con «Riesgo a los 12 meses, visita por visita» (S7): arriba de las tarjetas, sin repetir lo que ya cuenta,
 // y con una falla de red dicha con reintento.
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { RiesgoPorCorte } from '../api/ninos'
@@ -95,20 +95,18 @@ describe('ficha del niño: riesgo a los 12 meses', () => {
     expect(screen.getByText('talla baja a los 12 meses (riesgo calculado a 3 m EC)')).toBeInTheDocument()
   })
 
-  it('el índice de la ficha lleva a riesgo, crecimiento y visitas, y las curvas de crecimiento van antes que el resto', async () => {
+  it('las pestañas de la ficha llevan al riesgo, al resto de riesgos, al crecimiento y a las visitas, en ese orden', async () => {
     const z = (edad: number, valor: number) => ({ etapa: '3 m EC', indicador: 'talla', fecha: null, edad_corregida: edad, valor: 50, unidad: 'cm', z: valor, bajo_2de: false, caida_1de: false, improbable: false })
     const conCrecimiento = { ...linea, crecimiento: { talla: [z(10, -0.5), z(60, -1)] } }
     api(() => ({ cuerpo: historia }), { linea: conCrecimiento })
     montar('/ninos/s1')
-    const indice = await screen.findByRole('navigation', { name: 'En esta ficha' })
-    expect(indice).toHaveClass('no-imprimir')
-    const enlaces = within(indice).getAllByRole('link').map((a) => [a.textContent, a.getAttribute('href')])
-    expect(enlaces).toEqual([['Riesgo a 12 meses', '#riesgo-12-meses'], ['Crecimiento', '#crecimiento'], ['Visitas', '#visitas']])
-    for (const [, href] of enlaces) expect(document.querySelector(href!)).not.toBeNull()
-    // el crecimiento viene antes que las tarjetas del resto de desenlaces
+    const lista = await screen.findByRole('tablist', { name: 'Qué ver de este niño' })
+    expect(lista).toHaveClass('no-imprimir')
+    await waitFor(() => expect(within(lista).getAllByRole('tab').map((t) => t.textContent)).toEqual(['Talla baja a 12 meses', 'Otros riesgos', 'Crecimiento', 'Visitas']))
+    // las tarjetas del resto de desenlaces vienen antes que el crecimiento
     const crecimiento = screen.getByRole('heading', { name: 'Crecimiento frente a la OMS' })
     const tarjetas = await screen.findByRole('region', { name: 'Riesgo calculado' })
-    expect(crecimiento.compareDocumentPosition(tarjetas) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(tarjetas.compareDocumentPosition(crecimiento) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('«Riesgo en cada visita» no repite los desenlaces que la sección de 12 meses ya cuenta', async () => {

@@ -1,9 +1,12 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { montar, simularApi, usuario } from './util'
 
 afterEach(() => vi.unstubAllGlobals())
+
+const Ubicacion = () => <p>dirección: {useLocation().search}</p>
 
 const caso = (id: number, extra = {}) => ({
   id, sujeto: `N-${id}`, clave: 'oxigeno', desenlace: 'Oxígeno a los 12 meses', momento: '40s', momento_nombre: '40 semanas',
@@ -55,11 +58,39 @@ describe('Revisión de riesgos simplificada', () => {
     expect(screen.queryByText('Lo que va de la revisión')).toBeNull()
   })
 
-  it('el admin ve además el resumen de lo que va de la revisión', async () => {
+  it('el admin ve además el resumen de lo que va de la revisión, en su propia pestaña', async () => {
     simularApi(api('admin', [caso(1)]))
     montar('/revision/riesgos')
-    expect(await screen.findByText('Lo que va de la revisión')).toBeInTheDocument()
     expect((await screen.findAllByText(/Niño 1 de 1/)).length).toBeGreaterThan(0)
+    expect(screen.queryByText('Lo que va de la revisión')).toBeNull()
+    await userEvent.click(screen.getByRole('tab', { name: 'Resultados' }))
+    expect(await screen.findByText('Lo que va de la revisión')).toBeInTheDocument()
+  })
+
+  it('el admin elige entre revisar niños y los resultados; la pestaña vive en la dirección y el motivo escrito sobrevive', async () => {
+    simularApi(api('admin', [caso(1)]))
+    montar('/revision/riesgos', <Ubicacion />)
+    const lista = await screen.findByRole('tablist', { name: 'Qué ver de la revisión' })
+    expect(Array.from(lista.querySelectorAll('[role="tab"]')).map((t) => t.textContent)).toEqual(['Revisar niños', 'Resultados'])
+    expect(screen.getByRole('tab', { name: 'Revisar niños' })).toHaveAttribute('aria-selected', 'true')
+    await userEvent.type(await screen.findByLabelText(/Motivo/), 'Se ve bien')
+    await userEvent.click(screen.getByRole('tab', { name: 'Resultados' }))
+    expect(screen.getByText(/^dirección:/)).toHaveTextContent('ver=resultados')
+    expect(screen.queryByRole('group', { name: '¿Le preocupa este niño?' })).toBeNull()
+    await userEvent.click(screen.getByRole('tab', { name: 'Revisar niños' }))
+    expect(await screen.findByLabelText(/Motivo/)).toHaveValue('Se ve bien')
+  })
+
+  it('la dirección ?ver=resultados abre los resultados, y el experto no tiene pestañas', async () => {
+    simularApi(api('admin', [caso(1)]))
+    const { unmount } = montar('/revision/riesgos?ver=resultados')
+    expect(await screen.findByText('Lo que va de la revisión')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Resultados' })).toHaveAttribute('aria-selected', 'true')
+    unmount()
+    simularApi(api('experto', [caso(1)]))
+    montar('/revision/riesgos?ver=resultados')
+    expect(await screen.findByRole('group', { name: '¿Le preocupa este niño?' })).toBeInTheDocument()
+    expect(screen.queryByRole('tablist', { name: 'Qué ver de la revisión' })).toBeNull()
   })
 
   it('el visualizador no entra', async () => {

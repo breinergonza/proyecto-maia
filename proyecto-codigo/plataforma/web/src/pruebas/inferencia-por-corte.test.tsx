@@ -64,9 +64,9 @@ describe('calcular un niño: riesgo visita por visita', () => {
     montar('/prediccion')
     await userEvent.type(await screen.findByLabelText('Fecha de nacimiento'), '2026-01-10')
     await userEvent.type(screen.getByLabelText('Semanas de gestación al nacer'), '30')
-    await userEvent.click(screen.getByRole('button', { name: /^40 semanas/ }))
+    await userEvent.click(screen.getByRole('tab', { name: /^40 semanas/ }))
     await userEvent.type(screen.getByLabelText('Peso a 40 sem (g)'), '2500')
-    await userEvent.type(screen.getByLabelText('Fecha de la visita'), '2026-02-20')
+    await userEvent.type(within(screen.getByRole('tabpanel', { name: /^40 semanas/ })).getByLabelText('Fecha de la visita'), '2026-02-20')
     await userEvent.click(screen.getByRole('button', { name: 'Calcular el riesgo' }))
 
     expect(await screen.findByRole('heading', { level: 2, name: 'Riesgo a los 12 meses, visita por visita' })).toBeInTheDocument()
@@ -78,9 +78,11 @@ describe('calcular un niño: riesgo visita por visita', () => {
     // la tarjeta suelta de la última visita no repite lo que ya dice la sección
     expect(screen.queryByRole('heading', { level: 2, name: 'talla baja a los 12 meses' })).not.toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: /^3 meses/ }))
+    // el resultado se abrió solo: se vuelve a los datos para sumar la visita
+    await userEvent.click(screen.getByRole('tab', { name: 'Datos del niño' }))
+    await userEvent.click(screen.getByRole('tab', { name: /^3 meses/ }))
     await userEvent.type(screen.getByLabelText('Peso a 3 m (g)'), '5000')
-    await userEvent.type(screen.getAllByLabelText('Fecha de la visita')[1], '2026-05-10')
+    await userEvent.type(within(screen.getByRole('tabpanel', { name: /^3 meses/ })).getByLabelText('Fecha de la visita'), '2026-05-10')
     await userEvent.click(screen.getByRole('button', { name: 'Calcular el riesgo' }))
 
     await waitFor(() => expect(columnas()).toHaveLength(2))

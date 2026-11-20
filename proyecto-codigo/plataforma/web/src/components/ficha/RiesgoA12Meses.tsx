@@ -4,7 +4,7 @@
 // datos de visitas posteriores. «Cómo se calculó» (modelo, entrenamiento, calibración) sale una vez al pie de la sección: el
 // modelo es el mismo para todos los desenlaces; cada uno dice su visita («Calculado a …») y si está «En prueba».
 import { ArrowDown, ArrowUp, Minus } from 'lucide-react'
-import { useId, useState } from 'react'
+import { type ReactNode, useId, useState } from 'react'
 import type { RiesgoPorCorte } from '../../api/ninos'
 import { cn } from '../../lib/cn'
 import { aCsv, descargar, nombreArchivo, type FilaCsv } from '../../lib/exportar'
@@ -16,14 +16,18 @@ import { MiniSerie, type PuntoSerie } from '../graficos'
 import { Aviso, Boton, Cargando, Insignia, Panel, Tabla } from '../ui'
 
 const TITULO = 'Riesgo a los 12 meses, visita por visita'
+const INTRO = 'Cada columna es el riesgo del niño con lo medido hasta esa visita: no usa datos de visitas posteriores. Así se ve cuánto cambia con cada visita.'
 const minuscula = (t: string) => t.charAt(0).toLowerCase() + t.slice(1)
 
-export function RiesgoA12Meses({ historia, cargando, error, reintentar }: {
+interface Propiedades {
   historia?: RiesgoPorCorte | null
   cargando?: boolean
   error?: Error | null
   reintentar?: () => void
-}) {
+}
+
+/** `solo`: la clave de una familia; sin ella salen todas, una bajo otra. */
+export function RiesgoA12Meses({ historia, cargando, error, reintentar, solo }: Propiedades & { solo?: string }) {
   const id = useId()
   if (cargando) return <Panel titulo={TITULO}><Cargando texto="Calculando el riesgo visita por visita…" /></Panel>
   if (error) {
@@ -36,17 +40,19 @@ export function RiesgoA12Meses({ historia, cargando, error, reintentar }: {
   }
   // una respuesta sin las familias es de una API anterior: no hay nada que comparar
   if (!historia?.familias) return null
-  const { mostradas, ausentes } = familiasDelNino(historia)
+  const { mostradas: todas, ausentes } = familiasDelNino(historia)
+  const mostradas = solo ? todas.filter((f) => f.familia.clave === solo) : todas
   return (
-    <section aria-labelledby={id} className="space-y-4">
-      <div>
-        <h2 id={id}>{TITULO}</h2>
-        <p className="mt-1 text-sm">
-          Cada columna es el riesgo del niño con lo medido hasta esa visita: no usa datos de visitas posteriores. Así se ve cuánto cambia con cada visita.
-        </p>
-      </div>
-      {mostradas.map((f) => <Familia key={f.familia.clave} f={f} />)}
-      <ComoSeCalculo familias={mostradas} historia={historia} />
+    <section aria-labelledby={id} className="space-y-3 lg:space-y-4">
+      {solo ? <h2 id={id} className="sr-only">{TITULO}</h2> : (
+        <div>
+          <h2 id={id}>{TITULO}</h2>
+          <p className="mt-1 text-sm">{INTRO}</p>
+        </div>
+      )}
+      {/* con una sola familia (una pestaña) la explicación va en su tarjeta y el pie no la repite */}
+      {mostradas.map((f) => <Familia key={f.familia.clave} f={f} intro={solo ? INTRO : undefined} />)}
+      <ComoSeCalculo familias={mostradas} historia={historia} sinIntro={solo != null} />
       {ausentes.length > 0 && (
         <ul className="space-y-1 text-sm">{ausentes.map((a) => <li key={a.clave}>{sinFamilia(a.nombre)}</li>)}</ul>
       )}
@@ -54,7 +60,28 @@ export function RiesgoA12Meses({ historia, cargando, error, reintentar }: {
   )
 }
 
-function Familia({ f }: { f: FamiliaDelNino }) {
+/** Las pestañas del riesgo a 12 meses: una por desenlace, para que cada una tenga el alto de un solo desenlace. Mientras carga,
+ * si falla o si el paquete no trae ninguno, una sola con la sección entera. Sin las familias (API anterior), ninguna. */
+export function seccionesDeRiesgo(p: Propiedades): { clave: string; texto: string; contenido: ReactNode }[] {
+  const entera = [{ clave: 'riesgo', texto: 'Riesgo a 12 meses', contenido: <RiesgoA12Meses {...p} /> }]
+  if (p.cargando || p.error) return entera
+  if (!p.historia?.familias) return []
+  const { mostradas, ausentes } = familiasDelNino(p.historia)
+  if (mostradas.length === 0) return ausentes.length > 0 ? entera : []
+  return mostradas.map(({ familia }) => ({
+    clave: `riesgo-${familia.clave}`,
+    texto: textoDePestana(familia.nombre),
+    contenido: <RiesgoA12Meses {...p} solo={familia.clave} />,
+  }))
+}
+
+/** «talla baja para la edad a los 12 meses» -> «Talla baja a 12 meses» */
+const textoDePestana = (nombre: string) => {
+  const corto = nombre.replace(' a los 12 meses', ' a 12 meses').replace(' para la edad', '')
+  return corto.charAt(0).toUpperCase() + corto.slice(1)
+}
+
+function Familia({ f, intro }: { f: FamiliaDelNino; intro?: string }) {
   const { familia, columnas, sinRiesgo } = f
   const [tabla, setTabla] = useState(false)
   const ultima = columnas[columnas.length - 1]
@@ -67,7 +94,7 @@ function Familia({ f }: { f: FamiliaDelNino }) {
   const filas = columnas.map(filaDe)
   const nombreCsv = `riesgo-${familia.clave}`
   return (
-    <Panel titulo={titulo} descripcion={familia.definicion}
+    <Panel titulo={titulo} descripcion={[familia.definicion, intro].filter(Boolean).join(' ') || null}
       accion={columnas.length > 0 && (
         <span className="no-imprimir flex flex-wrap items-center gap-2">
           <Boton variante={tabla ? 'primario' : 'secundario'} chico aria-pressed={tabla} onClick={() => setTabla(!tabla)}>Ver como tabla</Boton>
@@ -84,9 +111,12 @@ function Familia({ f }: { f: FamiliaDelNino }) {
         </>
       ) : tabla ? <TablaDeColumnas filas={filas} nombre={familia.nombre} /> : (
         <>
-          <Columnas columnas={columnas} enUso={familia.estado === 'en_uso'} />
-          {/* con dos visitas la gráfica sería una raya entre dos puntos: las columnas ya dicen el cambio */}
-          {columnas.length >= 3 && <Evolucion columnas={columnas} nombre={familia.nombre} />}
+          {/* con tres columnas la gráfica de evolución cabe a su derecha; con más, va debajo. Con dos sería una raya entre dos
+              puntos: las columnas ya dicen el cambio */}
+          <div className={cn(columnas.length === 3 && 'lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] lg:gap-4')}>
+            <Columnas columnas={columnas} enUso={familia.estado === 'en_uso'} />
+            {columnas.length >= 3 && <Evolucion columnas={columnas} nombre={familia.nombre} aLaDerecha={columnas.length === 3} />}
+          </div>
           <Razones cortes={sinRiesgo} />
         </>
       )}
@@ -141,15 +171,16 @@ function Cambio({ c }: { c: NonNullable<ColumnaDeRiesgo['cambio']> }) {
 }
 
 /** Cómo fue cambiando el riesgo de visita en visita. La tabla de «Ver como tabla» trae los mismos datos. */
-function Evolucion({ columnas, nombre }: { columnas: ColumnaDeRiesgo[]; nombre: string }) {
+function Evolucion({ columnas, nombre, aLaDerecha }: { columnas: ColumnaDeRiesgo[]; nombre: string; aLaDerecha: boolean }) {
   const ordenes = columnas.map((c) => c.corte.orden)
   const dominioX: [number, number] = ordenes.length > 1 ? [ordenes[0], ordenes[ordenes.length - 1]] : [ordenes[0] - 0.5, ordenes[0] + 0.5]
   const techo = Math.min(100, Math.max(10, Math.ceil((100 * Math.max(...columnas.map((c) => c.punto.riesgo))) / 10) * 10))
   const nombres = new Map(columnas.map((c) => [c.corte.orden, c.corte.momento_nombre]))
   return (
-    <div className="mt-4">
+    <div className={cn('mt-4', aLaDerecha && 'lg:mt-0')}>
+      {aLaDerecha && <p className="mb-1 hidden text-sm font-semibold lg:block">Cómo cambió el riesgo</p>}
       <MiniSerie
-        alto={120}
+        alto={aLaDerecha ? 170 : 120}
         etiqueta={`Riesgo de ${nombre} por visita: ${columnas.map((c) => `${c.corte.momento_nombre}, ${textoPorcentaje(c.punto.riesgo)}`).join('; ')}`}
         puntos={columnas.map((c): PuntoSerie => ({
           x: c.corte.orden, y: 100 * c.punto.riesgo, marcado: c.punto.percentil >= RIESGO_ALTO,
@@ -173,7 +204,7 @@ function Razones({ cortes }: { cortes: FamiliaDelNino['sinRiesgo'] }) {
 }
 
 /** El modelo con que se calculó todo lo de arriba, una sola vez; la calibración se dice por desenlace solo si difiere. */
-function ComoSeCalculo({ familias, historia }: { familias: FamiliaDelNino[]; historia: RiesgoPorCorte }) {
+function ComoSeCalculo({ familias, historia, sinIntro }: { familias: FamiliaDelNino[]; historia: RiesgoPorCorte; sinIntro?: boolean }) {
   const conRiesgo = familias.filter((f) => f.columnas.length > 0)
   if (conRiesgo.length === 0) return null
   const calibraciones = conRiesgo.map((f) => ({ nombre: f.familia.nombre, con: f.columnas[f.columnas.length - 1].corte.calibrado_con }))
@@ -182,7 +213,7 @@ function ComoSeCalculo({ familias, historia }: { familias: FamiliaDelNino[]; his
     : distintas.size === 1 ? `Calibrado con los niños más recientes (${[...distintas][0]})`
       : `Calibrado con los niños más recientes: ${calibraciones.filter((c) => c.con).map((c) => `${c.nombre} (${c.con})`).join('; ')}`
   const partes = [
-    'Cada columna se calculó solo con lo medido hasta su visita',
+    sinIntro ? null : 'Cada columna se calculó solo con lo medido hasta su visita',
     historia.modelo ? `Modelo clínico ${historia.modelo.version}` : `Paquete de modelos ${historia.paquete}`,
     historia.modelo?.entrenado ? `Entrenamiento del ${fecha(historia.modelo.entrenado)}` : null,
     calibrado,
