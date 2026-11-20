@@ -8,6 +8,7 @@ import type { Respuesta, ResumenRevision, RiesgoRevision } from '../api/tipos'
 import { useSesion, puede } from '../auth/sesion'
 import { CrecimientoOms } from '../components/ficha'
 import { Aviso, Boton, Cargando, Encabezado, Panel, Tabla, Texto, Vacio } from '../components/ui'
+import { ErrorConReintento } from '../components/ErrorConReintento'
 import { cn } from '../lib/cn'
 import { fecha, num, pct } from '../lib/formato'
 import { alerta, ayudaAlerta } from '../lib/lenguaje'
@@ -51,7 +52,7 @@ export default function RevisionRiesgos() {
         Diga si el niño le preocupa, con su criterio clínico. No se muestra el riesgo calculado, a propósito, para que su
         opinión sea independiente.
       </Encabezado>
-      {q.isPending ? <Cargando /> : q.error ? <Aviso>{q.error.message}</Aviso> : total === 0 ? (
+      {q.isPending ? <Cargando /> : q.error ? <ErrorConReintento error={q.error} que="los niños por revisar" reintentando={q.isFetching} reintentar={() => void q.refetch()} /> : total === 0 ? (
         <Vacio titulo="No hay niños con riesgo calculado con los datos más recientes" />
       ) : (
         <>

@@ -8,7 +8,8 @@ import type { AlarmaGrupo, AlarmasTrimestre, CrecimientoEtapa, ResumenTablero } 
 import { puede, useSesion } from '../auth/sesion'
 import { BarrasApiladas, LeyendaSeries, LineasSeries, type ColorSerie, type FilaSeries, type Serie } from '../components/graficos'
 import { Grafica } from '../components/grafica'
-import { Aviso, Cargando, Encabezado, Insignia, Panel, Tabla, Vacio } from '../components/ui'
+import { Cargando, Encabezado, Insignia, Panel, Tabla, Vacio } from '../components/ui'
+import { ErrorConReintento } from '../components/ErrorConReintento'
 import { cn } from '../lib/cn'
 import { descripcionDe } from '../lib/descripciones'
 import { usePorClasificar } from '../lib/diccionario'
@@ -34,7 +35,12 @@ export default function Tablero() {
         </>
       )
     }
-    return <Aviso>{resumen.error.message}</Aviso>
+    return (
+      <>
+        <Encabezado titulo="Resumen del programa" />
+        <ErrorConReintento error={resumen.error} que="el resumen del programa" reintentando={resumen.isFetching} reintentar={() => void resumen.refetch()} />
+      </>
+    )
   }
   const r = resumen.data
   const verAltos = `/ninos?percentil_min=${r.percentil_alto}`
@@ -246,7 +252,7 @@ function AlarmasGrupo({ total, className }: { total: number | null; className?: 
             : `${num(q.data.length)} · las más recientes primero`}
         </span>
       )}>
-      {q.isPending ? <Cargando /> : q.error ? <Aviso>{q.error.message}</Aviso> : q.data.length === 0 ? (
+      {q.isPending ? <Cargando /> : q.error ? <ErrorConReintento error={q.error} que="las alarmas por grupo" reintentando={q.isFetching} reintentar={() => void q.refetch()} /> : q.data.length === 0 ? (
         <p className="text-sm text-salvia">Ningún grupo cambió de forma llamativa de un trimestre a otro.</p>
       ) : (
         <>

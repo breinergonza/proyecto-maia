@@ -9,7 +9,8 @@ import { historiaPorCorte } from '../api/ninos'
 import type { AlertaDato, LineaTemporal, Visita } from '../api/tipos'
 import { CrecimientoOms, PerfilCohorte, PerfilDelNino, TarjetaRiesgo, TrayectoriaRiesgo } from '../components/ficha'
 import { RiesgoA12Meses } from '../components/ficha/RiesgoA12Meses'
-import { Aviso, Boton, Cargando, Insignia, Panel, Tabla, Vacio } from '../components/ui'
+import { Boton, Cargando, Insignia, Panel, Tabla, Vacio } from '../components/ui'
+import { ErrorConReintento } from '../components/ErrorConReintento'
 import { cn } from '../lib/cn'
 import { familiaDe, familiasConRiesgo } from '../lib/familias'
 import { aproximado, dec, edad, fecha, indicador, RIESGO_ALTO } from '../lib/formato'
@@ -30,7 +31,7 @@ export default function Nino() {
   }, [q.data])
 
   if (q.isPending) return <Cargando />
-  if (q.error) return <Aviso>{q.error.message}</Aviso>
+  if (q.error) return <ErrorConReintento error={q.error} que="la ficha de este niño" reintentando={q.isFetching} reintentar={() => void q.refetch()} />
   const n = q.data
   const visita = n.visitas.find((v) => v.etapa === (elegida ?? inicial))
   // lo que «Riesgo a los 12 meses» ya cuenta visita por visita no se repite en una tarjeta de la última visita

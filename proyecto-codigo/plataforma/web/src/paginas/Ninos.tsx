@@ -6,7 +6,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { pedir } from '../api/cliente'
 import type { NinoFila, Pagina, ResumenTablero } from '../api/tipos'
-import { Aviso, Boton, Cargando, Encabezado, Entrada, Insignia, Paginador, Selector, Vacio } from '../components/ui'
+import { Boton, Cargando, Encabezado, Entrada, Insignia, Paginador, Selector, Vacio } from '../components/ui'
+import { ErrorConReintento } from '../components/ErrorConReintento'
 import { cn } from '../lib/cn'
 import { dec, edad, fecha, num, RIESGO_ALTO } from '../lib/formato'
 import { ayudaPosicion, AYUDA_OMS, BAJO_EDAD, CAYO, esAlto, nivelCorto, RIESGO_MUY_ALTO } from '../lib/lenguaje'
@@ -171,7 +172,7 @@ export default function Ninos() {
         <MenuColumnas columnas={columnas} reordenar={reordenar} />
       </div>
 
-      {q.isPending ? <Cargando /> : q.error ? <Aviso>{q.error.message}</Aviso> : q.data.items.length === 0 ? (
+      {q.isPending ? <Cargando /> : q.error ? <ErrorConReintento error={q.error} que="la lista de niños" conserva="Los filtros siguen en la dirección: al reintentar se pide la misma lista." reintentando={q.isFetching} reintentar={() => void q.refetch()} /> : q.data.items.length === 0 ? (
         <Vacio titulo="Ningún niño cumple estos filtros">Quite un filtro o busque otro código.</Vacio>
       ) : (
         <section className="flex animate-aparecer flex-col rounded-panel border border-linea/80 bg-papel shadow-suave lg:min-h-0 lg:flex-1">
