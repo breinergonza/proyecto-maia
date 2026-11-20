@@ -236,11 +236,12 @@ describe('vista clínica', () => {
 })
 
 describe('grupo activo', () => {
-  it('sin filtro dice «Todos los niños» con los elegibles y el total', async () => {
+  it('sin filtro dice «Todos los niños» con los elegibles, el total y cuántos tienen el dato del desenlace elegido', async () => {
     api('experto')
     montar('/')
     const barra = await screen.findByRole('region', { name: 'Grupo activo' })
     expect(await within(barra).findByText('312 niños elegibles de 5.000')).toBeInTheDocument()
+    expect(await within(barra).findByText('223 con el dato de «Talla baja a los 12 meses»')).toBeInTheDocument()
     expect(within(barra).getByText('Todos los niños')).toBeInTheDocument()
     expect(within(barra).getByText(/Sin filtros/)).toBeInTheDocument()
   })

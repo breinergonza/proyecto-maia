@@ -29,7 +29,7 @@ export function nombreDelGrupo(guardado: string | undefined, criterios: number):
 export const textoCriterios = (criterios: { texto: string }[]): string =>
   criterios.length ? criterios.map((c) => c.texto).join(' · ') : 'Sin filtros: están todos los niños del programa.'
 
-export function GrupoActivo({ ninos, total, minimo, error, conPanel = true }: {
+export function GrupoActivo({ ninos, total, minimo, error, conDato, conPanel = true }: {
   /** Niños del grupo en la respuesta de la página: sin valor mientras carga, nulo si son muy pocos para mostrar la cifra. */
   ninos?: number | null
   total?: number
@@ -37,6 +37,8 @@ export function GrupoActivo({ ninos, total, minimo, error, conPanel = true }: {
   minimo?: number
   /** La consulta de la página falló: no se sabe cuántos son. */
   error?: boolean
+  /** Cuántos niños del grupo tienen el dato del desenlace que muestra la página (nulo si son menos de 5). */
+  conDato?: { n: number | null; desenlace: string }
   /** La página ya trae el panel de filtros a la vista (Explorar): no hace falta el botón. */
   conPanel?: boolean
 }) {
@@ -66,6 +68,11 @@ export function GrupoActivo({ ninos, total, minimo, error, conPanel = true }: {
               {textoCriterios(criterios)}
             </p>
             <p className="mt-0.5 text-sm font-semibold text-teal">{cuantos}</p>
+            {conDato && (
+              <p className="text-sm">
+                {conDato.n === null ? 'Menos de 5' : num(conDato.n)} con el dato de «{conDato.desenlace}»
+              </p>
+            )}
           </div>
           {conPanel && (
             <Boton variante="secundario" aria-expanded={abierto} aria-controls={idPanel} onClick={() => setAbierto(!abierto)}>

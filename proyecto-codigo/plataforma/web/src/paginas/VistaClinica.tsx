@@ -53,6 +53,9 @@ export default function VistaClinica() {
   const total = consulta.data?.insuficiente ? undefined : r?.grupo.n_total
   const ninos = !consulta.data ? undefined : consulta.data.insuficiente ? consulta.data.ninos : consulta.data.grupo.n
   const minimo = consulta.data?.insuficiente ? consulta.data.minimo : undefined
+  const conDato = r?.observado.grupo
+    ? { n: r.observado.grupo.con_dato, desenlace: r.familias.find((f) => f.clave === r.familia)?.nombre ?? r.familia }
+    : undefined
 
   return (
     <div className="flex flex-col gap-4">
@@ -66,7 +69,7 @@ export default function VistaClinica() {
         {r?.datos_al ? <>{datosAl(r.datos_al)}. </> : null}
         Qué pasó con los niños del grupo a los 12 meses y a cuántos conviene mirar primero.
       </Encabezado>
-      <GrupoActivo ninos={ninos} total={total} minimo={minimo} error={consulta.isError} />
+      <GrupoActivo ninos={ninos} total={total} minimo={minimo} error={consulta.isError} conDato={conDato} />
       {consulta.isError ? <Falla error={consulta.error} reintentar={() => void consulta.refetch()} reintentando={consulta.isFetching} />
         : !consulta.data ? <p role="status" className="py-6 text-salvia">Cargando…</p>
           : consulta.data.insuficiente ? (
