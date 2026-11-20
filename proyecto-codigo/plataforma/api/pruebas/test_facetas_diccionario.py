@@ -33,3 +33,16 @@ def test_la_sede_solo_si_hay_mas_de_una_y_lo_no_filtrable_no_se_ofrece():
 
 def test_lo_pedido_se_suma_a_lo_marcado():
     assert P.elegir_facetas(_esquema(ern_sexo=True), True, ['ern_peso'])[-1] == 'ern_peso'
+
+
+def test_lubchenco_se_muestra_con_el_texto_completo_y_la_sigla_al_final():
+    from maia_api import poblacion as P
+    from maia_comun import perfiles as PF
+    esq = pd.DataFrame([{'variable': PF.VARIABLE_LUBCHENCO, 'tipo': 'categorical', 'rol': 'basal',
+                         'categorias': '1=PTAEG;2=PTPEG;4=ATPEG;5=ATBPN;7=PostTPEG;9=otra'}])
+    et = P.etiquetas_de(esq)[PF.VARIABLE_LUBCHENCO]
+    assert et[1] == 'Pretérmino, adecuado para la edad gestacional (PTAEG)'
+    assert et[5] == 'A término, bajo peso al nacer (ATBPN)'
+    assert et[7] == 'Postérmino, pequeño para la edad gestacional (PostTPEG)'
+    assert et[9] == 'otra'   # lo que no es una sigla conocida queda como lo escribió el Diccionario
+    assert P.etiqueta_de({}, PF.VARIABLE_LUBCHENCO).startswith('Clasificación de Lubchenco')

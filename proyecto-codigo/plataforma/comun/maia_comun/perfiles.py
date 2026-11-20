@@ -21,6 +21,27 @@ ETIQUETAS_EG = {
 }
 ETIQUETAS_LUBCHENCO = {'adecuado': 'Peso adecuado', 'pequeno': 'Pequeño para la edad', 'grande': 'Grande para la edad'}
 
+#: Cómo se leen las siglas de Lubchenco en pantalla: el texto completo y, al final, la sigla.
+ETIQUETA_VARIABLE_LUBCHENCO = 'Clasificación de Lubchenco según la edad gestacional y el peso al nacer'
+LUBCHENCO_COMPLETO = {
+    'PTAEG': 'Pretérmino, adecuado para la edad gestacional (PTAEG)',
+    'PTPEG': 'Pretérmino, pequeño para la edad gestacional (PTPEG)',
+    'PTGEG': 'Pretérmino, grande para la edad gestacional (PTGEG)',
+    'ATAEG': 'A término, adecuado para la edad gestacional (ATAEG)',
+    'ATPEG': 'A término, pequeño para la edad gestacional (ATPEG)',
+    'ATGEG': 'A término, grande para la edad gestacional (ATGEG)',
+    'ATBPN': 'A término, bajo peso al nacer (ATBPN)',
+    'POSTTPEG': 'Postérmino, pequeño para la edad gestacional (PostTPEG)',
+    'POSTTAEG': 'Postérmino, adecuado para la edad gestacional (PostTAEG)',
+    'POSTTGEG': 'Postérmino, grande para la edad gestacional (PostTGEG)',
+}
+
+
+def lubchenco_completo(etiqueta: str) -> str:
+    """La etiqueta de una categoría de Lubchenco con su texto completo; las que no son una sigla conocida quedan igual."""
+    return LUBCHENCO_COMPLETO.get(str(etiqueta).strip().upper(), etiqueta)
+
+
 # Códigos del diccionario: 1=PTAEG;2=PTPEG;3=PTGEG;4=ATPEG;5=ATBPN;7=PostTPEG (el 6 se toma como A término adecuado).
 _CODIGOS_LUBCHENCO = {1: 'adecuado', 2: 'pequeno', 3: 'grande', 4: 'pequeno', 5: 'pequeno', 6: 'adecuado', 7: 'pequeno'}
 
