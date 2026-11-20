@@ -66,7 +66,8 @@ export default function Calibracion() {
           return (
             <ConPestanas etiqueta="Qué ver de la calibración" pestanas={pestanas}>
               {(ver) => ver === 'creible' ? (
-                <div className="grid gap-4 xl:grid-cols-3 [&>*]:min-w-0">
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.1fr)_minmax(0,1.1fr)] [&>*]:min-w-0">
+                  {/* la tabla lleva más ancho que las cifras: con un tercio, «11,6 %» partía en dos líneas y alargaba la fila */}
                   {/* llenar: las cifras se reparten a lo alto de la tarjeta, que iguala a sus vecinas */}
                   <Panel llenar titulo={dErr.titulo} descripcion={dErr.descripcion}>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:flex xl:min-h-full xl:flex-col xl:justify-between">
@@ -87,7 +88,7 @@ export default function Calibracion() {
                   </Grafica>
                   <TablaDatos titulo="Por grupos de niños" descripcion="Diez grupos del mismo tamaño, del menor al mayor riesgo."
                     exportar={{ nombre: 'calibracion-grupos', filas: d.bins.map((b) => ({ grupo: b.bin, ninos: b.n, riesgo_medio: b.riesgo_medio, observado: b.observado })), muestra }}>
-                    <Tabla densa>
+                    <Tabla densa className="[&_td]:whitespace-nowrap">
                       <thead><tr><th>Grupo</th><th>Niños</th><th>Riesgo dicho</th><th>Real</th></tr></thead>
                       <tbody>{d.bins.map((b) => <tr key={b.bin}><td>{b.bin}</td><td>{num(b.n)}</td><td>{fracPct(b.riesgo_medio)}</td><td>{fracPct(b.observado)}</td></tr>)}</tbody>
                     </Tabla>

@@ -64,7 +64,7 @@ export default function Poblacion() {
                 {ver === 'muestra' && (
                   <>
                     <Panel titulo="La muestra en cifras" descripcion="Con cuántos niños y casos se valida el modelo para este desenlace.">
-                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 [&>*]:min-w-0">
                         <Cifra valor={num(d.eventos.niños)} texto="niños evaluados" />
                         <Cifra valor={omitida(d.eventos.casos, num)} texto="casos del desenlace" />
                         <Cifra valor={d.eventos.tasa != null ? pct(100 * d.eventos.tasa) : '—'} texto="de los niños tuvo el desenlace" />
@@ -117,7 +117,7 @@ export default function Poblacion() {
                 ) : mu.estado === 'insuficiente' ? (
                   <Aviso tono="teal">Hay menos de {mu.minimo_ninos} niños en la muestra o en el universo: no se muestran distribuciones.</Aviso>
                 ) : ver === 'categorias' ? (
-                  <div className="grid gap-3 xl:grid-cols-3">
+                  <div className="grid gap-3 xl:grid-cols-3 [&>*]:min-w-0">
                     {categoricas.map(([variable, v]) => (
                       <Grafica key={variable} titulo={`${dMu.titulo}: ${variable}`} descripcion={dMu.descripcion}
                         exportar={{ nombre: `poblacion-muestra-universo-${variable.replaceAll(' ', '-')}`, muestra: `${v.n_muestra} niños en la muestra de ${v.n_universo}`,
@@ -133,7 +133,7 @@ export default function Poblacion() {
                     ))}
                   </div>
                 ) : (
-                  <div className="grid gap-3 xl:grid-cols-2">
+                  <div className="grid gap-3 xl:grid-cols-2 [&>*]:min-w-0">
                     {numericas.map(([variable, q]) => (
                       <TablaDatos key={variable} titulo={dMuNum.titulo} descripcion={dMuNum.descripcion}
                         exportar={{ nombre: 'poblacion-muestra-universo-numerica',

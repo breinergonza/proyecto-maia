@@ -87,7 +87,9 @@ describe('anticipación', () => {
     montar('/analitica/anticipacion?entrenamiento=7&ver=tabla')
     await screen.findByText('Cada visita de cálculo')
     expect(screen.getAllByText('40,0 %').length).toBeGreaterThan(0)   // 3 m EC con el 10 %
-    fireEvent.change(screen.getByLabelText('Alertar a los niños con más riesgo'), { target: { value: '40' } })
+    // etiqueta corta junto a las pestañas: la opción completa la frase («Alertar al 10 % con más riesgo»)
+    expect(screen.getByRole('option', { name: '10 % con más riesgo' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Alertar al'), { target: { value: '40' } })
     await waitFor(() => expect(screen.getAllByText('80,0 %').length).toBeGreaterThan(0))
   })
 

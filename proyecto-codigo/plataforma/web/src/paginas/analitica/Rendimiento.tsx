@@ -83,13 +83,13 @@ export default function Rendimiento() {
                 <div className="grid gap-4 xl:grid-cols-2 [&>*]:min-w-0">
                   <Grafica titulo={dRoc.titulo} descripcion={dRoc.descripcion}
                     exportar={{ nombre: 'rendimiento-roc', filas: d.roc.puntos.map(([x, y]) => ({ falsas_alarmas: x, casos_detectados: y })), muestra }}>
-                    <CurvaXY etiqueta="Aciertos frente a falsas alarmas" ejeX="Falsas alarmas" ejeY="Casos detectados" diagonal alto={300}
+                    <CurvaXY etiqueta="Aciertos frente a falsas alarmas" ejeX="Falsas alarmas" ejeY="Casos detectados" diagonal alto={280}
                       formatoX={(v) => `${Math.round(v * 100)} %`} formatoY={(v) => `${Math.round(v * 100)} %`}
                       series={[{ clave: 'roc', nombre: `${jerga(tecnico, 'Modelo', 'Curva ROC')} · ${ic(d.auc_desenlace)}`, color: 0, puntos: d.roc.puntos, sinPuntos: true }]} />
                   </Grafica>
                   <Grafica titulo={dPr.titulo} descripcion={dPr.descripcion}
                     exportar={{ nombre: 'rendimiento-pr', filas: d.pr.puntos.map(([x, y]) => ({ casos_detectados: x, alertas_acertadas: y })), muestra }}>
-                    <CurvaXY etiqueta="Alertas acertadas frente a casos detectados" ejeX="Casos detectados" ejeY="Alertas acertadas" referenciaY={d.pr.prevalencia} alto={300}
+                    <CurvaXY etiqueta="Alertas acertadas frente a casos detectados" ejeX="Casos detectados" ejeY="Alertas acertadas" referenciaY={d.pr.prevalencia} alto={280}
                       formatoX={(v) => `${Math.round(v * 100)} %`} formatoY={(v) => `${Math.round(v * 100)} %`}
                       series={[{ clave: 'pr', nombre: jerga(tecnico, 'Modelo', 'Curva precisión-exhaustividad'), color: 0, puntos: d.pr.puntos, sinPuntos: true }]} />
                   </Grafica>

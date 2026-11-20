@@ -189,7 +189,7 @@ describe('Modelos 1: Anticipación en pestañas', () => {
     api('experto')
     montar(ruta('anticipacion', 'tabla'))
     await screen.findByText('Cada visita de cálculo')
-    fireEvent.change(screen.getByLabelText('Alertar a los niños con más riesgo'), { target: { value: '20' } })
+    fireEvent.change(screen.getByLabelText('Alertar al'), { target: { value: '20' } })
     await waitFor(() => expect(screen.getAllByText('58,0 %').length).toBeGreaterThan(0))
   })
 

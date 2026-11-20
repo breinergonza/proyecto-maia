@@ -35,7 +35,9 @@ export function Pestanas<K extends string>({ prefijo, etiqueta, pestanas, activa
     ir(destino)
   }
   return (
-    <div role="tablist" aria-label={etiqueta} className={cn('flex shrink-0 flex-wrap border-b border-linea', className)}>
+    // max-w-full: junto a otros controles en una fila, sin él la lista mide todas las pestañas en una línea y en un
+    // teléfono se sale de la pantalla en vez de pasar a la línea siguiente
+    <div role="tablist" aria-label={etiqueta} className={cn('flex max-w-full shrink-0 flex-wrap border-b border-linea', className)}>
       {pestanas.map((p, i) => {
         const seleccionada = p.clave === activa
         return (

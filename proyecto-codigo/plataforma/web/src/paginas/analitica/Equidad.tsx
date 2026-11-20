@@ -73,7 +73,7 @@ export default function Equidad() {
               </div>
               <PanelPestana prefijo="equidad" activa={ver} className={PANEL}>
                 {ver === 'grupo' && (
-                  <div className="grid gap-3 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] xl:items-start">
+                  <div className="grid gap-3 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] xl:items-start [&>*]:min-w-0">
                     <Grafica titulo={`${dGrupo.titulo}: ${nombreGrupo(por).toLowerCase()}`} descripcion={dGrupo.descripcion}>
                       <Bosque etiqueta="Qué tan bien ordena el modelo en cada grupo" referencia={total} nombreValor={jerga(tecnico, 'Ordena', 'AUC')}
                         puntos={filas.map((f) => ({ etiqueta: `${g(f)} · ${num(f.n)} niños`, valor: f.auc, bajo: f.ic_bajo, alto: f.ic_alto, nota: 'Pide 20 niños o más para calcularlo' }))} />

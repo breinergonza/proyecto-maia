@@ -37,8 +37,9 @@ export function NinosMasRiesgo({ ninos, riesgos, medida, className }: {
       {ninos.length === 0 ? (
         <p className="text-sm">Ningún niño del grupo está en alerta con los cálculos de ahora.</p>
       ) : (
-        // el encabezado queda fijo mientras la lista se desplaza dentro del panel
-        <Tabla densa apilar className="xl:overflow-visible [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-papel [&_th]:whitespace-normal!">
+        // el encabezado queda fijo mientras la lista se desplaza dentro del panel; -top-4 descuenta el relleno del panel
+        // (con top-0 quedaba una franja de 16 px por la que se veían pasar las filas)
+        <Tabla densa apilar className="xl:overflow-visible [&_th]:sticky [&_th]:-top-4 [&_th]:z-10 [&_th]:bg-papel [&_th]:whitespace-normal!">
           <thead>
             <tr>
               <th>Niño</th>

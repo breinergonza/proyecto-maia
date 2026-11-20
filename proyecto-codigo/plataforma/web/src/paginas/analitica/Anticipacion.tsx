@@ -92,9 +92,10 @@ function Detalle({ clave, entrenamiento, a, selector }: { clave: string; entrena
       {selector}
       {base.length > 0 && tops.length > 1 && (
         <label className="flex items-center gap-2 text-sm font-semibold">
-          Alertar a los niños con más riesgo
-          <Selector value={top} onChange={(e) => setTop(Number(e.target.value))} className="w-28">
-            {tops.map((t) => <option key={t} value={t}>{t} %</option>)}
+          {/* etiqueta corta para que las pestañas quepan en una línea junto a los selectores; la opción completa la frase */}
+          Alertar al
+          <Selector value={top} onChange={(e) => setTop(Number(e.target.value))} className="w-52">
+            {tops.map((t) => <option key={t} value={t}>{t} % con más riesgo</option>)}
           </Selector>
         </label>
       )}
