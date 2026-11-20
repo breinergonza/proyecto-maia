@@ -6,16 +6,23 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Download, Eye, Search, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useSearchParams } from 'react-router'
 import { pedir } from '../api/cliente'
 import type {
   Clasificacion, DiferenciasDiccionario as Diferencias, VariableDiccionario, VersionDiccionario, VistaDiccionario,
 } from '../api/tipos-diccionario'
 import DiferenciasDiccionario from '../components/DiferenciasDiccionario'
 import EditorDiccionario, { type FilaPedida } from '../components/EditorDiccionario'
+import { PanelesPestana, PanelPestana, Pestanas, usePestanaEnUrl } from '../components/ui/Pestanas'
 import { cn } from '../lib/cn'
 import { Aviso, Boton, Campo, Cargando, Encabezado, Entrada, Insignia, Panel, Tabla, Vacio } from '../components/ui'
 import { descargarVersion, origen, usePorClasificar } from '../lib/diccionario'
 import { conPunto, fechaHora, num } from '../lib/formato'
+
+type Seccion = 'editar' | 'clasificar' | 'versiones'
+const SECCIONES: readonly Seccion[] = ['editar', 'clasificar', 'versiones']
+/** Una tabla dentro de un panel que se desplaza: el encabezado queda fijo. */
+const ENCABEZADO_FIJO = 'xl:overflow-visible [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-papel'
 
 const ESTADOS: Record<VersionDiccionario['estado'], { texto: string; tono: 'teal' | 'ocre' | 'neutro' }> = {
   vigente: { texto: 'En uso', tono: 'teal' },
@@ -46,9 +53,99 @@ export default function Diccionario() {
     onSuccess: (_, c) => refrescar(`«${c.variable}» quedó como «${c.estado}».`),
   })
   const error = descargar.error ?? activar.error ?? clasificar.error
+  const [activa, elegir] = usePestanaEnUrl('ver', SECCIONES)
+  const [, ponerParams] = useSearchParams()
+  const [sinGuardar, setSinGuardar] = useState(0)
+  const porClasificar = pendientes.data?.variables.length ?? 0
+  const pestanas = [
+    {
+      clave: 'editar',
+      texto: <>Editar{sinGuardar > 0 && <span className="ml-1 text-ocre-hondo">• {sinGuardar} sin guardar</span>}</>,
+    },
+    { clave: 'clasificar', texto: <>Por clasificar <span className="font-normal opacity-70">{num(porClasificar)}</span></> },
+    { clave: 'versiones', texto: 'Versiones e importación' },
+  ] as const
 
-  return (
+  const clasificacion = (
     <>
+      {pendientes.data?.borrador && (
+        <Actualizacion nuevas={pendientes.data.borrador.nuevas} version={pendientes.data.borrador.version}
+          ocupado={activar.isPending} alAgregar={() => activar.mutate(pendientes.data!.borrador!.version)} />
+      )}
+      {pendientes.error ? <Aviso>{pendientes.error.message}</Aviso> : porClasificar > 0 ? (
+        <Panel llenar titulo={<div className="flex items-center gap-2"><h2 className="text-base">Variables nuevas por clasificar</h2>
+          <Insignia tono="ocre">{porClasificar}</Insignia></div>}>
+          <ul className="divide-y divide-linea/70">
+            {pendientes.data!.variables.map((v) => (
+              <Pendiente key={v.variable} v={v} ocupado={clasificar.isPending && clasificar.variables?.variable === v.variable}
+                deshabilitado={clasificar.isPending} alElegir={(estado) => clasificar.mutate({ variable: v.variable, estado })}
+                alCompletar={() => {
+                  setPedida({ hoja: 'Variables', clave: v.variable })
+                  // la sección y la hoja en un solo cambio de la dirección: dos seguidos se pisarían
+                  ponerParams((previo) => {
+                    const nuevo = new URLSearchParams(previo)
+                    nuevo.set('ver', 'editar')
+                    nuevo.set('hoja', 'Variables')
+                    return nuevo
+                  }, { replace: true })
+                }} />
+            ))}
+          </ul>
+        </Panel>
+      ) : !pendientes.isPending && !pendientes.data?.borrador && (
+        <Vacio titulo="No hay variables por clasificar">Las variables nuevas de cada actualización de la base aparecen aquí.</Vacio>
+      )}
+    </>
+  )
+
+  const versionesEImportacion = (
+    <div className="grid grid-cols-1 gap-3 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] xl:grid-rows-[minmax(0,1fr)] xl:items-start">
+      <Panel llenar titulo="Historial de versiones" className="min-w-0 xl:max-h-full">
+        {versiones.isPending ? <Cargando /> : versiones.error ? <Aviso>{versiones.error.message}</Aviso>
+          : versiones.data.length === 0 ? <Vacio titulo="Todavía no hay versiones">Suba el primer diccionario.</Vacio> : (
+            <Tabla apilar className={ENCABEZADO_FIJO}>
+              <thead><tr><th>Versión</th><th>Detalle</th><th data-acciones className="sticky right-0 bg-papel"><span className="sr-only">Acciones</span></th></tr></thead>
+              <tbody>
+                {versiones.data.map((v) => (
+                  <tr key={v.id}>
+                    <td>
+                      <p className="font-semibold">{num(v.version)}</p>
+                      <Insignia tono={ESTADOS[v.estado].tono}>{ESTADOS[v.estado].texto}</Insignia>
+                    </td>
+                    <td className="min-w-40">
+                      <p>{origen(v)}</p>
+                      <p className="text-xs text-salvia">{fechaHora(v.creado_en)}</p>
+                      {v.nota && <p className="mt-0.5 text-sm text-salvia">{v.nota}</p>}
+                    </td>
+                    <td className="sticky right-0 bg-papel">
+                      <div className="flex flex-col items-end gap-1 sm:flex-row sm:justify-end">
+                        <Boton chico variante="fantasma" onClick={() => setViendo(v)}
+                          aria-label={`Ver la versión ${v.version}`}><Eye size={15} aria-hidden />Ver</Boton>
+                        <Boton chico variante="fantasma" onClick={() => descargar.mutate(v)} disabled={descargar.isPending}
+                          aria-label={`Descargar la versión ${v.version}`}>Descargar</Boton>
+                        {v.estado !== 'vigente' && (
+                          <Boton chico variante="secundario" onClick={() => activar.mutate(v)} disabled={activar.isPending}
+                            aria-label={`Volver a la versión ${v.version}`}>
+                            {activar.isPending && activar.variables?.id === v.id ? 'Activando…' : 'Volver a esta'}
+                          </Boton>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Tabla>
+          )}
+      </Panel>
+
+      <Subir alGuardar={(v) => refrescar(`La versión ${v.version} quedó en uso.`)} />
+    </div>
+  )
+
+  // en escritorio la página ocupa la pantalla sin desplazarse: la tabla de la hoja y las listas se desplazan por dentro.
+  // Los paneles quedan montados: los cambios sin guardar del editor sobreviven al cambiar de pestaña.
+  return (
+    <div className="flex flex-col xl:h-full">
       <Encabezado titulo="Diccionario de variables"
         accion={<Boton variante="secundario" onClick={() => descargar.mutate(null)} disabled={descargar.isPending}>
           <Download size={16} aria-hidden />{descargar.isPending ? 'Descargando…' : 'Exportar a Excel'}
@@ -57,79 +154,27 @@ export default function Diccionario() {
         una fila y guarde; antes de guardar verá qué cambia. Cada cambio queda como una versión y se puede volver a una anterior.
       </Encabezado>
 
-      <div className="space-y-4">
-        {aviso && <Aviso tono="teal">{aviso}</Aviso>}
-        {error && <Aviso><span className="whitespace-pre-line">{error.message}</span></Aviso>}
-
-        {pendientes.data?.borrador && (
-          <Actualizacion nuevas={pendientes.data.borrador.nuevas} version={pendientes.data.borrador.version}
-            ocupado={activar.isPending} alAgregar={() => activar.mutate(pendientes.data!.borrador!.version)} />
-        )}
-
-        {pendientes.error ? <Aviso>{pendientes.error.message}</Aviso> : !!pendientes.data?.variables.length && (
-          <Panel titulo={<div className="flex items-center gap-2"><h2 className="text-base">Variables nuevas por clasificar</h2>
-            <Insignia tono="ocre">{pendientes.data.variables.length}</Insignia></div>}>
-            <ul className="divide-y divide-linea/70">
-              {pendientes.data.variables.map((v) => (
-                <Pendiente key={v.variable} v={v} ocupado={clasificar.isPending && clasificar.variables?.variable === v.variable}
-                  deshabilitado={clasificar.isPending} alElegir={(estado) => clasificar.mutate({ variable: v.variable, estado })}
-                  alCompletar={() => setPedida({ hoja: 'Variables', clave: v.variable })} />
-              ))}
-            </ul>
-          </Panel>
-        )}
-
-        {vigente ? <EditorDiccionario vigente={vigente} pedida={pedida} alAbrirPedida={abierta}
-          alGuardar={(v) => refrescar(`La versión ${v.version} quedó en uso.`)} /> : versiones.isPending && <Cargando />}
-
-        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
-          <div className="min-w-0 space-y-4">
-            <Panel titulo="Historial de versiones">
-              {versiones.isPending ? <Cargando /> : versiones.error ? <Aviso>{versiones.error.message}</Aviso>
-                : versiones.data.length === 0 ? <Vacio titulo="Todavía no hay versiones">Suba el primer diccionario.</Vacio> : (
-                  <Tabla apilar>
-                    <thead><tr><th>Versión</th><th>Detalle</th><th data-acciones className="sticky right-0 bg-papel"><span className="sr-only">Acciones</span></th></tr></thead>
-                    <tbody>
-                      {versiones.data.map((v) => (
-                        <tr key={v.id}>
-                          <td>
-                            <p className="font-semibold">{num(v.version)}</p>
-                            <Insignia tono={ESTADOS[v.estado].tono}>{ESTADOS[v.estado].texto}</Insignia>
-                          </td>
-                          <td className="min-w-40">
-                            <p>{origen(v)}</p>
-                            <p className="text-xs text-salvia">{fechaHora(v.creado_en)}</p>
-                            {v.nota && <p className="mt-0.5 text-sm text-salvia">{v.nota}</p>}
-                          </td>
-                          <td className="sticky right-0 bg-papel">
-                            <div className="flex flex-col items-end gap-1 sm:flex-row sm:justify-end">
-                              <Boton chico variante="fantasma" onClick={() => setViendo(v)}
-                                aria-label={`Ver la versión ${v.version}`}><Eye size={15} aria-hidden />Ver</Boton>
-                              <Boton chico variante="fantasma" onClick={() => descargar.mutate(v)} disabled={descargar.isPending}
-                                aria-label={`Descargar la versión ${v.version}`}>Descargar</Boton>
-                              {v.estado !== 'vigente' && (
-                                <Boton chico variante="secundario" onClick={() => activar.mutate(v)} disabled={activar.isPending}
-                                  aria-label={`Volver a la versión ${v.version}`}>
-                                  {activar.isPending && activar.variables?.id === v.id ? 'Activando…' : 'Volver a esta'}
-                                </Boton>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Tabla>
-                )}
-            </Panel>
-          </div>
-
-          <Subir alGuardar={(v) => refrescar(`La versión ${v.version} quedó en uso.`)} />
+      {(aviso || error) && (
+        <div className="mb-3 space-y-3">
+          {aviso && <Aviso tono="teal">{aviso}</Aviso>}
+          {error && <Aviso><span className="whitespace-pre-line">{error.message}</span></Aviso>}
         </div>
-      </div>
+      )}
+
+      <Pestanas prefijo="diccionario" etiqueta="Secciones del diccionario" pestanas={pestanas} activa={activa} elegir={elegir} />
+      <PanelesPestana prefijo="diccionario" activa={activa} className="mt-3 flex min-h-0 flex-col gap-3 xl:flex-1" paneles={[
+        {
+          clave: 'editar',
+          contenido: vigente ? <EditorDiccionario vigente={vigente} pedida={pedida} alAbrirPedida={abierta} alCambiar={setSinGuardar}
+            alGuardar={(v) => refrescar(`La versión ${v.version} quedó en uso.`)} /> : versiones.isPending && <Cargando />,
+        },
+        { clave: 'clasificar', contenido: clasificacion },
+        { clave: 'versiones', contenido: versionesEImportacion },
+      ]} />
 
       {viendo && <Vista v={viendo} alCerrar={() => setViendo(null)} alDescargar={() => descargar.mutate(viendo)}
         descargando={descargar.isPending} />}
-    </>
+    </div>
   )
 }
 
@@ -191,19 +236,14 @@ function Vista({ v, alCerrar, alDescargar, descargando }: {
           : vista.error ? <div className="p-6"><Aviso><span className="whitespace-pre-line">{vista.error.message}</span></Aviso></div> : (
             <>
               <div className="shrink-0 space-y-3 px-4 pt-3 sm:px-6">
-                <div role="tablist" aria-label="Hojas del diccionario" className="-mx-4 flex gap-1 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-                  {vista.data.hojas.map((h, i) => (
-                    <button key={h.nombre} type="button" role="tab" aria-selected={i === hoja}
-                      onClick={() => {
-                        setHoja(i)
-                        setBuscar('')
-                      }}
-                      className={cn('shrink-0 rounded-control px-3 py-1.5 text-sm font-semibold transition-colors',
-                        i === hoja ? 'bg-teal-tinte text-teal' : 'text-salvia hover:bg-fondo hover:text-tinta')}>
-                      {h.nombre} <span className="font-normal opacity-70">{num(h.filas.length)}</span>
-                    </button>
-                  ))}
-                </div>
+                {actual && (
+                  <Pestanas prefijo="vista-hoja" etiqueta="Hojas del diccionario" activa={actual.nombre}
+                    pestanas={vista.data.hojas.map((h) => ({ clave: h.nombre, texto: <>{h.nombre} <span className="font-normal opacity-70">{num(h.filas.length)}</span></> }))}
+                    elegir={(nombre) => {
+                      setHoja(vista.data.hojas.findIndex((h) => h.nombre === nombre))
+                      setBuscar('')
+                    }} />
+                )}
                 {actual && (
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-sm text-salvia">{actual.describe}</p>
@@ -215,7 +255,7 @@ function Vista({ v, alCerrar, alDescargar, descargando }: {
                   </div>
                 )}
               </div>
-              <div className="min-h-0 flex-1 overflow-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 sm:px-6">
+              <PanelPestana prefijo="vista-hoja" activa={actual?.nombre ?? ''} className="min-h-0 flex-1 overflow-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 sm:px-6">
                 {actual && (filas.length === 0
                   ? <Vacio titulo={buscar ? 'Nada coincide con la búsqueda' : 'Esta hoja está vacía'} />
                   : (
@@ -236,7 +276,7 @@ function Vista({ v, alCerrar, alDescargar, descargando }: {
                       </tbody>
                     </Tabla>
                   ))}
-              </div>
+              </PanelPestana>
               {actual && buscar && (
                 <p className="shrink-0 border-t border-linea px-4 py-2 text-xs text-salvia sm:px-6">
                   {num(filas.length)} de {num(actual.filas.length)} filas
@@ -291,7 +331,7 @@ function Actualizacion({ nuevas, version, ocupado, alAgregar }: {
         </div>
         <Boton className="shrink-0" onClick={alAgregar} disabled={ocupado}>{ocupado ? 'Agregando…' : 'Agregarlas al diccionario'}</Boton>
       </div>
-      <ul className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-[repeat(2,minmax(0,1fr))]">
+      <ul className="mt-3 grid max-h-40 grid-cols-1 gap-x-6 gap-y-1 overflow-auto text-sm sm:grid-cols-[repeat(2,minmax(0,1fr))]">
         {nuevas.map((v) => (
           <li key={v.variable} className="min-w-0 truncate">
             <span className="font-semibold">{v.etiqueta ?? v.variable}</span>
@@ -334,7 +374,7 @@ function Subir({ alGuardar }: { alGuardar: (v: VersionDiccionario) => void }) {
   })
 
   return (
-    <Panel titulo="Importar desde Excel" className="xl:sticky xl:top-0">
+    <Panel llenar titulo="Importar desde Excel" className="xl:max-h-full">
       <p className="mb-3 text-sm text-salvia">Para cambios grandes: exporte el vigente, edítelo en Excel y súbalo aquí. Antes de
         confirmar verá qué cambia.</p>
       <form className="flex flex-col gap-3" onSubmit={(e) => {

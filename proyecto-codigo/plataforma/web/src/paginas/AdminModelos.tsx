@@ -35,8 +35,10 @@ export default function AdminModelos() {
     onSuccess: refrescar,
   })
 
+  // en escritorio la página ocupa la pantalla sin desplazarse: la lista de paquetes se desplaza por dentro y subir uno
+  // queda siempre a la vista a su lado
   return (
-    <>
+    <div className="flex flex-col xl:h-full">
       <Encabezado titulo="Modelos">
         Los modelos se usan como un paquete firmado. Se arma solo al aprobar versiones en{' '}
         <Link className="text-teal underline" to="/admin/entrenamientos">Entrenamientos</Link>; aquí también se puede subir
@@ -45,7 +47,7 @@ export default function AdminModelos() {
         {salud.data?.entorno === 'demo' && ' En esta demostración solo se aceptan paquetes entrenados con datos simulados.'}
       </Encabezado>
 
-      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="grid grid-cols-1 items-start gap-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_22rem] xl:grid-rows-[minmax(0,1fr)]">
       <Panel titulo="Subir un paquete" className="xl:order-2">
         <form className="flex flex-col gap-3" onSubmit={(e) => {
           e.preventDefault()
@@ -62,7 +64,7 @@ export default function AdminModelos() {
         {subir.data && <div className="mt-3"><Aviso tono="teal">Paquete {subir.data.version} verificado y guardado. Actívelo para usarlo.</Aviso></div>}
       </Panel>
 
-      <div className="min-w-0 space-y-4 xl:order-1">
+      <div className="min-w-0 space-y-4 xl:order-1 xl:max-h-full xl:overflow-y-auto xl:pr-1">
       {activar.error && <Aviso>{activar.error.message}</Aviso>}
       {lista.isPending ? <Cargando /> : lista.error ? <Aviso>{lista.error.message}</Aviso> : lista.data.length === 0 ? (
         <Vacio titulo="Todavía no hay paquetes">Suba el primero con el formulario de arriba.</Vacio>
@@ -92,7 +94,7 @@ export default function AdminModelos() {
       )}
       </div>
       </div>
-    </>
+    </div>
   )
 }
 

@@ -8,26 +8,40 @@ import { pedir } from '../api/cliente'
 import type { Conexion, ConexionEntrada, Hiperparametros, PruebaConexion, ResumenAdministracion } from '../api/tipos'
 import { CampoHiperparametro } from '../components/CampoHiperparametro'
 import { useConfirmar } from '../components/Confirmar'
-import { Aviso, Boton, Campo, Cargando, Encabezado, Entrada, Insignia, Panel, Selector } from '../components/ui'
+import { PanelesPestana, Pestanas, usePestanaEnUrl } from '../components/ui/Pestanas'
+import { Aviso, Boton, Campo, Cargando, Encabezado, Entrada, Insignia, Panel, Selector, Vacio } from '../components/ui'
 import { conPunto, fechaHora, MODELOS } from '../lib/formato'
 
 const SSL = ['disable', 'allow', 'prefer', 'require', 'verify-ca', 'verify-full'] as const
 type Datos = Omit<ConexionEntrada, 'clave' | 'borrar_clave'>
 
+// Cada formulario vive entero en su pestaña, con su botón de guardar. Los paneles quedan montados: lo escrito en uno
+// sigue ahí al cambiar de pestaña.
+const PESTANAS = [
+  { clave: 'estado', texto: 'Estado' },
+  { clave: 'base', texto: 'Base de datos' },
+  { clave: 'anomalias', texto: 'Hiperparámetros · Anomalías' },
+  { clave: 'clinico', texto: 'Hiperparámetros · Alertas clínicas' },
+] as const
+const CLAVES = PESTANAS.map((p) => p.clave)
+
 export default function AdminConfiguracion() {
   const resumen = useQuery({ queryKey: ['administracion', 'resumen'], queryFn: () => pedir<ResumenAdministracion>('/administracion/resumen') })
+  const [activa, elegir] = usePestanaEnUrl('ver', CLAVES)
   return (
     <>
       <Encabezado titulo="Configuración inicial">
         Lo que la solución necesita para extraer los datos, entrenar los modelos en los horarios que se programen y
         usarlos. Los horarios y la cola están en Programación; lo entrenado, en Entrenamientos.
       </Encabezado>
-      {resumen.isPending ? <Cargando /> : resumen.error ? <Aviso>{resumen.error.message}</Aviso> : <Pasos r={resumen.data} />}
-      <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
-        <FormConexion soloSimulado={!!resumen.data?.solo_simulado} />
-        <div className="flex flex-col gap-4">
-          <FormHiperparametros />
-        </div>
+      <Pestanas prefijo="config" etiqueta="Secciones de la configuración" pestanas={PESTANAS} activa={activa} elegir={elegir} />
+      <div className="mt-3">
+        <PanelesPestana prefijo="config" activa={activa} paneles={[
+          { clave: 'estado', contenido: resumen.isPending ? <Cargando /> : resumen.error ? <Aviso>{resumen.error.message}</Aviso> : <Pasos r={resumen.data} /> },
+          { clave: 'base', contenido: <FormConexion soloSimulado={!!resumen.data?.solo_simulado} /> },
+          { clave: 'anomalias', contenido: <FormHiperparametros modelo="anomalias" /> },
+          { clave: 'clinico', contenido: <FormHiperparametros modelo="clinico" /> },
+        ]} />
       </div>
     </>
   )
@@ -50,7 +64,7 @@ function Pasos({ r }: { r: ResumenAdministracion }) {
   return (
     <Panel titulo="Estado de la configuración">
       {r.solo_simulado && <div className="mb-3"><Aviso tono="teal">Este servicio solo trabaja con datos simulados: la base real se configura en el servidor on-premise.</Aviso></div>}
-      <ol className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <ol className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Paso hecho={r.cifrado_disponible} titulo="1. Llave de cifrado en el servidor">
           {r.cifrado_disponible ? 'MAIA_CIFRADO_CLAVE está definida: la clave de la base se guarda cifrada.'
             : 'Defina MAIA_CIFRADO_CLAVE (32 caracteres o más) en el entorno del servidor para guardar la clave desde aquí.'}
@@ -111,31 +125,29 @@ function FormConexion({ soloSimulado }: { soloSimulado: boolean }) {
             Postgres de la Fundación, en solo lectura. Las consultas usan valores enlazados y nunca piden las columnas
             restringidas. {actual.data.guardada ? `Guardada el ${conPunto(fechaHora(actual.data.actualizado_en))}` : 'Hoy se usan los valores del entorno del servidor (KMC_*).'}
           </p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_7rem]">
-            <Campo id="c-host" etiqueta="Servidor"><Entrada id="c-host" required value={d.host} onChange={cambio('host')} /></Campo>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="sm:col-span-2"><Campo id="c-host" etiqueta="Servidor"><Entrada id="c-host" required value={d.host} onChange={cambio('host')} /></Campo></div>
             <Campo id="c-puerto" etiqueta="Puerto"><Entrada id="c-puerto" type="number" min={1} max={65535} value={d.puerto} onChange={cambio('puerto')} /></Campo>
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Campo id="c-base" etiqueta="Base"><Entrada id="c-base" required value={d.base} onChange={cambio('base')} /></Campo>
             <Campo id="c-usuario" etiqueta="Usuario"><Entrada id="c-usuario" required autoComplete="off" value={d.usuario} onChange={cambio('usuario')} /></Campo>
             <Campo id="c-esquema" etiqueta="Esquema"><Entrada id="c-esquema" required value={d.esquema} onChange={cambio('esquema')} /></Campo>
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Campo id="c-ssl" etiqueta="SSL"><Selector id="c-ssl" value={d.sslmode} onChange={cambio('sslmode')}>{SSL.map((s) => <option key={s}>{s}</option>)}</Selector></Campo>
             <Campo id="c-timeout" etiqueta="Espera al conectar (s)"><Entrada id="c-timeout" type="number" min={1} max={120} value={d.timeout} onChange={cambio('timeout')} /></Campo>
+            <div className="sm:col-span-2">
+              <Campo id="c-clave" etiqueta="Clave"
+                ayuda={origen === 'guardada' ? 'Hay una clave guardada (cifrada): déjelo vacío para conservarla.'
+                  : origen === 'entorno' ? 'Hoy se usa KMC_PW del servidor. Escriba una para guardarla cifrada.' : 'Sin clave: escríbala para guardarla cifrada.'}>
+                <Entrada id="c-clave" type="password" autoComplete="new-password" value={clave} onChange={(e) => setClave(e.target.value)}
+                  placeholder={origen === 'guardada' ? '•••••••• (guardada)' : ''} />
+              </Campo>
+            </div>
+            {origen === 'guardada' && (
+              <label className="flex items-center gap-2 text-sm sm:col-span-2 xl:mt-7">
+                <input type="checkbox" className="size-4 accent-teal" checked={borrar} onChange={(e) => setBorrar(e.target.checked)} />
+                Borrar la clave guardada (volver a KMC_PW del servidor)
+              </label>
+            )}
           </div>
-          <Campo id="c-clave" etiqueta="Clave"
-            ayuda={origen === 'guardada' ? 'Hay una clave guardada (cifrada): déjelo vacío para conservarla.'
-              : origen === 'entorno' ? 'Hoy se usa KMC_PW del servidor. Escriba una para guardarla cifrada.' : 'Sin clave: escríbala para guardarla cifrada.'}>
-            <Entrada id="c-clave" type="password" autoComplete="new-password" value={clave} onChange={(e) => setClave(e.target.value)}
-              placeholder={origen === 'guardada' ? '•••••••• (guardada)' : ''} />
-          </Campo>
-          {origen === 'guardada' && (
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" className="size-4 accent-teal" checked={borrar} onChange={(e) => setBorrar(e.target.checked)} />
-              Borrar la clave guardada (volver a KMC_PW del servidor)
-            </label>
-          )}
           {!actual.data.cifrado_disponible && clave && <Aviso>El servidor no tiene MAIA_CIFRADO_CLAVE: la clave se puede probar, pero no guardar.</Aviso>}
           {probar.data && <Aviso tono={probar.data.ok ? 'teal' : 'coral'}>
             {probar.data.mensaje}{probar.data.ok && <> Postgres {probar.data.version_servidor}; {probar.data.tablas?.length ?? 0} tablas en {probar.data.esquema}.</>}
@@ -154,11 +166,13 @@ function FormConexion({ soloSimulado }: { soloSimulado: boolean }) {
   )
 }
 
-function FormHiperparametros() {
+function FormHiperparametros({ modelo }: { modelo: Hiperparametros['modelo'] }) {
   const lista = useQuery({ queryKey: ['administracion', 'hiperparametros'], queryFn: () => pedir<Hiperparametros[]>('/administracion/hiperparametros') })
   if (lista.isPending) return <Cargando />
   if (lista.error) return <Aviso>{lista.error.message}</Aviso>
-  return <>{lista.data.map((h) => <PanelModelo key={`${h.modelo}-${h.actualizado_en ?? ''}`} h={h} />)}</>
+  const h = lista.data.find((x) => x.modelo === modelo)
+  if (!h) return <Vacio titulo={`Sin hiperparámetros para ${MODELOS[modelo]}`} />
+  return <PanelModelo key={`${h.modelo}-${h.actualizado_en ?? ''}`} h={h} />
 }
 
 function PanelModelo({ h }: { h: Hiperparametros }) {
@@ -193,7 +207,7 @@ function PanelModelo({ h }: { h: Hiperparametros }) {
           Si lo deja vacío se usa el valor por defecto (en gris). Aplican al próximo entrenamiento, que guarda los valores que usó.
           {h.actualizado_en && <> Último cambio: {conPunto(fechaHora(h.actualizado_en))}</>}
         </p>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {h.campos.map((c) => (
             <CampoHiperparametro key={c.nombre} c={c} id={`hp-${h.modelo}-${c.nombre}`} sugerirDefecto
               valor={v[c.nombre] ?? ''} cambiar={(x) => setV({ ...v, [c.nombre]: x })} />

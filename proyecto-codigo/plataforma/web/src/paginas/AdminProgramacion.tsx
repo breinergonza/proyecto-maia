@@ -7,6 +7,7 @@ import { pedir } from '../api/cliente'
 import type { Calendario, Ejecucion, Programacion, ProgramacionEntrada } from '../api/tipos'
 import { Termino } from '../components/Termino'
 import { useConfirmar } from '../components/Confirmar'
+import { PanelesPestana, Pestanas, usePestanaEnUrl } from '../components/ui/Pestanas'
 import { Aviso, Boton, Campo, Cargando, Encabezado, Entrada, Insignia, Panel, Selector, Tabla, Vacio } from '../components/ui'
 import { ESTADOS_EJECUCION, fechaHora, FUENTES, TIPOS_EJECUCION } from '../lib/formato'
 
@@ -23,6 +24,9 @@ const VACIA: ProgramacionEntrada = {
 }
 const TONO: Record<string, 'teal' | 'coral' | 'ocre' | 'neutro'> = { ok: 'teal', error: 'coral', en_curso: 'ocre', pendiente: 'neutro' }
 type Filtro = 'anio_desde' | 'anio_hasta' | 'ventana_meses'
+const CLAVES = ['horarios', 'programar'] as const
+/** Una tabla dentro de un panel que se desplaza: el encabezado queda fijo. */
+const ENCABEZADO_FIJO = 'xl:overflow-visible [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-papel'
 
 function useDemorado<T>(valor: T, ms = 400): T {
   const [v, setV] = useState(valor)
@@ -35,8 +39,14 @@ function useDemorado<T>(valor: T, ms = 400): T {
 
 export default function AdminProgramacion() {
   const [editando, setEditando] = useState<Programacion | null>(null)
+  const [activa, elegir] = usePestanaEnUrl('ver', CLAVES)
+  const pestanas = [
+    { clave: 'horarios', texto: 'Horarios y ejecuciones' },
+    { clave: 'programar', texto: editando ? 'Editar programación' : 'Nueva programación' },
+  ] as const
+  // en escritorio la página ocupa la pantalla sin desplazarse: las dos listas se desplazan por dentro si no caben
   return (
-    <>
+    <div className="flex flex-col xl:h-full">
       <Encabezado titulo="Programación">
         Cada ejecución extrae la base de la entidad con los filtros indicados, revisa los datos y calcula los riesgos con
         los modelos aprobados en <Link className="text-teal underline" to="/admin/entrenamientos">Entrenamientos</Link>.
@@ -44,14 +54,23 @@ export default function AdminProgramacion() {
         como candidatos; <strong>Corrida ahora</strong> no entrena. Para recalcular sin extraer, use{' '}
         <Link className="text-teal underline" to="/admin/corridas">Corridas</Link>.
       </Encabezado>
-      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_26rem]">
-        <div className="flex min-w-0 flex-col gap-4">
-          <ListaProgramaciones editar={setEditando} />
-          <ListaEjecuciones />
-        </div>
-        <FormProgramacion key={editando?.id ?? 'nueva'} p={editando} listo={() => setEditando(null)} />
-      </div>
-    </>
+      <Pestanas prefijo="programacion" etiqueta="Secciones de la programación" pestanas={pestanas} activa={activa} elegir={elegir} />
+      <PanelesPestana prefijo="programacion" activa={activa} className="mt-3 flex min-h-0 flex-col gap-3 xl:flex-1" paneles={[
+        {
+          clave: 'horarios',
+          contenido: (
+            <>
+              <ListaProgramaciones editar={(p) => { setEditando(p); elegir('programar') }} />
+              <ListaEjecuciones />
+            </>
+          ),
+        },
+        {
+          clave: 'programar',
+          contenido: <FormProgramacion key={editando?.id ?? 'nueva'} p={editando} listo={() => { setEditando(null); elegir('horarios') }} />,
+        },
+      ]} />
+    </div>
   )
 }
 
@@ -75,12 +94,12 @@ function ListaProgramaciones({ editar }: { editar: (p: Programacion) => void }) 
     if (ok) borrar.mutate(p.id)
   }
   return (
-    <Panel titulo="Horarios">
+    <Panel llenar titulo="Horarios" className="xl:min-h-60">
       {dialogo}
       {lista.isPending ? <Cargando /> : lista.error ? <Aviso>{lista.error.message}</Aviso> : lista.data.length === 0 ? (
-        <Vacio titulo="Sin horarios">Cree uno con el formulario: la corrida semestral es el punto de partida.</Vacio>
+        <Vacio titulo="Sin horarios">Cree uno en «Nueva programación»: la corrida semestral es el punto de partida.</Vacio>
       ) : (
-        <Tabla apilar>
+        <Tabla apilar className={ENCABEZADO_FIJO}>
           <thead><tr><th>Nombre</th><th>Cuándo</th><th>Próxima</th><th>Última</th><th></th></tr></thead>
           <tbody>
             {lista.data.map((p) => (
@@ -136,53 +155,62 @@ function FormProgramacion({ p, listo }: { p: Programacion | null; listo: () => v
   const kmc = d.fuente === 'kmc'
   return (
     <Panel titulo={p ? `Editar «${p.nombre}»` : 'Nueva programación'} accion={p && <Boton chico variante="fantasma" onClick={listo}>Cancelar</Boton>}>
-      <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); guardar.mutate() }}>
-        <Campo id="p-nombre" etiqueta="Nombre"><Entrada id="p-nombre" required maxLength={120} value={d.nombre} onChange={(e) => setD({ ...d, nombre: e.target.value })} /></Campo>
-        <Campo id="p-fuente" etiqueta="Datos">
-          <Selector id="p-fuente" value={d.fuente} onChange={(e) => setD({ ...d, fuente: e.target.value as ProgramacionEntrada['fuente'], parametros: {} })}>
-            {Object.entries(FUENTES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </Selector>
-        </Campo>
-        <Campo id="p-preset" etiqueta="Frecuencia">
-          <Selector id="p-preset" value={preset} onChange={(e) => e.target.value !== 'otra' && setD({ ...d, cron: PRESETS[e.target.value].cron })}>
-            {Object.entries(PRESETS).map(([k, v]) => <option key={k} value={k}>{v.texto}</option>)}
-            <option value="otra">Otra (expresión cron)</option>
-          </Selector>
-        </Campo>
-        <Campo id="p-cron" etiqueta="Expresión cron" ayuda="minuto hora día-del-mes mes día-de-la-semana (domingo = 0)" error={cal.error?.message}>
-          <Entrada id="p-cron" className="font-mono" value={d.cron} onChange={(e) => setD({ ...d, cron: e.target.value })} aria-invalid={!!cal.error} />
-        </Campo>
-        <p className="text-xs text-salvia sm:col-span-2">¿Qué es una <Termino id="cron">expresión cron</Termino>?</p>
-        {cal.data && (
-          <div className="rounded-control bg-fondo p-3 text-sm" aria-live="polite">
-            <p className="font-semibold">{cal.data.descripcion} <span className="font-normal text-salvia">({cal.data.zona})</span></p>
-            <p className="text-salvia">Próximas: {cal.data.proximas.slice(0, 3).map((x) => fechaHora(x)).join(' · ')}</p>
-          </div>
-        )}
-        {kmc && (
-          <fieldset className="space-y-3 rounded-control border border-linea p-3">
-            <legend className="px-1 text-sm font-semibold">Filtros de la extracción (opcionales)</legend>
-            <div className="grid grid-cols-2 gap-3">
-              <Campo id="p-desde" etiqueta="Nacidos desde (año)"><Entrada id="p-desde" type="number" min={1990} max={2100} value={par.anio_desde ?? ''} onChange={num('anio_desde')} /></Campo>
-              <Campo id="p-hasta" etiqueta="Nacidos hasta (año)"><Entrada id="p-hasta" type="number" min={1990} max={2100} value={par.anio_hasta ?? ''} onChange={num('anio_hasta')} /></Campo>
-            </div>
-            <Campo id="p-ventana" etiqueta="Solo niños con visitas en los últimos (meses)" ayuda="Conservan su historia completa. Vacío: todos.">
-              <Entrada id="p-ventana" type="number" min={1} max={240} value={par.ventana_meses ?? ''} onChange={num('ventana_meses')} />
+      <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); guardar.mutate() }}>
+        {/* tres columnas en escritorio: qué y cuándo, cómo se lee el horario, y los filtros y opciones */}
+        <div className="grid grid-cols-1 gap-x-6 gap-y-3 xl:grid-cols-3">
+          <div className="space-y-3">
+            <Campo id="p-nombre" etiqueta="Nombre"><Entrada id="p-nombre" required maxLength={120} value={d.nombre} onChange={(e) => setD({ ...d, nombre: e.target.value })} /></Campo>
+            <Campo id="p-fuente" etiqueta="Datos">
+              <Selector id="p-fuente" value={d.fuente} onChange={(e) => setD({ ...d, fuente: e.target.value as ProgramacionEntrada['fuente'], parametros: {} })}>
+                {Object.entries(FUENTES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </Selector>
             </Campo>
-          </fieldset>
-        )}
-        <div className="space-y-2 text-sm">
-          {kmc && (
-            <label className="flex items-start gap-2"><input type="checkbox" className="mt-0.5 size-4 accent-teal" checked={d.solo_si_nuevo} onChange={(e) => setD({ ...d, solo_si_nuevo: e.target.checked })} />
-              <span>Solo si la base cambió desde el último corte <span className="text-salvia">(si no, no entrena)</span></span></label>
-          )}
-          <label className="flex items-start gap-2"><input type="checkbox" className="mt-0.5 size-4 accent-teal" checked={d.silencio} onChange={(e) => setD({ ...d, silencio: e.target.checked })} />
-            <span>En silencio <span className="text-salvia">(guarda los riesgos sin mostrarlos ni enviar correos)</span></span></label>
-          <label className="flex items-start gap-2"><input type="checkbox" className="mt-0.5 size-4 accent-teal" checked={d.activo} onChange={(e) => setD({ ...d, activo: e.target.checked })} />
-            <span>Activa</span></label>
+            <Campo id="p-preset" etiqueta="Frecuencia">
+              <Selector id="p-preset" value={preset} onChange={(e) => e.target.value !== 'otra' && setD({ ...d, cron: PRESETS[e.target.value].cron })}>
+                {Object.entries(PRESETS).map(([k, v]) => <option key={k} value={k}>{v.texto}</option>)}
+                <option value="otra">Otra (expresión cron)</option>
+              </Selector>
+            </Campo>
+          </div>
+          <div className="space-y-3">
+            <Campo id="p-cron" etiqueta="Expresión cron" ayuda="minuto hora día-del-mes mes día-de-la-semana (domingo = 0)" error={cal.error?.message}>
+              <Entrada id="p-cron" className="font-mono" value={d.cron} onChange={(e) => setD({ ...d, cron: e.target.value })} aria-invalid={!!cal.error} />
+            </Campo>
+            <p className="text-xs text-salvia">¿Qué es una <Termino id="cron">expresión cron</Termino>?</p>
+            {cal.data && (
+              <div className="rounded-control bg-fondo p-3 text-sm" aria-live="polite">
+                <p className="font-semibold">{cal.data.descripcion} <span className="font-normal text-salvia">({cal.data.zona})</span></p>
+                <p className="text-salvia">Próximas: {cal.data.proximas.slice(0, 3).map((x) => fechaHora(x)).join(' · ')}</p>
+              </div>
+            )}
+          </div>
+          <div className="space-y-3">
+            {kmc && (
+              <fieldset className="space-y-3 rounded-control border border-linea p-3">
+                <legend className="px-1 text-sm font-semibold">Filtros de la extracción (opcionales)</legend>
+                <div className="grid grid-cols-2 gap-3">
+                  <Campo id="p-desde" etiqueta="Nacidos desde (año)"><Entrada id="p-desde" type="number" min={1990} max={2100} value={par.anio_desde ?? ''} onChange={num('anio_desde')} /></Campo>
+                  <Campo id="p-hasta" etiqueta="Nacidos hasta (año)"><Entrada id="p-hasta" type="number" min={1990} max={2100} value={par.anio_hasta ?? ''} onChange={num('anio_hasta')} /></Campo>
+                </div>
+                <Campo id="p-ventana" etiqueta="Solo niños con visitas en los últimos (meses)" ayuda="Conservan su historia completa. Vacío: todos.">
+                  <Entrada id="p-ventana" type="number" min={1} max={240} value={par.ventana_meses ?? ''} onChange={num('ventana_meses')} />
+                </Campo>
+              </fieldset>
+            )}
+            <div className="space-y-2 text-sm">
+              {kmc && (
+                <label className="flex items-start gap-2"><input type="checkbox" className="mt-0.5 size-4 accent-teal" checked={d.solo_si_nuevo} onChange={(e) => setD({ ...d, solo_si_nuevo: e.target.checked })} />
+                  <span>Solo si la base cambió desde el último corte <span className="text-salvia">(si no, no entrena)</span></span></label>
+              )}
+              <label className="flex items-start gap-2"><input type="checkbox" className="mt-0.5 size-4 accent-teal" checked={d.silencio} onChange={(e) => setD({ ...d, silencio: e.target.checked })} />
+                <span>En silencio <span className="text-salvia">(guarda los riesgos sin mostrarlos ni enviar correos)</span></span></label>
+              <label className="flex items-start gap-2"><input type="checkbox" className="mt-0.5 size-4 accent-teal" checked={d.activo} onChange={(e) => setD({ ...d, activo: e.target.checked })} />
+                <span>Activa</span></label>
+            </div>
+          </div>
         </div>
         {guardar.error && <Aviso>{guardar.error.message}</Aviso>}
-        <Boton type="submit" className="w-full" disabled={guardar.isPending || !!cal.error}>{p ? 'Guardar cambios' : 'Crear programación'}</Boton>
+        <Boton type="submit" className="w-full sm:w-auto" disabled={guardar.isPending || !!cal.error}>{p ? 'Guardar cambios' : 'Crear programación'}</Boton>
       </form>
     </Panel>
   )
@@ -202,7 +230,7 @@ function ListaEjecuciones() {
     onSuccess: () => void cliente.invalidateQueries({ queryKey: ['administracion', 'ejecuciones'] }),
   })
   return (
-    <Panel titulo="Ejecuciones" accion={
+    <Panel llenar titulo="Ejecuciones" className="xl:min-h-60" accion={
       <div className="flex items-center gap-2">
         <label htmlFor="e-fuente" className="sr-only">Datos de la corrida</label>
         <Selector id="e-fuente" className="h-9 w-auto text-sm sm:h-8" value={fuente} onChange={(e) => setFuente(e.target.value as 'kmc' | 'simulado')}>

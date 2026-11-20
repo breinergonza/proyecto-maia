@@ -15,6 +15,7 @@ import { num } from '../lib/formato'
 import { useConfirmar } from './Confirmar'
 import DiferenciasDiccionario from './DiferenciasDiccionario'
 import { Aviso, Boton, Campo, Cargando, Entrada, Insignia, Paginador, Selector, Tabla, Texto, Vacio } from './ui'
+import { PanelPestana, Pestanas, usePestanaEnUrl } from './ui/Pestanas'
 
 type Valores = Record<string, string | null>
 type Pendiente = { accion: 'editar' | 'agregar'; valores: Valores } | { accion: 'borrar' }
@@ -24,6 +25,8 @@ type Fila = { clave: string; valores: Valores; original: Valores | null; pendien
 /** Una fila que otra parte de la página pide abrir (por ejemplo «Completar» en las variables por clasificar). */
 export type FilaPedida = { hoja: string; clave: string }
 
+/** Una tabla dentro de un panel que se desplaza: el encabezado queda fijo. */
+const ENCABEZADO_FIJO = 'xl:overflow-visible [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-papel'
 const POR_PAGINA = 50
 const COLUMNAS_TABLA = 4   // la tabla muestra las primeras (en el teléfono, dos); el formulario, todas
 const ESTADO_FILA = {
@@ -54,8 +57,10 @@ const aCambios = (hojas: HojaVista[], pendientes: Pendientes): CambioFila[] =>
 
 const contar = (pendientes: Pendientes) => Object.values(pendientes).reduce((n, h) => n + Object.keys(h).length, 0)
 
-export default function EditorDiccionario({ vigente, pedida, alAbrirPedida, alGuardar }: {
+export default function EditorDiccionario({ vigente, pedida, alAbrirPedida, alGuardar, alCambiar }: {
   vigente: VersionDiccionario; pedida: FilaPedida | null; alAbrirPedida: () => void; alGuardar: (v: VersionDiccionario) => void
+  /** Cuántas filas llevan cambios sin guardar, para avisarlo fuera del editor (por ejemplo en su pestaña). */
+  alCambiar?: (filas: number) => void
 }) {
   const titulo = useId()
   const seccion = useRef<HTMLElement>(null)
@@ -64,7 +69,6 @@ export default function EditorDiccionario({ vigente, pedida, alAbrirPedida, alGu
     queryFn: () => pedir<VistaDiccionario>(`/diccionario/versiones/${vigente.id}/vista`),
     staleTime: Infinity,   // una versión guardada no cambia
   })
-  const [indice, setIndice] = useState(0)
   const [buscar, setBuscar] = useState('')
   const [pagina, setPagina] = useState(1)
   const [pendientes, setPendientes] = useState<Pendientes>({})
@@ -72,7 +76,9 @@ export default function EditorDiccionario({ vigente, pedida, alAbrirPedida, alGu
   const [revisando, setRevisando] = useState(false)
   const { confirmar, dialogo } = useConfirmar()
   const hojas = vista.data?.hojas ?? []
-  const hoja = hojas[indice]
+  // la hoja elegida va en la dirección (?hoja=Visitas)
+  const [nombreHoja, elegirHoja] = usePestanaEnUrl('hoja', hojas.map((h) => h.nombre))
+  const hoja = hojas.find((h) => h.nombre === nombreHoja)
   const n = contar(pendientes)
 
   const filas = useMemo(() => hoja ? filasDe(hoja, pendientes[hoja.nombre]) : [], [hoja, pendientes])
@@ -86,15 +92,16 @@ export default function EditorDiccionario({ vigente, pedida, alAbrirPedida, alGu
 
   useEffect(() => {
     if (!pedida || !vista.data) return
-    const i = vista.data.hojas.findIndex((h) => h.nombre === pedida.hoja)
-    if (i >= 0) {
-      setIndice(i)
+    if (vista.data.hojas.some((h) => h.nombre === pedida.hoja)) {
+      if (nombreHoja !== pedida.hoja) elegirHoja(pedida.hoja)
       setBuscar('')
       setAbierta({ hoja: pedida.hoja, clave: pedida.clave })
       seccion.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' })
     }
     alAbrirPedida()
   }, [pedida, vista.data, alAbrirPedida])
+
+  useEffect(() => alCambiar?.(n), [n, alCambiar])
 
   // con cambios sin guardar, el navegador pregunta antes de salir de la página
   useEffect(() => {
@@ -108,8 +115,8 @@ export default function EditorDiccionario({ vigente, pedida, alAbrirPedida, alGu
     const { [clave]: _, ...resto } = todos[nombre] ?? {}
     return { ...todos, [nombre]: p ? { ...resto, [clave]: p } : resto }
   })
-  const elegir = (i: number) => {
-    setIndice(i)
+  const cambiarHoja = (nombre: string) => {
+    elegirHoja(nombre)
     setBuscar('')
     setPagina(1)
   }
@@ -127,27 +134,26 @@ export default function EditorDiccionario({ vigente, pedida, alAbrirPedida, alGu
   const fila = formulario && abierta.clave !== null ? filasDe(formulario, pendientes[formulario.nombre]).find((f) => f.clave === abierta.clave) : undefined
 
   return (
-    <section ref={seccion} aria-labelledby={titulo} className="animate-aparecer scroll-mt-4 rounded-panel border border-linea/80 bg-papel shadow-suave">
-      <header className="px-4 pt-4 sm:px-6 sm:pt-5">
-        <h2 id={titulo} className="text-base">Editar el diccionario</h2>
-      </header>
+    <section ref={seccion} aria-labelledby={titulo} className="flex min-h-0 animate-aparecer scroll-mt-4 flex-col rounded-panel border border-linea/80 bg-papel shadow-suave">
+      {/* la pestaña «Editar» de la página ya lo dice a la vista; el encabezado queda para los lectores de pantalla */}
+      <h2 id={titulo} className="sr-only">Editar el diccionario</h2>
       {dialogo}
-      <div className="space-y-3 p-4 sm:p-6">
+      <div className="flex min-h-0 flex-col gap-3 p-4 sm:px-5">
         {vista.isPending ? <Cargando /> : vista.error ? <Aviso><span className="whitespace-pre-line">{vista.error.message}</span></Aviso> : hoja && (
           <>
-            <div role="tablist" aria-label="Hojas del diccionario" className="-mx-4 flex gap-1 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-              {hojas.map((h, i) => {
+            <Pestanas prefijo="hoja" etiqueta="Hojas del diccionario" activa={hoja.nombre} elegir={cambiarHoja}
+              pestanas={hojas.map((h) => {
                 const cambios = Object.keys(pendientes[h.nombre] ?? {}).length
-                return (
-                  <button key={h.nombre} type="button" role="tab" aria-selected={i === indice} onClick={() => elegir(i)}
-                    className={cn('shrink-0 rounded-control px-3 py-1.5 text-sm font-semibold transition-colors',
-                      i === indice ? 'bg-teal-tinte text-teal' : 'text-salvia hover:bg-fondo hover:text-tinta')}>
-                    {h.nombre} <span className="font-normal opacity-70">{num(h.filas.length)}</span>
-                    {cambios > 0 && <span className="ml-1 text-ocre-hondo" aria-label={`, ${cambios} con cambios`}>•</span>}
-                  </button>
-                )
-              })}
-            </div>
+                return {
+                  clave: h.nombre,
+                  texto: (
+                    <>
+                      {h.nombre} <span className="font-normal opacity-70">{num(h.filas.length)}</span>
+                      {cambios > 0 && <span className="ml-1 text-ocre-hondo" aria-label={`, ${cambios} con cambios`}>•</span>}
+                    </>
+                  ),
+                }
+              })} />
 
             {n > 0 && (
               <div className="flex flex-col gap-2 rounded-control border border-ocre/40 bg-ocre-tinte/60 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
@@ -178,41 +184,46 @@ export default function EditorDiccionario({ vigente, pedida, alAbrirPedida, alGu
               </div>
             </div>
 
-            {visibles.length === 0 ? <Vacio titulo={buscar ? 'Nada coincide con la búsqueda' : 'Esta hoja está vacía'} /> : (
-              <>
-                <Tabla densa>
-                  <thead>
-                    <tr>
-                      {hoja.columnas.slice(0, COLUMNAS_TABLA).map((c, j) => <th key={c.clave} className={cn(j > 1 && 'hidden md:table-cell')}>{c.titulo}</th>)}
-                      <th><span className="sr-only">Cambios</span></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibles.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA).map((f) => (
-                      <tr key={f.clave} onClick={() => setAbierta({ hoja: hoja.nombre, clave: f.clave })}
-                        className={cn('cursor-pointer hover:bg-fondo/60', f.pendiente?.accion === 'borrar' && 'text-salvia line-through')}>
-                        {hoja.columnas.slice(0, COLUMNAS_TABLA).map((c, j) => (
-                          <td key={c.clave} className={cn('max-w-80 align-top', j > 1 && 'hidden md:table-cell')}>
-                            {j === 0 ? (
-                              <button type="button" aria-label={`Editar ${f.clave}`} onClick={(e) => {
-                                e.stopPropagation()
-                                setAbierta({ hoja: hoja.nombre, clave: f.clave })
-                              }} className="break-all text-left font-mono text-xs font-semibold text-teal underline-offset-2 hover:underline">
-                                {f.clave}
-                              </button>
-                            ) : f.valores[c.clave] ?? <span className="text-salvia/60">—</span>}
-                          </td>
+            {/* la tabla se desplaza dentro del panel con su encabezado fijo; la paginación queda debajo */}
+            <PanelPestana prefijo="hoja" activa={hoja.nombre} className="flex min-h-0 flex-col">
+              {visibles.length === 0 ? <Vacio titulo={buscar ? 'Nada coincide con la búsqueda' : 'Esta hoja está vacía'} /> : (
+                <>
+                  <div className="min-h-0 overflow-auto">
+                    <Tabla densa className={ENCABEZADO_FIJO}>
+                      <thead>
+                        <tr>
+                          {hoja.columnas.slice(0, COLUMNAS_TABLA).map((c, j) => <th key={c.clave} className={cn(j > 1 && 'hidden md:table-cell')}>{c.titulo}</th>)}
+                          <th><span className="sr-only">Cambios</span></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {visibles.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA).map((f) => (
+                          <tr key={f.clave} onClick={() => setAbierta({ hoja: hoja.nombre, clave: f.clave })}
+                            className={cn('cursor-pointer hover:bg-fondo/60', f.pendiente?.accion === 'borrar' && 'text-salvia line-through')}>
+                            {hoja.columnas.slice(0, COLUMNAS_TABLA).map((c, j) => (
+                              <td key={c.clave} className={cn('max-w-80 align-top', j > 1 && 'hidden md:table-cell')}>
+                                {j === 0 ? (
+                                  <button type="button" aria-label={`Editar ${f.clave}`} onClick={(e) => {
+                                    e.stopPropagation()
+                                    setAbierta({ hoja: hoja.nombre, clave: f.clave })
+                                  }} className="break-all text-left font-mono text-xs font-semibold text-teal underline-offset-2 hover:underline">
+                                    {f.clave}
+                                  </button>
+                                ) : f.valores[c.clave] ?? <span className="text-salvia/60">—</span>}
+                              </td>
+                            ))}
+                            <td className="align-top">
+                              {f.pendiente && <Insignia tono={ESTADO_FILA[f.pendiente.accion].tono}>{ESTADO_FILA[f.pendiente.accion].texto}</Insignia>}
+                            </td>
+                          </tr>
                         ))}
-                        <td className="align-top">
-                          {f.pendiente && <Insignia tono={ESTADO_FILA[f.pendiente.accion].tono}>{ESTADO_FILA[f.pendiente.accion].texto}</Insignia>}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Tabla>
-                <Paginador pagina={pagina} tamano={POR_PAGINA} total={visibles.length} cambiar={setPagina} />
-              </>
-            )}
+                      </tbody>
+                    </Tabla>
+                  </div>
+                  <Paginador pagina={pagina} tamano={POR_PAGINA} total={visibles.length} cambiar={setPagina} />
+                </>
+              )}
+            </PanelPestana>
           </>
         )}
       </div>

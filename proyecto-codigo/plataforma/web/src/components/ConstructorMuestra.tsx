@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { ErrorApi, pedir } from '../api/cliente'
 import { useFacetasExplorar } from '../api/exploracion'
 import type { MuestraGuardada } from '../api/tipos'
+import { cn } from '../lib/cn'
 import { descripcionDe } from '../lib/descripciones'
 import { num } from '../lib/formato'
 import { useFiltros } from '../lib/useFiltros'
@@ -29,8 +30,11 @@ export function avisosDeMuestra(n: number, minimo: number): string[] {
   return avisos
 }
 
-export function ConstructorMuestra({ fuente, nombre, bloqueado, alTerminar, alCerrar }: {
-  fuente: 'kmc' | 'simulado'; nombre?: string; bloqueado?: boolean; alTerminar: () => void; alCerrar: () => void
+export function ConstructorMuestra({ fuente, nombre, bloqueado, llenar, alTerminar, alCerrar }: {
+  fuente: 'kmc' | 'simulado'; nombre?: string; bloqueado?: boolean
+  /** Ocupa el alto que le da su contenedor y se desplaza por dentro, sin alargar la página. */
+  llenar?: boolean
+  alTerminar: () => void; alCerrar: () => void
 }) {
   const filtros = useFiltros()
   const cliente = useQueryClient()
@@ -83,10 +87,13 @@ export function ConstructorMuestra({ fuente, nombre, bloqueado, alTerminar, alCe
   const dResultante = descripcionDe('muestra_resultante')
 
   return (
-    <Panel titulo={dMuestra.titulo} descripcion={dMuestra.descripcion}
+    <Panel llenar={llenar} titulo={dMuestra.titulo} descripcion={dMuestra.descripcion}
       accion={<Boton variante="fantasma" chico onClick={alCerrar}>Cerrar</Boton>}>
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,22rem)_1fr]">
-        <PanelFacetas facetas={facetas.data} cargando={facetas.isPending} filtros={filtros} esExperto={false} />
+      <div className={cn('grid gap-4 lg:grid-cols-[minmax(0,22rem)_1fr]', llenar && 'xl:h-full xl:grid-rows-[minmax(0,1fr)]')}>
+        {/* con `llenar`, las opciones se desplazan por su lado y el formulario queda a la vista */}
+        <div className={cn(llenar && 'xl:min-h-0 xl:overflow-y-auto')}>
+          <PanelFacetas facetas={facetas.data} cargando={facetas.isPending} filtros={filtros} esExperto={false} />
+        </div>
 
         <div className="flex flex-col gap-4">
           <fieldset className="grid gap-3 rounded-control border border-linea p-3 sm:grid-cols-3">
@@ -105,52 +112,54 @@ export function ConstructorMuestra({ fuente, nombre, bloqueado, alTerminar, alCe
             </Campo>
           </fieldset>
 
-          <fieldset className="grid gap-3 rounded-control border border-linea p-3 sm:grid-cols-3">
-            <legend className="px-1 text-sm font-semibold">Muestreo</legend>
-            <Campo id="cm-modo" etiqueta="Cuántos niños">
-              <Selector id="cm-modo" value={modo} onChange={(e) => setModo(e.target.value as 'todos' | 'estratificado')}>
-                <option value="todos">Todos los que cumplen</option>
-                <option value="estratificado">Un tope por grupo</option>
-              </Selector>
-            </Campo>
-            {modo === 'estratificado' && (
-              <>
-                <Campo id="cm-por" etiqueta="Grupos según">
-                  <Selector id="cm-por" value={por} onChange={(e) => setPor(e.target.value)}>
-                    <option value="sede">Sede</option>
-                    {categoricas.map(([k, f]) => <option key={k} value={k}>{f.etiqueta}</option>)}
-                  </Selector>
-                </Campo>
-                <Campo id="cm-tope" etiqueta="Máximo por grupo" error={topeMalo ? 'Escriba un número entero mayor que cero.' : undefined}>
-                  <Entrada id="cm-tope" inputMode="numeric" value={tope} onChange={(e) => setTope(e.target.value)} aria-invalid={topeMalo || undefined} />
-                </Campo>
-              </>
-            )}
-          </fieldset>
+          <div className="grid gap-4 xl:grid-cols-2">
+            <fieldset className="grid content-start gap-3 rounded-control border border-linea p-3 [grid-template-columns:repeat(auto-fit,minmax(9rem,1fr))]">
+              <legend className="px-1 text-sm font-semibold">Muestreo</legend>
+              <Campo id="cm-modo" etiqueta="Cuántos niños">
+                <Selector id="cm-modo" value={modo} onChange={(e) => setModo(e.target.value as 'todos' | 'estratificado')}>
+                  <option value="todos">Todos los que cumplen</option>
+                  <option value="estratificado">Un tope por grupo</option>
+                </Selector>
+              </Campo>
+              {modo === 'estratificado' && (
+                <>
+                  <Campo id="cm-por" etiqueta="Grupos según">
+                    <Selector id="cm-por" value={por} onChange={(e) => setPor(e.target.value)}>
+                      <option value="sede">Sede</option>
+                      {categoricas.map(([k, f]) => <option key={k} value={k}>{f.etiqueta}</option>)}
+                    </Selector>
+                  </Campo>
+                  <Campo id="cm-tope" etiqueta="Máximo por grupo" error={topeMalo ? 'Escriba un número entero mayor que cero.' : undefined}>
+                    <Entrada id="cm-tope" inputMode="numeric" value={tope} onChange={(e) => setTope(e.target.value)} aria-invalid={topeMalo || undefined} />
+                  </Campo>
+                </>
+              )}
+            </fieldset>
 
-          <section aria-label={dResultante.titulo} className="rounded-control bg-teal-tinte p-3" aria-live="polite">
-            <h3 className="text-sm font-semibold">{dResultante.titulo}</h3>
-            <p className="text-sm text-salvia">{dResultante.descripcion}</p>
-            {conteo.isPending && !fechaMala && !topeMalo ? <p className="text-sm text-salvia">Contando…</p>
-              : conteo.error ? <Aviso>{conteo.error instanceof ErrorApi ? conteo.error.message : 'No se pudo contar.'}</Aviso>
-                : n !== undefined && (
-                  <div className="mt-1 flex flex-wrap items-end gap-6">
-                    <Cifra valor={num(n)} texto={`de ${num(conteo.data!.n_base)} niños`} />
-                    <ul className="flex-1 space-y-1 text-sm text-ocre-hondo">{avisos.map((a) => <li key={a}>{a}</li>)}</ul>
-                  </div>
-                )}
-          </section>
+            <section aria-label={dResultante.titulo} className="rounded-control bg-teal-tinte p-3" aria-live="polite">
+              <h3 className="text-sm font-semibold">{dResultante.titulo}</h3>
+              <p className="text-sm text-salvia">{dResultante.descripcion}</p>
+              {conteo.isPending && !fechaMala && !topeMalo ? <p className="text-sm text-salvia">Contando…</p>
+                : conteo.error ? <Aviso>{conteo.error instanceof ErrorApi ? conteo.error.message : 'No se pudo contar.'}</Aviso>
+                  : n !== undefined && (
+                    <div className="mt-1 flex flex-wrap items-end gap-6">
+                      <Cifra valor={num(n)} texto={`de ${num(conteo.data!.n_base)} niños`} />
+                      <ul className="flex-1 space-y-1 text-sm text-ocre-hondo">{avisos.map((a) => <li key={a}>{a}</li>)}</ul>
+                    </div>
+                  )}
+            </section>
+          </div>
 
-          <form className="grid gap-3" onSubmit={(e) => { e.preventDefault(); if (puedeGuardar) guardarYEntrenar.mutate() }}>
+          <form className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-start" onSubmit={(e) => { e.preventDefault(); if (puedeGuardar) guardarYEntrenar.mutate() }}>
             <Campo id="cm-titulo" etiqueta="Título de la muestra">
               <Entrada id="cm-titulo" maxLength={200} value={titulo} onChange={(e) => setTitulo(e.target.value)} />
             </Campo>
             <Campo id="cm-descripcion" etiqueta="Descripción (opcional)">
               <Texto id="cm-descripcion" rows={2} maxLength={500} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
             </Campo>
-            {guardarYEntrenar.error && <Aviso>{guardarYEntrenar.error.message}</Aviso>}
-            <div><Boton type="submit" disabled={!puedeGuardar || guardarYEntrenar.isPending}>Guardar y entrenar</Boton></div>
-            {bloqueado && <p className="text-sm text-salvia">Llegó a su límite: cancele o descarte alguno para entrenar otro.</p>}
+            {guardarYEntrenar.error && <div className="xl:col-span-3"><Aviso>{guardarYEntrenar.error.message}</Aviso></div>}
+            <div className="xl:self-end"><Boton type="submit" disabled={!puedeGuardar || guardarYEntrenar.isPending}>Guardar y entrenar</Boton></div>
+            {bloqueado && <p className="text-sm text-salvia xl:col-span-3">Llegó a su límite: cancele o descarte alguno para entrenar otro.</p>}
           </form>
         </div>
       </div>

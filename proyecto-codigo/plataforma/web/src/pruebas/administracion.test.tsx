@@ -39,8 +39,8 @@ describe('administración de las ejecuciones', () => {
             : url === '/api/administracion/conexion/probar'
               ? { cuerpo: { ok: true, mensaje: 'Conexión de solo lectura correcta.', version_servidor: '16.4', esquema: 'consumo', tablas: ['a', 'b'] } }
               : undefined))
-    montar('/admin/configuracion')
-    expect(await screen.findByText('2. Conexión a la base de la entidad')).toBeInTheDocument()
+    montar('/admin/configuracion?ver=base')
+    await screen.findByLabelText('Clave')
     const clave = await screen.findByLabelText('Clave')
     expect(clave).toHaveValue('')
     await waitFor(() => expect(screen.getByLabelText('Servidor')).toHaveValue('db.entidad'))
@@ -63,7 +63,7 @@ describe('administración de las ejecuciones', () => {
             : url.startsWith('/api/administracion/calendario')
               ? { cuerpo: { cron: '0 2 1 1,7 *', zona: 'America/Bogota', descripcion: 'El día 1 de enero y julio, a las 02:00', proximas: ['2027-01-01T07:00:00Z'] } }
               : undefined))
-    montar('/admin/programacion')
+    montar('/admin/programacion?ver=programar')
     expect(await screen.findByText('El día 1 de enero y julio, a las 02:00')).toBeInTheDocument()
     await userEvent.type(screen.getByLabelText('Nacidos desde (año)'), '2015')
     await userEvent.click(screen.getByRole('button', { name: 'Crear programación' }))
@@ -83,7 +83,7 @@ describe('administración de las ejecuciones', () => {
         : url === '/api/administracion/conexion' ? { cuerpo: conexion }
           : url.startsWith('/api/administracion/hiperparametros') ? { cuerpo: anomalias }
             : undefined))
-    montar('/admin/configuracion')
+    montar('/admin/configuracion?ver=anomalias')
     const alpha = await screen.findByLabelText('Meta de falsas alertas por dato (capa 2)')
     expect(screen.getByText(/0,005 = 5 por cada 1\.000 datos/)).toBeInTheDocument()
     expect(within(screen.getByRole('main')).queryByText(/núcleo/i)).not.toBeInTheDocument()   // el equipo clínico no conoce «el núcleo»
@@ -186,7 +186,7 @@ describe('administración de las ejecuciones', () => {
         : url === '/api/entrenamientos/aprobar' ? { estado: 202, cuerpo: { id: 9 } }
           : undefined))
     montar('/admin/entrenamientos')
-    const clinico = (await screen.findByText('Alertas clínicas')).closest('section')!
+    const clinico = (await screen.findByRole('heading', { name: 'Alertas clínicas' })).closest('section')!
     expect(within(clinico).getByText('produccion')).toBeInTheDocument()
     expect(within(clinico).getByText('ajustado')).toBeInTheDocument()
     expect(within(clinico).getByText('0,83')).toBeInTheDocument()
@@ -220,7 +220,7 @@ describe('administración de las ejecuciones', () => {
           : url === '/api/administracion/hiperparametros' ? { cuerpo: hiper }
             : url.startsWith('/api/entrenamientos?') ? { cuerpo: { mlflow_url: null, anomalias: [], clinico: [] } }
               : undefined))
-    montar('/admin/entrenamientos')
+    montar('/admin/entrenamientos?ver=entrenar')
     const rondas = await screen.findByLabelText('Rondas de boosting (máximo)')
     expect(rondas).toHaveValue(600)                       // parte del valor del núcleo
     await userEvent.click(screen.getByLabelText('Anomalías (revisión de datos)'))
