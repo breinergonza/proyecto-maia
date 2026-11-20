@@ -20,8 +20,8 @@ const resumen = {
   corrida_id: 3, datos_al: '2026-06-30', familias, familia: 'talla_baja_12m', indicador: 'talla',
   grupo: { n: 312, n_total: 5000 },
   observado: {
-    grupo: { casos: 41, con_dato: 223, sin_dato: 89 },
-    poblacion: { casos: 412, con_dato: 3680, sin_dato: 800 },
+    grupo: { casos: 41, con_dato: 223, sin_dato: 89, pct: 18.4 },
+    poblacion: { casos: 412, con_dato: 3680, sin_dato: 800, pct: 11.2 },
   },
   trayectoria: {
     indicador: 'talla', unidad: 'puntaje z de la OMS',
@@ -33,8 +33,8 @@ const resumen = {
     ],
   },
   riesgo: [
-    { momento: '40 sem', clave: 'talla_baja_12m_desde_40sem', estado: 'en_prueba', calculados: 290, en_alerta: 58 },
-    { momento: '3 m EC', clave: 'talla_baja_12m_desde_3m', estado: 'en_prueba', calculados: 268, en_alerta: 61 },
+    { momento: '40 sem', clave: 'talla_baja_12m_desde_40sem', estado: 'en_prueba', calculados: 290, en_alerta: 58, pct_en_alerta: 20 },
+    { momento: '3 m EC', clave: 'talla_baja_12m_desde_3m', estado: 'en_prueba', calculados: 268, en_alerta: 61, pct_en_alerta: 22.8 },
   ],
   alerta_percentil: 90,
   ninos: [

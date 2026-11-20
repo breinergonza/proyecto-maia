@@ -607,13 +607,15 @@ export type CuerpoClinica = CuerpoExplorar & { familia?: string | null; indicado
 /** Un desenlace a 12 meses (con sus cortes): ``en_prueba`` hasta que haya entrenamientos y métricas verificables. */
 export interface FamiliaClinica { clave: string; nombre: string; definicion: string; estado: 'en_uso' | 'en_prueba'; indicador: string | null }
 /** Niños con el desenlace entre los que tienen dato a los 12 meses; un conteo menor que 5 llega nulo. */
-export interface ObservadoClinico { casos: number | null; con_dato: number | null; sin_dato: number | null }
+/** ``pct``: casos entre quienes tienen dato, de los conteos exactos (los conteos se redondean para quien solo consulta). */
+export interface ObservadoClinico { casos: number | null; con_dato: number | null; sin_dato: number | null; pct: number }
 export interface EtapaClinica {
   etapa: string
   grupo: { n: number; p25: number | null; mediana: number | null; p75: number | null } | null
   poblacion: { n: number; mediana: number | null } | null
 }
-export interface RiesgoCorte { momento: string; clave: string; estado: 'en_uso' | 'en_prueba'; calculados: number; en_alerta: number }
+/** ``pct_en_alerta``: de los conteos exactos (los conteos se redondean para quien solo consulta). */
+export interface RiesgoCorte { momento: string; clave: string; estado: 'en_uso' | 'en_prueba'; calculados: number; en_alerta: number; pct_en_alerta: number }
 export interface NinoEnAlerta { sujeto: string; semanas: number | null; momento: string; riesgo: number; percentil: number; ultima_z: number | null }
 export interface ClinicaResumen {
   insuficiente?: false

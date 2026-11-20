@@ -4,11 +4,6 @@ import type { ObservadoClinico } from '../../api/tipos'
 import { num, pct } from '../../lib/formato'
 import { Panel } from '../ui'
 
-/** Casos entre quienes tienen dato; nulo si algún conteo se ocultó (menos de 5) o nadie tiene dato. */
-function porcentaje(o: ObservadoClinico): number | null {
-  return o.casos == null || !o.con_dato ? null : (100 * o.casos) / o.con_dato
-}
-
 export function Observado({ grupo, poblacion }: { grupo: ObservadoClinico | null; poblacion: ObservadoClinico | null }) {
   return (
     <Panel titulo="Qué les pasó a los 12 meses"
@@ -16,7 +11,7 @@ export function Observado({ grupo, poblacion }: { grupo: ObservadoClinico | null
       {grupo ? (
         <div>
           <p className="text-sm font-semibold">Observado en el grupo</p>
-          <p className="mt-1 text-4xl font-bold leading-none tracking-tight text-teal">{pct(porcentaje(grupo))}</p>
+          <p className="mt-1 text-4xl font-bold leading-none tracking-tight text-teal">{pct(grupo.pct)}</p>
           <p className="mt-2 text-sm">
             {num(grupo.casos)} de {num(grupo.con_dato)} niños con dato a los 12 meses · {num(grupo.sin_dato)} sin dato
           </p>
@@ -28,7 +23,7 @@ export function Observado({ grupo, poblacion }: { grupo: ObservadoClinico | null
         <div className="mt-4 border-t border-linea pt-3">
           <p className="text-sm">Toda la población (referencia):</p>
           <p className="mt-0.5 text-sm">
-            <strong className="text-lg text-tinta">{pct(porcentaje(poblacion))}</strong> · {num(poblacion.casos)} de {num(poblacion.con_dato)} niños con dato
+            <strong className="text-lg text-tinta">{pct(poblacion.pct)}</strong> · {num(poblacion.casos)} de {num(poblacion.con_dato)} niños con dato
           </p>
         </div>
       )}

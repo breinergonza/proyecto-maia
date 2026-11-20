@@ -131,8 +131,9 @@ def _filas(s: Session, sql: str, **p) -> list[dict]:
 
 
 def observado_de(s: Session, corrida: int, familia: str, ids: list[str] | None, n: int, red: bool) -> dict | None:
-    """Casos, niños con dato y sin dato de ``n`` niños (``ids``; ``None`` es todo el corte). Con menos de 5 con dato,
-    nada."""
+    """Casos, niños con dato y sin dato de ``n`` niños (``ids``; ``None`` es todo el corte), y el porcentaje de casos
+    entre quienes tienen dato, de los conteos exactos (los conteos se redondean para quien solo consulta; dividir los
+    redondeados daría otro porcentaje). Con menos de 5 con dato, nada."""
     de = ' AND sujeto = ANY(:ids)' if ids is not None else ''
     p = {'c': corrida, 'f': familia, **({'ids': ids} if ids is not None else {})}
     casos, con_dato = s.execute(text(f"""
@@ -141,7 +142,7 @@ def observado_de(s: Session, corrida: int, familia: str, ids: list[str] | None, 
     if con_dato < P.MIN_OPCION:
         return None
     return {'casos': P.proteger(casos, red), 'con_dato': P.proteger(con_dato, red),
-            'sin_dato': P.proteger(max(n - con_dato, 0), red)}
+            'sin_dato': P.proteger(max(n - con_dato, 0), red), 'pct': round(100 * casos / con_dato, 1)}
 
 
 def trayectoria_de(s: Session, corrida: int, corte_id: int, indicador: str, ids: list[str] | None,
@@ -192,7 +193,8 @@ def riesgo_de(s: Session, corrida: int, corte_id: int, familia: str, ids: list[s
     filas.sort(key=lambda f: (mapa.get(f['momento'], {}).get('orden', 99), f['clave']))
     return [{'momento': f['momento'], 'momento_nombre': nombre_etapa(mapa, f['momento']), 'clave': f['clave'],
              'estado': estados.get(f['clave']) or CL.estado_de(f['clave']),
-             'calculados': P.proteger(f['calculados'], red), 'en_alerta': P.proteger(f['en_alerta'], red)}
+             'calculados': P.proteger(f['calculados'], red), 'en_alerta': P.proteger(f['en_alerta'], red),
+             'pct_en_alerta': round(100 * f['en_alerta'] / f['calculados'], 1)}
             for f in filas]
 
 

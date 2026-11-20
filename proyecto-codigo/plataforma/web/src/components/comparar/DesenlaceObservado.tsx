@@ -9,8 +9,8 @@ import { BarrasObservado, claridad, FichaDelDato, MENOS_DE_5, ninos, porcentaje,
 const ESTADO = { en_prueba: 'En prueba', en_uso: 'En uso' } as const
 
 function celdaRiesgo(r: RiesgoDeCorte | null): string {
-  if (r?.calculados == null || r.en_alerta == null) return MENOS_DE_5
-  return `${num(r.en_alerta)} de ${num(r.calculados)} en alerta (${porcentaje((100 * r.en_alerta) / r.calculados)})`
+  if (r?.calculados == null || r.en_alerta == null || r.pct_en_alerta == null) return MENOS_DE_5
+  return `${num(r.en_alerta)} de ${num(r.calculados)} en alerta (${porcentaje(r.pct_en_alerta)})`
 }
 
 function RiesgoEstimado({ d, alerta }: { d: DesenlaceComparado; alerta: number }) {

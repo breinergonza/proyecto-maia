@@ -110,7 +110,8 @@ def test_contrato(cliente, tokens, corrida, datos):  # noqa: F811
     assert r['grupo'] == {'n': n, 'n_total': n}
 
     obs = datos['observados'][datos['observados'].familia == 'talla_baja_12m']
-    esperado = {'casos': int(obs.valor.sum()), 'con_dato': len(obs), 'sin_dato': n - len(obs)}
+    esperado = {'casos': int(obs.valor.sum()), 'con_dato': len(obs), 'sin_dato': n - len(obs),
+                'pct': round(100 * int(obs.valor.sum()) / len(obs), 1)}
     assert r['observado']['grupo'] == esperado == r['observado']['poblacion']   # sin filtro, el grupo es la población
 
     tr = r['trayectoria']
@@ -160,7 +161,8 @@ def test_un_filtro_cambia_cada_bloque(cliente, tokens, corrida, datos):  # noqa:
     assert v['grupo'] == {'n': len(ids), 'n_total': len(datos['todos'])} and 0 < len(ids) < len(datos['todos'])
     obs = datos['observados']
     obs = obs[(obs.familia == 'talla_baja_12m') & obs.sujeto.isin(ids)]
-    assert v['observado']['grupo'] == {'casos': int(obs.valor.sum()), 'con_dato': len(obs), 'sin_dato': len(ids) - len(obs)}
+    assert v['observado']['grupo'] == {'casos': int(obs.valor.sum()), 'con_dato': len(obs), 'sin_dato': len(ids) - len(obs),
+                                       'pct': round(100 * int(obs.valor.sum()) / len(obs), 1)}
     assert v['observado']['poblacion'] == todos['observado']['poblacion']   # la población de referencia no cambia
     z = _z(datos, 'talla', ids)
     for e, antes in zip(v['trayectoria']['etapas'], todos['trayectoria']['etapas']):
@@ -215,6 +217,12 @@ def test_el_visualizador_no_ve_ninos_y_ve_conteos_redondeados(cliente, tokens, c
     assert v['ninos'] is None and e['ninos'] is not None
     assert v['riesgo'] and all(f['calculados'] % 5 == 0 and f['en_alerta'] % 5 == 0 for f in v['riesgo'])
     assert v['observado']['grupo'] and all(v['observado']['grupo'][k] % 5 == 0 for k in ('casos', 'con_dato', 'sin_dato'))
+    # los porcentajes salen de los conteos exactos (los del experto, menos de 100): redondear antes de dividir los cambiaría
+    og = e['observado']['grupo']
+    assert v['observado']['grupo']['pct'] == e['observado']['grupo']['pct'] == round(100 * og['casos'] / og['con_dato'], 1)
+    exacto = {f['clave']: f for f in e['riesgo']}
+    assert all(f['pct_en_alerta'] == exacto[f['clave']]['pct_en_alerta']
+               == round(100 * exacto[f['clave']]['en_alerta'] / exacto[f['clave']]['calculados'], 1) for f in v['riesgo'])
 
 
 def test_familia_o_indicador_desconocidos(cliente, tokens, corrida):  # noqa: F811

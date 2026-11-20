@@ -147,7 +147,12 @@ def _faltan_ninos(ids_a: list[str], ids_b: list[str]) -> dict | None:
     return {'estado': 'insuficiente', 'mensaje': f'Cada grupo necesita al menos {AN.MIN_DISTRIBUCION} niños para compararse.'}
 
 
-def _composicion(cat: pd.DataFrame, ids_a: list[str], ids_b: list[str]) -> dict:
+def _conteos(d: dict, red: bool) -> dict:
+    """Los conteos de cada lado de una comparación, redondeados para quien solo consulta (D46)."""
+    return {**d, **{k: P.proteger(d[k], red) for k in ('n_a', 'n_b') if d.get(k) is not None}}
+
+
+def _composicion(cat: pd.DataFrame, ids_a: list[str], ids_b: list[str], red: bool) -> dict:
     """Reparto en % de sexo, edad gestacional, Lubchenco y sede en cada grupo. Una categoría con menos de 5 niños en un
     lado no da cifra; una variable con menos de 20 niños con dato en un lado no se muestra."""
     salida: dict[str, dict] = {}
@@ -161,7 +166,8 @@ def _composicion(cat: pd.DataFrame, ids_a: list[str], ids_b: list[str]) -> dict:
         for c in orden:
             na, nb = int((ga == c).sum()), int((gb == c).sum())
             filas.append({'categoria': c, 'etiqueta': nombres.get(c, c),
-                          'n_a': na if na >= AN.MIN_CELDA else None, 'n_b': nb if nb >= AN.MIN_CELDA else None,
+                          'n_a': P.proteger(na, red) if na >= AN.MIN_CELDA else None,
+                          'n_b': P.proteger(nb, red) if nb >= AN.MIN_CELDA else None,
                           'pct_a': round(100 * na / len(ga), 1) if na >= AN.MIN_CELDA else None,
                           'pct_b': round(100 * nb / len(gb), 1) if nb >= AN.MIN_CELDA else None})
         salida[col] = {'etiqueta': titulo, 'categorias': filas}
@@ -169,7 +175,7 @@ def _composicion(cat: pd.DataFrame, ids_a: list[str], ids_b: list[str]) -> dict:
 
 
 def _motivos_por_grupo(s: Session, corrida_id: int, desenlace: str | None, esq: dict,
-                       ids_a: list[str], ids_b: list[str]) -> list[dict]:
+                       ids_a: list[str], ids_b: list[str], red: bool) -> list[dict]:
     """Qué razones se repiten entre los niños con riesgo alto de cada grupo (los motivos que dejó la corrida). Un lado
     con menos de 20 niños de riesgo alto no da cifras; una razón con menos de 5 niños queda oculta."""
     filas = s.execute(text(
@@ -192,16 +198,16 @@ def _motivos_por_grupo(s: Session, corrida_id: int, desenlace: str | None, esq: 
 
     def celda(n: int, total: int) -> dict:
         ok = n >= AN.MIN_CELDA
-        return {'n': n if ok else None, 'pct': round(100 * n / total, 1) if ok else None}
+        return {'n': P.proteger(n, red) if ok else None, 'pct': round(100 * n / total, 1) if ok else None}
     todos = {*lados[0][1], *lados[1][1]}
     filas_m = [{'motivo': m, 'a': celda(lados[0][1].get(m, 0), lados[0][0]), 'b': celda(lados[1][1].get(m, 0), lados[1][0])}
                for m in todos]
     filas_m = [f for f in filas_m if f['a']['pct'] is not None or f['b']['pct'] is not None]
     filas_m.sort(key=lambda f: -max(f['a']['pct'] or 0, f['b']['pct'] or 0))
-    return [{**f, 'altos_a': lados[0][0], 'altos_b': lados[1][0]} for f in filas_m[:MAX_FILAS]]
+    return [{**f, 'altos_a': P.proteger(lados[0][0], red), 'altos_b': P.proteger(lados[1][0], red)} for f in filas_m[:MAX_FILAS]]
 
 
-def _faltantes_por_grupo(s: Session, corte: int, esq: dict, ids_a: list[str], ids_b: list[str]) -> list[dict]:
+def _faltantes_por_grupo(s: Session, corte: int, esq: dict, ids_a: list[str], ids_b: list[str], red: bool) -> list[dict]:
     """Porcentaje de niños de cada grupo sin el dato, para los datos que más se distancian entre los dos grupos. Un
     conteo de 1 a 4 niños (con dato o sin él) queda oculto."""
     def con_dato(ids: list[str]) -> dict[str, int]:
@@ -213,7 +219,7 @@ def _faltantes_por_grupo(s: Session, corte: int, esq: dict, ids_a: list[str], id
     def celda(n: int, total: int) -> dict:
         faltan = total - n
         ok = faltan >= AN.MIN_CELDA or faltan == 0
-        return {'faltan': faltan if ok else None, 'pct': round(100 * faltan / total, 1) if ok else None}
+        return {'faltan': P.proteger(faltan, red) if ok else None, 'pct': round(100 * faltan / total, 1) if ok else None}
     filas = []
     for v in {*ca, *cb}:
         a, b = celda(ca.get(v, 0), len(ids_a)), celda(cb.get(v, 0), len(ids_b))
@@ -244,23 +250,23 @@ def grupos(c: ComparaGrupos, s: Session = Depends(sesion), u: Usuario = Depends(
         va = (p.reindex([x for x in ids_a if x in p.index]) >= PERCENTIL_ALTO).astype(float).to_numpy()
         vb = (p.reindex([x for x in ids_b if x in p.index]) >= PERCENTIL_ALTO).astype(float).to_numpy()
         por_desenlace.append({'clave': clave, 'desenlace': str(g.desenlace.iloc[0]),
-                              **CM.comparar_valores(va, vb, escala=100, unidad='pp')})
+                              **_conteos(CM.comparar_valores(va, vb, escala=100, unidad='pp'), red)})
 
     z = pd.DataFrame(s.execute(text(
         'SELECT sujeto, avg(z) AS z FROM resultados.crecimiento WHERE corrida_id = :c AND indicador = :i AND z IS NOT NULL '
         'AND NOT improbable AND sujeto = ANY(:ids) GROUP BY sujeto'),
         {'c': corrida.id, 'i': INDICADOR, 'ids': list({*ids_a, *ids_b})}).fetchall(), columns=['sujeto', 'z'])
     zz = z.set_index('sujeto').z.astype(float)
-    crecimiento = CM.comparar_valores(zz.reindex([x for x in ids_a if x in zz.index]).to_numpy(),
-                                      zz.reindex([x for x in ids_b if x in zz.index]).to_numpy(), unidad='z')
+    crecimiento = _conteos(CM.comparar_valores(zz.reindex([x for x in ids_a if x in zz.index]).to_numpy(),
+                                      zz.reindex([x for x in ids_b if x in zz.index]).to_numpy(), unidad='z'), red)
     cat = P.categorias_por_nino(s, corrida.corte_id)
     esq = esquema(s, corrida.corte_id)
     return {**base, 'estado': 'ok', 'percentil_alto': PERCENTIL_ALTO, 'riesgo': por_desenlace,
-            'motivos': _motivos_por_grupo(s, corrida.id, c.desenlace, esq, ids_a, ids_b),
-            'faltantes': _faltantes_por_grupo(s, corrida.corte_id, esq, ids_a, ids_b),
+            'motivos': _motivos_por_grupo(s, corrida.id, c.desenlace, esq, ids_a, ids_b, red),
+            'faltantes': _faltantes_por_grupo(s, corrida.corte_id, esq, ids_a, ids_b, red),
             'crecimiento': {'indicador': INDICADOR, 'etiqueta': 'Peso para la edad (puntaje z frente a la OMS)',
                             **crecimiento},
-            'composicion': _composicion(cat, ids_a, ids_b),
+            'composicion': _composicion(cat, ids_a, ids_b, red),
             'aviso': 'Las diferencias son asociaciones entre grupos, no causas. Un asterisco marca una diferencia clara: '
                      'su intervalo del 95 % no incluye cero.'}
 
@@ -291,7 +297,7 @@ def _riesgo_por_corte(s: Session, corrida: Corrida, familia: str, ids_a: list[st
     for clave in {*cortes[0], *cortes[1]}:
         propio = cortes[0].get(clave) or cortes[1][clave]
         filas.append({k: propio[k] for k in ('momento', 'momento_nombre', 'clave', 'estado')}
-                     | {lado: {k: c[clave][k] for k in ('calculados', 'en_alerta')} if clave in c else None
+                     | {lado: {k: c[clave][k] for k in ('calculados', 'en_alerta', 'pct_en_alerta')} if clave in c else None
                         for lado, c in zip(('a', 'b'), cortes, strict=True)})
     return sorted(filas, key=lambda f: (mapa.get(f['momento'], {}).get('orden', 99), f['clave']))
 
@@ -314,17 +320,19 @@ def _desenlace(s: Session, corrida: Corrida, familia: dict, ids_a: list[str], id
 
 def _talla_por_visita(s: Session, corrida: Corrida, ids_a: list[str], ids_b: list[str], dic: Dic, red: bool) -> dict:
     """La mediana del puntaje z de talla en cada visita, de cada lado, con los niños que tienen dato y los que no (el
-    porcentaje que falta es sobre todos los niños del lado). Una visita con menos de 5 niños con dato no da cifra."""
-    por_lado = [CLI.trayectoria_de(s, corrida.id, corrida.corte_id, INDICADOR_TALLA, ids, dic, red) for ids in (ids_a, ids_b)]
-    totales = [P.proteger(len(ids), red) for ids in (ids_a, ids_b)]
+    porcentaje que falta es sobre todos los niños del lado). Una visita con menos de 5 niños con dato no da cifra. Se
+    cuenta con los conteos exactos y solo se redondea lo que se muestra: restar o dividir conteos redondeados para quien
+    solo consulta daría otras cifras."""
+    por_lado = [CLI.trayectoria_de(s, corrida.id, corrida.corte_id, INDICADOR_TALLA, ids, dic, False) for ids in (ids_a, ids_b)]
 
     def celda(e: dict, total: int) -> dict | None:
         g = e['grupo']
         if g is None:
             return None
         sin = max(total - g['n'], 0)
-        return {'n': g['n'], 'mediana': g['mediana'], 'sin_dato': sin, 'pct_sin_dato': round(100 * sin / total, 1)}
-    visitas = [{'etapa': ea['etapa'], 'etapa_nombre': ea['etapa_nombre'], 'a': celda(ea, totales[0]), 'b': celda(eb, totales[1])}
+        return {'n': P.proteger(g['n'], red), 'mediana': g['mediana'], 'sin_dato': P.proteger(sin, red),
+                'pct_sin_dato': round(100 * sin / total, 1)}
+    visitas = [{'etapa': ea['etapa'], 'etapa_nombre': ea['etapa_nombre'], 'a': celda(ea, len(ids_a)), 'b': celda(eb, len(ids_b))}
                for ea, eb in zip(por_lado[0]['etapas'], por_lado[1]['etapas'], strict=True)]
     return {**{k: por_lado[0][k] for k in ('indicador', 'nombre', 'unidad', 'referencia', 'umbral')}, 'etapas': visitas}
 

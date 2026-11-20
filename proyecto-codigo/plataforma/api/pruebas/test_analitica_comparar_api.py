@@ -119,6 +119,37 @@ def test_comparar_grupos(cliente, tokens, corrida):  # noqa: F811
     assert [f['clave'] for f in solo['riesgo']] == ['readm_3m']
 
 
+CONTEOS = {'n', 'n_a', 'n_b', 'faltan', 'altos_a', 'altos_b'}
+
+
+def _redondeado(experto, visualizador) -> None:
+    """El visualizador recibe lo mismo que el experto, con cada conteo menor de 100 redondeado a múltiplos de 5 (D46):
+    los porcentajes salen de los conteos exactos."""
+    from maia_api import poblacion as P
+    if isinstance(experto, dict):
+        assert experto.keys() == visualizador.keys()
+        for k, x in experto.items():
+            if k in CONTEOS and isinstance(x, int):
+                assert visualizador[k] == P.proteger(x, True), k
+            else:
+                _redondeado(x, visualizador[k])
+    elif isinstance(experto, list):
+        assert len(experto) == len(visualizador)
+        for x, y in zip(experto, visualizador):
+            _redondeado(x, y)
+    else:
+        assert experto == visualizador
+
+
+def test_comparar_grupos_el_visualizador_ve_conteos_redondeados(cliente, tokens, corrida):  # noqa: F811
+    a, b = {'muestra': _muestra(_y('sexo', 'lista', ['M']))}, {'muestra': _muestra(_y('sexo', 'lista', ['F']))}
+    e = _grupos(cliente, tokens, 'experto', a=a, b=b, corrida_id=corrida).json()
+    v = _grupos(cliente, tokens, 'visualizador', a=a, b=b, corrida_id=corrida).json()
+    sueltos = [f['b']['faltan'] for f in e['faltantes']] + [f['n_b'] for c in e['composicion'].values() for f in c['categorias']]
+    assert any(x is not None and x < 100 and x % 5 for x in sueltos)   # el caso trae conteos que hay que redondear
+    _redondeado(e, v)
+
+
 def test_comparar_grupos_con_pocos_ninos_no_da_cifras_y_queda_en_auditoria(cliente, tokens, corrida):  # noqa: F811
     from maia_comun import db
     from maia_comun.modelos_db import Auditoria
@@ -221,7 +252,8 @@ def test_clinico_riesgo_estimado_por_corte_de_cada_lado(cliente, tokens, corrida
     for f in talla['riesgo']:
         for lado, ids in (('a', lados['ids_a']), ('b', lados['ids_b'])):
             filas = ri[(ri.clave == f['clave']) & ri.sujeto.isin(ids)]
-            assert f[lado] == {'calculados': len(filas), 'en_alerta': int((filas.percentil >= 90).sum())}
+            alerta = int((filas.percentil >= 90).sum())
+            assert f[lado] == {'calculados': len(filas), 'en_alerta': alerta, 'pct_en_alerta': round(100 * alerta / len(filas), 1)}
     # desarrollo: solo 3 varones tienen riesgo de esa familia, así que el lado A no da cifra y B sí
     assert [f['clave'] for f in desarrollo['riesgo']] == ['desarrollo_12m']
     assert desarrollo['riesgo'][0]['a'] is None and desarrollo['riesgo'][0]['b']['calculados'] > 5
@@ -251,6 +283,14 @@ def test_clinico_el_visualizador_ve_conteos_redondeados(cliente, tokens, corrida
     talla = r['desenlaces'][0]
     assert all(talla['a'][k] % 5 == 0 for k in ('casos', 'con_dato', 'sin_dato'))
     assert all(f['a']['calculados'] % 5 == 0 for f in talla['riesgo'] if f['a'])
+    # los porcentajes salen de los conteos exactos: redondear antes de dividir los cambiaría
+    exactas = {e['etapa']: e['a'] for e in exacto['trayectoria']['etapas'] if e['a']}
+    visitas = [e for e in r['trayectoria']['etapas'] if e['a']]
+    assert visitas and all(e['a']['pct_sin_dato'] == exactas[e['etapa']]['pct_sin_dato'] for e in visitas)
+    riesgo_exacto = {f['clave']: f['a'] for f in exacto['desenlaces'][0]['riesgo'] if f['a']}
+    assert all(f['a']['pct_en_alerta'] == riesgo_exacto[f['clave']]['pct_en_alerta']
+               == round(100 * riesgo_exacto[f['clave']]['en_alerta'] / riesgo_exacto[f['clave']]['calculados'], 1)
+               for f in talla['riesgo'] if f['a'])
 
 
 def test_clinico_errores_y_auditoria(cliente, tokens, corrida_clinica, lados):  # noqa: F811

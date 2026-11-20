@@ -38,7 +38,7 @@ export interface LadoClinico { nombre: string; n: number | null }
 export interface ObservadoLado { casos: number | null; con_dato: number | null; sin_dato: number | null; pct: number | null }
 /** B frente a A en puntos porcentuales, con su intervalo del 95 %; todo nulo si un lado tiene menos de 20 niños con dato. */
 export interface DiferenciaObservada { valor: number | null; ic_bajo: number | null; ic_alto: number | null; clara: boolean | null }
-export interface RiesgoDeCorte { calculados: number | null; en_alerta: number | null }
+export interface RiesgoDeCorte { calculados: number | null; en_alerta: number | null; pct_en_alerta: number | null }
 /** El riesgo estimado por el modelo en un corte (visita desde la que se predice); ``estado`` dice si el modelo está «En prueba». */
 export interface RiesgoPorCorteLados {
   momento: string; momento_nombre: string; clave: string; estado: 'en_uso' | 'en_prueba'

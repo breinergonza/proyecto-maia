@@ -19,9 +19,9 @@ const talla: DesenlaceComparado = {
   dif: { valor: 5.3, ic_bajo: -0.8, ic_alto: 11.4, clara: false },
   riesgo: [
     { momento: '40 sem', momento_nombre: '40 semanas', clave: 'talla_baja_12m_desde_40', estado: 'en_prueba',
-      a: { calculados: 400, en_alerta: 40 }, b: { calculados: 250, en_alerta: 30 } },
+      a: { calculados: 400, en_alerta: 40, pct_en_alerta: 10 }, b: { calculados: 250, en_alerta: 30, pct_en_alerta: 12 } },
     { momento: '3 m EC', momento_nombre: '3 meses', clave: 'talla_baja_12m_desde_3', estado: 'en_prueba',
-      a: { calculados: 380, en_alerta: 38 }, b: null },
+      a: { calculados: 380, en_alerta: 38, pct_en_alerta: 10 }, b: null },
   ],
 }
 
@@ -31,7 +31,7 @@ const desarrollo: DesenlaceComparado = {
   a: { casos: 20, con_dato: 200, sin_dato: 298, pct: 10 }, b: null,
   dif: { valor: null, ic_bajo: null, ic_alto: null, clara: null },
   riesgo: [{ momento: '40 sem', momento_nombre: '40 semanas', clave: 'desarrollo_12m', estado: 'en_uso',
-    a: { calculados: 450, en_alerta: 45 }, b: { calculados: 280, en_alerta: 28 } }],
+    a: { calculados: 450, en_alerta: 45, pct_en_alerta: 10 }, b: { calculados: 280, en_alerta: 28, pct_en_alerta: 10 } }],
 }
 
 const visita = (etapa: string, a: [number, number] | null, b: [number, number] | null) => ({

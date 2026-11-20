@@ -33,7 +33,7 @@ export function RiesgoPorCorte({ nombre, filas, alertaPercentil }: { nombre: str
                   {f.estado === 'en_prueba' && <Insignia tono="ocre">En prueba</Insignia>}
                 </p>
                 <p className="mt-0.5 text-lg font-semibold text-teal">
-                  {num(f.en_alerta)} de {num(f.calculados)} niños en alerta ({pct(f.calculados ? (100 * f.en_alerta) / f.calculados : null)})
+                  {num(f.en_alerta)} de {num(f.calculados)} niños en alerta ({pct(f.pct_en_alerta)})
                 </p>
               </li>
             ))}
