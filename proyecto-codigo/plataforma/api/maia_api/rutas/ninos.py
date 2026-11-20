@@ -2,8 +2,12 @@
 de la OMS, alertas de dato y riesgos). Los códigos son los seudonimizados de la base; nunca hay nombres."""
 from __future__ import annotations
 
+import json
 import logging
+import re
 from collections import defaultdict
+from collections.abc import Callable
+from pathlib import Path
 from typing import Literal
 
 import numpy as np
@@ -12,6 +16,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from clinico import crecimiento as CR
+from clinico.modelo import Desenlace
 from maia_api import estado as E
 from maia_api.consultas import (
     corrida_de,
@@ -26,9 +32,11 @@ from maia_api.consultas import (
     valor_legible,
 )
 from maia_api.dependencias import CUALQUIERA, sesion
+from maia_comun import clinica as CL
 from maia_comun import puntuacion as PU
 from maia_comun.modelos_db import PERCENTIL_ALTO, Usuario
 from maia_comun.perfiles import VARIABLE_LUBCHENCO, perfil_provisional
+from sevarti.contrato import Sevarti
 
 ruta = APIRouter(prefix='/ninos', tags=['niños'])
 registro = logging.getLogger(__name__)
@@ -230,11 +238,102 @@ def linea_temporal(sujeto: str, corrida_id: int | None = None, s: Session = Depe
     }
 
 
+_INDICADOR_Z = {'talla': 'Talla para la edad', 'peso': 'Peso para la edad', 'perimetro_cefalico': 'Perímetro cefálico para la edad'}
+
+
+def _nombre_familia(des: Desenlace) -> str:
+    """El nombre del desenlace sin la visita desde la que se calcula: «… (riesgo calculado a 3 m EC)» -> «…»."""
+    return re.sub(r'\s*\(riesgo calculado a [^()]*\)\s*$', '', des.nombre)
+
+
+def _definicion(des: Desenlace, medidas: tuple[CR.Medida, ...]) -> str | None:
+    """Qué cuenta como el desenlace, dicho para quien lee la ficha; None si la regla no se resume en una frase."""
+    if des.regla == 'z_bajo' and des.concepto and des.etapa:
+        limite = next((m.z_bajo for m in medidas if m.nombre == des.concepto), CR.Z_BAJO)
+        nombre = _INDICADOR_Z.get(des.concepto, des.concepto.replace('_', ' ').capitalize())
+        return f'{nombre} con z menor que {f"{limite:g}".replace("-", "−")} (OMS) en la visita de {des.etapa}.'
+    if des.regla == 'percentil_bajo':
+        return f'Resultado por debajo del percentil {round(100 * des.percentil)} de los niños del programa.'
+    return None
+
+
+def riesgo_por_corte(sev: Sevarti, modelos: PU.Modelos, manifest: dict, base: Path, sujeto: str, con_motivos: bool = False,
+                     legible: Callable[[str], str] = str) -> dict:
+    """El riesgo del niño en cada visita a la que fue, con el paquete activo: cada punto usa solo lo medido hasta su
+    visita (``ModeloClinico.matriz`` descarta lo posterior). Además de los puntos, dice qué familias de desenlace tiene
+    el paquete, desde qué visitas se calcula cada una, por qué falta el riesgo de un corte y con qué modelo se calculó.
+    Lo comparten la ficha del niño y «Calcular un niño». La corrida no sirve de fuente: guarda solo la última visita."""
+    clin = modelos.clinico
+    p = clin.preparar(sev)
+    bruto = clin.riesgos(p, solo_ultima_visita=False, con_motivos=con_motivos, solo_pendientes=False)
+    tabla = PU.tabla_riesgos(bruto, 0, False)
+    tabla = tabla[tabla.sujeto == sujeto]
+    # el orden y el nombre de cada visita salen del mismo paquete que calculó el riesgo, no del corte de la corrida
+    et = pd.read_parquet(base / 'etapas.parquet')
+    mapa = {str(e): {'nombre': n if isinstance(n, str) and n else str(e), 'orden': int(o)}
+            for e, n, o in zip(et.etapa, et.nombre if 'nombre' in et else et.etapa, et.orden)}
+    puntos = []
+    for f in tabla.itertuples():
+        punto = {
+            'clave': f.clave, 'desenlace': f.desenlace, 'momento': f.momento, 'estado': CL.estado_de(f.clave),
+            'momento_nombre': nombre_etapa(mapa, f.momento), 'orden': mapa.get(f.momento, {}).get('orden', 99),
+            'riesgo': float(f.riesgo), 'percentil': float(f.percentil),
+            'fecha_visita': None if pd.isna(f.fecha_visita) else str(f.fecha_visita)[:10],
+        }
+        if con_motivos:
+            punto['motivos'] = [legible(m) for m in _texto_motivos(json.loads(f.motivos))]
+        puntos.append(punto)
+    puntos.sort(key=lambda x: (x['orden'], x['desenlace']))
+    # primera visita en que el niño llegó a riesgo alto, por desenlace (null si nunca)
+    primera: dict[str, dict | None] = {x['clave']: None for x in puntos}
+    for x in puntos:
+        if primera[x['clave']] is None and x['percentil'] >= PERCENTIL_ALTO:
+            primera[x['clave']] = {'momento': x['momento'], 'momento_nombre': x['momento_nombre'], 'orden': x['orden']}
+
+    # las familias del paquete: todas las visitas desde las que se predice cada una, con o sin riesgo para este niño
+    con_riesgo = {x['clave'] for x in puntos}
+    sin_datos = clin.sin_datos(sev)
+    asistio = {m: sujeto in set(clin.asistieron(p, m)) for m in {d.momento for d in clin.cfg.desenlaces}}
+
+    def motivo_sin_riesgo(d: Desenlace) -> str | None:
+        if d.clave in con_riesgo:
+            return None
+        if d.clave not in clin.modelos:
+            return 'no_entrenado'
+        if d.clave in sin_datos:
+            return 'sin_datos'
+        return 'fuera_de_poblacion' if asistio[d.momento] else 'no_asistio'
+
+    por_familia: dict[str, list[Desenlace]] = defaultdict(list)
+    for d in clin.cfg.desenlaces:
+        por_familia[CL.familia_de(d.clave)].append(d)
+    familias = []
+    for clave, ds in por_familia.items():
+        ds.sort(key=lambda d: mapa.get(d.momento, {}).get('orden', 99))
+        propio = next((d for d in ds if d.clave == clave), ds[0])
+        familias.append({
+            'clave': clave, 'nombre': _nombre_familia(propio), 'definicion': _definicion(propio, clin.cfg.medidas),
+            # «En uso» si existe la fila base de la familia; si solo hay filas _desde_, «En prueba»
+            'estado': CL.estado_de(clave) if propio.clave == clave else 'en_prueba',
+            'cortes': [{
+                'clave': d.clave, 'momento': d.momento, 'momento_nombre': nombre_etapa(mapa, d.momento),
+                'orden': mapa.get(d.momento, {}).get('orden', 99), 'estado': CL.estado_de(d.clave),
+                'motivo_sin_riesgo': motivo_sin_riesgo(d),
+                'calibrado_con': (clin.modelos[d.clave].calibrado_con or None) if d.clave in clin.modelos else None,
+            } for d in ds],
+        })
+    ficha = modelos.ficha_clinica
+    return {'paquete': manifest['version'], 'puntos': puntos, 'primera_alerta': primera, 'familias': familias,
+            'modelo': {'version': clin.version, 'entrenado': ficha.get('entrenado'), 'corte_datos': ficha.get('corte_datos')}}
+
+
 @ruta.get('/{sujeto}/historia-riesgo')
 def historia_riesgo(sujeto: str, corrida_id: int | None = None, s: Session = Depends(sesion),
-                    _: Usuario = Depends(CUALQUIERA)) -> dict:
+                    _: Usuario = Depends(CUALQUIERA), motivos: bool = False) -> dict:
     """El riesgo de cada desenlace en cada visita del niño, calculado ahora con el paquete activo: cada punto usa solo lo
-    medido hasta su visita. La corrida guarda solo la última visita, así que esto no sale de ``resultados.riesgos``."""
+    medido hasta su visita. La corrida guarda solo la última visita, así que esto no sale de ``resultados.riesgos``.
+    Con ``motivos`` cada punto trae también lo que más pesó en su riesgo (es lo caro: por eso es opcional). Trae además
+    las familias del paquete con sus cortes y el modelo con que se calculó (ver ``riesgo_por_corte``)."""
     c = corrida_de(s, corrida_id)
     if not sujeto_existe(s, c.corte_id, sujeto):
         raise HTTPException(status.HTTP_404_NOT_FOUND, f'No hay un niño {sujeto} en el corte de la corrida.')
@@ -254,30 +353,16 @@ def historia_riesgo(sujeto: str, corrida_id: int | None = None, s: Session = Dep
                                'WHERE corte_id = :c AND sujeto = :s', p),
     }
     corte = pd.Timestamp(c.fecha_corte) if c.fecha_corte else None
+    esq = esquema(s, c.corte_id)
     try:
-        tabla = PU.historia_riesgo(PU.completar(parcial, base, corte), modelos)
+        historia = riesgo_por_corte(PU.completar(parcial, base, corte), modelos, manifest, base, sujeto, motivos,
+                                    lambda m: motivo_legible(m, esq))
     except (ValueError, KeyError) as e:
         registro.warning('No se pudo calcular la historia de riesgo de %s: %s: %s', sujeto, type(e).__name__, e,
                          exc_info=True)
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
                             'No se pudo calcular el riesgo en las visitas anteriores de este niño.') from e
-    # el orden y el nombre de cada visita salen del mismo paquete que calculó el riesgo, no del corte de la corrida
-    et = pd.read_parquet(base / 'etapas.parquet')
-    mapa = {str(e): {'nombre': n if isinstance(n, str) and n else str(e), 'orden': int(o)}
-            for e, n, o in zip(et.etapa, et.nombre if 'nombre' in et else et.etapa, et.orden)}
-    puntos = [{
-        'clave': f.clave, 'desenlace': f.desenlace, 'momento': f.momento,
-        'momento_nombre': nombre_etapa(mapa, f.momento), 'orden': mapa.get(f.momento, {}).get('orden', 99),
-        'riesgo': float(f.riesgo), 'percentil': float(f.percentil),
-        'fecha_visita': None if pd.isna(f.fecha_visita) else str(f.fecha_visita)[:10],
-    } for f in tabla.itertuples()]
-    puntos.sort(key=lambda x: (x['orden'], x['desenlace']))
-    # primera visita en que el niño llegó a riesgo alto, por desenlace (null si nunca)
-    primera: dict[str, dict | None] = {x['clave']: None for x in puntos}
-    for x in puntos:
-        if primera[x['clave']] is None and x['percentil'] >= PERCENTIL_ALTO:
-            primera[x['clave']] = {'momento': x['momento'], 'momento_nombre': x['momento_nombre'], 'orden': x['orden']}
-    return {'paquete': manifest['version'], 'paquete_corrida': c.paquete, 'puntos': puntos, 'primera_alerta': primera}
+    return {**historia, 'paquete_corrida': c.paquete}
 
 
 # Valores de cada variable del perfil (uno por niño), por corte y ordenados. Los datos de un corte no cambian: se leen

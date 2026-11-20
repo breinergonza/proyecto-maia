@@ -7,6 +7,7 @@ import { ChevronDown } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { ErrorApi, pedir } from '../api/cliente'
+import type { ResultadoConHistoria } from '../api/inferencia'
 import type { CampoFormulario, FormularioCalculo, PeticionInferencia, PuntoCrecimiento, ResultadoInferencia, VisitaFormulario } from '../api/tipos'
 import { puede, useSesion } from '../auth/sesion'
 import { descripcionDe } from '../lib/descripciones'
@@ -14,7 +15,9 @@ import { Aviso, Boton, Cargando, Encabezado, Entrada, Insignia, Panel, Selector,
 import { cn } from '../lib/cn'
 import { usePaqueteActivo } from '../lib/consultas'
 import { CrecimientoOms, TarjetaRiesgo } from '../components/ficha'
+import { RiesgoA12Meses } from '../components/ficha/RiesgoA12Meses'
 import { RangoEsperado } from '../components/graficos'
+import { familiaDe, familiasConRiesgo } from '../lib/familias'
 import { aproximado, dec, edad, indicador, medida } from '../lib/formato'
 import { alerta, AYUDA_DOS_CIFRAS, AYUDA_OMS, ayudaAlerta, ayudaZ, CAYO, frenteOms, motivoExtra } from '../lib/lenguaje'
 
@@ -125,7 +128,7 @@ export default function Inferencia() {
   const { usuario } = useSesion()
   const activo = usePaqueteActivo()
   const [avanzado, setAvanzado] = useState(false)
-  const calcular = useMutation({ mutationFn: (p: unknown) => pedir<ResultadoInferencia>('/inferencia', { cuerpo: p }) })
+  const calcular = useMutation({ mutationFn: (p: unknown) => pedir<ResultadoConHistoria>('/inferencia', { cuerpo: p }) })
   // el botón queda al final de un formulario largo: al terminar, el resultado (o el error) se trae a la vista
   const resultado = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -375,15 +378,19 @@ function porIndicador(crecimiento: ResultadoInferencia['crecimiento']): Record<s
   return series
 }
 
-function Resultado({ r, varios }: { r: ResultadoInferencia; varios: boolean }) {
+function Resultado({ r, varios }: { r: ResultadoConHistoria; varios: boolean }) {
   const quien = (s: string) => (varios ? <span className="font-normal text-salvia"> · {s}</span> : null)
   // con un solo niño, el crecimiento se dibuja como en su ficha; con varios, una tabla deja comparar
   const grafica = !varios && r.crecimiento.some((c) => c.improbable || (c.z != null && c.edad_corregida != null))
+  // lo que «Riesgo a los 12 meses» ya cuenta visita por visita no se repite en una tarjeta de la última visita
+  const enSeccion = familiasConRiesgo(r.historia)
+  const riesgos = r.riesgos.filter((x) => !enSeccion.has(familiaDe(x.clave)))
   return (
     <>
       {r.variables_ignoradas.length > 0 && (
         <Aviso tono="teal">No se usaron estos datos porque el modelo no los conoce: {r.variables_ignoradas.join(', ')}.</Aviso>
       )}
+      <RiesgoA12Meses historia={r.historia} />
       {r.riesgos.length === 0 ? (
         <Panel titulo={descripcionDe('riesgo').titulo} descripcion={descripcionDe('riesgo').descripcion}>
           <p className="text-sm text-salvia">
@@ -391,12 +398,12 @@ function Resultado({ r, varios }: { r: ResultadoInferencia; varios: boolean }) {
             visita debe ser una de las que dicen «Aquí se calcula» (deje vacías las posteriores).
           </p>
         </Panel>
-      ) : (
+      ) : riesgos.length > 0 && (
         <section aria-label="Riesgo calculado" className="space-y-3">
           <p className="text-sm">{AYUDA_DOS_CIFRAS}</p>
           {/* el resultado ocupa una columna angosta junto al formulario: una tarjeta por fila */}
           <div className="grid grid-cols-1 gap-4">
-            {r.riesgos.map((x) => <TarjetaRiesgo key={`${x.sujeto}-${x.clave}`} r={x} nota={varios ? `Niño ${x.sujeto}` : undefined} />)}
+            {riesgos.map((x) => <TarjetaRiesgo key={`${x.sujeto}-${x.clave}`} r={x} nota={varios ? `Niño ${x.sujeto}` : undefined} />)}
           </div>
         </section>
       )}

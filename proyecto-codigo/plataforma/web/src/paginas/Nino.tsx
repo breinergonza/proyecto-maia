@@ -5,10 +5,13 @@ import { ArrowLeft, Printer } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { pedir } from '../api/cliente'
+import { historiaPorCorte } from '../api/ninos'
 import type { AlertaDato, LineaTemporal, Visita } from '../api/tipos'
 import { CrecimientoOms, PerfilCohorte, PerfilDelNino, TarjetaRiesgo, TrayectoriaRiesgo } from '../components/ficha'
+import { RiesgoA12Meses } from '../components/ficha/RiesgoA12Meses'
 import { Aviso, Boton, Cargando, Insignia, Panel, Tabla, Vacio } from '../components/ui'
 import { cn } from '../lib/cn'
+import { familiaDe, familiasConRiesgo } from '../lib/familias'
 import { aproximado, dec, edad, fecha, indicador, RIESGO_ALTO } from '../lib/formato'
 import { alerta, AYUDA_DOS_CIFRAS, AYUDA_OMS, ayudaAlerta, ayudaZ, datosAl, frenteOms, motivo } from '../lib/lenguaje'
 
@@ -18,6 +21,7 @@ export default function Nino() {
     queryKey: ['nino', sujeto],
     queryFn: () => pedir<LineaTemporal>(`/ninos/${encodeURIComponent(sujeto)}/linea-temporal`),
   })
+  const historia = useQuery(historiaPorCorte(sujeto))
   const [elegida, setElegida] = useState<string | null>(null)
 
   const inicial = useMemo(() => {
@@ -29,7 +33,9 @@ export default function Nino() {
   if (q.error) return <Aviso>{q.error.message}</Aviso>
   const n = q.data
   const visita = n.visitas.find((v) => v.etapa === (elegida ?? inicial))
-  const riesgos = n.visitas.flatMap((v) => v.riesgos.map((r) => ({ ...r, visita: v.nombre })))
+  // lo que «Riesgo a los 12 meses» ya cuenta visita por visita no se repite en una tarjeta de la última visita
+  const enSeccion = familiasConRiesgo(historia.data)
+  const riesgos = n.visitas.flatMap((v) => v.riesgos.map((r) => ({ ...r, visita: v.nombre }))).filter((r) => !enSeccion.has(familiaDe(r.clave)))
 
   return (
     <>
@@ -48,6 +54,11 @@ export default function Nino() {
         <Boton variante="secundario" className="no-imprimir" onClick={() => window.print()}>
           <Printer size={16} aria-hidden /> Imprimir ficha
         </Boton>
+      </div>
+
+      <div className="mb-4 empty:hidden">
+        <RiesgoA12Meses historia={historia.data} cargando={historia.isPending} error={historia.error}
+          reintentar={() => { void historia.refetch() }} />
       </div>
 
       <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">

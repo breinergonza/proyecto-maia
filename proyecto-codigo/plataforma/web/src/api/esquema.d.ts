@@ -311,6 +311,8 @@ export interface paths {
          * Historia Riesgo
          * @description El riesgo de cada desenlace en cada visita del niño, calculado ahora con el paquete activo: cada punto usa solo lo
          *     medido hasta su visita. La corrida guarda solo la última visita, así que esto no sale de ``resultados.riesgos``.
+         *     Con ``motivos`` cada punto trae también lo que más pesó en su riesgo (es lo caro: por eso es opcional). Trae además
+         *     las familias del paquete con sus cortes y el modelo con que se calculó (ver ``riesgo_por_corte``).
          */
         get: operations["historia_riesgo_api_ninos__sujeto__historia_riesgo_get"];
         put?: never;
@@ -1797,6 +1799,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/clinica/resumen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resumen */
+        post: operations["resumen_api_clinica_resumen_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2067,6 +2086,23 @@ export interface components {
             corrida_id?: number | null;
             /** Variables */
             variables?: components["schemas"]["VariableExtra"][] | null;
+        };
+        /** ConsultaClinica */
+        ConsultaClinica: {
+            /** Muestra */
+            muestra?: {
+                [key: string]: unknown;
+            } | null;
+            /** Muestra Id */
+            muestra_id?: number | null;
+            /** Corrida Id */
+            corrida_id?: number | null;
+            /** Variables */
+            variables?: components["schemas"]["VariableExtra"][] | null;
+            /** Familia */
+            familia?: string | null;
+            /** Indicador */
+            indicador?: string | null;
         };
         /** CorridaNueva */
         CorridaNueva: {
@@ -3583,6 +3619,7 @@ export interface operations {
         parameters: {
             query?: {
                 corrida_id?: number | null;
+                motivos?: boolean;
             };
             header?: never;
             path: {
@@ -6355,6 +6392,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resumen_api_clinica_resumen_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsultaClinica"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
             };
             /** @description Validation Error */
             422: {

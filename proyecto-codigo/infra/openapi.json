@@ -969,7 +969,7 @@
      "niños"
     ],
     "summary": "Historia Riesgo",
-    "description": "El riesgo de cada desenlace en cada visita del niño, calculado ahora con el paquete activo: cada punto usa solo lo\nmedido hasta su visita. La corrida guarda solo la última visita, así que esto no sale de ``resultados.riesgos``.",
+    "description": "El riesgo de cada desenlace en cada visita del niño, calculado ahora con el paquete activo: cada punto usa solo lo\nmedido hasta su visita. La corrida guarda solo la última visita, así que esto no sale de ``resultados.riesgos``.\nCon ``motivos`` cada punto trae también lo que más pesó en su riesgo (es lo caro: por eso es opcional). Trae además\nlas familias del paquete con sus cortes y el modelo con que se calculó (ver ``riesgo_por_corte``).",
     "operationId": "historia_riesgo_api_ninos__sujeto__historia_riesgo_get",
     "security": [
      {
@@ -1000,6 +1000,16 @@
         }
        ],
        "title": "Corrida Id"
+      }
+     },
+     {
+      "name": "motivos",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "default": false,
+       "title": "Motivos"
       }
      }
     ],
@@ -5603,6 +5613,54 @@
      }
     }
    }
+  },
+  "/api/clinica/resumen": {
+   "post": {
+    "tags": [
+     "clinica"
+    ],
+    "summary": "Resumen",
+    "operationId": "resumen_api_clinica_resumen_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ConsultaClinica"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Resumen Api Clinica Resumen Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
   }
  },
  "components": {
@@ -6394,6 +6452,82 @@
     },
     "type": "object",
     "title": "Consulta"
+   },
+   "ConsultaClinica": {
+    "properties": {
+     "muestra": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Muestra"
+     },
+     "muestra_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Muestra Id"
+     },
+     "corrida_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Corrida Id"
+     },
+     "variables": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/VariableExtra"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Variables"
+     },
+     "familia": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Familia"
+     },
+     "indicador": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Indicador"
+     }
+    },
+    "type": "object",
+    "title": "ConsultaClinica"
    },
    "CorridaNueva": {
     "properties": {
