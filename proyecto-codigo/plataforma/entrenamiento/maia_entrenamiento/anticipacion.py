@@ -2,8 +2,8 @@
 visitas (claves ``<familia>_desde_<visita>``; en readmisión, oxigenodependencia y desarrollo bajo, además, la fila
 base de la familia cuenta como una visita de partida) y se comparan.
 
-Por familia con al menos dos visitas de partida deja tres artefactos, solo agregados (D7; celdas de menos de 5 niños
-omitidas, cuantiles con 20 o más):
+Por familia con al menos dos visitas de partida deja tres artefactos, solo agregados (D7; cada celda con su cifra aunque
+tenga un solo niño, D63; cuantiles con 20 o más):
 
 * ``anticipacion``: por visita de partida los casos detectados y las alertas acertadas con el ``top_pct`` % de mayor
   riesgo, y qué parte de los casos se avisó al menos una visita antes (la meta de D12).

@@ -141,7 +141,7 @@ def crecimiento_largo(modelo, p) -> pd.DataFrame:
 
 def trayectorias_riesgo(d: dict, crec: pd.DataFrame, orden: dict, nombres: dict, unidades: dict) -> dict:
     """Por indicador, el puntaje z por visita de los niños de validación en «Riesgo alto» (10 % con más riesgo) y en
-    el «Resto». Solo agregados (D7): ``AN.trayectorias`` omite celdas de menos de 5 niños y grupos pequeños."""
+    el «Resto». Solo agregados (D7): ``AN.trayectorias`` da cada celda con su cifra, aunque tenga un solo niño (D63)."""
     grupo = pd.Series(np.where(_riesgo_alto(d['r']), 'Riesgo alto', 'Resto'), index=d['variables'].index.astype(str))
     sal = {}
     for indicador in INDICADORES_TRAYECTORIA:
