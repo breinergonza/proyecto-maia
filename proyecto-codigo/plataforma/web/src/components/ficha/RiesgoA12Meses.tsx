@@ -90,7 +90,7 @@ function Familia({ f }: { f: FamiliaDelNino }) {
         </>
       )}
       {ultima && (
-        <p className="mt-4 border-t border-linea pt-3 font-semibold">{fraseCalibrada(ultima.punto.riesgo, familia.nombre)}</p>
+        <p className="mt-4 border-t border-linea pt-3 font-semibold">{fraseCalibrada(ultima.punto.riesgo, familia.nombre, familia.estado === 'en_uso' && ultima.corte.estado !== 'en_prueba')}</p>
       )}
     </Panel>
   )

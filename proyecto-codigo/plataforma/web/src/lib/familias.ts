@@ -118,9 +118,15 @@ export const razonSinRiesgo = (c: { momento_nombre: string; motivo_sin_riesgo: M
 
 export const sinFamilia = (nombre: string) => `El paquete de modelos activo no calcula ${nombre}.`
 
-/** La probabilidad dicha como lo que pasó con otros niños: el modelo está calibrado con los niños más recientes. */
-export function fraseCalibrada(riesgo: number, desenlace: string): string {
+/** La probabilidad dicha como lo que pasó con otros niños. Solo un modelo en uso tiene esa calibración comprobada; con uno
+ *  en prueba se dice que aún no se sabe, para no prometer una frecuencia que nadie ha verificado. */
+export function fraseCalibrada(riesgo: number, desenlace: string, enUso: boolean): string {
   const n = porcentaje(riesgo)
+  if (!enUso) {
+    return n < 1
+      ? `Modelo en prueba: aún no se ha comprobado si, de cada 100 niños con un riesgo menor de 1 %, menos de 1 tiene ${desenlace}.`
+      : `Modelo en prueba: aún no se ha comprobado si, de cada 100 niños con un riesgo de ${n} %, unos ${n} tienen ${desenlace}.`
+  }
   return n < 1
     ? `De cada 100 niños con un riesgo menor de 1 %, menos de 1 tuvo ${desenlace}.`
     : `De cada 100 niños con un riesgo de ${n} %, unos ${n} tuvieron ${desenlace}.`

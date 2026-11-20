@@ -103,9 +103,10 @@ describe('RiesgoA12Meses', () => {
     expect(within(ahora).getByText('Datos que faltan:')).toBeInTheDocument()
   })
 
-  it('la frase calibrada es del último corte y el pie dice cómo se calculó', () => {
+  it('con un modelo en prueba no se promete la frecuencia; el pie dice cómo se calculó', () => {
     render(<RiesgoA12Meses historia={historia()} />)
-    expect(screen.getByText('De cada 100 niños con un riesgo de 35 %, unos 35 tuvieron talla baja a los 12 meses.')).toBeInTheDocument()
+    expect(screen.getByText('Modelo en prueba: aún no se ha comprobado si, de cada 100 niños con un riesgo de 35 %, unos 35 tienen talla baja a los 12 meses.')).toBeInTheDocument()
+    expect(screen.queryByText(/^De cada 100 niños/)).not.toBeInTheDocument()
     const pie = screen.getByRole('heading', { name: 'Cómo se calculó' }).parentElement!
     expect(pie.textContent).toMatch(/solo con lo medido hasta su visita/i)
     expect(pie.textContent).toMatch(/Modelo clínico a1b2c3d4e5/)
@@ -143,6 +144,14 @@ describe('RiesgoA12Meses', () => {
     const columnas = screen.getAllByRole('listitem').filter((li) => within(li).queryByText(/^Calculado a /))
     expect(within(columnas[0]).getByText('En prueba')).toBeInTheDocument()
     expect(within(columnas[1]).queryByText('En prueba')).not.toBeInTheDocument()
+    // la frase es la del último corte, que ya está en uso: ahí sí se dice lo que pasó con otros niños
+    expect(screen.getByText('De cada 100 niños con un riesgo de 20 %, unos 20 tuvieron desarrollo bajo a los 12 meses.')).toBeInTheDocument()
+  })
+
+  it('si el último corte de una familia en uso está en prueba, tampoco se promete la frecuencia', () => {
+    const uso: FamiliaDelPaquete = { ...tallaBaja, estado: 'en_uso', cortes: [{ ...c40, estado: 'en_uso' }, { ...c3, estado: 'en_prueba' }] }
+    render(<RiesgoA12Meses historia={historia({ familias: [uso] })} />)
+    expect(screen.getByText('Modelo en prueba: aún no se ha comprobado si, de cada 100 niños con un riesgo de 35 %, unos 35 tienen talla baja a los 12 meses.')).toBeInTheDocument()
   })
 
   it('si una familia no tiene riesgo en ningún corte, dice por qué; si el paquete no la tiene, también', () => {

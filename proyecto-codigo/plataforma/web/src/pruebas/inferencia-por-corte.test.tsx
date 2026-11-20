@@ -88,6 +88,6 @@ describe('calcular un niño: riesgo visita por visita', () => {
     expect(within(ahora).getByText('35 %')).toBeInTheDocument()
     expect(within(ahora).getByText('Subió 13 puntos con la visita de 3 meses')).toBeInTheDocument()
     expect(screen.queryByText('Aún no hay datos de la visita de 3 meses.')).not.toBeInTheDocument()
-    expect(screen.getByText('De cada 100 niños con un riesgo de 35 %, unos 35 tuvieron talla baja a los 12 meses.')).toBeInTheDocument()
+    expect(screen.getByText('Modelo en prueba: aún no se ha comprobado si, de cada 100 niños con un riesgo de 35 %, unos 35 tienen talla baja a los 12 meses.')).toBeInTheDocument()
   })
 })
