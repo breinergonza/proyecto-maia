@@ -1,14 +1,17 @@
 // Talla para la edad visita por visita, un grupo frente al otro: la mediana del puntaje z con el umbral de talla baja y,
-// debajo, cuántos niños tienen dato en cada visita. Se dibuja un punto solo donde hay dato (5 niños o más): una visita
-// sin dato queda como hueco y la línea no la cruza, así no se inventa una medición que no existe.
+// bajo cada visita del eje, cuántos niños de cada grupo tienen dato en ella. Se dibuja un punto solo donde hay dato (5
+// niños o más): una visita sin dato queda como hueco y la línea no la cruza, así no se inventa una medición que no existe.
 import { CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { GruposClinicoOk, VisitaComparada } from '../../api/comparar'
 import { dec2, num } from '../../lib/formato'
 import { Grafica } from '../grafica'
 import { COLOR, LeyendaSeries, SERIES_COLOR } from '../graficos'
 import { GraficaNavegable, resumenDe } from '../graficos/navegacion'
-import { Tabla } from '../ui'
-import { FichaDelDato, MENOS_DE_5, ninos, SERIES_AB, SERIE_A, SERIE_B } from './comun'
+import { FichaDelDato, poblacionAB, SERIES_AB, SERIE_A, SERIE_B } from './comun'
+
+/** Alto de la línea: el que deja la pantalla bajo el resto de la pregunta, para que Comparar grupos quepa sin desplazarse
+ *  y, en una pantalla grande, la gráfica la aproveche. ``alta``: la gráfica va debajo de lo observado a los 12 meses. */
+const ALTO = { lado: 'h-[280px] xl:h-[clamp(230px,calc(100dvh-34rem),560px)]', debajo: 'h-[clamp(300px,calc(100dvh-46rem),520px)]' }
 
 type Fila = { x: string; a: number | null; b: number | null; nA: number | null; nB: number | null }
 
@@ -28,7 +31,22 @@ function Globo({ active, payload }: { active?: boolean; payload?: ReadonlyArray<
   )
 }
 
-export function TallaPorVisita({ r }: { r: GruposClinicoOk }) {
+/** La visita en el eje y, debajo, cuántos niños de cada grupo tienen dato en ella: el denominador de cada mediana. */
+function MarcaVisita({ x, y, payload, filas }: { x?: number | string; y?: number | string; payload?: { value?: unknown }; filas: Fila[] }) {
+  const visita = String(payload?.value ?? '')
+  const f = filas.find((fila) => fila.x === visita)
+  const cx = Number(x ?? 0)
+  return (
+    <text x={cx} y={Number(y ?? 0)} textAnchor="middle" fill={COLOR.eje} fontSize={12}>
+      <tspan x={cx} dy={12}>{visita}</tspan>
+      {[{ s: SERIE_A, n: f?.nA }, { s: SERIE_B, n: f?.nB }].map(({ s, n }) => (
+        <tspan key={s.clave} x={cx} dy={14} fontSize={11}>{s.nombre.slice(-1)}: {n == null ? '<5' : num(n)}</tspan>
+      ))}
+    </text>
+  )
+}
+
+export function TallaPorVisita({ r, alta = false }: { r: GruposClinicoOk; alta?: boolean }) {
   const { trayectoria: t } = r
   const filas = filasDe(t.etapas)
   const umbral = String(t.umbral).replace('-', '−')
@@ -46,24 +64,25 @@ export function TallaPorVisita({ r }: { r: GruposClinicoOk }) {
 
   return (
     <Grafica titulo={`${t.nombre}, visita por visita`}
-      descripcion="Mediana del puntaje z de talla en cada visita, del grupo A frente al grupo B. Solo hay punto donde 5 niños o más tienen dato."
+      descripcion="Mediana de cada grupo en cada visita; solo hay punto donde 5 niños o más tienen dato."
       exportar={{ nombre: 'comparar-grupos-talla-por-visita', filas: tabla, columnas: Object.keys(tabla[0] ?? {}) }}>
       {hayDatos ? (
         <div className="space-y-2">
           <div className="flex flex-wrap gap-x-4 gap-y-1">
             <LeyendaSeries series={SERIES_AB.map((s) => ({ ...s, nombre: `${s.nombre} · mediana` }))} />
-            <ul className="flex text-xs" aria-hidden>
+            <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs" aria-hidden>
               <li className="inline-flex items-center gap-1.5">
                 <span className="inline-block w-4 border-t-2 border-dashed border-coral-hondo" />Umbral de talla baja ({umbral})
               </li>
+              <li>Bajo cada visita: niños con dato de A y de B</li>
             </ul>
           </div>
-          <GraficaNavegable etiqueta={etiqueta} resumen={resumenDe('Líneas', filas.length, ['visita', 'visitas'])} items={items} style={{ height: 260 }}>
+          <GraficaNavegable etiqueta={etiqueta} resumen={resumenDe('Líneas', filas.length, ['visita', 'visitas'])} items={items} className={alta ? ALTO.debajo : ALTO.lado}>
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={filas} margin={{ left: 0, right: 12, top: 8, bottom: 16 }}>
+              <ComposedChart data={filas} margin={{ left: 0, right: 12, top: 8, bottom: 0 }}>
                 <CartesianGrid stroke={COLOR.rejilla} vertical={false} />
-                <XAxis dataKey="x" stroke={COLOR.eje} fontSize={12} tickLine={false} interval="preserveStartEnd" padding={{ left: 14, right: 14 }}
-                  label={{ value: 'Visita (edad corregida)', position: 'insideBottom', offset: -12, fill: COLOR.eje, fontSize: 12 }} />
+                <XAxis dataKey="x" stroke={COLOR.eje} tickLine={false} interval={0} height={50} padding={{ left: 28, right: 28 }}
+                  tick={(p) => <MarcaVisita {...p} filas={filas} />} />
                 <YAxis domain={dominio} stroke={COLOR.eje} fontSize={12} width={48} tickLine={false} axisLine={false} allowDecimals={false}
                   label={{ value: 'Puntaje z de talla', angle: -90, position: 'insideLeft', offset: 14, fill: COLOR.eje, fontSize: 12, style: { textAnchor: 'middle' } }} />
                 <Tooltip cursor={{ stroke: COLOR.referencia, strokeDasharray: '3 3' }} content={(p) => <Globo {...p} />} />
@@ -75,34 +94,12 @@ export function TallaPorVisita({ r }: { r: GruposClinicoOk }) {
               </ComposedChart>
             </ResponsiveContainer>
           </GraficaNavegable>
-          <Tabla densa>
-            <caption className="sr-only">Niños con dato en cada visita</caption>
-            <thead>
-              <tr>
-                <th>Visita</th>
-                {[SERIE_A, SERIE_B].map((s) => (
-                  <th key={s.clave}>
-                    <span aria-hidden className="mr-1.5 inline-block size-2.5 rounded-sm" style={{ background: SERIES_COLOR[s.color] }} />{s.nombre}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filas.map((f) => (
-                <tr key={f.x}>
-                  <td className="whitespace-nowrap font-semibold">{f.x}</td>
-                  {[f.nA, f.nB].map((n, i) => <td key={i} className="tabular-nums">{n == null ? MENOS_DE_5 : num(n)}</td>)}
-                </tr>
-              ))}
-            </tbody>
-          </Tabla>
         </div>
       ) : <p className="text-sm">Ningún grupo tiene 5 niños o más con dato de talla en una misma visita.</p>}
       <FichaDelDato items={{
         variable: `${t.nombre.toLowerCase()} (puntaje z, referencia ${t.referencia})`, unidad: t.unidad,
-        momento: 'cada visita, en edad corregida',
-        poblacion: `niños elegibles de cada grupo (Grupo A: ${ninos(r.a.n)}; Grupo B: ${ninos(r.b.n)})`,
-        validos: 'niños con z de talla válido en esa visita (tabla de arriba); una visita con menos de 5 no da cifra',
+        momento: 'cada visita, en edad corregida', poblacion: poblacionAB(r.a.n, r.b.n),
+        validos: 'niños con dato, bajo cada visita',
       }} />
     </Grafica>
   )

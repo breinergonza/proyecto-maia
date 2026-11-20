@@ -1,11 +1,12 @@
 // Comparar grupos: dos grupos A y B (cada uno con su nombre, criterios, período y tamaño), una pestaña por pregunta
 // (¿crecen distinto?, ¿les pasa algo distinto?, ¿faltan datos distintos?), el intercambio de A y B y la falla de red.
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DesenlaceComparado, GruposClinicoOk, RespuestaGruposClinico } from '../api/comparar'
 import type { Usuario } from '../api/tipos'
+import { Veredicto } from '../components/comparar/comun'
 import { montar, simularApi, usuario } from './util'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -15,7 +16,7 @@ const RUTA = '/api/analitica/comparar/grupos/clinico'
 const talla: DesenlaceComparado = {
   clave: 'talla_baja_12m', nombre: 'Talla baja a los 12 meses', estado: 'en_prueba', indicador: 'talla',
   definicion: 'Talla para la edad con puntaje z menor que −2 frente a la referencia de la OMS, medido a los 12 m EC.',
-  a: { casos: 52, con_dato: 397, sin_dato: 101, pct: 13.1 }, b: { casos: 41, con_dato: 223, sin_dato: 89, pct: 18.4 },
+  a: { casos: 52, con_dato: 397, sin_dato: 101, pct: 13.1, pct_sin_dato: 20.3 }, b: { casos: 41, con_dato: 223, sin_dato: 89, pct: 18.4, pct_sin_dato: 28.5 },
   dif: { valor: 5.3, ic_bajo: -0.8, ic_alto: 11.4, clara: false },
   riesgo_con_modelo: true,
   riesgo: [
@@ -29,7 +30,7 @@ const talla: DesenlaceComparado = {
 const desarrollo: DesenlaceComparado = {
   clave: 'desarrollo_12m', nombre: 'Desarrollo psicomotor bajo a los 12 meses', estado: 'en_uso', indicador: null,
   definicion: 'Desarrollo psicomotor entre el 10 % más bajo de los niños con que se entrenó el modelo.',
-  a: { casos: 20, con_dato: 200, sin_dato: 298, pct: 10 }, b: null,
+  a: { casos: 20, con_dato: 200, sin_dato: 298, pct: 10, pct_sin_dato: 59.8 }, b: null,
   dif: { valor: null, ic_bajo: null, ic_alto: null, clara: null },
   riesgo_con_modelo: true,
   riesgo: [{ momento: '40 sem', momento_nombre: '40 semanas', clave: 'desarrollo_12m', estado: 'en_uso',
@@ -97,6 +98,14 @@ function Ubicacion() {
 const ladoA = () => screen.getByRole('region', { name: 'Grupo A' })
 const ladoB = () => screen.getByRole('region', { name: 'Grupo B' })
 
+/** La ficha del dato (S6: variable, unidad, momento, población y observaciones válidas) es un pie visible de cada gráfica,
+ *  no un desplegable: se comprueba que cada campo está a la vista. */
+function fichaVisible(panel: HTMLElement) {
+  for (const campo of ['Variable', 'Unidad', 'Momento', 'Población', 'Observaciones válidas']) {
+    expect(within(panel).getByText(new RegExp(`^${campo}:`))).toBeVisible()
+  }
+}
+
 async function compararConTodos(ruta = '/comparar?f=sexo|lista|F') {
   const llamadas = api()
   montar(ruta, <Ubicacion />)
@@ -112,10 +121,31 @@ describe('comparar grupos', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Comparar grupos' })).toBeInTheDocument()
     expect(await within(ladoA()).findByText(/Sexo: Femenino/)).toBeInTheDocument()
     expect(within(ladoA()).getByText(/Período: 2015 a 2018/)).toBeInTheDocument()
+    expect(within(ladoA()).getByText('498 niños elegibles')).toBeInTheDocument()   // S8: el tamaño, antes de comparar
     expect(within(ladoB()).getByText('Sin elegir')).toBeInTheDocument()
     expect(screen.getByText(/Elija el grupo B/)).toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: '¿Crecen distinto?' })).toBeNull()
     expect(cuerpos(llamadas)).toHaveLength(0)
+  })
+
+  it('si el grupo A ya son todos los niños no ofrece compararlo con todos (A = B): pide elegir B y abre su panel', async () => {
+    const llamadas = api()
+    montar('/comparar')
+    expect(await screen.findByText(/El grupo A ya son todos los niños/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Comparar con todos los niños' })).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Elegir los criterios del grupo B' }))
+    expect(await within(ladoB()).findByRole('checkbox', { name: /Masculino/ })).toBeInTheDocument()
+    expect(cuerpos(llamadas)).toHaveLength(0)
+  })
+
+  it('si A y B quedan con los mismos criterios no compara: lo dice y no pide nada', async () => {
+    const llamadas = await compararConTodos()
+    const antes = cuerpos(llamadas).length
+    await userEvent.click(screen.getByRole('button', { name: 'Editar grupo A' }))
+    await userEvent.click(await within(ladoA()).findByRole('checkbox', { name: /Femenino/ }))   // A se queda sin filtros, como B
+    expect(await screen.findByText(/Los grupos A y B tienen los mismos criterios/)).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: '¿Crecen distinto?' })).toBeNull()
+    expect(cuerpos(llamadas)).toHaveLength(antes)
   })
 
   it('cada lado se identifica por su nombre, sus criterios, su período y su tamaño, y conserva los suyos', async () => {
@@ -132,7 +162,7 @@ describe('comparar grupos', () => {
     expect(c.b).toMatchObject({ muestra: { version: 2, y: [] } })
   })
 
-  it('«¿Crecen distinto?»: talla baja a los 12 meses de cada lado con «x de n con dato» y la diferencia con su intervalo', async () => {
+  it('«¿Crecen distinto?»: talla baja a los 12 meses de cada lado con «x de n con dato» y un solo veredicto con su intervalo', async () => {
     await compararConTodos()
     expect(screen.getByRole('tab', { name: '¿Crecen distinto?' })).toHaveAttribute('aria-selected', 'true')
     const panel = screen.getByRole('heading', { name: 'Talla baja a los 12 meses' }).closest('section')!
@@ -141,71 +171,116 @@ describe('comparar grupos', () => {
     expect(within(panel).getByText(/52 de 397 niños con dato/)).toBeInTheDocument()
     expect(within(panel).getByText('18,4 %')).toBeInTheDocument()
     expect(within(panel).getByText(/41 de 223 niños con dato/)).toBeInTheDocument()
-    expect(within(panel).getByText(/5,3 puntos más en B/)).toBeInTheDocument()
-    expect(within(panel).getByText(/intervalo del 95 %: −0,8 a 11,4/)).toBeInTheDocument()
-    // S6: variable, unidad, momento, población y n válidos
-    expect(within(panel).getByText(/Variable: talla baja \(z menor que −2, OMS\)/)).toBeInTheDocument()
-    expect(within(panel).getByText(/Unidad: % de niños con dato/)).toBeInTheDocument()
-    expect(within(panel).getByText(/Momento: 12 meses de edad corregida/)).toBeInTheDocument()
+    expect(within(panel).getByText(/No se ve una diferencia clara/).closest('p')).toHaveTextContent(
+      'No se ve una diferencia clara: 5,3 puntos más en B; el intervalo del 95 % va de −0,8 a 11,4 puntos e incluye el 0.')
+    expect(within(panel).queryByText(/la diferencia no es clara/i)).toBeNull()   // una sola frase, no dos
+    // S6: variable, unidad, momento, población y n válidos, a la vista bajo la gráfica
+    fichaVisible(panel)
+    expect(within(panel).getByText(/Variable: talla baja \(z menor que −2, OMS\)/)).toBeVisible()
+    expect(within(panel).getByText(/Unidad: % de niños con dato/)).toBeVisible()
+    expect(within(panel).getByText(/Momento: 12 meses de edad corregida/)).toBeVisible()
+    expect(within(panel).getByText(/Población: niños elegibles de A \(498\) y de B \(312\)/)).toBeVisible()
   })
 
-  it('la talla por visita dibuja un punto solo donde hay dato, con el umbral y una tabla de niños con dato por visita', async () => {
+  it('la talla por visita dibuja un punto solo donde hay dato, con el umbral y los niños con dato de cada visita', async () => {
     await compararConTodos()
     const panel = screen.getByRole('heading', { name: 'Talla para la edad, visita por visita' }).closest('section')!
-    expect(within(panel).getByRole('figure', { name: /Talla para la edad.*puntaje z/ })).toBeInTheDocument()
+    const figura = within(panel).getByRole('figure', { name: /Talla para la edad.*puntaje z/ })
+    expect(figura).toHaveAccessibleName(/40 sem\. Grupo A: mediana -2,2, 472 niños con dato; Grupo B: mediana -2,6, 298 niños con dato/)
+    expect(figura).toHaveAccessibleName(/6 m EC\. Grupo A: mediana -1,6, 431 niños con dato; Grupo B: sin dato/)
     expect(within(panel).getByText(/Umbral de talla baja \(−2\)/)).toBeInTheDocument()
-    expect(within(panel).getByText(/Unidad: puntaje z/)).toBeInTheDocument()
-    const tabla = within(panel).getByRole('table', { name: /Niños con dato en cada visita/ })
-    // una fila por visita (como la tabla de faltantes): tres columnas que caben en el teléfono
-    expect(within(tabla).getAllByRole('columnheader').map((c) => c.textContent)).toEqual(['Visita', 'Grupo A', 'Grupo B'])
-    const celdas = (v: string) => within(within(tabla).getByRole('row', { name: new RegExp(v) })).getAllByRole('cell').map((c) => c.textContent)
-    expect(['40 sem', '3 m EC', '6 m EC', '12 m EC'].map(celdas)).toEqual([
-      ['40 sem', '472', '298'], ['3 m EC', '450', '271'], ['6 m EC', '431', 'n menor que 5'], ['12 m EC', '397', '223']])
+    fichaVisible(panel)
+    expect(within(panel).getByText(/Unidad: puntaje z/)).toBeVisible()
+    expect(within(panel).getByText(/Observaciones válidas: niños con dato, bajo cada visita/)).toBeVisible()
+    // ya no hay una tabla aparte que repita la gráfica: los niños con dato van bajo cada visita y en «Ver como tabla»
+    expect(within(panel).queryByRole('table')).toBeNull()
+    expect(within(panel).getByRole('button', { name: /Descargar PNG/ })).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: /Descargar CSV/ })).toBeInTheDocument()
+    await userEvent.click(within(panel).getByRole('button', { name: 'Ver como tabla' }))
+    const tabla = within(panel).getByRole('table')
+    expect(within(tabla).getByRole('columnheader', { name: 'Grupo A: niños con dato' })).toBeInTheDocument()
+    expect(within(within(tabla).getByRole('row', { name: /40 sem/ })).getByText('472')).toBeInTheDocument()
+    await userEvent.click(within(panel).getByRole('button', { name: 'Ver como tabla' }))   // deja la gráfica para las demás pruebas
   })
 
-  it('«¿Les pasa algo distinto?»: lo observado de los dos desenlaces con denominadores y sin dato, y el riesgo estimado rotulado aparte', async () => {
+  it('«¿Les pasa algo distinto?»: lo observado de los dos desenlaces y, en el mismo lugar, el riesgo estimado rotulado aparte', async () => {
     await compararConTodos()
     await userEvent.click(screen.getByRole('tab', { name: '¿Les pasa algo distinto?' }))
-    const dt = screen.getByRole('heading', { name: 'Talla baja a los 12 meses' }).closest('section')!
-    expect(within(dt).getByText(/52 de 397 niños con dato/)).toBeInTheDocument()
-    expect(within(dt).getByText(/101 sin dato/)).toBeInTheDocument()
-    expect(within(dt).getByText(/89 sin dato/)).toBeInTheDocument()
-    const dd = screen.getByRole('heading', { name: 'Desarrollo psicomotor bajo a los 12 meses' }).closest('section')!
-    expect(within(dd).getByText(/20 de 200 niños con dato/)).toBeInTheDocument()
-    expect(within(dd).getByText(/Menos de 5 niños con dato/)).toBeInTheDocument()   // B no da cifra
-    expect(within(dd).getByText(/No se compara: cada lado necesita 20 niños con dato/)).toBeInTheDocument()
-    // el riesgo estimado no se confunde con lo observado
-    const riesgo = within(dt).getByRole('table', { name: /Riesgo estimado de talla baja a los 12 meses/ })
-    expect(within(dt).getByText(/Riesgo estimado por el modelo: no es lo observado/)).toBeInTheDocument()
-    expect(within(riesgo).getByText('40 de 400 en alerta (10,0 %)')).toBeInTheDocument()
-    expect(within(riesgo).getByText('30 de 250 en alerta (12,0 %)')).toBeInTheDocument()
-    expect(within(riesgo).getAllByText('n menor que 5').length).toBeGreaterThan(0)
-    expect(within(dt).getAllByText('En prueba').length).toBeGreaterThan(0)
+    const vista = screen.getByRole('radiogroup', { name: 'Qué se muestra' })
+    expect(within(vista).getByRole('radio', { name: 'Observado' })).toBeChecked()
+    const dt = () => screen.getByRole('heading', { name: 'Talla baja a los 12 meses' }).closest('section')!
+    const dd = () => screen.getByRole('heading', { name: 'Desarrollo psicomotor bajo a los 12 meses' }).closest('section')!
+    expect(within(dt()).getByText(/52 de 397 niños con dato/)).toBeInTheDocument()
+    expect(within(dt()).getByText(/101 sin dato/)).toBeInTheDocument()
+    expect(within(dt()).getByText(/89 sin dato/)).toBeInTheDocument()
+    expect(within(dd()).getByText(/20 de 200 niños con dato/)).toBeInTheDocument()
+    expect(within(dd()).getByText(/Menos de 5 niños con dato/)).toBeInTheDocument()   // B no da cifra
+    expect(within(dd()).getByText(/No se compara: cada lado necesita 20 niños con dato/)).toBeInTheDocument()
+    fichaVisible(dd())
+    expect(within(dd()).getByText(/Población: niños elegibles de A \(498\) y de B \(312\)/)).toBeVisible()
+    expect(screen.queryByRole('table', { name: /Riesgo estimado/ })).toBeNull()
+    // el riesgo estimado no se confunde con lo observado: es otra vista, en el mismo lugar, que dice que no es lo observado
+    await userEvent.click(within(vista).getByRole('radio', { name: 'Riesgo estimado' }))
+    expect(screen.getByTestId('ubicacion').textContent).toContain('vista=riesgo')
+    expect(screen.getByText(/no es lo que pasó a los 12 meses/)).toBeVisible()
+    expect(within(dt()).queryByText(/52 de 397 niños con dato/)).toBeNull()
+    const riesgo = within(dt()).getByRole('table', { name: /Riesgo estimado de talla baja a los 12 meses/ })
+    expect(within(riesgo).getAllByRole('columnheader').map((c) => c.textContent)).toEqual(['Calculado a', 'Grupo A en alerta', 'Grupo B en alerta', 'Modelo'])
+    const fila = within(riesgo).getByRole('row', { name: /40 sem/ })
+    expect(within(fila).getByText('10,0 % (40 de 400)')).toBeInTheDocument()
+    expect(within(fila).getByText('12,0 % (30 de 250)')).toBeInTheDocument()
+    expect(within(fila).getByText('En prueba')).toBeInTheDocument()
+    expect(within(within(riesgo).getByRole('row', { name: /3 m EC/ })).getByText('n menor que 5')).toBeInTheDocument()
+    expect(within(within(dd()).getByRole('table')).getByText('En uso')).toBeInTheDocument()
+    fichaVisible(dt())
+    expect(within(dt()).getByText(/Observaciones válidas: niños con riesgo calculado en cada corte/)).toBeVisible()
     expect(screen.queryByText(/AUC|calibración|entrenamiento/i)).toBeNull()   // el rendimiento del modelo vive en Modelos
+    await userEvent.click(within(vista).getByRole('radio', { name: 'Observado' }))
+    expect(within(dt()).getByText(/52 de 397 niños con dato/)).toBeInTheDocument()
   })
 
-  it('«¿Faltan datos distintos?»: porcentaje sin dato por visita de cada lado, con su denominador', async () => {
+  it('en una pantalla alta lo observado y el riesgo estimado van juntos, sin conmutador, y el riesgo sigue rotulado aparte', async () => {
+    vi.stubGlobal('matchMedia', (consulta: string) => ({ matches: true, media: consulta, addEventListener: () => {}, removeEventListener: () => {} }))
+    await compararConTodos()
+    await userEvent.click(screen.getByRole('tab', { name: '¿Les pasa algo distinto?' }))
+    expect(screen.queryByRole('radiogroup', { name: 'Qué se muestra' })).toBeNull()
+    expect(screen.getByText(/Debajo, el riesgo estimado: .*no es lo que pasó a los 12 meses/)).toBeVisible()
+    const dt = screen.getByRole('heading', { name: 'Talla baja a los 12 meses' }).closest('section')!
+    expect(within(dt).getByText(/52 de 397 niños con dato/)).toBeVisible()
+    expect(within(dt).getByRole('heading', { name: /Riesgo estimado por el modelo \(no es lo observado\)/ })).toBeVisible()
+    expect(within(dt).getByRole('table', { name: /Riesgo estimado de talla baja/ })).toBeVisible()
+    expect(within(dt).getAllByText(/^Variable:/)).toHaveLength(2)   // una ficha por cifra: lo observado y lo estimado
+    // «¿Crecen distinto?» a todo lo ancho: lo observado a los 12 meses arriba y la talla por visita debajo
+    await userEvent.click(screen.getByRole('tab', { name: '¿Crecen distinto?' }))
+    expect(screen.getByRole('figure', { name: /Talla para la edad/ })).toBeInTheDocument()
+  })
+
+  it('«¿Faltan datos distintos?»: porcentaje sin dato por visita de cada lado, con su denominador, sin cortar las cifras', async () => {
     await compararConTodos()
     await userEvent.click(screen.getByRole('tab', { name: '¿Faltan datos distintos?' }))
     const panel = screen.getByRole('heading', { name: 'Niños sin dato de talla, visita por visita' }).closest('section')!
-    expect(within(panel).getByRole('figure', { name: /sin dato de talla/ })).toBeInTheDocument()
     const tabla = within(panel).getByRole('table', { name: /Niños sin dato de talla en cada visita/ })
-    const fila = within(tabla).getByRole('row', { name: /40 sem/ })
-    expect(within(fila).getByText('26 de 498 (5,2 %)')).toBeInTheDocument()
-    expect(within(fila).getByText('14 de 312 (4,5 %)')).toBeInTheDocument()
-    expect(within(within(tabla).getByRole('row', { name: /6 m EC/ })).getByText('n menor que 5')).toBeInTheDocument()
-    expect(within(panel).getByText(/Momento: cada visita, en edad corregida/)).toBeInTheDocument()
+    const celdas = (v: string) => within(within(tabla).getByRole('row', { name: new RegExp(v) })).getAllByRole('cell').map((c) => c.textContent)
+    expect(celdas('40 sem')).toEqual(['40 sem', '5,2 % 26 de 498', '4,5 % 14 de 312'])
+    expect(celdas('6 m EC')).toEqual(['6 m EC', '13,5 % 67 de 498', 'n menor que 5'])
+    expect(within(panel).getByRole('button', { name: /Descargar CSV/ })).toBeInTheDocument()
+    fichaVisible(panel)
+    expect(within(panel).getByText(/Momento: cada visita, en edad corregida/)).toBeVisible()
     // los desenlaces a 12 meses también tienen sin dato
     const doce = screen.getByRole('heading', { name: 'Desenlaces a los 12 meses sin dato' }).closest('section')!
-    expect(within(doce).getByText('101 de 498 (20,3 %)')).toBeInTheDocument()
-    expect(within(doce).getByText('89 de 312 (28,5 %)')).toBeInTheDocument()
+    const fila = within(within(doce).getByRole('table')).getByRole('row', { name: /Talla baja/ })
+    expect(within(fila).getAllByRole('cell').map((c) => c.textContent)).toEqual(['Talla baja', '20,3 % 101 de 498', '28,5 % 89 de 312'])
+    fichaVisible(doce)
   })
 
-  it('la pestaña queda en la dirección y «¿El modelo funciona distinto?» lleva a Modelos', async () => {
+  it('la pestaña queda en la dirección y el rendimiento del modelo es un enlace a Modelos, no otra pestaña', async () => {
     await compararConTodos()
     await userEvent.click(screen.getByRole('tab', { name: '¿Faltan datos distintos?' }))
     expect(screen.getByTestId('ubicacion').textContent).toContain('pregunta=faltan')
-    expect(screen.getByRole('link', { name: /¿El modelo funciona distinto\?/ })).toHaveAttribute('href', '/analitica/comparar')
+    const enlace = screen.getByRole('link', { name: /Rendimiento del modelo por grupo/ })
+    expect(enlace).toHaveAttribute('href', '/analitica/comparar')
+    expect(screen.getByRole('tablist').contains(enlace)).toBe(false)
+    expect(screen.getAllByRole('tab')).toHaveLength(3)
   })
 
   it('«Intercambiar A y B» cambia los lados: B pasa a ser el grupo activo y cada uno conserva sus criterios', async () => {
@@ -292,5 +367,16 @@ describe('comparar grupos', () => {
     primera.focus()
     fireEvent.keyDown(primera, { key: 'ArrowRight' })
     await waitFor(() => expect(screen.getByRole('tab', { name: '¿Les pasa algo distinto?' })).toHaveAttribute('aria-selected', 'true'))
+  })
+})
+
+describe('Veredicto', () => {
+  it('el intervalo va en la misma dirección que la diferencia: más en A da un intervalo positivo, no el de B frente a A', () => {
+    render(<Veredicto d={{ valor: -5.1, ic_bajo: -8.1, ic_alto: -1.8, clara: true }} />)
+    expect(screen.getByText(/puntos más en A/).textContent).toBe('Diferencia clara: 5,1 puntos más en A; el intervalo del 95 % va de 1,8 a 8,1 puntos.')
+  })
+  it('más en B y sin diferencia clara: el intervalo cruza el 0 y se dice', () => {
+    render(<Veredicto d={{ valor: 5.3, ic_bajo: -0.8, ic_alto: 11.4, clara: false }} />)
+    expect(screen.getByText(/puntos más en B/).textContent).toBe('No se ve una diferencia clara: 5,3 puntos más en B; el intervalo del 95 % va de −0,8 a 11,4 puntos e incluye el 0.')
   })
 })

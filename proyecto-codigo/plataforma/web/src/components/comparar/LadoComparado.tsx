@@ -45,30 +45,34 @@ export function LadoComparado({ serie, filtros, elegido, resumen, contando, erro
   const guardado = filtros.guardada ? guardadas.data?.find((m) => m.id === filtros.guardada)?.titulo : undefined
   const letra = serie.nombre
 
-  const cuantos = error ? 'No se pudo contar los niños del grupo.'
-    : !resumen ? (contando ? 'Contando niños…' : null)
-      : resumen.n == null ? 'Menos de 5 niños elegibles'
-        : `${num(resumen.n)} niños elegibles${resumen.n_total == null ? '' : ` de ${num(resumen.n_total)}`}`
+  // El tamaño sale de la comparación; mientras no la hay (B sin elegir, o A y B iguales), del conteo del panel de filtros.
+  const propio = elegido && facetas.data ? { n: facetas.data.n, ...(facetas.data.n_base == null ? {} : { n_total: facetas.data.n_base }) } : undefined
+  const tamano = resumen ?? (error ? undefined : propio)
+  const cuantos = tamano ? (tamano.n == null ? 'Menos de 5 niños elegibles'
+    : `${num(tamano.n)} niños elegibles${tamano.n_total == null ? '' : ` de ${num(tamano.n_total)}`}`)
+    : error ? 'No se pudo contar los niños del grupo.' : contando ? 'Contando niños…' : null
 
   return (
     <section aria-label={letra} className="flex min-w-0 flex-col gap-2">
-      <div className="rounded-panel border border-t-4 border-linea/80 bg-papel px-4 py-3 shadow-suave sm:px-5" style={{ borderTopColor: SERIES_COLOR[serie.color] }}>
-        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-          <div className="min-w-0">
+      <div className="rounded-panel border border-t-4 border-linea/80 bg-papel px-4 py-2.5 shadow-suave sm:px-5" style={{ borderTopColor: SERIES_COLOR[serie.color] }}>
+        <div className="flex items-start justify-between gap-x-4">
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
             <p className="text-sm font-semibold" aria-hidden>{letra}</p>
-            <h2 className="mt-0.5 text-lg leading-tight">{elegido ? nombreDelGrupo(guardado, criterios.length) : 'Sin elegir'}</h2>
-            {elegido ? (
-              <>
-                <p className="mt-1 text-sm">{textoCriterios(criterios)}</p>
-                <p className="mt-0.5 text-sm">Período: {textoPeriodo(filtros.tiempo, facetas.data)}</p>
-              </>
-            ) : <p className="mt-1 text-sm">Elija un grupo para compararlo con el grupo A.</p>}
-            {cuantos && <p className="mt-0.5 text-sm font-semibold text-teal">{cuantos}</p>}
+            <h2 className="text-lg leading-tight">{elegido ? nombreDelGrupo(guardado, criterios.length) : 'Sin elegir'}</h2>
+            {cuantos && <p className="text-sm font-semibold text-teal">{cuantos}</p>}
           </div>
           <Boton variante="secundario" chico aria-expanded={abierto} aria-controls={idPanel} onClick={alternar}
             aria-label={elegido ? `Editar grupo ${letra.slice(-1)}` : undefined}>
             {elegido ? 'Editar' : 'Elegir grupo B'}
           </Boton>
+        </div>
+        <div className="mt-0.5 flex flex-wrap gap-x-4 text-sm">
+          {elegido ? (
+            <>
+              <p>{textoCriterios(criterios)}</p>
+              <p>Período: {textoPeriodo(filtros.tiempo, facetas.data)}</p>
+            </>
+          ) : <p>Elija un grupo para compararlo con el grupo A.</p>}
         </div>
       </div>
       {abierto && (

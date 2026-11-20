@@ -35,7 +35,7 @@ export interface CuerpoGruposClinico { a: CuerpoExplorar; b: CuerpoExplorar; cor
 export interface LadoClinico { nombre: string; n: number | null }
 /** Niños con el desenlace entre los que tienen dato a los 12 meses. Los conteos redondeados o nulos siguen las reglas de
  *  la Vista clínica; ``pct`` es nulo con menos de 20 niños con dato. */
-export interface ObservadoLado { casos: number | null; con_dato: number | null; sin_dato: number | null; pct: number | null }
+export interface ObservadoLado { casos: number | null; con_dato: number | null; sin_dato: number | null; pct: number | null; pct_sin_dato: number | null }
 /** B frente a A en puntos porcentuales, con su intervalo del 95 %; todo nulo si un lado tiene menos de 20 niños con dato. */
 export interface DiferenciaObservada { valor: number | null; ic_bajo: number | null; ic_alto: number | null; clara: boolean | null }
 export interface RiesgoDeCorte { calculados: number | null; en_alerta: number | null; pct_en_alerta: number | null }
