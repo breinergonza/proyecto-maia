@@ -255,6 +255,17 @@ export interface DatoRevision {
   comentario: string | null
   /** Las medidas del mismo niño y el mismo concepto en cada visita (vacía si la variable no tiene concepto). */
   serie: PuntoSerieDato[]
+  /** Las respuestas de todo el equipo a esta medición, la más reciente primero. */
+  revisiones: RevisionDelEquipo[]
+}
+
+/** Quién respondió una medición, qué respondió y cuándo (la última vez que lo hizo). */
+export interface RevisionDelEquipo {
+  usuario: string
+  /** La respuesta es de quien consulta. */
+  propia: boolean
+  es_error: Respuesta
+  cuando: string
 }
 
 export interface PuntoSerieDato {

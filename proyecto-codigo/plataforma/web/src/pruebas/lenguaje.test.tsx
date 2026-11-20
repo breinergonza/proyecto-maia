@@ -133,7 +133,7 @@ const sinDato = { ...fila, sujeto: 's3', percentil_max: 20, n_bajo_2de: 0, n_cai
 const notificaciones = [{ id: 1, nombre: 'readmisión a los 3 meses', percentil_minimo: 95, destinatarios: ['a@maia.prueba'], alertas: ['readm'], activo: true }]
 const aviso = { id: 1, destinatario: 'a@maia.prueba', estado: 'enviado', error: null, enviado_en: '2026-07-01T10:00:00Z', sujeto: 's1',
   desenlace: 'readmisión a los 3 meses', percentil: 93, corrida_id: 3, notificacion: null }
-const datoRevision = { ...alertaDato, sujeto: 's1', unidad: 'g', etapa_nombre: '3 meses', fecha: '2026-03-01', fuerza: 9, es_error: null, comentario: null, serie: [] }
+const datoRevision = { ...alertaDato, sujeto: 's1', unidad: 'g', etapa_nombre: '3 meses', fecha: '2026-03-01', fuerza: 9, es_error: null, comentario: null, serie: [], revisiones: [] }
 
 function api(rol: 'admin' | 'experto' = 'experto') {
   simularApi((url) => {

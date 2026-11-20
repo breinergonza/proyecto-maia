@@ -70,7 +70,31 @@ def datos(estado: str = Query('pendiente', pattern='^(pendiente|revisado|todos)$
         items.append(d)
     for d, serie in zip(items, _series(s, c.corte_id, items, esquema(s, c.corte_id), mapa), strict=True):
         d['serie'] = serie
+    revisiones = _revisiones(s, [d['id'] for d in items], u)
+    for d in items:
+        d['revisiones'] = revisiones.get(d['id'], [])
     return {'total': total, 'pagina': pagina, 'tamano': tamano, 'items': items}
+
+
+def _revisiones(s: Session, ids: list[int], u: Usuario) -> dict[int, list[dict]]:
+    """Las respuestas de todo el equipo a cada dato: quién, qué respondió y cuándo, la más reciente primero. «Cuándo» es
+    la última vez que respondió (la auditoría guarda cada respuesta; la fila solo la primera hora), así un cambio de
+    opinión queda con su fecha."""
+    if not ids:
+        return {}
+    filas = s.execute(text("""
+        SELECT r.alerta_id, us.nombre AS usuario, r.usuario_id = :u AS propia, r.es_error,
+               coalesce((SELECT max(x.creado_en) FROM app.auditoria x
+                         WHERE x.accion = 'revisar_dato' AND x.recurso = r.alerta_id::text AND x.usuario_id = r.usuario_id),
+                        r.creado_en) AS cuando
+        FROM resultados.revision_datos r JOIN app.usuarios us ON us.id = r.usuario_id
+        WHERE r.alerta_id = ANY(:ids)
+        ORDER BY cuando DESC, us.nombre"""), {'ids': ids, 'u': u.id})
+    por_alerta: dict[int, list[dict]] = {}
+    for f in filas:
+        por_alerta.setdefault(f.alerta_id, []).append(
+            {'usuario': f.usuario, 'propia': f.propia, 'es_error': f.es_error, 'cuando': f.cuando})
+    return por_alerta
 
 
 INDICADOR_COMPLETITUD = ('talla', 'Talla para la edad')

@@ -196,3 +196,31 @@ def test_cola_se_filtra_por_visita_y_conserva_su_contrato(cliente, admin, corrid
     todas = cliente.get('/api/revision/datos', headers=admin, params={'corrida_id': corrida_visitas, 'estado': 'todos'}).json()
     assert todas['total'] == 10   # sin el filtro nuevo, igual que antes
     assert {'id', 'sujeto', 'variable', 'etiqueta', 'valor', 'capas', 'motivo', 'es_error', 'comentario', 'serie'} <= set(todas['items'][0])
+
+
+def test_cada_dato_dice_quien_lo_reviso_y_cuando(cliente, admin, corrida_visitas):
+    """Quien revisa ve las respuestas de todo el equipo a cada dato: quién, qué respondió y cuándo (la última vez que
+    respondió, aunque haya cambiado de opinión), la más reciente primero."""
+    r = cliente.post('/api/usuarios', headers=admin, json={'email': 'segunda@maia.prueba', 'nombre': 'Segunda Revisora',
+                                                             'rol': 'admin', 'clave': 'clave-segunda-de-prueba'})
+    assert r.status_code == 201, r.text
+    segunda = _login(cliente, 'segunda@maia.prueba', 'clave-segunda-de-prueba')
+    todas = cliente.get('/api/revision/datos', headers=admin, params={'corrida_id': corrida_visitas, 'estado': 'todos'}).json()
+    alerta = todas['items'][-1]
+    assert alerta['revisiones'] == []   # nadie la respondió todavía
+    assert cliente.post(f"/api/revision/datos/{alerta['id']}", headers=admin, json={'es_error': 'si'}).status_code == 204
+    assert cliente.post(f"/api/revision/datos/{alerta['id']}", headers=segunda, json={'es_error': 'no'}).status_code == 204
+
+    def revisiones():
+        items = cliente.get('/api/revision/datos', headers=admin, params={'corrida_id': corrida_visitas, 'estado': 'todos'}).json()['items']
+        return next(d for d in items if d['id'] == alerta['id'])['revisiones']
+
+    antes = revisiones()
+    assert [(x['usuario'], x['propia'], x['es_error']) for x in antes][0] == ('Segunda Revisora', False, 'no')
+    assert [(x['propia'], x['es_error']) for x in antes] == [(False, 'no'), (True, 'si')]
+    assert all(set(x) == {'usuario', 'propia', 'es_error', 'cuando'} and x['cuando'] for x in antes)
+    # cambiar la respuesta la vuelve la más reciente, con la hora de ese cambio
+    assert cliente.post(f"/api/revision/datos/{alerta['id']}", headers=admin, json={'es_error': 'no_se'}).status_code == 204
+    despues = revisiones()
+    assert [(x['propia'], x['es_error']) for x in despues] == [(True, 'no_se'), (False, 'no')]
+    assert despues[0]['cuando'] >= antes[0]['cuando']

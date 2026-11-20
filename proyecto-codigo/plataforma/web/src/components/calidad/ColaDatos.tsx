@@ -1,15 +1,16 @@
 // La cola de mediciones por revisar: filtros (visita, medición, detectado por, estado) y una tabla de una línea por medición con
 // el niño (y su estado), la medición con su visita, el valor, por qué es dudosa y la acción. Responder «¿es un error de
-// registro?» guarda la respuesta del administrador. Lo que sobra para decidir (quién la detectó, lo más probable, cuándo se
+// registro?» guarda la respuesta del administrador; bajo los botones se ve quién la revisó por última vez y cuándo, y el detalle
+// trae las respuestas de todo el equipo. Lo que sobra para decidir (quién la detectó, lo más probable, cuándo se
 // midió, la serie del niño y el comentario, con el botón de la flecha) se abre aparte para no alargar la fila. En escritorio las filas se desplazan por
 // dentro con el encabezado fijo, para que los filtros y la completitud sigan a la vista.
 import { Check, ChevronDown, Circle } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { TAMANO_COLA, useColaDatos, useResponderDato, type EstadoCola, type FiltrosCola, type ResumenCalidad } from '../../api/calidad'
-import type { DatoRevision, Respuesta } from '../../api/tipos'
+import type { DatoRevision, Respuesta, RevisionDelEquipo } from '../../api/tipos'
 import { cn } from '../../lib/cn'
-import { aproximado, fecha, frase, medida, num } from '../../lib/formato'
+import { aproximado, fecha, fechaHora, frase, medida, num } from '../../lib/formato'
 import { alerta, ayudaAlerta, motivoExtra } from '../../lib/lenguaje'
 import { ErrorConReintento } from '../ErrorConReintento'
 import { Boton, Cargando, Paginador, Selector, Tabla, Texto, Vacio } from '../ui'
@@ -109,6 +110,9 @@ function Estado({ respuesta }: { respuesta: Respuesta | null }) {
   )
 }
 
+/** Quién respondió: «Tú» para quien consulta, el nombre para el resto del equipo. */
+const quien = (r: RevisionDelEquipo) => (r.propia ? 'Tú' : r.usuario)
+
 function FilaDato({ dato }: { dato: DatoRevision }) {
   const [comentario, setComentario] = useState(dato.comentario ?? '')
   const [abierta, setAbierta] = useState(Boolean(dato.comentario))   // el detalle se abre solo si ya hay un comentario
@@ -122,6 +126,8 @@ function FilaDato({ dato }: { dato: DatoRevision }) {
   // la etiqueta del diccionario suele traer la visita («Peso a 6 m EC»): entonces no se repite
   const visita = dato.etapa_nombre?.replace(' (edad corregida)', ' EC') ?? 'Visita sin nombre'
   const visitaEnNombre = dato.etapa != null && nombre.toLowerCase().includes(dato.etapa.toLowerCase())
+  const [ultima] = dato.revisiones
+  const otras = dato.revisiones.length - 1
   return (
     <>
       <tr>
@@ -156,6 +162,12 @@ function FilaDato({ dato }: { dato: DatoRevision }) {
               <ChevronDown size={16} aria-hidden className={cn('transition-transform', abierta && 'rotate-180')} />
             </button>
           </div>
+          {ultima && (
+            <p className="mt-0.5 text-xs">
+              Última revisión: {quien(ultima)}, {ACCION[ultima.es_error].estado.toLowerCase()}, {fecha(ultima.cuando)}
+              {otras > 0 && ` · y ${otras} ${otras === 1 ? 'respuesta más' : 'respuestas más'}`}
+            </p>
+          )}
           <p className={cn('text-xs', m.error ? 'text-coral-hondo' : 'text-tinta/80', !m.error && !m.isSuccess && 'sr-only')} role="status">
             {m.error ? m.error.message : m.isSuccess ? 'Respuesta guardada.' : ''}
           </p>
@@ -174,6 +186,16 @@ function FilaDato({ dato }: { dato: DatoRevision }) {
                   </p>
                   <SerieDato dato={dato} />
                   {dato.serie.length < 2 && !rango && <p>No hay otras visitas de este niño para comparar.</p>}
+                  {dato.revisiones.length > 0 && (
+                    <>
+                      <p className="mt-2 font-semibold" aria-hidden>Respuestas del equipo</p>
+                      <ul aria-label="Respuestas del equipo">
+                        {dato.revisiones.map((r) => (
+                          <li key={`${r.usuario}-${r.cuando}`}>{quien(r)}: {ACCION[r.es_error].estado.toLowerCase()} · {fechaHora(r.cuando)}</li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
               </div>
               <div>
                 <label className="sr-only" htmlFor={`com-${dato.id}`}>Comentario</label>

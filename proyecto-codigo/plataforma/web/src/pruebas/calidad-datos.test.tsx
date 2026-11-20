@@ -26,7 +26,7 @@ const resumen = {
 const dato = (extra: object = {}) => ({
   id: 7, prioridad: 1, sujeto: 'S-02210', variable: 'talla_6', etiqueta: 'Talla', unidad: 'cm', etapa: 'e6', etapa_nombre: '6 m',
   fecha: '2026-01-01', valor: '58', esperado: 66, rango_bajo: 62, rango_alto: 70, capas: ['1'], motivo: 'valor atípico', fuerza: 9,
-  es_error: null, comentario: null, serie: [], ...extra,
+  es_error: null, comentario: null, serie: [], revisiones: [], ...extra,
 })
 const cola = (items: object[]) => ({ total: items.length, pagina: 1, tamano: 12, items })
 
@@ -133,6 +133,31 @@ describe('calidad de datos: la cola', () => {
     expect(screen.queryByRole('figure', { name: /Talla de este niño en cada visita/ })).not.toBeInTheDocument()
     await userEvent.click(within(fila).getByRole('button', { name: /Ver detalle/ }))
     expect(await screen.findByRole('figure', { name: 'Talla de este niño en cada visita: 3 m, 60 cm; 6 m, 58 cm' })).toBeInTheDocument()
+  })
+
+  it('cada medición dice quién la revisó por última vez y cuándo; el detalle trae las respuestas de todo el equipo', async () => {
+    api([dato({
+      es_error: 'si',
+      revisiones: [
+        { usuario: 'Segunda Revisora', propia: false, es_error: 'no', cuando: '2026-11-19T15:00:00Z' },
+        { usuario: 'Administración', propia: true, es_error: 'si', cuando: '2026-11-18T10:00:00Z' },
+      ],
+    })])
+    montar('/admin/calidad-datos')
+    const fila = (await screen.findByRole('link', { name: 'S-02210' })).closest('tr')!
+    expect(within(fila).getByText(/^Última revisión: Segunda Revisora, no es un error, 19 de nov/)).toBeInTheDocument()
+    expect(within(fila).getByText(/y 1 respuesta más/)).toBeInTheDocument()
+    await userEvent.click(within(fila).getByRole('button', { name: /Ver detalle/ }))
+    const equipo = await screen.findByRole('list', { name: 'Respuestas del equipo' })
+    expect(within(equipo).getAllByRole('listitem').map((li) => li.textContent?.split(' · ')[0])).toEqual([
+      'Segunda Revisora: no es un error', 'Tú: es un error'])
+  })
+
+  it('una medición que nadie revisó no dice quién la revisó', async () => {
+    api([dato()])
+    montar('/admin/calidad-datos')
+    const fila = (await screen.findByRole('link', { name: 'S-02210' })).closest('tr')!
+    expect(within(fila).queryByText(/Última revisión/)).not.toBeInTheDocument()
   })
 
   it('sin mediciones por revisar lo dice', async () => {

@@ -140,7 +140,7 @@ describe('calidad de datos', () => {
     const dato = {
       id: 7, prioridad: 1, sujeto: 's1', variable: 'peso_40', etiqueta: 'Peso a 40 sem', unidad: 'g', etapa: 's40',
       etapa_nombre: '40 semanas', fecha: '2026-01-01', valor: '9999', esperado: 2800, rango_bajo: 2000, rango_alto: 3500,
-      capas: ['1', '2'], motivo: 'valor atípico', fuerza: 9, es_error: null, comentario: null,
+      capas: ['1', '2'], motivo: 'valor atípico', fuerza: 9, es_error: null, comentario: null, revisiones: [],
       serie: [
         { variable: 'peso_nacer', etapa_nombre: 'Nacimiento', orden: 0, valor: 1500, es_este: false },
         { variable: 'peso_40', etapa_nombre: '40 semanas', orden: 2, valor: 9999, es_este: true },
