@@ -6,7 +6,7 @@ import type { AnaliticaMeta } from '../../api/tipos'
 import { paqueteQueContiene } from '../../api/modelos'
 import { puede, useSesion } from '../../auth/sesion'
 import { usePaqueteActivo } from '../../lib/consultas'
-import { fecha, fechaHora } from '../../lib/formato'
+import { fecha, fechaHora, numero } from '../../lib/formato'
 import { datosAl } from '../../lib/lenguaje'
 import { Panel } from '../ui'
 
@@ -34,6 +34,12 @@ export function ConfiguracionModelo({ meta }: { meta: AnaliticaMeta | undefined 
         ['División de datos', 'Temporal por fecha de nacimiento: se entrena con los nacidos antes y se prueba con los más recientes.'],
         ['Algoritmo', 'Gradient boosting (LightGBM)'],
       ]} />
+      {meta?.hiperparametros?.length ? (
+        <div className="mt-4">
+          <h3 className="mb-2 text-sm font-semibold">Hiperparámetros</h3>
+          <Datos filas={meta.hiperparametros.map((h) => [h.etiqueta, numero(h.valor)])} />
+        </div>
+      ) : null}
       {puede(usuario, ['admin']) && (
         <p className="mt-3"><Link to="/admin/entrenamientos" className="text-sm font-semibold text-teal hover:underline">Ver hiperparámetros ›</Link></p>
       )}

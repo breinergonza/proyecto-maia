@@ -19,6 +19,7 @@ from maia_api.rutas import analitica_comparar as comparar
 from maia_api.rutas.ninos import _variables_perfil, unidad_crecimiento
 from maia_comun import analitica as AN
 from maia_comun import analitica_interpretabilidad as AI
+from maia_comun import hiperparametros as HP
 from maia_comun import perfiles as PF
 from maia_comun.modelos_analitica import Analitica
 from maia_comun.modelos_db import PERCENTIL_ALTO, Usuario
@@ -62,7 +63,8 @@ def _resumen_meta(a: Analitica) -> dict:
     return {'entrenamiento': a.entrenamiento_id, 'ejecucion': a.ejecucion_id, 'modelo': a.modelo,
             'fuente': m.get('fuente'), 'registro': m.get('registro'), 'version_registro': m.get('version_registro'),
             'version_modelo': m.get('version_modelo'), 'corte': m.get('corte'), 'creada': a.creada,
-            'desenlaces': m.get('desenlaces', []), 'submodulos': _submodulos(m)}
+            'desenlaces': m.get('desenlaces', []), 'submodulos': _submodulos(m),
+            'hiperparametros': HP.rotulados(a.modelo, m.get('hiperparametros'))}
 
 
 @ruta.get('/entrenamientos')

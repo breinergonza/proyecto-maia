@@ -28,6 +28,10 @@ const desenlaces = [
 const meta = {
   entrenamiento: 7, modelo: 'clinico', fuente: 'simulado', registro: 'maia-clinico', version_registro: 3, version_modelo: 'abc123',
   corte: '2026-06-30', creada: '2026-07-01T10:00:00Z', desenlaces, submodulos: SUBMODULOS.map((s) => ({ id: s.id, estado: 'ok' })),
+  hiperparametros: [
+    { nombre: 'rondas', etiqueta: 'Rondas de boosting (máximo)', valor: 1200 },
+    { nombre: 'tasa', etiqueta: 'Tasa de aprendizaje', valor: 0.05 },
+  ],
 }
 const contexto = {
   estado: 'ok', entrenamiento: 7,
@@ -58,14 +62,14 @@ function api(rol: Usuario['rol'] = 'experto', extra?: Extra, conReferencia = tru
     const e = extra?.(url, init)
     if (e) return e
     if (url.startsWith('/api/analitica/contexto')) return { cuerpo: contexto }
-    if (url === '/api/analitica/entrenamientos') return { cuerpo: { entrenamientos: [meta, { ...meta, entrenamiento: 6, creada: '2026-06-01T10:00:00Z' }] } }
+    if (url === '/api/analitica/entrenamientos') return { cuerpo: { entrenamientos: [meta, { ...meta, entrenamiento: 6, creada: '2026-06-01T10:00:00Z', hiperparametros: [] }] } }
     if (url === '/api/modelos/activo') {
       return { cuerpo: { version: '2026-11-19-5dcbdc', fuente: 'simulado', activo: true, metricas: {}, modelos: { clinico: { version_modelo: 'abc123' } } } }
     }
     const m = /^\/api\/analitica\/(\d+)\/(\w+)\?desenlace=(.+)$/.exec(url)
     if (m) {
       const [, n, sub, clave] = m
-      const base = { estado: 'ok', entrenamiento: Number(n), submodulo: sub, meta }
+      const base = { estado: 'ok', entrenamiento: Number(n), submodulo: sub, meta: n === '6' ? { ...meta, entrenamiento: 6, hiperparametros: [] } : meta }
       if (sub === 'rendimiento') return { cuerpo: { ...base, desenlaces: { [clave]: rendimiento(0.74, conReferencia ? 0.68 : null) } } }
       if (sub === 'calibracion') return { cuerpo: { ...base, desenlaces: { [clave]: calibracion } } }
       if (sub === 'resumen') return { cuerpo: { ...base, desenlaces: { [clave]: { auc: 0.74, semaforos } } } }
@@ -114,11 +118,22 @@ describe('modelos: configuración y trazabilidad', () => {
     expect(within(config).getByText(/Temporal por fecha de nacimiento/)).toBeInTheDocument()
     expect(within(config).getByText('Gradient boosting (LightGBM)')).toBeInTheDocument()
     expect(within(config).queryByRole('link', { name: /hiperparámetros/ })).not.toBeInTheDocument()   // solo administración
+    const hp = within(config).getByRole('heading', { name: 'Hiperparámetros' }).parentElement!   // todos los perfiles los ven
+    expect(within(hp).getByText('Rondas de boosting (máximo)').nextElementSibling).toHaveTextContent('1.200')
+    expect(within(hp).getByText('Tasa de aprendizaje').nextElementSibling).toHaveTextContent('0,05')
     const traza = screen.getByRole('heading', { name: 'Trazabilidad' }).closest('section')!
     expect(within(traza).getByText('N.º 7')).toBeInTheDocument()
     expect(within(traza).getByText(/versión 3/)).toBeInTheDocument()
     expect(await within(traza).findByText('2026-11-19-5dcbdc')).toBeInTheDocument()
     expect(within(traza).queryByText(/Diccionario/)).not.toBeInTheDocument()   // el entrenamiento no lo registra: no se inventa
+  })
+
+  it('un entrenamiento que no guardó sus hiperparámetros no los muestra', async () => {
+    api('experto')
+    montar(`/analitica?entrenamiento=6&desenlace=${T3}`)
+    const config = (await screen.findByRole('heading', { name: 'Configuración' })).closest('section')!
+    await within(config).findByText('Gradient boosting (LightGBM)')
+    expect(within(config).queryByRole('heading', { name: 'Hiperparámetros' })).not.toBeInTheDocument()
   })
 
   it('el administrador ve el enlace a los hiperparámetros; un entrenamiento que no está en el paquete activo lo dice', async () => {

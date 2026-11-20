@@ -158,6 +158,7 @@ def entrenar_clinico(sev: Sevarti, fuente: str, cfg: AC.ConfigClinica, validar: 
         AL.analizar_y_guardar(retenido['modelo'], retenido['preparado'],
                               {'fuente': fuente, 'registro': nombre, 'version_registro': str(numero),
                                'version_modelo': modelo.version, 'corte': None if sev.corte is None else str(sev.corte.date()),
+                               'hiperparametros': HP.usados('clinico', cfg),
                                **({'embudo': muestra.embudo} if muestra else {})})
     return Entrenado('clinico', modelo.version, nombre, numero, carpeta, metricas, _dispositivos(),
                      (time.time() - t0) / 60)

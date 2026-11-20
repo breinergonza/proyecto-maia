@@ -439,6 +439,8 @@ export interface AnaliticaMeta {
   entrenamiento: number; ejecucion?: number | null; modelo: string | null; fuente?: string | null; registro?: string | null
   version_registro?: string | number | null; version_modelo?: string | number | null; corte?: string | null; creada?: string | null
   desenlaces: AnaliticaDesenlace[]; submodulos: AnaliticaSubmodulo[]
+  /** Los hiperparámetros con que se entrenó; vacío si el entrenamiento no los guardó. */
+  hiperparametros?: { nombre: string; etiqueta: string; valor: number }[]
 }
 export interface AnaliticaEntrenamientos { entrenamientos: AnaliticaMeta[] }
 export interface AnaliticaContexto {
