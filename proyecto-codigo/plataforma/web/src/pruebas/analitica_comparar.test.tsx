@@ -1,5 +1,5 @@
-// Calibración (riesgo con y sin el desenlace), Población (muestra frente a todos los niños) y Comparar con intervalos,
-// «Aprobar B» solo para administración. Siempre con celdas de menos de 5 niños ocultas. Los grupos de niños se comparan en
+// Calibración (riesgo con y sin el desenlace), Población (muestra frente a todos los niños, en su pestaña) y Comparar con
+// intervalos (en pestañas), «Aprobar B» solo para administración. Siempre con celdas de menos de 5 niños ocultas. Los grupos de niños se comparan en
 // Comparar grupos (/comparar), no aquí.
 import { configure, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -92,7 +92,7 @@ function api(rol: Usuario['rol'], extra?: Extra) {
 describe('calibración: riesgo con y sin el desenlace', () => {
   it('muestra la gráfica con descripción, PNG y CSV, y los tramos pequeños quedan vacíos', async () => {
     api('experto')
-    montar('/analitica/calibracion?entrenamiento=7&desenlace=des_a')
+    montar('/analitica/calibracion?entrenamiento=7&desenlace=des_a&ver=reparto')
     expect(await screen.findByText('Riesgo de los niños con y sin el desenlace', { selector: 'h2, h3' })).toBeInTheDocument()
     expect(screen.getByText(/Cómo se reparte el riesgo en quienes tuvieron el desenlace/)).toBeInTheDocument()
     expect(screen.getByRole('figure', { name: 'Riesgo de los niños con y sin el desenlace' })).toBeInTheDocument()
@@ -105,7 +105,7 @@ describe('calibración: riesgo con y sin el desenlace', () => {
   it('un entrenamiento anterior sin hist_riesgo sigue mostrando el histograma de siempre', async () => {
     api('experto', (url) => (/\/analitica\/7\/calibracion/.test(url)
       ? { cuerpo: { estado: 'ok', entrenamiento: 7, submodulo: 'calibracion', desenlaces: { des_a: { ...calibracion, hist_riesgo: undefined } } } } : undefined))
-    montar('/analitica/calibracion?entrenamiento=7&desenlace=des_a')
+    montar('/analitica/calibracion?entrenamiento=7&desenlace=des_a&ver=reparto')
     expect(await screen.findByRole('figure', { name: 'Cómo se reparte el riesgo' })).toBeInTheDocument()
     expect(screen.queryByRole('figure', { name: 'Riesgo de los niños con y sin el desenlace' })).not.toBeInTheDocument()
   })
@@ -114,19 +114,20 @@ describe('calibración: riesgo con y sin el desenlace', () => {
 describe('población: muestra frente a todos los niños', () => {
   it('dibuja el reparto por categoría y la tabla de valores típicos con su descripción', async () => {
     api('visualizador')
-    montar('/analitica/poblacion?entrenamiento=7&desenlace=des_a')
+    montar('/analitica/poblacion?entrenamiento=7&desenlace=des_a&ver=categorias')   // el reparto y los valores típicos tienen cada uno su pestaña
     expect(await screen.findByRole('figure', { name: 'sexo: la muestra frente a todos los niños' })).toBeInTheDocument()
     expect(screen.getAllByText('Si la muestra se parece a todos los niños del programa.').length).toBeGreaterThan(0)
     expect(screen.getByText(/La mayor diferencia es de 1,2 puntos/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Descargar PNG: Muestra frente a todos los niños: sexo/ })).toBeInTheDocument()
-    expect(screen.getByText('Edad gestacional: muestra frente a todos')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: 'Valores típicos' }))
+    expect(await screen.findByText('Edad gestacional: muestra frente a todos')).toBeInTheDocument()
     expect(screen.getByText('Mediana')).toBeInTheDocument()
   })
 
   it('un entrenamiento anterior lo explica y no inventa cifras', async () => {
     api('experto', (url) => (/\/analitica\/7\/poblacion/.test(url)
       ? { cuerpo: { estado: 'ok', entrenamiento: 7, submodulo: 'poblacion', desenlaces: { des_a: { ...poblacion, distribuciones_muestra_universo: undefined } } } } : undefined))
-    montar('/analitica/poblacion?entrenamiento=7&desenlace=des_a')
+    montar('/analitica/poblacion?entrenamiento=7&desenlace=des_a&ver=categorias')
     expect(await screen.findByText(/no trae la comparación de la muestra con todos los niños/)).toBeInTheDocument()
   })
 })
@@ -141,12 +142,17 @@ describe('comparar entrenamientos: intervalos y Aprobar B', () => {
     expect(screen.getAllByText('Sin intervalo').length).toBeGreaterThan(0)
     expect(screen.getByText(/el intervalo de la diferencia es aproximado/)).toBeInTheDocument()
     expect(llamadas.some((l) => l.url === '/api/analitica/comparar?a=6&b=7&desenlace=des_a')).toBe(true)
-    expect(await screen.findByText('sexo: femenino')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Aprobar B/ })).not.toBeInTheDocument()
     // en el teléfono cada fila de métricas, grupos y muestra se vuelve una tarjeta: B y la diferencia no quedan fuera de la vista
-    const tablas = screen.getAllByRole('table').filter((t) => !t.closest('figure'))
-    expect(tablas.length).toBeGreaterThanOrEqual(3)
-    for (const t of tablas) expect(t.parentElement).toHaveClass('tabla-apilada')
+    const apiladas = () => {
+      const tablas = screen.getAllByRole('table').filter((t) => !t.closest('figure'))
+      for (const t of tablas) expect(t.parentElement).toHaveClass('tabla-apilada')
+      return tablas.length
+    }
+    expect(apiladas()).toBe(1)
+    await userEvent.click(screen.getByRole('tab', { name: 'Niños y grupos' }))
+    expect(await screen.findByText('sexo: femenino')).toBeInTheDocument()
+    expect(apiladas()).toBe(2)
   })
 
   const registro = {
@@ -199,12 +205,12 @@ describe('comparar entrenamientos: intervalos y Aprobar B', () => {
 })
 
 describe('comparar: solo entrenamientos', () => {
-  it('no mezcla grupos de niños con entrenamientos: no hay pestañas y una línea lleva a Comparar grupos', async () => {
+  it('no mezcla grupos de niños con entrenamientos: ninguna pestaña es de grupos y una línea lleva a Comparar grupos', async () => {
     api('experto')
     montar('/analitica/comparar?entrenamiento=7&desenlace=des_a')
     expect(await screen.findByText('Entrenamiento B')).toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: 'Grupos de niños' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+    expect(within(await screen.findByRole('tablist', { name: 'Qué ver' })).getAllByRole('tab').map((t) => t.textContent)).toEqual(['Medidas', 'Curva ROC', 'Niños y grupos'])
     const linea = screen.getByText(/Aquí se comparan entrenamientos/).closest('p')!
     expect(linea).toHaveTextContent('Aquí se comparan entrenamientos. Para comparar dos grupos de niños, use Comparar grupos.')
     expect(within(linea).getByRole('link', { name: 'Comparar grupos' })).toHaveAttribute('href', '/comparar')

@@ -14,13 +14,15 @@ function tono(v: number | null, [bajo, alto]: [number, number]): string {
   return `color-mix(in srgb, var(--color-teal-medio) ${Math.round(8 + t * 62)}%, var(--color-papel))`
 }
 
-export function MapaCalor({ columnas, filas, escala = [0.5, 1], etiqueta }: {
+export function MapaCalor({ columnas, filas, escala = [0.5, 1], etiqueta, primeraColumna = 'Grupo' }: {
   columnas: string[]; filas: FilaMapa[]; escala?: [number, number]; etiqueta: string
+  /** Qué nombran las filas (el encabezado de la primera columna). */
+  primeraColumna?: string
 }) {
   return (
     <div role="table" aria-label={etiqueta} className="overflow-x-auto">
       <div role="row" className="grid min-w-[34rem] gap-1 text-xs font-semibold text-salvia" style={{ gridTemplateColumns: `minmax(9rem,1.4fr) repeat(${columnas.length}, minmax(5rem,1fr))` }}>
-        <span role="columnheader">Grupo</span>
+        <span role="columnheader">{primeraColumna}</span>
         {columnas.map((c) => <span key={c} role="columnheader">{c}</span>)}
       </div>
       {filas.map((f) => (

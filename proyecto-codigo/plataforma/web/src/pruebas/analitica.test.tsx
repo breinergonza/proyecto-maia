@@ -129,7 +129,7 @@ describe('analítica: anticipación sin datos', () => {
 describe('analítica: a cuántos niños se alerta', () => {
   it('empieza en 10 % y el control deslizante recalcula las cifras en el navegador', async () => {
     const llamadas = api('experto')
-    montar('/analitica/rendimiento?entrenamiento=7&desenlace=des_a')
+    montar('/analitica/rendimiento?entrenamiento=7&desenlace=des_a&ver=linea')
     const control = await screen.findByRole('slider')
     expect(control).toHaveValue('10')
     expect(screen.getByTestId('cifra-detectados').textContent).toContain('40')
@@ -142,7 +142,7 @@ describe('analítica: a cuántos niños se alerta', () => {
 
   it('con menos de 5 niños la cifra dice «n menor que 5»', async () => {
     api('experto')
-    montar('/analitica/rendimiento?entrenamiento=7&desenlace=des_a')
+    montar('/analitica/rendimiento?entrenamiento=7&desenlace=des_a&ver=linea')
     const control = await screen.findByRole('slider')
     fireEvent.change(control, { target: { value: '2' } })
     expect(screen.getByTestId('cifra-detectados').textContent).toBe('n menor que 5')
@@ -151,7 +151,7 @@ describe('analítica: a cuántos niños se alerta', () => {
 
   it('el modo técnico (interruptor del encabezado) muestra la jerga y se recuerda', async () => {
     api('experto')
-    montar('/analitica/rendimiento?entrenamiento=7&desenlace=des_a')
+    montar('/analitica/rendimiento?entrenamiento=7&desenlace=des_a&ver=linea')
     await screen.findByRole('slider')
     expect(screen.queryByText('Sensibilidad')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('switch', { name: 'Modo técnico' }))
@@ -171,9 +171,11 @@ describe('analítica: privacidad (n<5) en equidad', () => {
       }
       return undefined
     })
-    montar('/analitica/equidad?entrenamiento=7&desenlace=des_a')
-    // el mapa ahora es grupo × desenlace para el «Subgrupo por» elegido (aquí, un solo desenlace)
+    montar('/analitica/equidad?entrenamiento=7&desenlace=des_a&ver=desenlace')
+    // el mapa (pestaña «Por desenlace») es grupo × desenlace para el «Subgrupo por» elegido (aquí, un solo desenlace)
     const mapa = await screen.findByRole('table', { name: 'Qué tan bien ordena por grupo y desenlace' })
+    // un desenlace por fila: el encabezado de la primera columna lo dice
+    expect(within(mapa).getAllByRole('columnheader')[0]).toHaveTextContent('Desenlace')
     expect(within(mapa).getAllByText('n menor que 5')).toHaveLength(1)
     expect(within(mapa).getByText('0,8')).toBeInTheDocument()
     expect(within(mapa).queryByText('0,5')).not.toBeInTheDocument()
