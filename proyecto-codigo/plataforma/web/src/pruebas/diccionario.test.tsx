@@ -46,7 +46,7 @@ describe('diccionario de variables', () => {
     expect(screen.getByText(/visita sugerida: 3 meses \(edad corregida\)/)).toBeInTheDocument()
     const enlace = screen.getAllByRole('link', { name: /Diccionario/ })[0]
     expect(within(enlace).getByText('3')).toBeInTheDocument()
-    expect(screen.getAllByRole('link', { name: 'Predicción' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('link', { name: 'Calcular un niño' }).length).toBeGreaterThan(0)
     // sin palabras técnicas para el equipo clínico
     expect(document.body.textContent).not.toMatch(/sha|corte|corrida/i)
     await userEvent.click(screen.getByRole('button', { name: 'Marcar var_simulada_a como Lista' }))

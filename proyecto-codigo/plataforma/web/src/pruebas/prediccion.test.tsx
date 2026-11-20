@@ -72,13 +72,13 @@ function api(rol: Usuario['rol'], trabajo: unknown = trabajoOk) {
 }
 
 describe('predicción', () => {
-  it('ofrece los tres modos como pestañas y el enlace en Revisión clínica', async () => {
+  it('ofrece los tres modos como pestañas y el enlace «Calcular un niño» en Clínica', async () => {
     api('experto')
     montar('/prediccion?vista=grupo')
     expect(await screen.findByRole('heading', { name: 'Predicción' })).toBeInTheDocument()
     const pestanas = screen.getAllByRole('tab').map((t) => t.textContent)
     expect(pestanas).toEqual(['Un niño', 'Un grupo de niños', 'Muestra', 'Todo el universo', 'Niño nuevo desde un perfil'])
-    expect(screen.getAllByRole('link', { name: 'Predicción' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('link', { name: 'Calcular un niño' }).length).toBeGreaterThan(0)
     await userEvent.click(screen.getByRole('tab', { name: 'Niño nuevo desde un perfil' }))
     expect(await screen.findByText('Biblioteca de niños de ejemplo')).toBeInTheDocument()
     expect(await screen.findByRole('button', { name: /Prematuro extremo/ })).toBeInTheDocument()

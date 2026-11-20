@@ -14,6 +14,15 @@ function api(rol: 'admin' | 'experto' | 'visualizador') {
   })
 }
 
+/** Los enlaces (texto) de la sección del menú que lleva ese título. */
+function seccion(menu: HTMLElement, titulo: string) {
+  const p = Array.from(menu.querySelectorAll('p')).find((x) => x.textContent === titulo)
+  if (!p?.parentElement) return null
+  return within(p.parentElement).queryAllByRole('link').map((a) => a.textContent)
+}
+
+const menuDe = async () => (await screen.findAllByRole('navigation', { name: 'Secciones' }))[0]
+
 describe('navegación', () => {
   it('/inferencia redirige a Predicción, pestaña «Un niño»', async () => {
     api('experto')
@@ -33,11 +42,14 @@ describe('navegación', () => {
     expect(await screen.findByRole('tab', { name: 'Todo el universo' })).toBeInTheDocument()
   })
 
-  it('el menú ofrece una sola entrada de Predicción y ya no «Calcular el riesgo de un niño»', async () => {
+  it('el menú ofrece una sola entrada para calcular un niño, «Calcular un niño», que lleva a la predicción', async () => {
     api('experto')
     montar('/prediccion')
     await screen.findByRole('tab', { name: 'Un niño' })
-    expect(screen.getAllByRole('link', { name: 'Predicción' }).length).toBeGreaterThan(0)
+    const enlaces = screen.getAllByRole('link', { name: 'Calcular un niño' })
+    expect(enlaces.length).toBeGreaterThan(0)
+    expect(enlaces[0]).toHaveAttribute('href', '/prediccion')
+    expect(screen.queryByRole('link', { name: 'Predicción' })).toBeNull()
     expect(screen.queryByRole('link', { name: 'Calcular el riesgo de un niño' })).toBeNull()
   })
 
@@ -69,6 +81,10 @@ describe('navegación', () => {
     expect(nombrePagina('/analitica/calibracion')).toBe('Analítica: Calibración')
     expect(nombrePagina('/ninos/ABC-1')).toBe('Niño ABC-1')
     expect(nombrePagina('/admin/corridas/')).toBe('Corridas')
+    expect(nombrePagina('/')).toBe('Vista clínica')
+    expect(nombrePagina('/tablero')).toBe('Resumen del programa')
+    expect(nombrePagina('/comparar')).toBe('Comparar grupos')
+    expect(nombrePagina('/prediccion')).toBe('Calcular un niño')
     expect(tituloDocumento('/x/y')).toBe('No existe esa página · Observatorio Canguro')
   })
 
@@ -77,7 +93,9 @@ describe('navegación', () => {
     montar('/admin/entrenamientos')
     const menu = (await screen.findAllByRole('navigation', { name: 'Secciones' }))[0]
     expect(within(menu).getByRole('link', { name: 'Modelos y corridas' })).toBeInTheDocument()
-    for (const t of ['Entrenamientos', 'Modelos', 'Corridas']) expect(within(menu).getByRole('link', { name: t })).toBeInTheDocument()
+    // «Modelos» también es una opción de TÉCNICA: se mira solo la sección de administración
+    const administracion = Array.from(menu.querySelectorAll('p')).find((p) => p.textContent === 'Administración')!.parentElement!
+    for (const t of ['Entrenamientos', 'Modelos', 'Corridas']) expect(within(administracion).getByRole('link', { name: t })).toBeInTheDocument()
     expect(within(menu).getByRole('link', { name: 'Configuración' })).toBeInTheDocument()
     expect(within(menu).queryByRole('link', { name: 'Programación' })).toBeNull() // el grupo está plegado
     await userEvent.click(within(menu).getByRole('button', { name: 'Desplegar Configuración' }))
@@ -86,8 +104,7 @@ describe('navegación', () => {
     expect(within(menu).getByRole('link', { name: 'Servidor de correo' })).toHaveAttribute('href', '/notificaciones/servidor')
     expect(within(menu).getByRole('link', { name: 'Alertas' })).toHaveAttribute('href', '/notificaciones/alertas')
     const titulos = Array.from(menu.querySelectorAll('p')).map((p) => p.textContent)
-    expect(titulos.indexOf('Notificaciones')).toBeGreaterThan(titulos.indexOf('Revisión clínica'))
-    expect(titulos.indexOf('Notificaciones')).toBeLessThan(titulos.indexOf('Administración'))
+    expect(titulos).toEqual(['Clínica', 'Técnica', 'Notificaciones', 'Administración'])
   })
 
   it('el experto no ve los grupos de administración', async () => {
@@ -97,6 +114,7 @@ describe('navegación', () => {
     await screen.findByRole('tab', { name: 'Un niño' })
     expect(within(menu).queryByRole('link', { name: 'Modelos y corridas' })).toBeNull()
     expect(within(menu).queryByRole('link', { name: 'Configuración' })).toBeNull()
+    await userEvent.click(within(menu).getByRole('button', { name: 'Desplegar Modelos' }))
     expect(within(menu).getByRole('link', { name: 'Mis modelos' })).toBeInTheDocument()
   })
 
@@ -108,5 +126,81 @@ describe('navegación', () => {
     expect(within(menu).queryByRole('link', { name: 'Alertas' })).toBeNull()
     expect(Array.from(menu.querySelectorAll('p')).map((p) => p.textContent)).not.toContain('Notificaciones')
     expect(screen.queryByRole('heading', { name: 'Servidor de correo' })).toBeNull()
+  })
+
+  it('el administrador ve CLÍNICA (vista, niños, comparar, revisión, calcular un niño) y TÉCNICA (modelos, calidad, diccionario, resumen)', async () => {
+    api('admin')
+    montar('/ninos')
+    const menu = await menuDe()
+    expect(seccion(menu, 'Clínica')).toEqual(['Vista clínica', 'Niños', 'Comparar grupos', 'Revisión de riesgos', 'Calcular un niño'])
+    expect(seccion(menu, 'Técnica')).toEqual(['Modelos', 'Calidad de datos', 'Diccionario', 'Resumen del programa'])
+    // Calidad de datos salió de Administración; Explorar y Tablero ya no están en el menú con esos nombres
+    expect(seccion(menu, 'Administración')).not.toContain('Calidad de datos')
+    expect(within(menu).queryByRole('link', { name: 'Explorar' })).toBeNull()
+    expect(within(menu).queryByRole('link', { name: 'Tablero' })).toBeNull()
+    expect(within(menu).getByRole('link', { name: 'Vista clínica' })).toHaveAttribute('href', '/')
+    expect(within(menu).getByRole('link', { name: 'Comparar grupos' })).toHaveAttribute('href', '/comparar')
+    expect(within(menu).getByRole('link', { name: 'Calidad de datos' })).toHaveAttribute('href', '/admin/calidad-datos')
+    expect(within(menu).getByRole('link', { name: 'Resumen del programa' })).toHaveAttribute('href', '/tablero')
+    // Modelos es el grupo de la analítica, con Mis modelos entre sus opciones
+    await userEvent.click(within(menu).getByRole('button', { name: 'Desplegar Modelos' }))
+    expect(within(menu).getByRole('link', { name: 'Rendimiento' })).toHaveAttribute('href', '/analitica/rendimiento')
+    expect(within(menu).getByRole('link', { name: 'Mis modelos' })).toHaveAttribute('href', '/mis-modelos')
+  })
+
+  it('el experto ve lo clínico y lo técnico menos Calidad de datos', async () => {
+    api('experto')
+    montar('/ninos')
+    const menu = await menuDe()
+    expect(seccion(menu, 'Clínica')).toEqual(['Vista clínica', 'Niños', 'Comparar grupos', 'Revisión de riesgos', 'Calcular un niño'])
+    expect(seccion(menu, 'Técnica')).toEqual(['Modelos', 'Diccionario', 'Resumen del programa'])
+  })
+
+  it('quien solo consulta ve vista clínica, niños, comparar, modelos y el resumen; no lo que cambia o calcula', async () => {
+    api('visualizador')
+    montar('/ninos')
+    const menu = await menuDe()
+    expect(seccion(menu, 'Clínica')).toEqual(['Vista clínica', 'Niños', 'Comparar grupos'])
+    expect(seccion(menu, 'Técnica')).toEqual(['Modelos', 'Resumen del programa'])
+  })
+
+  it('«/» abre la vista clínica y el tablero de antes queda en «/tablero» como «Resumen del programa»', async () => {
+    simularApi((url) => {
+      if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('experto') } }
+      if (url === '/api/tablero/resumen') return { estado: 404, cuerpo: { detail: 'x' } }
+      if (url === '/api/clinica/resumen') return { estado: 404, cuerpo: { detail: 'x' } }
+      if (url.startsWith('/api/')) return { cuerpo: [] }
+    })
+    const { unmount } = montar('/')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Vista clínica' })).toBeInTheDocument()
+    unmount()
+    montar('/tablero')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Resumen del programa' })).toBeInTheDocument()
+    await waitFor(() => expect(document.title).toBe('Resumen del programa · Observatorio Canguro'))
+  })
+
+  it('«/comparar» abre «Comparar grupos» con la vista de grupos de siempre', async () => {
+    simularApi((url) => {
+      if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('experto') } }
+      if (url.startsWith('/api/analitica/contexto')) return { cuerpo: { entrenamiento: 1, desenlaces: [], modelos: [], submodulos: [], estado: 'ok' } }
+      if (url === '/api/exploracion/facetas') return { cuerpo: { n: 0, minimo: 20, facetas: {} } }
+      if (url.startsWith('/api/')) return { cuerpo: [] }
+    })
+    montar('/comparar')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Comparar grupos' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Comparar grupos' })).toBeInTheDocument()
+    expect(await screen.findByRole('group', { name: 'Grupo A' })).toBeInTheDocument()
+  })
+
+  it('«/explorar» sigue abierto aunque ya no esté en el menú', async () => {
+    api('visualizador')
+    montar('/explorar')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Explorar' })).toBeInTheDocument()
+  })
+
+  it('Calidad de datos sigue siendo solo de administración, también por la dirección', async () => {
+    api('experto')
+    montar('/admin/calidad-datos')
+    expect(await screen.findByRole('heading', { name: 'Sin permiso' })).toBeInTheDocument()
   })
 })

@@ -1,5 +1,5 @@
 // Explorar: las cifras del grupo, el filtro en la dirección, el aviso con menos de 20 niños y el enlace del menú.
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { EntradaFiltro, Usuario } from '../api/tipos'
@@ -183,7 +183,7 @@ describe('explorar', () => {
     await waitFor(() => expect(screen.getByTestId('ubicacion')).toHaveTextContent('f=oxigeno|si_no|true|alguna'))
     fireEvent.change(screen.getByRole('combobox', { name: 'Regla de lectura: Oxigenodependencia' }), { target: { value: 'etapa:40 sem' } })
     await waitFor(() => expect(screen.getByTestId('ubicacion')).toHaveTextContent('f=oxigeno|si_no|true|etapa%3A40%20sem'))
-    expect(screen.getByText('Oxigenodependencia (en la visita 40 semanas): Sí')).toBeInTheDocument()
+    expect(within(screen.getByRole('list', { name: 'Filtros activos' })).getByText('Oxigenodependencia (en la visita 40 semanas): Sí')).toBeInTheDocument()
   })
 
   it('la dirección guarda y recupera cada filtro, el tiempo y el muestreo tal como se eligieron', () => {
@@ -258,13 +258,10 @@ describe('explorar', () => {
     expect(JSON.parse(String(envio.init!.body))).toMatchObject({ titulo: 'Varones', muestra: { version: 2, y: [{ variable: 'sexo', valores: ['M'] }] } })
   })
 
-  it.each(['admin', 'experto', 'visualizador'] as const)('el menú de %s tiene «Explorar» debajo de «Tablero»', async (rol) => {
+  it.each(['admin', 'experto', 'visualizador'] as const)('el menú de %s ya no ofrece «Explorar»: se llega desde la vista clínica', async (rol) => {
     api(rol)
-    montar('/')
-    const enlaces = await screen.findAllByRole('link', { name: /^(Tablero|Explorar)$/ })
-    const texto = enlaces.map((e) => e.textContent)
-    expect(texto.indexOf('Tablero')).toBeGreaterThanOrEqual(0)
-    expect(texto.indexOf('Explorar')).toBe(texto.indexOf('Tablero') + 1)
-    expect(enlaces.find((e) => e.textContent === 'Explorar')).toHaveAttribute('href', '/explorar')
+    montar('/explorar')
+    expect((await screen.findAllByRole('link', { name: 'Vista clínica' })).length).toBeGreaterThan(0)
+    expect(screen.queryAllByRole('link', { name: 'Explorar' })).toHaveLength(0)
   })
 })

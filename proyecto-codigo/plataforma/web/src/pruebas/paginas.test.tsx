@@ -93,7 +93,7 @@ describe('calidad de datos', () => {
       if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('admin') } }
       if (url === '/api/tablero/resumen') return { estado: 404, cuerpo: { detail: 'x' } }
     })
-    montar('/')
+    montar('/tablero')
     expect((await screen.findAllByRole('link', { name: 'Calidad de datos' })).length).toBeGreaterThan(0)
   })
 

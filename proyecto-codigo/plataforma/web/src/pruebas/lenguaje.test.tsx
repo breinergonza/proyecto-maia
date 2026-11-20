@@ -160,7 +160,7 @@ const visible = () => document.body.textContent ?? ''
 describe('pantallas del equipo clínico sin términos técnicos', () => {
   it('tablero', async () => {
     api()
-    montar('/')
+    montar('/tablero')
     expect(await screen.findByText('niños con algún riesgo alto')).toBeInTheDocument()
     expect(await screen.findByText('subió de golpe en todo el programa')).toBeInTheDocument()
     expect(screen.getByText('No cuadra con el resto de sus datos')).toBeInTheDocument()

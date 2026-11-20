@@ -268,6 +268,26 @@ function textoTiempo(t: TiempoJson): string {
   return [t.desde, t.hasta].filter(Boolean).join(' a ') || 'sin límite'
 }
 
+/** Los criterios del grupo activo, uno por filtro, con su texto legible y cómo quitarlo. Las fichas del panel y la barra
+ *  «Grupo activo» leen de aquí, para que el grupo se describa igual en todas partes. */
+export function criteriosActivos(filtros: Filtros, facetas?: RespuestaFacetas) {
+  const todas = facetas?.facetas ?? {}
+  const etapas = facetas?.etapas ?? []
+  const lista = filtros.entradas.map((e) => {
+    const f = todas[e.variable]
+    const nombre = f?.etiqueta ?? e.variable
+    const regla = f?.reglas?.length ? ` (${textoRegla(e.cuando, etapas).toLowerCase()})` : ''
+    return { id: e.variable, texto: `${nombre}${regla}: ${resumenEntrada(e, f)}`, etiqueta: `Quitar filtro ${nombre}`, quitar: () => filtros.poner(e.variable, null) }
+  })
+  if (filtros.tiempo) {
+    lista.push({ id: 'tiempo', texto: `Tiempo: ${textoTiempo(filtros.tiempo)}`, etiqueta: 'Quitar el tiempo', quitar: () => filtros.ponerTiempo(null) })
+  }
+  if (filtros.muestreo) {
+    lista.push({ id: 'muestreo', texto: `Muestreo: hasta ${filtros.muestreo.maximo_por_categoria} por categoría`, etiqueta: 'Quitar el muestreo', quitar: () => filtros.ponerMuestreo(null) })
+  }
+  return lista
+}
+
 export function PanelFacetas({ facetas, cargando, filtros, esExperto, conTiempo = false, error = false, reintentar }: {
   facetas?: RespuestaFacetas; cargando?: boolean; filtros: Filtros; esExperto: boolean
   /** Muestra el tiempo y el muestreo (Explorar); el constructor de muestras los trae en su propio formulario. */
@@ -294,7 +314,8 @@ export function PanelFacetas({ facetas, cargando, filtros, esExperto, conTiempo 
     ...(facetas?.disponibles ?? []).filter((d) => !(d.variable in todas)).map((d) => ({ variable: d.variable, etiqueta: d.etiqueta, cuando: d.cuando })),
   ]
   const otrosGuardados = (guardadas.data ?? []).filter((m) => m.id !== filtros.guardada)
-  const hayActivos = filtros.entradas.length > 0 || !!filtros.tiempo || !!filtros.muestreo
+  const criterios = criteriosActivos(filtros, facetas)
+  const hayActivos = criterios.length > 0
 
   const agregar = (variable: string) => {
     if (!variable) return
@@ -322,18 +343,7 @@ export function PanelFacetas({ facetas, cargando, filtros, esExperto, conTiempo 
 
         {hayActivos && (
           <ul className="flex flex-wrap gap-2" aria-label="Filtros activos">
-            {filtros.entradas.map((e) => {
-              const f = todas[e.variable]
-              const nombre = f?.etiqueta ?? e.variable
-              const regla = f?.reglas?.length ? ` (${textoRegla(e.cuando, etapas).toLowerCase()})` : ''
-              return <Ficha key={e.variable} texto={`${nombre}${regla}: ${resumenEntrada(e, f)}`} etiqueta={`Quitar filtro ${nombre}`}
-                quitar={() => filtros.poner(e.variable, null)} />
-            })}
-            {filtros.tiempo && <Ficha texto={`Tiempo: ${textoTiempo(filtros.tiempo)}`} etiqueta="Quitar el tiempo" quitar={() => filtros.ponerTiempo(null)} />}
-            {filtros.muestreo && (
-              <Ficha texto={`Muestreo: hasta ${filtros.muestreo.maximo_por_categoria} por categoría`} etiqueta="Quitar el muestreo"
-                quitar={() => filtros.ponerMuestreo(null)} />
-            )}
+            {criterios.map((c) => <Ficha key={c.id} texto={c.texto} etiqueta={c.etiqueta} quitar={c.quitar} />)}
           </ul>
         )}
 

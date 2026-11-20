@@ -34,25 +34,25 @@ const cifra = (texto: string) => screen.getByText(texto).previousElementSibling?
 describe('tablero', () => {
   it('no dice «Paquete —» ni «corrida» cuando la actualización no vino de un paquete', async () => {
     api('admin')
-    montar('/')
+    montar('/tablero')
     expect(await screen.findByText('niños con datos')).toBeInTheDocument()
-    const encabezado = screen.getByRole('heading', { name: 'Tablero' }).parentElement!.textContent ?? ''
+    const encabezado = screen.getByRole('heading', { name: 'Resumen del programa' }).parentElement!.textContent ?? ''
     expect(encabezado).toMatch(/Datos al 30 de jun/)
     expect(encabezado).not.toMatch(/Paquete|corrida|—/i)
   })
 
   it('con paquete lo dice, sin la palabra «corrida»', async () => {
     api('admin', 'p1')
-    montar('/')
+    montar('/tablero')
     expect(await screen.findByText('niños con datos')).toBeInTheDocument()
-    const encabezado = screen.getByRole('heading', { name: 'Tablero' }).parentElement!.textContent ?? ''
+    const encabezado = screen.getByRole('heading', { name: 'Resumen del programa' }).parentElement!.textContent ?? ''
     expect(encabezado).toMatch(/Paquete p1/)
     expect(encabezado).not.toMatch(/corrida/i)
   })
 
   it('«por revisar» y las respuestas de los expertos son cifras distintas', async () => {
     api('experto')
-    montar('/')
+    montar('/tablero')
     await screen.findByText('niños con datos')
     expect(cifra('datos por revisar · 12,5 por mil')).toBe('200')
     expect(cifra('datos ya respondidos por expertos')).toBe('12')
@@ -61,7 +61,7 @@ describe('tablero', () => {
 
   it('el contador de alarmas es el total y dice cuántas se listan', async () => {
     api('experto')
-    montar('/')
+    montar('/tablero')
     const panel = (await screen.findByRole('heading', { name: 'Alarmas de grupo' })).closest('section')!
     expect(await within(panel).findByText('789 · se muestran las 100 más recientes')).toBeInTheDocument()
     expect(within(panel).getAllByRole('listitem')).toHaveLength(100)
@@ -84,7 +84,7 @@ describe('tablero', () => {
       if (url === '/api/tablero/alarmas-por-trimestre') return { cuerpo: trimestres }
       return { cuerpo: {} }
     })
-    montar('/')
+    montar('/tablero')
     // visitas en orden (40 semanas antes que 3 meses) y una medida sin dato en una visita no corre a las demás
     expect(await screen.findByRole('figure', { name: 'Porcentaje de niños medidos con crecimiento bajo frente a la OMS en cada visita: '
       + 'Peso para la edad, 40 semanas 12,0 %, 3 meses EC 8,0 %; Talla para la edad, 40 semanas 15,0 %, 3 meses EC sin dato' }))
@@ -113,20 +113,20 @@ describe('series de crecimiento del tablero', () => {
 describe('tablero: claridad y enlaces de revisión', () => {
   it('el experto ve la cifra de datos por revisar sin enlace a /revision/datos; el admin sí', async () => {
     api('experto')
-    const { unmount } = montar('/')
+    const { unmount } = montar('/tablero')
     await screen.findByText('niños con datos')
     expect(screen.getByText('datos por revisar · 12,5 por mil').closest('a')).toBeNull()
     expect(cifra('datos por revisar · 12,5 por mil')).toBe('200')
     unmount()
     api('admin')
-    montar('/')
+    montar('/tablero')
     await screen.findByText('niños con datos')
     expect(screen.getByText('datos por revisar · 12,5 por mil').closest('a')).toHaveAttribute('href', '/revision/datos')
   })
 
   it('los paneles llevan su descripción y botón PNG', async () => {
     api('admin')
-    montar('/')
+    montar('/tablero')
     await screen.findByText('niños con datos')
     expect(screen.getByText('Niños con riesgo alto en cada desenlace.')).toBeInTheDocument()
     expect(screen.getByText('Cambios de toda una sede o de todo un trimestre.')).toBeInTheDocument()

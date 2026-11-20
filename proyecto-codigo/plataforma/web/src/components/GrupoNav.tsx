@@ -3,9 +3,10 @@
 import { ChevronDown, type LucideIcon } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router'
+import type { Rol } from '../api/tipos'
 import { cn } from '../lib/cn'
 
-export type Hijo = { a: string; texto: string; extra?: ReactNode }
+export type Hijo = { a: string; texto: string; extra?: ReactNode; roles?: Rol[] }
 
 export function GrupoNav({ a, texto, icono: Icono, hijos, alElegir, insignia, compacto, filtrando }: {
   a: string; texto: string; icono: LucideIcon; hijos: Hijo[]; alElegir?: () => void; insignia?: ReactNode; compacto?: boolean; filtrando?: boolean

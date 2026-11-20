@@ -3,13 +3,14 @@
 // aproximados de 5 en 5.
 import { ErrorApi } from '../api/cliente'
 import { useFacetasExplorar, useResumenExplorar } from '../api/exploracion'
-import type { CuerpoExplorar, ExplorarResumen } from '../api/tipos'
+import type { ExplorarResumen } from '../api/tipos'
 import { puede, useSesion } from '../auth/sesion'
 import { CrecimientoGrupo } from '../components/explorar/CrecimientoGrupo'
 import { Indicador } from '../components/explorar/Indicador'
 import { QuienesSon } from '../components/explorar/QuienesSon'
 import { RiesgoGrupo } from '../components/explorar/RiesgoGrupo'
 import { Grafica } from '../components/grafica'
+import { cuerpoDeFacetas, cuerpoDeFiltros, GrupoActivo } from '../components/GrupoActivo'
 import { PanelFacetas } from '../components/PanelFacetas'
 import { Aviso, Boton, Cargando, Encabezado, Vacio } from '../components/ui'
 import { descripcionDe } from '../lib/descripciones'
@@ -22,10 +23,9 @@ export default function Explorar() {
   const filtros = useFiltros()
   const esExperto = puede(usuario, ['admin', 'experto'])
   // una muestra guardada sin cambios se pide por su número: conserva el tiempo y el muestreo que tenga
-  const cuerpo: CuerpoExplorar = filtros.guardada ? { muestra_id: filtros.guardada } : { muestra: filtros.muestra }
-  const resumen = useResumenExplorar(cuerpo)
+  const resumen = useResumenExplorar(cuerpoDeFiltros(filtros))
   // las variables agregadas al panel solo afectan a las opciones, no a las cifras del grupo
-  const facetas = useFacetasExplorar(filtros.extras.length ? { ...cuerpo, variables: filtros.extras } : cuerpo)
+  const facetas = useFacetasExplorar(cuerpoDeFacetas(filtros))
   const r = resumen.data
 
   return (
@@ -34,6 +34,8 @@ export default function Explorar() {
         {r && !r.insuficiente ? <>{datosAl(r.corte)}. </> : null}
         Elija un grupo de niños y vea su riesgo, su crecimiento y quiénes son, frente a todos.
       </Encabezado>
+      {/* el panel de filtros ya está a la vista en esta página: la barra solo dice qué grupo es */}
+      <GrupoActivo conPanel={false} ninos={r?.ninos} total={r && !r.insuficiente ? r.ninos_total : undefined} minimo={r?.minimo} error={resumen.isError} />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <aside className="lg:col-span-4 xl:col-span-3">
           <PanelFacetas facetas={facetas.data} cargando={facetas.isPending} filtros={filtros} esExperto={esExperto} conTiempo

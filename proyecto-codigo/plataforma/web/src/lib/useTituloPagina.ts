@@ -6,11 +6,13 @@ import { SUBMODULOS } from '../paginas/analitica/submodulos'
 export const NOMBRE_APP = 'Observatorio Canguro'
 
 const TITULOS: Record<string, string> = {
-  '/': 'Tablero',
+  '/': 'Vista clínica',
+  '/tablero': 'Resumen del programa',
+  '/comparar': 'Comparar grupos',
   '/explorar': 'Explorar',
   '/ninos': 'Niños',
   '/revision/riesgos': 'Revisión de riesgos',
-  '/prediccion': 'Predicción',
+  '/prediccion': 'Calcular un niño',
   '/mis-modelos': 'Mis modelos',
   '/diccionario': 'Diccionario',
   '/admin/calidad-datos': 'Calidad de datos',

@@ -189,12 +189,12 @@ describe('analítica: acceso y menú', () => {
     expect(screen.queryByText('Sin permiso')).not.toBeInTheDocument()
   })
 
-  it('el menú tiene el grupo «Analítica» con sus submódulos para todos los perfiles', async () => {
+  it('el menú tiene el grupo «Modelos» con sus submódulos para todos los perfiles', async () => {
     api('visualizador')
-    montar('/')
-    const enlaces = await screen.findAllByRole('link', { name: 'Analítica' })
+    montar('/tablero')
+    const enlaces = await screen.findAllByRole('link', { name: 'Modelos' })
     expect(enlaces[0]).toHaveAttribute('href', '/analitica/resumen')
-    expect(screen.getAllByRole('button', { name: /Desplegar Analítica/ }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: /Desplegar Modelos/ }).length).toBeGreaterThan(0)
   })
 
   it('en la analítica el grupo del menú se abre solo y lista los submódulos', async () => {
