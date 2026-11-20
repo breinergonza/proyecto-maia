@@ -254,12 +254,12 @@ describe('explorar', () => {
     expect(screen.queryByRole('heading', { name: 'Riesgo del grupo elegido' })).not.toBeInTheDocument()
   })
 
-  it('quien solo consulta no ve los filtros guardados y se le avisa de las cifras aproximadas', async () => {
+  it('quien solo consulta no ve los filtros guardados ni un aviso de cifras aproximadas: las ve exactas', async () => {
     const llamadas = api('visualizador')
     montar('/explorar')
     await screen.findByText('niños con algún riesgo alto')
     expect(screen.queryByRole('button', { name: 'Guardar este filtro' })).not.toBeInTheDocument()
-    expect(screen.getByText(/se aproximan de 5 en 5/)).toBeInTheDocument()
+    expect(screen.queryByText(/aproxima/)).not.toBeInTheDocument()
     expect(llamadas.some((l) => l.url === '/api/muestras')).toBe(false)
   })
 

@@ -1,6 +1,5 @@
 // Explorar: las cifras del Tablero para el grupo de niños que se elija con un filtro. El filtro vive en la dirección
-// (useFiltros). Con menos de 20 niños no se muestran cifras (D46); quien solo consulta ve los conteos menores de 100
-// aproximados de 5 en 5.
+// (useFiltros). Con menos de 20 niños no se muestran cifras (D46); las demás son exactas para todos los perfiles (D64).
 import { ErrorApi } from '../api/cliente'
 import { useFacetasExplorar, useResumenExplorar } from '../api/exploracion'
 import type { ExplorarResumen } from '../api/tipos'
@@ -55,7 +54,7 @@ export default function Explorar() {
                 <Aviso tono="teal">
                   <strong>Con menos de {r.minimo} niños no se muestran cifras.</strong> Quite algún filtro para ver el grupo.
                 </Aviso>
-              ) : r ? <Cifras r={r} aproximado={usuario?.rol === 'visualizador'} filtros={filtros.entradas.length + (filtros.tiempo ? 1 : 0)} /> : null}
+              ) : r ? <Cifras r={r} filtros={filtros.entradas.length + (filtros.tiempo ? 1 : 0)} /> : null}
         </div>
       </div>
     </div>
@@ -76,7 +75,7 @@ const GRAFICAS = [
 ] as const
 const CLAVES = GRAFICAS.map((g) => g.clave)
 
-function Cifras({ r, aproximado, filtros }: { r: ExplorarResumen; aproximado: boolean; filtros: number }) {
+function Cifras({ r, filtros }: { r: ExplorarResumen; filtros: number }) {
   // una gráfica por pestaña: apiladas, la página (o la columna) se desplazaba casi tres pantallas
   const [ver, elegir] = usePestanaEnUrl('ver', CLAVES)
   const muestra = `${filtros ? 'Grupo elegido' : 'Todos los niños'}: ${num(r.ninos)} niños de ${num(r.ninos_total)}`
@@ -95,7 +94,6 @@ function Cifras({ r, aproximado, filtros }: { r: ExplorarResumen; aproximado: bo
           {r.muestreo.ninos == null ? ' quedarían menos de 20 niños.' : ` quedarían ${num(r.muestreo.ninos)} niños.`}
         </p>
       )}
-      {aproximado && <p className="text-xs text-salvia">Para proteger a los niños, las cifras menores de 100 se aproximan de 5 en 5.</p>}
       <Pestanas prefijo="explorar" etiqueta="Qué ver del grupo" pestanas={GRAFICAS} activa={ver} elegir={elegir} />
       {/* la gráfica llena lo que queda de alto; una lista larga (riesgo de muchos desenlaces) se desplaza dentro de ella */}
       <PanelPestana prefijo="explorar" activa={ver} className="flex min-h-0 flex-1 flex-col [&>*]:min-w-0">

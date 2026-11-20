@@ -1,8 +1,8 @@
 """Explorar: las cifras del Tablero para el grupo de niños que se elija con un filtro.
 
 Sin filtros da lo mismo que ``/tablero/resumen`` (riesgo por desenlace y crecimiento por visita); con filtro, solo los
-niños del grupo. D46: con menos de 20 niños no se devuelve ninguna cifra, y para quien solo consulta los conteos
-menores de 100 se redondean a múltiplos de 5. Cada consulta queda en la auditoría con la huella de la muestra y el
+niños del grupo. D46: con menos de 20 niños no se devuelve ninguna cifra; las demás son exactas para todos los perfiles
+(D64). Cada consulta queda en la auditoría con la huella de la muestra y el
 número de niños, sin valores clínicos."""
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ def _filas(s: Session, sql: str, **p) -> list[dict]:
     return [dict(r._mapping) for r in s.execute(text(sql), p)]
 
 
-def _muestreo(s: Session, corte_id: int, defn: dict, redondear: bool) -> dict | None:
+def _muestreo(s: Session, corte_id: int, defn: dict) -> dict | None:
     """Si la muestra trae tope por categoría: con cuántos niños se entrenaría. Las cifras de Explorar son las del
     grupo completo; el tope se aplica al entrenar."""
     mu = M.normalizar(defn)['muestreo']
@@ -58,7 +58,7 @@ def _muestreo(s: Session, corte_id: int, defn: dict, redondear: bool) -> dict | 
         return None
     con = len(P.ids_de(s, corte_id, defn, muestreo=True))
     return {'modo': 'estratificado', 'por': mu.get('por'), 'maximo_por_categoria': mu.get('maximo_por_categoria'),
-            'ninos': P.proteger(con, redondear) if con >= P.MIN_NINOS else None}
+            'ninos': int(con) if con >= P.MIN_NINOS else None}
 
 
 def _datos(s: Session, corrida, ids: list[str] | None) -> int:
@@ -84,7 +84,6 @@ def resumen(consulta: Consulta, s: Session = Depends(sesion), u: Usuario = Depen
         return {'insuficiente': True, 'vacio': True, 'ninos': 0, 'minimo': P.MIN_NINOS}
     if len(ids) < P.MIN_NINOS:
         return {'insuficiente': True, 'vacio': False, 'ninos': None, 'minimo': P.MIN_NINOS}
-    red = u.rol == 'visualizador'
     filtrado = not P.sin_filtros(defn)
     de = ' AND sujeto = ANY(:ids)' if filtrado else ''
     p = {'c': corrida.id, 'ids': ids} if filtrado else {'c': corrida.id}
@@ -113,11 +112,11 @@ def resumen(consulta: Consulta, s: Session = Depends(sesion), u: Usuario = Depen
     altos_total = sum(f['altos'] for f in riesgos)
     for f in riesgos:
         f['momento_nombre'] = nombre_etapa(mapa, f['momento'])
-        f['ninos'], f['altos'] = P.proteger(f['ninos'], red), P.proteger(f['altos'], red)
+        f['ninos'], f['altos'] = int(f['ninos']), int(f['altos'])
     for f in crec:
         f['etapa_nombre'] = nombre_etapa(mapa, f['etapa'])
         f['orden'] = mapa.get(f['etapa'], {}).get('orden', 99)
-        f['datos'] = P.proteger(f['datos'], red)
+        f['datos'] = int(f['datos'])
     crec.sort(key=lambda f: (f['orden'], f['indicador']))
     cat = P.categorias_por_nino(s, corrida.corte_id)
     return {
@@ -125,14 +124,14 @@ def resumen(consulta: Consulta, s: Session = Depends(sesion), u: Usuario = Depen
         'corrida': CorridaSalida.model_validate(corrida).model_dump(mode='json'),
         'corte': (corrida.resumen or {}).get('corte') or (str(corrida.fecha_corte) if corrida.fecha_corte else None),
         'filtrado': filtrado,
-        'ninos': P.proteger(len(ids), red), 'ninos_total': P.proteger(len(cat), red),
-        'datos': P.proteger(int(datos), red),
-        'ninos_riesgo_alto': P.proteger(ninos_alto, red), 'riesgos_altos': P.proteger(altos_total, red),
+        'ninos': int(len(ids)), 'ninos_total': int(len(cat)),
+        'datos': int(int(datos)),
+        'ninos_riesgo_alto': int(ninos_alto), 'riesgos_altos': int(altos_total),
         'percentil_alto': PERCENTIL_ALTO,
         'riesgos_por_desenlace': riesgos, 'crecimiento_por_etapa': crec,
         'pct_crecimiento_bajo': float(pct_bajo) if pct_bajo is not None else None,
         'distribuciones': P.distribuciones(cat, ids),
-        'muestreo': _muestreo(s, corrida.corte_id, defn, red),
+        'muestreo': _muestreo(s, corrida.corte_id, defn),
     }
 
 
@@ -148,10 +147,9 @@ def facetas(consulta: Consulta, respuesta: Response, s: Session = Depends(sesion
         corte = None
     if corte is None:
         corte = P.corte_actual(s).id
-    red = u.rol == 'visualizador'
     try:
         tiempos['previo'] = round((time.perf_counter() - t0) * 1000, 1)
-        r = P.facetas(s, corte, _definicion(s, consulta), redondear=red,
+        r = P.facetas(s, corte, _definicion(s, consulta),
                       extra=[v.model_dump() for v in consulta.variables or []], tiempos=tiempos)
     except M.MuestraInvalida as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, ' '.join(e.errores)) from None
@@ -166,5 +164,5 @@ def facetas(consulta: Consulta, respuesta: Response, s: Session = Depends(sesion
             f.pop('cifra', None)
         r['n'] = 0 if vacio else None
     else:
-        r['n'] = P.proteger(r['n'], red)
+        r['n'] = int(r['n'])
     return {**r, 'insuficiente': insuficiente, 'vacio': vacio, 'minimo': P.MIN_NINOS}

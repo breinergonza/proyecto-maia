@@ -3,8 +3,8 @@
 ``POST /clinica/resumen`` junta lo que la pantalla pide de una vez: qué les pasó a los 12 meses (lo observado, que la
 corrida guarda en ``resultados.desenlaces_observados``), la talla para la edad por visita frente a la población, el
 riesgo estimado por corte y los niños con más riesgo. El grupo se elige igual que en Explorar y valen las mismas reglas
-de privacidad (D46): menos de 20 niños no da cifras y para quien solo consulta los conteos menores de 100 se
-redondean a múltiplos de 5; una celda de 1 a 4 niños se da con su cifra. Los niños individuales, con su código seudonimizado,
+de privacidad (D46): menos de 20 niños no da cifras; una celda de 1 a 4 niños se da con su cifra y ninguna cifra se
+redondea para ningún perfil (D64). Los niños individuales, con su código seudonimizado,
 solo los ven el experto y el administrador, y cada lista queda en la auditoría."""
 from __future__ import annotations
 
@@ -130,10 +130,10 @@ def _filas(s: Session, sql: str, **p) -> list[dict]:
     return [dict(r._mapping) for r in s.execute(text(sql), p)]
 
 
-def observado_de(s: Session, corrida: int, familia: str, ids: list[str] | None, n: int, red: bool) -> dict | None:
+def observado_de(s: Session, corrida: int, familia: str, ids: list[str] | None, n: int) -> dict | None:
     """Casos, niños con dato y sin dato de ``n`` niños (``ids``; ``None`` es todo el corte), el porcentaje de casos
-    entre quienes tienen dato y el de niños sin dato entre los ``n``, de los conteos exactos (los conteos se redondean para quien solo consulta; dividir los
-    redondeados daría otro porcentaje). Sin niños con dato, nada."""
+    entre quienes tienen dato y el de niños sin dato entre los ``n``, de los mismos conteos. Sin niños
+    con dato, nada."""
     de = ' AND sujeto = ANY(:ids)' if ids is not None else ''
     p = {'c': corrida, 'f': familia, **({'ids': ids} if ids is not None else {})}
     casos, con_dato = s.execute(text(f"""
@@ -142,13 +142,13 @@ def observado_de(s: Session, corrida: int, familia: str, ids: list[str] | None, 
     if not con_dato:
         return None
     sin_dato = max(n - con_dato, 0)
-    return {'casos': P.proteger(casos, red), 'con_dato': P.proteger(con_dato, red),
-            'sin_dato': P.proteger(sin_dato, red), 'pct': round(100 * casos / con_dato, 1),
+    return {'casos': int(casos), 'con_dato': int(con_dato),
+            'sin_dato': int(sin_dato), 'pct': round(100 * casos / con_dato, 1),
             'pct_sin_dato': round(100 * sin_dato / n, 1) if n else None}
 
 
 def trayectoria_de(s: Session, corrida: int, corte_id: int, indicador: str, ids: list[str] | None,
-                 dic: Dic, red: bool) -> dict:
+                 dic: Dic) -> dict:
     """Por visita (en orden clínico), la mediana y la mitad central del puntaje z del grupo y la mediana de la
     población, con los niños que tienen dato. Los datos improbables no cuentan."""
     por = {'p': {'c': corrida, 'i': indicador}, 'g': {'c': corrida, 'i': indicador, 'ids': ids}}
@@ -167,7 +167,7 @@ def trayectoria_de(s: Session, corrida: int, corte_id: int, indicador: str, ids:
     def celda(f: dict | None, completa: bool) -> dict | None:
         if f is None:
             return None
-        base = {'n': P.proteger(f['n'], red), 'mediana': float(f['mediana'])}
+        base = {'n': int(f['n']), 'mediana': float(f['mediana'])}
         return {'n': base['n'], 'p25': float(f['p25']), 'mediana': base['mediana'], 'p75': float(f['p75'])} \
             if completa else base
 
@@ -178,8 +178,7 @@ def trayectoria_de(s: Session, corrida: int, corte_id: int, indicador: str, ids:
                         'poblacion': celda(poblacion.get(e), False)} for e in visitas]}
 
 
-def riesgo_de(s: Session, corrida: int, corte_id: int, familia: str, ids: list[str] | None, dic: Dic,
-            red: bool) -> list[dict]:
+def riesgo_de(s: Session, corrida: int, corte_id: int, familia: str, ids: list[str] | None, dic: Dic) -> list[dict]:
     """Por corte (visita desde la que se predice), cuántos niños del grupo tienen riesgo calculado y cuántos están en
     alerta (percentil de ``PERCENTIL_ALTO`` o más)."""
     de = ' AND sujeto = ANY(:ids)' if ids is not None else ''
@@ -194,7 +193,7 @@ def riesgo_de(s: Session, corrida: int, corte_id: int, familia: str, ids: list[s
     filas.sort(key=lambda f: (mapa.get(f['momento'], {}).get('orden', 99), f['clave']))
     return [{'momento': f['momento'], 'momento_nombre': nombre_etapa(mapa, f['momento']), 'clave': f['clave'],
              'estado': estados.get(f['clave']) or CL.estado_de(f['clave']),
-             'calculados': P.proteger(f['calculados'], red), 'en_alerta': P.proteger(f['en_alerta'], red),
+             'calculados': int(f['calculados']), 'en_alerta': int(f['en_alerta']),
              'pct_en_alerta': round(100 * f['en_alerta'] / f['calculados'], 1)}
             for f in filas]
 
@@ -258,7 +257,6 @@ def resumen(consulta: ConsultaClinica, s: Session = Depends(sesion), u: Usuario 
         return {'insuficiente': True, 'vacio': True, 'ninos': 0, 'minimo': P.MIN_NINOS}
     if len(ids) < P.MIN_NINOS:
         return {'insuficiente': True, 'vacio': False, 'ninos': None, 'minimo': P.MIN_NINOS}
-    red = u.rol == 'visualizador'
     total = P.n_base(s, corrida.corte_id)
     filtrado = not P.sin_filtros(_definicion(s, consulta))
     grupo = ids if filtrado else None
@@ -273,11 +271,11 @@ def resumen(consulta: ConsultaClinica, s: Session = Depends(sesion), u: Usuario 
         'insuficiente': False, 'minimo': P.MIN_NINOS, 'corrida_id': corrida.id,
         'datos_al': (corrida.resumen or {}).get('corte') or (str(corrida.fecha_corte) if corrida.fecha_corte else None),
         'familias': familias, 'familia': familia, 'indicador': indicador,
-        'grupo': {'n': P.proteger(len(ids), red), 'n_total': P.proteger(total, red)},
-        'observado': {'grupo': observado_de(s, corrida.id, familia, grupo, len(ids), red) if familia else None,
-                      'poblacion': observado_de(s, corrida.id, familia, None, total, red) if familia else None},
-        'trayectoria': trayectoria_de(s, corrida.id, corrida.corte_id, indicador, grupo, dic, red),
-        'riesgo': riesgo_de(s, corrida.id, corrida.corte_id, familia, grupo, dic, red) if familia else [],
+        'grupo': {'n': int(len(ids)), 'n_total': int(total)},
+        'observado': {'grupo': observado_de(s, corrida.id, familia, grupo, len(ids)) if familia else None,
+                      'poblacion': observado_de(s, corrida.id, familia, None, total) if familia else None},
+        'trayectoria': trayectoria_de(s, corrida.id, corrida.corte_id, indicador, grupo, dic),
+        'riesgo': riesgo_de(s, corrida.id, corrida.corte_id, familia, grupo, dic) if familia else [],
         'riesgo_con_modelo': riesgo_con_modelo(s, corrida.id, familia) if familia else False,
         'alerta_percentil': PERCENTIL_ALTO,
         'ninos': ninos,

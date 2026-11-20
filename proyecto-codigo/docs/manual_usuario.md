@@ -224,9 +224,8 @@ Tablero, pero para el grupo de niños que usted elija; el Tablero no cambia y si
 * **Guardar este filtro:** queda en la lista de filtros guardados para volver a usarlo (por ejemplo en Predicción).
 * **Qué se ve:** niños en el grupo, datos leídos, niños con algún riesgo alto, crecimiento bajo frente a la OMS, y
   tres gráficas: riesgo del grupo, crecimiento del grupo y quiénes son los niños.
-* **Privacidad:** con menos de 20 niños no se muestran cifras; basta quitar algún filtro. Quien solo consulta ve las
-  cifras menores de 100 aproximadas de 5 en 5, y nunca ven 0 donde hay niños (la cifra más baja es 5). Un grupo con 1 a
-  4 niños dice su número.
+* **Privacidad:** con menos de 20 niños no se muestran cifras; basta quitar algún filtro. Todos los perfiles ven las
+  mismas cifras, exactas: nada se redondea ni se aproxima. Una opción con 1 a 4 niños dice su número.
 * **Cómo leer los símbolos:** una opción sin niños se ve **0**; una opción con 1 a 4 niños dice cuántos son; **—** es un grupo
   de menos de 20 niños. Si ningún niño cumple, aparece «Ningún niño cumple estos filtros» con el botón para quitarlos.
   El muestreo no cambia las cifras de Explorar: solo dice con cuántos niños se entrenaría.
@@ -720,7 +719,7 @@ Estas son las definiciones que aparecen al pasar el mouse por un término subray
   motivos ni en **Predicción › Un niño**.
 * **Los datos reales no salen del equipo de la Fundación.** La versión de demostración usa solo niños simulados.
 * **Los conteos pequeños se dicen.** Una cifra de 1 a 4 niños se muestra con su número; las pantallas solo exigen un mínimo de
-  20 niños para dar cifras de grupo, distribuciones y promedios. Quien solo consulta ve los conteos menores de 100 de 5 en 5.
+  20 niños para dar cifras de grupo, distribuciones y cuartiles. Ninguna cifra se redondea, tampoco para quien solo consulta.
 * **Cuide su cuenta.** No comparta su contraseña, cierre la sesión en equipos compartidos y avise a la administración
   si cree que alguien más la conoce.
 * **No saque capturas, impresiones ni exportaciones con datos de niños** fuera de los canales que autorice la Fundación (esto incluye **Imprimir ficha**).

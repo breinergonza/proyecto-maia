@@ -33,7 +33,7 @@ export const useComparaEntrenamientos = (a: number | null, b: number | null, des
 /** Un lado del cuerpo es un grupo como el de Explorar: el filtro guardado por su número o la muestra completa. */
 export interface CuerpoGruposClinico { a: CuerpoExplorar; b: CuerpoExplorar; corrida_id?: number }
 export interface LadoClinico { nombre: string; n: number | null }
-/** Niños con el desenlace entre los que tienen dato a los 12 meses. Los conteos redondeados o nulos siguen las reglas de
+/** Niños con el desenlace entre los que tienen dato a los 12 meses. Los conteos nulos siguen las reglas de
  *  la Vista clínica; ``pct`` es nulo con menos de 20 niños con dato. */
 export interface ObservadoLado { casos: number | null; con_dato: number | null; sin_dato: number | null; pct: number | null; pct_sin_dato: number | null }
 /** B frente a A en puntos porcentuales, con su intervalo del 95 %; todo nulo si un lado tiene menos de 20 niños con dato. */

@@ -124,15 +124,6 @@ def test_facetas_aplican_los_demas_filtros_pero_no_el_propio(cliente, tokens, co
 def test_cifra_de_1_a_4_ninos_dice_cuantos_son():
     from maia_api import poblacion as P
     assert P.cifra(3) == {'n': 3} and P.cifra(1) == {'n': 1} and P.cifra(0) == {'n': 0} and P.cifra(5) == {'n': 5}
-    assert P.cifra(3, True) == {'n': 5} and P.cifra(0, True) == {'n': 0}
-
-
-def test_el_visualizador_redondea_de_5_en_5_y_nunca_muestra_0_donde_hay_ninos():
-    from maia_api import poblacion as P
-    assert [P.proteger(n, True) for n in (0, 1, 2, 3, 4, 5)] == [0, 5, 5, 5, 5, 5]
-    assert P.proteger(7, True) == 5 and P.proteger(8, True) == 10 and P.proteger(47, True) == 45
-    assert P.proteger(99, True) == 100 and P.proteger(103, True) == 103 and P.proteger(120, True) == 120
-    assert [P.proteger(n) for n in (0, 1, 4, 47, 120)] == [0, 1, 4, 47, 120]   # quien no solo consulta ve lo exacto
 
 
 def test_opciones_de_1_a_4_ninos_salen_con_su_cifra(cliente, tokens, corte, sev):

@@ -201,17 +201,17 @@ def test_menos_de_20_ninos_no_hay_cifras(cliente, tokens, corrida):  # noqa: F81
         assert r.status_code == 200 and r.json() == {'insuficiente': True, 'vacio': False, 'ninos': None, 'minimo': 20}
 
 
-def test_el_visualizador_no_ve_ninos_y_ve_conteos_redondeados(cliente, tokens, corrida, sev):  # noqa: F811
+def test_el_visualizador_no_ve_ninos_y_ve_las_mismas_cifras(cliente, tokens, corrida, sev):  # noqa: F811
     from maia_comun import muestra as M
     for rol in ('admin', 'experto'):
         assert len(_resumen(cliente, tokens, rol, corrida_id=corrida).json()['ninos']) == NINOS_LISTADOS == 25   # la lista se desplaza dentro de su panel
     vis = _resumen(cliente, tokens, 'visualizador', corrida_id=corrida)
     assert vis.status_code == 200 and vis.json()['ninos'] is None
-    # un grupo de 20 a 99 niños: sus conteos van en múltiplos de 5 para quien solo consulta
+    # un grupo de 20 a 99 niños con un conteo que no es múltiplo de 5
     elegida = None
     for tope in range(25, 36):
         m = _muestra(_y('eg_semanas', 'numero', [None, tope]))
-        if 20 <= len(M.ids(sev, m)) < 100:
+        if 20 <= len(M.ids(sev, m)) < 100 and len(M.ids(sev, m)) % 5:
             elegida = m
             break
     assert elegida, 'el corte de prueba no tiene un grupo de 20 a 99 niños para esta prueba'
@@ -219,16 +219,8 @@ def test_el_visualizador_no_ve_ninos_y_ve_conteos_redondeados(cliente, tokens, c
     n = len(M.ids(sev, m))
     v = _resumen(cliente, tokens, 'visualizador', corrida_id=corrida, muestra=m).json()
     e = _resumen(cliente, tokens, 'experto', corrida_id=corrida, muestra=m).json()
-    assert e['grupo']['n'] == n and v['grupo']['n'] == int(n / 5 + 0.5) * 5
-    assert v['ninos'] is None and e['ninos'] is not None
-    assert v['riesgo'] and all(f['calculados'] % 5 == 0 and f['en_alerta'] % 5 == 0 for f in v['riesgo'])
-    assert v['observado']['grupo'] and all(v['observado']['grupo'][k] % 5 == 0 for k in ('casos', 'con_dato', 'sin_dato'))
-    # los porcentajes salen de los conteos exactos (los del experto, menos de 100): redondear antes de dividir los cambiaría
-    og = e['observado']['grupo']
-    assert v['observado']['grupo']['pct'] == e['observado']['grupo']['pct'] == round(100 * og['casos'] / og['con_dato'], 1)
-    exacto = {f['clave']: f for f in e['riesgo']}
-    assert all(f['pct_en_alerta'] == exacto[f['clave']]['pct_en_alerta']
-               == round(100 * exacto[f['clave']]['en_alerta'] / exacto[f['clave']]['calculados'], 1) for f in v['riesgo'])
+    assert e['ninos'] is not None and v['ninos'] is None
+    assert v['grupo']['n'] == n and v == {**e, 'ninos': None}   # las mismas cifras, sin redondeo (D64)
 
 
 def test_familia_o_indicador_desconocidos(cliente, tokens, corrida):  # noqa: F811

@@ -114,7 +114,7 @@ def test_con_menos_de_20_ninos_no_hay_cifras(cliente, tokens, corrida):  # noqa:
     assert all(o['n'] is None for fa in f['facetas'].values() for o in fa.get('opciones', []))
 
 
-def test_el_visualizador_ve_conteos_pequenos_redondeados(cliente, tokens, corrida, sev):  # noqa: F811
+def test_el_visualizador_ve_las_mismas_cifras_que_el_admin(cliente, tokens, corrida, sev):  # noqa: F811
     from maia_comun import muestra as M
     elegida = None
     for tope in range(25, 36):
@@ -127,16 +127,7 @@ def test_el_visualizador_ve_conteos_pequenos_redondeados(cliente, tokens, corrid
     m, n = elegida
     adm = _resumen(cliente, tokens, 'admin', corrida_id=corrida, muestra=m).json()
     vis = _resumen(cliente, tokens, 'visualizador', corrida_id=corrida, muestra=m).json()
-    assert adm['ninos'] == n and vis['ninos'] == int(n / 5 + 0.5) * 5 != n
-    for f in vis['riesgos_por_desenlace']:
-        assert f['ninos'] % 5 == 0 and f['altos'] % 5 == 0
-    assert all(f['datos'] % 5 == 0 for f in vis['crecimiento_por_etapa'] if f['datos'] < 100)
-    # las facetas también: nada menor de 100 que no sea múltiplo de 5
-    fv = cliente.post('/api/exploracion/facetas', headers=tokens['visualizador'], json={'muestra': m}).json()
-    assert fv['n'] % 5 == 0
-    assert all(o['n'] is None or o['n'] >= 100 or o['n'] % 5 == 0 for fa in fv['facetas'].values() for o in fa.get('opciones', []))
-    # el experto ve el número exacto
-    assert _resumen(cliente, tokens, 'experto', corrida_id=corrida, muestra=m).json()['ninos'] == n
+    assert vis['ninos'] == n and vis == adm   # ninguna cifra se redondea para quien solo consulta (D64)
 
 
 def _contar_auditoria() -> int:
@@ -217,15 +208,15 @@ def _opcion_de_pocos(cliente, tokens, sev):  # noqa: F811
     return None
 
 
-def test_una_opcion_de_1_a_4_ninos_dice_cuantos_son_y_el_visualizador_ve_5(cliente, tokens, corte, sev):  # noqa: F811
+def test_una_opcion_de_1_a_4_ninos_dice_cuantos_son_para_todos(cliente, tokens, corte, sev):  # noqa: F811
     elegida = _opcion_de_pocos(cliente, tokens, sev)
     assert elegida, 'el corte de prueba no tiene un grupo con una opción de 1 a 4 niños'
     m, clave, valor, n = elegida
     assert 1 <= n <= 4
-    for rol, esperado in (('experto', n), ('admin', n), ('visualizador', 5)):
+    for rol in ('experto', 'admin', 'visualizador'):
         opciones = _facetas(cliente, tokens, rol, muestra=m)['facetas'][clave]['opciones']
         o = next(o for o in opciones if o['valor'] == valor)
-        assert o['n'] == esperado and 'texto' not in o, rol
+        assert o['n'] == n and 'texto' not in o, rol
 
 
 def test_el_resumen_de_un_grupo_da_cada_desenlace_aunque_tenga_pocos_ninos(cliente, tokens, corte, sev):  # noqa: F811
@@ -248,7 +239,7 @@ def test_el_resumen_de_un_grupo_da_cada_desenlace_aunque_tenga_pocos_ninos(clien
     assert {f['clave']: f['ninos'] for f in e['riesgos_por_desenlace']} == esperado, 'el desenlace de 3 niños sale con su cifra'
     v = _resumen(cliente, tokens, 'visualizador', corrida_id=c, muestra=m).json()
     assert {f['clave'] for f in v['riesgos_por_desenlace']} == set(esperado)
-    assert next(f['ninos'] for f in v['riesgos_por_desenlace'] if f['clave'] == 'oxigeno_3m') == 5,         'el visualizador ve 5 (de 5 en 5), nunca 0 donde hay niños'
+    assert next(f['ninos'] for f in v['riesgos_por_desenlace'] if f['clave'] == 'oxigeno_3m') == 3, 'el visualizador ve la cifra exacta (D64)'
 
 
 def test_una_opcion_sin_ninos_sale_con_cero(cliente, tokens, corte, sev):  # noqa: F811

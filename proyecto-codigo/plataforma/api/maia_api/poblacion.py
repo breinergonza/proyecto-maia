@@ -1,6 +1,6 @@
 """Lo que comparten /muestras y /exploracion: el corte con el que se trabaja, los niños de una muestra, las facetas
-(conteos por opción) y el mínimo de 20 niños y el redondeo del visualizador (D46). Todo se calcula en Postgres sobre
-``sevarti.atributos_sujeto``; no se leen las mediciones."""
+(conteos por opción) y el mínimo de 20 niños (D46). Las cifras son exactas para todos los perfiles (D64). Todo se
+calcula en Postgres sobre ``sevarti.atributos_sujeto``; no se leen las mediciones."""
 from __future__ import annotations
 
 import time
@@ -30,7 +30,6 @@ FACETAS_POR_DEFECTO = ('sede', 'ern_sexo', 'eg_categoria', 'eg_semanas', 'ern_lu
 VARIABLES_SEXO = ('ern_sexo', 'sexo')
 MIN_NINOS = 20          # D46: con menos niños no se muestran cifras ni se guarda un filtro
 MAX_OPCIONES = 30       # una variable con más opciones distintas es texto libre, no una faceta
-TOPE_REDONDEO = 100     # D46: para el rol visualizador, los conteos menores se redondean a múltiplos de 5
 TIPOS_FILTRABLES = {'categorical': 'lista', 'boolean': 'si_no', 'numeric': 'numero'}
 # categorías por semanas de gestación: (categoría, desde incluido, hasta excluido); cada una es una opción por sí sola
 CATEGORIAS_EG = M.CATEGORIAS_EG
@@ -62,17 +61,9 @@ def sin_filtros(muestra: dict | None) -> bool:
     return not m['y'] and not m['tiempo']
 
 
-def proteger(n: int, redondear: bool = False) -> int:
-    """D46: un conteo menor de 100 se redondea a múltiplos de 5 para quien solo consulta. Con niños (1 a 4) nunca
-    baja a 0: sube a 5, porque un cero diría que no hay ninguno. Solo un cero verdadero queda en 0."""
-    if not redondear or n >= TOPE_REDONDEO:
-        return int(n)
-    return max(5, int(n / 5 + 0.5) * 5) if n > 0 else 0
-
-
-def cifra(n: int, redondear: bool = False) -> dict:
-    """Un conteo de opción o de tramo: ``n``, con el redondeo del visualizador (D46)."""
-    return {'n': proteger(n, redondear)}
+def cifra(n: int) -> dict:
+    """Un conteo de opción o de tramo: ``n``, exacto para todos los perfiles (D64)."""
+    return {'n': int(n)}
 
 
 # ---------------------------------------------------------------- qué variables se ofrecen
@@ -376,27 +367,27 @@ def _lista_atributo(s: Session, c: int, v: str, nombre: str, g: _Grupo, tipo: st
     return {'opciones': opciones}
 
 
-def _resumen_de(r: dict, ninos: int, redondear: bool) -> dict:
-    return {'cifra': cifra(ninos, redondear), 'min': r['min'], 'max': r['max'],
-            'bins': [{'desde': b['desde'], 'hasta': b['hasta'], **cifra(b['n'], redondear)} for b in r['bins']]}
+def _resumen_de(r: dict, ninos: int) -> dict:
+    return {'cifra': cifra(ninos), 'min': r['min'], 'max': r['max'],
+            'bins': [{'desde': b['desde'], 'hasta': b['hasta'], **cifra(b['n'])} for b in r['bins']]}
 
 
-def _resumen_numerico(valores: list[float], ninos: int, redondear: bool) -> dict:
-    return _resumen_de(M._numerica(pd.Series(valores, dtype=float)), ninos, redondear)
+def _resumen_numerico(valores: list[float], ninos: int) -> dict:
+    return _resumen_de(M._numerica(pd.Series(valores, dtype=float)), ninos)
 
 
-def _numerica(s: Session, c: int, nombre: str, g: _Grupo, redondear: bool, lect: pd.DataFrame | None = None,
+def _numerica(s: Session, c: int, nombre: str, g: _Grupo, lect: pd.DataFrame | None = None,
               pre: dict | None = None) -> dict:
     if lect is not None:
         v = lect.dropna(subset=['num'])
-        return _resumen_numerico(list(v.num.astype(float)), int(v.sujeto.nunique()), redondear)
+        return _resumen_numerico(list(v.num.astype(float)), int(v.sujeto.nunique()))
     if pre is not None:
-        return _resumen_de(pre, pre['n'], redondear)
+        return _resumen_de(pre, pre['n'])
     cond, p = g.cond('sujeto')
     valores = [x for (x,) in s.execute(text('SELECT valor_num FROM sevarti.atributos_sujeto WHERE corte_id = :c '
                                             f'AND variable = :v AND valor_num IS NOT NULL AND {cond}'),
                                        {'c': c, 'v': nombre, **p})]
-    return _resumen_numerico(valores, len(valores), redondear)
+    return _resumen_numerico(valores, len(valores))
 
 
 def _regla_de(filas: dict, v: str, entrada: dict | None, pedidas: dict[str, str]) -> str | None:
@@ -406,10 +397,10 @@ def _regla_de(filas: dict, v: str, entrada: dict | None, pedidas: dict[str, str]
     return (entrada or {}).get('cuando') or pedidas.get(v) or regla_por_defecto(filas, v)
 
 
-def facetas(s: Session, corte_id: int, muestra: dict | None, redondear: bool = False,
+def facetas(s: Session, corte_id: int, muestra: dict | None,
             extra: Sequence[dict] | None = None, tiempos: dict[str, float] | None = None) -> dict:
     """Conteos por opción de cada faceta aplicando los demás filtros pero no el propio (D35). Una opción con 1 a 4
-    niños sale con su cifra; con ``redondear`` (visualizador) los conteos menores de 100 van de 5 en 5 (D46). Una
+    niños sale con su cifra, igual para todos los perfiles (D64). Una
     opción sin niños sale con ``n`` 0: es un cero real. ``extra``: variables que se pidieron
     además de las de siempre, ``[{"variable", "cuando"}]``; las que ya están en el filtro se agregan solas."""
     marca = _Reloj(tiempos)
@@ -476,9 +467,9 @@ def facetas(s: Session, corte_id: int, muestra: dict | None, redondear: bool = F
             r = _lista_eg(s, corte_id, ids)
         elif v == 'eg_semanas':
             sem = _semanas(s, corte_id, ids)
-            r = _resumen_numerico(sem, len(sem), redondear)
+            r = _resumen_numerico(sem, len(sem))
         elif tipo == 'numero':
-            r = _numerica(s, corte_id, nombre, ids, redondear, lect, precargado_num.get(excluidas_de(v), {}).get(nombre))
+            r = _numerica(s, corte_id, nombre, ids, lect, precargado_num.get(excluidas_de(v), {}).get(nombre))
         else:
             pre = precargado.get(excluidas_de(v), {}).get(nombre) if lect is None else None
             if lect is None and pre is None:   # texto libre o sin datos: no es una faceta
@@ -487,7 +478,7 @@ def facetas(s: Session, corte_id: int, muestra: dict | None, redondear: bool = F
             if r is None:
                 continue
         for o in r.get('opciones', []):
-            o.update(cifra(o['n'], redondear))
+            o.update(cifra(o['n']))
         salida[v] = {'etiqueta': etiqueta_de(filas, v), 'tipo': tipo, 'cuando': cuando, 'reglas': reglas_de(filas, v),
                      'destacada': v in FACETAS_POR_DEFECTO or (v in filas and _marcada(filas[v])), **r}
     marca('variables')
