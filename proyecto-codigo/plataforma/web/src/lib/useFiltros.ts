@@ -76,7 +76,53 @@ export function decodificarMuestreo(texto: string): MuestreoJson | null {
   return { modo: 'estratificado', por, maximo_por_categoria: tope, semilla: semilla !== '' && Number.isInteger(s) ? s : SEMILLA_POR_DEFECTO }
 }
 
-type Estado = { entradas: EntradaFiltro[]; tiempo: TiempoJson | null; muestreo: MuestreoJson | null; extras: VariableExtra[] }
+/** Un grupo de niños: sus filtros, su tiempo, su muestreo y las variables agregadas al panel que aún no filtran. */
+export type EstadoFiltros = { entradas: EntradaFiltro[]; tiempo: TiempoJson | null; muestreo: MuestreoJson | null; extras: VariableExtra[] }
+
+/** La muestra que se envía a la API para un grupo. */
+export const muestraDe = (e: EstadoFiltros): MuestraJson =>
+  ({ version: 2, y: e.entradas, ...(e.tiempo ? { tiempo: e.tiempo } : {}), ...(e.muestreo ? { muestreo: e.muestreo } : {}) })
+
+/** Las reglas para cambiar un grupo, sin importar dónde vive (la dirección o el estado de una página): cada cambio
+ *  escribe el grupo completo y, salvo poner un filtro guardado tal cual, deja de ser un filtro guardado. */
+export function operacionesFiltros(actual: EstadoFiltros, escribir: (nuevo: EstadoFiltros, idGuardada: number | null) => void) {
+  /** Agrega una variable al panel (o le cambia la regla de lectura); con ``null`` la quita. */
+  const ponerExtra = (variable: string, cuando: string | null) => {
+    const resto = actual.extras.filter((x) => x.variable !== variable)
+    escribir({ ...actual, extras: cuando ? [...resto, { variable, cuando }] : resto }, null)
+  }
+  return {
+    /** Pone, cambia o (con ``null``) quita el filtro de una variable. */
+    poner: (variable: string, entrada: EntradaFiltro | null) => {
+      const resto = actual.entradas.filter((e) => e.variable !== variable)
+      escribir({ ...actual, entradas: entrada ? [...resto, entrada] : resto }, null)
+    },
+    /** Pone un filtro guardado (con su tiempo y su muestreo, si los trae) o varios filtros a la vez. */
+    ponerTodas: (lista: EntradaFiltro[], idGuardada: number | null = null, resto?: Pick<MuestraJson, 'tiempo' | 'muestreo'>) => {
+      escribir({
+        entradas: lista, tiempo: resto?.tiempo ?? null,
+        muestreo: resto?.muestreo?.modo === 'estratificado' ? resto.muestreo : null, extras: [],
+      }, idGuardada)
+    },
+    ponerTiempo: (t: TiempoJson | null) => escribir({ ...actual, tiempo: t }, null),
+    ponerMuestreo: (m: MuestreoJson | null) => escribir({ ...actual, muestreo: m && m.modo === 'estratificado' ? m : null }, null),
+    ponerExtra,
+    /** Cambia la regla de lectura de una variable: la del filtro si ya filtra, si no la de la variable agregada. */
+    ponerRegla: (variable: string, cuando: string) => {
+      const e = actual.entradas.find((x) => x.variable === variable)
+      if (e) {
+        escribir({ ...actual, entradas: actual.entradas.map((x) => (x === e ? { ...e, cuando } : x)), extras: actual.extras.filter((x) => x.variable !== variable) }, null)
+      } else {
+        ponerExtra(variable, cuando)
+      }
+    },
+    /** Quita una variable agregada del panel junto con su filtro, en un solo cambio. */
+    quitarVariable: (variable: string) => escribir({
+      ...actual, entradas: actual.entradas.filter((e) => e.variable !== variable), extras: actual.extras.filter((x) => x.variable !== variable),
+    }, null),
+    limpiar: () => escribir({ entradas: [], tiempo: null, muestreo: null, extras: [] }, null),
+  }
+}
 
 export function useFiltros() {
   const [params, setParams] = useSearchParams()
@@ -97,13 +143,10 @@ export function useFiltros() {
     [crudoV],
   )
   const guardada = Number(params.get('guardada')) || null
-  const muestra: MuestraJson = useMemo(
-    () => ({ version: 2, y: entradas, ...(tiempo ? { tiempo } : {}), ...(muestreo ? { muestreo } : {}) }),
-    [entradas, tiempo, muestreo],
-  )
-  const actual: Estado = useMemo(() => ({ entradas, tiempo, muestreo, extras }), [entradas, tiempo, muestreo, extras])
+  const actual: EstadoFiltros = useMemo(() => ({ entradas, tiempo, muestreo, extras }), [entradas, tiempo, muestreo, extras])
+  const muestra = useMemo(() => muestraDe(actual), [actual])
 
-  const escribir = useCallback((nuevo: Estado, idGuardada: number | null) => {
+  const escribir = useCallback((nuevo: EstadoFiltros, idGuardada: number | null) => {
     setParams((previo) => {
       const p = new URLSearchParams(previo)
       for (const k of ['f', 't', 'm', 'v', 'guardada']) p.delete(k)
@@ -116,49 +159,8 @@ export function useFiltros() {
     }, { replace: true })
   }, [setParams])
 
-  /** Pone, cambia o (con ``null``) quita el filtro de una variable. */
-  const poner = useCallback((variable: string, entrada: EntradaFiltro | null) => {
-    const resto = actual.entradas.filter((e) => e.variable !== variable)
-    escribir({ ...actual, entradas: entrada ? [...resto, entrada] : resto }, null)
-  }, [actual, escribir])
-
-  /** Pone un filtro guardado (con su tiempo y su muestreo, si los trae) o varios filtros a la vez. */
-  const ponerTodas = useCallback((lista: EntradaFiltro[], idGuardada: number | null = null, resto?: Pick<MuestraJson, 'tiempo' | 'muestreo'>) => {
-    escribir({
-      entradas: lista, tiempo: resto?.tiempo ?? null,
-      muestreo: resto?.muestreo?.modo === 'estratificado' ? resto.muestreo : null, extras: [],
-    }, idGuardada)
-  }, [escribir])
-
-  const ponerTiempo = useCallback((t: TiempoJson | null) => escribir({ ...actual, tiempo: t }, null), [actual, escribir])
-  const ponerMuestreo = useCallback(
-    (m: MuestreoJson | null) => escribir({ ...actual, muestreo: m && m.modo === 'estratificado' ? m : null }, null),
-    [actual, escribir])
-
-  /** Agrega una variable al panel (o le cambia la regla de lectura); con ``null`` la quita. */
-  const ponerExtra = useCallback((variable: string, cuando: string | null) => {
-    const resto = actual.extras.filter((x) => x.variable !== variable)
-    escribir({ ...actual, extras: cuando ? [...resto, { variable, cuando }] : resto }, null)
-  }, [actual, escribir])
-
-  /** Cambia la regla de lectura de una variable: la del filtro si ya filtra, si no la de la variable agregada. */
-  const ponerRegla = useCallback((variable: string, cuando: string) => {
-    const e = actual.entradas.find((x) => x.variable === variable)
-    if (e) {
-      escribir({ ...actual, entradas: actual.entradas.map((x) => (x === e ? { ...e, cuando } : x)), extras: actual.extras.filter((x) => x.variable !== variable) }, null)
-    } else {
-      ponerExtra(variable, cuando)
-    }
-  }, [actual, escribir, ponerExtra])
-
-  /** Quita una variable agregada del panel junto con su filtro, en un solo cambio. */
-  const quitarVariable = useCallback((variable: string) => escribir({
-    ...actual, entradas: actual.entradas.filter((e) => e.variable !== variable), extras: actual.extras.filter((x) => x.variable !== variable),
-  }, null), [actual, escribir])
-
-  const limpiar = useCallback(() => escribir({ entradas: [], tiempo: null, muestreo: null, extras: [] }, null), [escribir])
-
-  return { entradas, tiempo, muestreo, extras, muestra, guardada, poner, ponerTodas, ponerTiempo, ponerMuestreo, ponerExtra, ponerRegla, quitarVariable, limpiar }
+  const operaciones = useMemo(() => operacionesFiltros(actual, escribir), [actual, escribir])
+  return { ...actual, muestra, guardada, ...operaciones }
 }
 
 export type Filtros = ReturnType<typeof useFiltros>

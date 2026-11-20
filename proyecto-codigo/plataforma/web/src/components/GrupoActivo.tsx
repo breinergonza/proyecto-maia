@@ -18,11 +18,16 @@ export const cuerpoDeFiltros = (filtros: Filtros): CuerpoExplorar =>
 export const cuerpoDeFacetas = (filtros: Filtros): CuerpoExplorar =>
   filtros.extras.length ? { ...cuerpoDeFiltros(filtros), variables: filtros.extras } : cuerpoDeFiltros(filtros)
 
-function nombreDelGrupo(guardado: string | undefined, criterios: number): string {
+/** El nombre de un grupo: el de su muestra guardada, «Todos los niños» sin filtros, o cuántos criterios tiene. */
+export function nombreDelGrupo(guardado: string | undefined, criterios: number): string {
   if (guardado) return guardado
   if (criterios === 0) return 'Todos los niños'
   return `Grupo con ${criterios} ${criterios === 1 ? 'criterio' : 'criterios'}`
 }
+
+/** Los criterios de un grupo en una línea legible; sin criterios, que están todos los niños. */
+export const textoCriterios = (criterios: { texto: string }[]): string =>
+  criterios.length ? criterios.map((c) => c.texto).join(' · ') : 'Sin filtros: están todos los niños del programa.'
 
 export function GrupoActivo({ ninos, total, minimo, error, conPanel = true }: {
   /** Niños del grupo en la respuesta de la página: sin valor mientras carga, nulo si son muy pocos para mostrar la cifra. */
@@ -58,7 +63,7 @@ export function GrupoActivo({ ninos, total, minimo, error, conPanel = true }: {
             <p className="text-sm font-semibold text-salvia" aria-hidden>Grupo activo</p>
             <h2 className="mt-0.5 text-lg leading-tight">{nombreDelGrupo(guardado, criterios.length)}</h2>
             <p className="mt-1 text-sm">
-              {criterios.length ? criterios.map((c) => c.texto).join(' · ') : 'Sin filtros: están todos los niños del programa.'}
+              {textoCriterios(criterios)}
             </p>
             <p className="mt-0.5 text-sm font-semibold text-teal">{cuantos}</p>
           </div>

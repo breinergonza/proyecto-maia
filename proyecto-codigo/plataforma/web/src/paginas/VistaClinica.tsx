@@ -12,7 +12,8 @@ import { Observado } from '../components/clinica/Observado'
 import { RiesgoPorCorte } from '../components/clinica/RiesgoPorCorte'
 import { SelectorDesenlace } from '../components/clinica/SelectorDesenlace'
 import { Trayectoria } from '../components/clinica/Trayectoria'
-import { Aviso, Boton, Encabezado, Vacio } from '../components/ui'
+import { Aviso, Encabezado, Vacio } from '../components/ui'
+import { ErrorConReintento } from '../components/ErrorConReintento'
 import { num } from '../lib/formato'
 import { datosAl } from '../lib/lenguaje'
 import { useFiltros } from '../lib/useFiltros'
@@ -58,7 +59,7 @@ export default function VistaClinica() {
       <Encabezado titulo="Vista clínica"
         accion={(
           <div className="flex flex-wrap gap-2">
-            <Link className={enlace} to="/comparar">Comparar con otro grupo</Link>
+            <Link className={enlace} to={{ pathname: '/comparar', search: params.toString() }}>Comparar con otro grupo</Link>
             <Link className={enlace} to={{ pathname: '/explorar', search: params.toString() }}>Explorar más variables</Link>
           </div>
         )}>
@@ -89,15 +90,7 @@ function Falla({ error, reintentar, reintentando }: { error: Error; reintentar: 
   if (error instanceof ErrorApi && error.estado === 404) {
     return <Vacio titulo="Todavía no hay resultados">Cuando se procesen los datos podrá ver aquí a los niños de cada grupo.</Vacio>
   }
-  return (
-    <Aviso>
-      <p>{error.message}</p>
-      <p className="mt-1">El grupo elegido sigue en la dirección: al reintentar se pide lo mismo.</p>
-      <Boton variante="secundario" chico className="mt-2" onClick={reintentar} disabled={reintentando}>
-        {reintentando ? 'Reintentando…' : 'Reintentar'}
-      </Boton>
-    </Aviso>
-  )
+  return <ErrorConReintento error={error} que="la vista clínica" conserva="El grupo elegido sigue en la dirección: al reintentar se pide lo mismo." reintentar={reintentar} reintentando={reintentando} />
 }
 
 function Contenido({ r, activa, elegir }: { r: ClinicaResumen; activa: string; elegir: (clave: string) => void }) {

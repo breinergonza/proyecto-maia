@@ -19,9 +19,8 @@ from sqlalchemy.orm import Session
 from clinico import configuracion as CONFIG
 from clinico import crecimiento as CR
 from maia_api import poblacion as P
-from maia_api.consultas import corrida_de, etapas, nombre_etapa
+from maia_api.consultas import INDICADORES, corrida_de, etapas, nombre_etapa
 from maia_api.dependencias import CUALQUIERA, auditar, sesion
-from maia_api.rutas.analitica import INDICADORES
 from maia_api.rutas.exploracion import Consulta, _definicion
 from maia_comun import clinica as CL
 from maia_comun import diccionarios as DIC
@@ -67,7 +66,7 @@ class Dic:
         return CR.Z_BAJO
 
 
-def _diccionario(s: Session) -> Dic:
+def diccionario_clinico(s: Session) -> Dic:
     v = DIC.vigente(s)
     if v is None:
         return Dic()
@@ -116,7 +115,7 @@ def _describir(familia: str, dic: Dic, nombres: dict[str, str], claves: set[str]
     return {'clave': familia, 'nombre': nombre, 'definicion': definicion, 'estado': estado, 'indicador': indicador}
 
 
-def _familias(s: Session, corrida: int, dic: Dic) -> list[dict]:
+def familias_de(s: Session, corrida: int, dic: Dic) -> list[dict]:
     """Las familias priorizadas de las que la corrida tiene algo (lo observado o el riesgo de alguna de sus claves)."""
     claves = s.execute(text('SELECT DISTINCT clave, desenlace FROM resultados.riesgos WHERE corrida_id = :c'),
                        {'c': corrida}).all()
@@ -131,7 +130,7 @@ def _filas(s: Session, sql: str, **p) -> list[dict]:
     return [dict(r._mapping) for r in s.execute(text(sql), p)]
 
 
-def _observado(s: Session, corrida: int, familia: str, ids: list[str] | None, n: int, red: bool) -> dict | None:
+def observado_de(s: Session, corrida: int, familia: str, ids: list[str] | None, n: int, red: bool) -> dict | None:
     """Casos, niños con dato y sin dato de ``n`` niños (``ids``; ``None`` es todo el corte). Con menos de 5 con dato,
     nada."""
     de = ' AND sujeto = ANY(:ids)' if ids is not None else ''
@@ -145,7 +144,7 @@ def _observado(s: Session, corrida: int, familia: str, ids: list[str] | None, n:
             'sin_dato': P.proteger(max(n - con_dato, 0), red)}
 
 
-def _trayectoria(s: Session, corrida: int, corte_id: int, indicador: str, ids: list[str] | None,
+def trayectoria_de(s: Session, corrida: int, corte_id: int, indicador: str, ids: list[str] | None,
                  dic: Dic, red: bool) -> dict:
     """Por visita (en orden clínico), la mediana y la mitad central del puntaje z del grupo y la mediana de la
     población, con los niños que tienen dato. Los datos improbables no cuentan."""
@@ -176,7 +175,7 @@ def _trayectoria(s: Session, corrida: int, corte_id: int, indicador: str, ids: l
                         'poblacion': celda(poblacion.get(e), False)} for e in visitas]}
 
 
-def _riesgo(s: Session, corrida: int, corte_id: int, familia: str, ids: list[str] | None, dic: Dic,
+def riesgo_de(s: Session, corrida: int, corte_id: int, familia: str, ids: list[str] | None, dic: Dic,
             red: bool) -> list[dict]:
     """Por corte (visita desde la que se predice), cuántos niños del grupo tienen riesgo calculado y cuántos están en
     alerta (percentil de ``PERCENTIL_ALTO`` o más)."""
@@ -233,8 +232,8 @@ def resumen(consulta: ConsultaClinica, s: Session = Depends(sesion), u: Usuario 
     if consulta.indicador is not None and consulta.indicador not in INDICADORES:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
                             f'El indicador {consulta.indicador} no existe: {", ".join(INDICADORES)}.')
-    dic = _diccionario(s)
-    familias = _familias(s, corrida.id, dic)
+    dic = diccionario_clinico(s)
+    familias = familias_de(s, corrida.id, dic)
     elegida = next((f for f in familias if f['clave'] == consulta.familia), None) if consulta.familia else \
         next(iter(familias), None)
     if consulta.familia and elegida is None:
@@ -263,10 +262,10 @@ def resumen(consulta: ConsultaClinica, s: Session = Depends(sesion), u: Usuario 
         'datos_al': (corrida.resumen or {}).get('corte') or (str(corrida.fecha_corte) if corrida.fecha_corte else None),
         'familias': familias, 'familia': familia, 'indicador': indicador,
         'grupo': {'n': P.proteger(len(ids), red), 'n_total': P.proteger(total, red)},
-        'observado': {'grupo': _observado(s, corrida.id, familia, grupo, len(ids), red) if familia else None,
-                      'poblacion': _observado(s, corrida.id, familia, None, total, red) if familia else None},
-        'trayectoria': _trayectoria(s, corrida.id, corrida.corte_id, indicador, grupo, dic, red),
-        'riesgo': _riesgo(s, corrida.id, corrida.corte_id, familia, grupo, dic, red) if familia else [],
+        'observado': {'grupo': observado_de(s, corrida.id, familia, grupo, len(ids), red) if familia else None,
+                      'poblacion': observado_de(s, corrida.id, familia, None, total, red) if familia else None},
+        'trayectoria': trayectoria_de(s, corrida.id, corrida.corte_id, indicador, grupo, dic, red),
+        'riesgo': riesgo_de(s, corrida.id, corrida.corte_id, familia, grupo, dic, red) if familia else [],
         'alerta_percentil': PERCENTIL_ALTO,
         'ninos': ninos,
     }

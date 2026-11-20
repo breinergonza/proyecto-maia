@@ -1,0 +1,104 @@
+// Talla para la edad visita por visita, un grupo frente al otro: la mediana del puntaje z con el umbral de talla baja y,
+// debajo, cuántos niños tienen dato en cada visita. Se dibuja un punto solo donde hay dato (5 niños o más): una visita
+// sin dato queda como hueco y la línea no la cruza, así no se inventa una medición que no existe.
+import { CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import type { GruposClinicoOk, VisitaComparada } from '../../api/comparar'
+import { dec2, num } from '../../lib/formato'
+import { Grafica } from '../grafica'
+import { COLOR, LeyendaSeries, SERIES_COLOR } from '../graficos'
+import { GraficaNavegable, resumenDe } from '../graficos/navegacion'
+import { Tabla } from '../ui'
+import { FichaDelDato, MENOS_DE_5, ninos, SERIES_AB, SERIE_A, SERIE_B } from './comun'
+
+type Fila = { x: string; a: number | null; b: number | null; nA: number | null; nB: number | null }
+
+const filasDe = (etapas: VisitaComparada[]): Fila[] =>
+  etapas.map((e) => ({ x: e.etapa, a: e.a?.mediana ?? null, b: e.b?.mediana ?? null, nA: e.a?.n ?? null, nB: e.b?.n ?? null }))
+
+function Globo({ active, payload }: { active?: boolean; payload?: ReadonlyArray<{ payload?: Fila }> }) {
+  const f = payload?.[0]?.payload
+  if (!active || !f) return null
+  return (
+    <div role="status" aria-live="polite" className="max-w-72 rounded-control border border-linea bg-papel px-3 py-2 text-sm shadow-elevada">
+      <p className="font-semibold">{f.x}</p>
+      {[{ s: SERIE_A, v: f.a, n: f.nA }, { s: SERIE_B, v: f.b, n: f.nB }].map(({ s, v, n }) => (
+        <p key={s.clave}>{s.nombre}: {v == null ? 'sin dato en esta visita' : `mediana ${dec2(v)}, ${num(n)} niños con dato`}</p>
+      ))}
+    </div>
+  )
+}
+
+export function TallaPorVisita({ r }: { r: GruposClinicoOk }) {
+  const { trayectoria: t } = r
+  const filas = filasDe(t.etapas)
+  const umbral = String(t.umbral).replace('-', '−')
+  const valores = filas.flatMap((f) => [f.a, f.b]).filter((v): v is number => v != null)
+  const dominio: [number, number] = [Math.floor(Math.min(t.umbral, ...valores) - 0.3), Math.ceil(Math.max(t.umbral, ...valores) + 0.3)]
+  const hayDatos = valores.length > 0
+
+  const items = filas.map((f) => `${f.x}. ${[{ s: SERIE_A, v: f.a, n: f.nA }, { s: SERIE_B, v: f.b, n: f.nB }].map(({ s, v, n }) =>
+    `${s.nombre}: ${v == null ? 'sin dato' : `mediana ${dec2(v)}, ${num(n)} niños con dato`}`).join('; ')}`)
+  const etiqueta = `${t.nombre} por visita: mediana del ${t.unidad} de cada grupo frente al umbral de ${umbral}. ${items.join('. ')}`
+  const tabla = filas.map((f) => ({
+    Visita: f.x, 'Grupo A: niños con dato': f.nA, 'Grupo A: mediana': f.a == null ? null : dec2(f.a),
+    'Grupo B: niños con dato': f.nB, 'Grupo B: mediana': f.b == null ? null : dec2(f.b),
+  }))
+
+  return (
+    <Grafica titulo={`${t.nombre}, visita por visita`}
+      descripcion="Mediana del puntaje z de talla en cada visita, del grupo A frente al grupo B. Solo hay punto donde 5 niños o más tienen dato."
+      exportar={{ nombre: 'comparar-grupos-talla-por-visita', filas: tabla, columnas: Object.keys(tabla[0] ?? {}) }}>
+      {hayDatos ? (
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            <LeyendaSeries series={SERIES_AB.map((s) => ({ ...s, nombre: `${s.nombre} · mediana` }))} />
+            <ul className="flex text-xs" aria-hidden>
+              <li className="inline-flex items-center gap-1.5">
+                <span className="inline-block w-4 border-t-2 border-dashed border-coral-hondo" />Umbral de talla baja ({umbral})
+              </li>
+            </ul>
+          </div>
+          <GraficaNavegable etiqueta={etiqueta} resumen={resumenDe('Líneas', filas.length, ['visita', 'visitas'])} items={items} style={{ height: 260 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={filas} margin={{ left: 0, right: 12, top: 8, bottom: 16 }}>
+                <CartesianGrid stroke={COLOR.rejilla} vertical={false} />
+                <XAxis dataKey="x" stroke={COLOR.eje} fontSize={12} tickLine={false} interval="preserveStartEnd" padding={{ left: 14, right: 14 }}
+                  label={{ value: 'Visita (edad corregida)', position: 'insideBottom', offset: -12, fill: COLOR.eje, fontSize: 12 }} />
+                <YAxis domain={dominio} stroke={COLOR.eje} fontSize={12} width={48} tickLine={false} axisLine={false} allowDecimals={false}
+                  label={{ value: 'Puntaje z de talla', angle: -90, position: 'insideLeft', offset: 14, fill: COLOR.eje, fontSize: 12, style: { textAnchor: 'middle' } }} />
+                <Tooltip cursor={{ stroke: COLOR.referencia, strokeDasharray: '3 3' }} content={(p) => <Globo {...p} />} />
+                <ReferenceLine y={t.umbral} stroke={COLOR.marca} strokeDasharray="5 4" />
+                {SERIES_AB.map((s) => (
+                  <Line key={s.clave} dataKey={s.clave} stroke={SERIES_COLOR[s.color]} strokeWidth={2.5} isAnimationActive={false} connectNulls={false}
+                    dot={{ r: 4, fill: SERIES_COLOR[s.color], stroke: COLOR.papel, strokeWidth: 2 }} activeDot={{ r: 6, stroke: COLOR.papel, strokeWidth: 2 }} />
+                ))}
+              </ComposedChart>
+            </ResponsiveContainer>
+          </GraficaNavegable>
+          <Tabla densa>
+            <caption className="sr-only">Niños con dato en cada visita</caption>
+            <thead>
+              <tr><th>Niños con dato</th>{filas.map((f) => <th key={f.x}>{f.x}</th>)}</tr>
+            </thead>
+            <tbody>
+              {[{ s: SERIE_A, n: (f: Fila) => f.nA }, { s: SERIE_B, n: (f: Fila) => f.nB }].map(({ s, n }) => (
+                <tr key={s.clave}>
+                  <td className="whitespace-nowrap font-semibold">
+                    <span aria-hidden className="mr-1.5 inline-block size-2.5 rounded-sm" style={{ background: SERIES_COLOR[s.color] }} />{s.nombre}
+                  </td>
+                  {filas.map((f) => <td key={f.x} className="tabular-nums">{n(f) == null ? MENOS_DE_5 : num(n(f))}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </Tabla>
+        </div>
+      ) : <p className="text-sm">Ningún grupo tiene 5 niños o más con dato de talla en una misma visita.</p>}
+      <FichaDelDato items={{
+        variable: `${t.nombre.toLowerCase()} (puntaje z, referencia ${t.referencia})`, unidad: t.unidad,
+        momento: 'cada visita, en edad corregida',
+        poblacion: `niños elegibles de cada grupo (Grupo A: ${ninos(r.a.n)}; Grupo B: ${ninos(r.b.n)})`,
+        validos: 'niños con z de talla válido en esa visita (tabla de arriba); una visita con menos de 5 no da cifra',
+      }} />
+    </Grafica>
+  )
+}

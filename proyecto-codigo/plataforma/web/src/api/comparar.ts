@@ -1,8 +1,8 @@
-// Analítica › Comparar: dos entrenamientos (con réplicas bootstrap) o dos grupos de niños, y «Aprobar B» (solo
-// administración), que usa el mismo endpoint de aprobación que Administración › Entrenamientos.
-import { useMutation, useQuery } from '@tanstack/react-query'
+// Comparar: dos entrenamientos (con réplicas bootstrap, en Modelos), dos grupos de niños (Comparar grupos) y «Aprobar B»
+// (solo administración), que usa el mismo endpoint de aprobación que Administración › Entrenamientos.
+import { keepPreviousData, skipToken, useMutation, useQuery } from '@tanstack/react-query'
 import { pedir } from './cliente'
-import type { Ejecucion, EntradaFiltro, Entrenamientos } from './tipos'
+import type { CuerpoExplorar, Ejecucion, Entrenamientos } from './tipos'
 
 export interface MedidaComparada {
   id: string; texto: string; unidad: 'abs' | 'pp'; a: number | null; b: number | null; diferencia: number | null
@@ -29,30 +29,46 @@ export const useComparaEntrenamientos = (a: number | null, b: number | null, des
     queryFn: () => pedir<ComparaEntrenamientos>('/analitica/comparar', { params: { a, b, desenlace } }),
   })
 
-// ---- grupos de niños
-export interface LadoGrupoEntrada { muestra?: { version: 2; y: EntradaFiltro[] }; muestra_id?: number; nombre?: string }
-export interface ValorComparado {
-  unidad: string; n_a: number | null; n_b: number | null; a: number | null; b: number | null
-  ic_a: [number, number] | null; ic_b: [number, number] | null
-  diferencia: number | null; ic_bajo: number | null; ic_alto: number | null; clara: boolean | null
+// ---- grupos de niños, por pregunta clínica (POST /analitica/comparar/grupos/clinico), a mano hasta que el esquema tenga tipos
+/** Un lado del cuerpo es un grupo como el de Explorar: el filtro guardado por su número o la muestra completa. */
+export interface CuerpoGruposClinico { a: CuerpoExplorar; b: CuerpoExplorar; corrida_id?: number }
+export interface LadoClinico { nombre: string; n: number | null }
+/** Niños con el desenlace entre los que tienen dato a los 12 meses. Los conteos redondeados o nulos siguen las reglas de
+ *  la Vista clínica; ``pct`` es nulo con menos de 20 niños con dato. */
+export interface ObservadoLado { casos: number | null; con_dato: number | null; sin_dato: number | null; pct: number | null }
+/** B frente a A en puntos porcentuales, con su intervalo del 95 %; todo nulo si un lado tiene menos de 20 niños con dato. */
+export interface DiferenciaObservada { valor: number | null; ic_bajo: number | null; ic_alto: number | null; clara: boolean | null }
+export interface RiesgoDeCorte { calculados: number | null; en_alerta: number | null }
+/** El riesgo estimado por el modelo en un corte (visita desde la que se predice); ``estado`` dice si el modelo está «En prueba». */
+export interface RiesgoPorCorteLados {
+  momento: string; momento_nombre: string; clave: string; estado: 'en_uso' | 'en_prueba'
+  a: RiesgoDeCorte | null; b: RiesgoDeCorte | null
 }
-export interface ComparaGrupos {
-  estado: 'ok' | 'insuficiente'; mensaje?: string; corrida_id: number; minimo_ninos: number; replicas: number
-  a: { nombre: string; n: number | null }; b: { nombre: string; n: number | null }
-  percentil_alto?: number; aviso?: string
-  riesgo?: (ValorComparado & { clave: string; desenlace: string })[]
-  crecimiento?: ValorComparado & { indicador: string; etiqueta: string }
-  motivos?: { motivo: string; altos_a: number; altos_b: number
-    a: { n: number | null; pct: number | null }; b: { n: number | null; pct: number | null } }[]
-  faltantes?: { variable: string; etiqueta: string
-    a: { faltan: number | null; pct: number | null }; b: { faltan: number | null; pct: number | null } }[]
-  composicion?: Record<string, { etiqueta: string
-    categorias: { categoria: string; etiqueta: string; n_a: number | null; n_b: number | null; pct_a: number | null; pct_b: number | null }[] }>
+export interface DesenlaceComparado {
+  clave: string; nombre: string; definicion: string; estado: 'en_uso' | 'en_prueba'; indicador: string | null
+  a: ObservadoLado | null; b: ObservadoLado | null; dif: DiferenciaObservada; riesgo: RiesgoPorCorteLados[]
 }
-export interface CuerpoGrupos { a: LadoGrupoEntrada; b: LadoGrupoEntrada; corrida_id?: number; desenlace?: string }
+/** Lo de un grupo en una visita: niños con z de talla, su mediana y los que no tienen dato (con su porcentaje). */
+export interface TallaDeVisita { n: number; mediana: number; sin_dato: number; pct_sin_dato: number }
+export interface VisitaComparada { etapa: string; etapa_nombre: string; a: TallaDeVisita | null; b: TallaDeVisita | null }
+export interface GruposClinicoOk {
+  estado: 'ok'; corrida_id: number; minimo_ninos: number; alerta_percentil: number
+  /** Con ``ok`` los dos lados tienen 20 niños o más: ``n`` y ``n_total`` van siempre. */
+  a: { nombre: string; n: number; n_total: number }; b: { nombre: string; n: number; n_total: number }
+  desenlaces: DesenlaceComparado[]
+  trayectoria: { indicador: string; nombre: string; unidad: string; referencia: string; umbral: number; etapas: VisitaComparada[] }
+}
+export interface GruposClinicoInsuficiente { estado: 'insuficiente'; corrida_id: number; minimo_ninos: number; mensaje: string; a: LadoClinico; b: LadoClinico }
+export type RespuestaGruposClinico = GruposClinicoOk | GruposClinicoInsuficiente
 
-export const useComparaGrupos = () =>
-  useMutation({ mutationFn: (cuerpo: CuerpoGrupos) => pedir<ComparaGrupos>('/analitica/comparar/grupos', { cuerpo }) })
+/** Los dos grupos a la vez; sin el grupo B elegido (``null``) no se pide nada. La llave lleva ambos cuerpos, así que
+ *  reintentar tras una falla pide lo mismo. */
+export const useComparaGruposClinico = (cuerpo: CuerpoGruposClinico | null) =>
+  useQuery({
+    queryKey: ['analitica', 'comparar', 'grupos', 'clinico', cuerpo],
+    queryFn: cuerpo ? () => pedir<RespuestaGruposClinico>('/analitica/comparar/grupos/clinico', { cuerpo }) : skipToken,
+    placeholderData: keepPreviousData,
+  })
 
 // ---- aprobar B (solo administración)
 /** La versión de anomalías que hoy está en producción (o, si no hay, la más reciente): «Aprobar» promueve las dos. */

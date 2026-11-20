@@ -230,7 +230,7 @@ describe('vista clínica', () => {
     api('experto')
     montar('/?f=sexo|lista|F')
     await screen.findByRole('heading', { name: 'Qué les pasó a los 12 meses' })
-    expect(screen.getByRole('link', { name: 'Comparar con otro grupo' })).toHaveAttribute('href', '/comparar')
+    expect(screen.getByRole('link', { name: 'Comparar con otro grupo' })).toHaveAttribute('href', '/comparar?f=sexo%7Clista%7CF')
     expect(screen.getByRole('link', { name: 'Explorar más variables' })).toHaveAttribute('href', '/explorar?f=sexo%7Clista%7CF')
   })
 })

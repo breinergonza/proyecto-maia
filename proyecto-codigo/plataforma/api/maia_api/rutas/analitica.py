@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from maia_api.consultas import corrida_de, esquema, etapas, medidas_numericas
+from maia_api.consultas import INDICADORES, corrida_de, esquema, etapas, medidas_numericas
 from maia_api.dependencias import CUALQUIERA, sesion
 from maia_api.poblacion import VARIABLES_SEXO
 from maia_api.rutas import analitica_anticipacion as anticipacion
@@ -36,8 +36,6 @@ ORDEN = tuple(TIPOS)
 EXTRAS = {'calibracion': ('hist_riesgo',), 'poblacion': ('distribuciones_muestra_universo',),
           'anticipacion': ('metricas_por_visita', 'primera_alerta')}
 EN_VIVO = ('trayectorias', 'perfiles')   # se calculan al pedirlos (de crecimiento y riesgos), no son artefactos guardados
-INDICADORES = {'peso': 'Peso para la edad', 'talla': 'Talla para la edad',
-               'perimetro_cefalico': 'Perímetro cefálico para la edad', 'peso_para_talla': 'Peso para la talla'}
 # el sexo viene como 1/2 en la base de la Fundación (ern_sexo) y como M/F en los datos simulados (sexo)
 SEXOS = {'1': 'masculino', '2': 'femenino', 'm': 'masculino', 'f': 'femenino', 'masculino': 'masculino', 'femenino': 'femenino'}
 MSG_SIN_RIESGO = ('La última corrida no calculó el riesgo de este desenlace: el riesgo se calcula solo para los niños que '

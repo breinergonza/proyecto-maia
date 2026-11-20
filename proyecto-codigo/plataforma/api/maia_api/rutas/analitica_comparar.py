@@ -5,11 +5,17 @@
 * ``POST /analitica/comparar/grupos``: dos grupos de niños (cada lado, un filtro guardado o una combinación de
   facetas) sobre una corrida: tamaño, riesgo alto por desenlace, crecimiento y composición. Con menos de 20 niños en
   un lado no se da ninguna cifra (D52) y los conteos de 1 a 4 se ocultan (D4).
+* ``POST /analitica/comparar/grupos/clinico``: los mismos dos grupos vistos como los ve el equipo clínico (Comparar
+  grupos): qué les pasó a los 12 meses (lo observado, con la diferencia de B frente a A), la talla para la edad por
+  visita y los datos que faltan en cada una, y el riesgo estimado por corte (aparte, porque no es lo observado). Las
+  cifras de cada lado salen de las mismas funciones que la Vista clínica (``rutas.clinica``) y con sus reglas de
+  privacidad: 20 niños por lado, celdas de 5 o más y conteos redondeados para quien solo consulta.
 
 Aprobar B no vive aquí: la pantalla llama a ``POST /entrenamientos/aprobar`` (solo administración, con auditoría).
 """
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
@@ -17,13 +23,15 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from maia_api import poblacion as P
-from maia_api.consultas import corrida_de, esquema, motivo_legible
+from maia_api.consultas import corrida_de, esquema, etapas, motivo_legible
 from maia_api.dependencias import CUALQUIERA, auditar, sesion
+from maia_api.rutas import clinica as CLI
+from maia_api.rutas.clinica import Dic
 from maia_comun import analitica as AN
 from maia_comun import analitica_comparar as CM
 from maia_comun import muestra as M
 from maia_comun.modelos_analitica import Analitica
-from maia_comun.modelos_db import PERCENTIL_ALTO, Usuario
+from maia_comun.modelos_db import PERCENTIL_ALTO, Corrida, Usuario
 from maia_comun.modelos_muestras import Muestra
 
 ruta = APIRouter(prefix='/comparar', tags=['analitica'])
@@ -93,10 +101,13 @@ class LadoGrupo(BaseModel):
     nombre: str | None = None
 
 
-class ComparaGrupos(BaseModel):
+class DosGrupos(BaseModel):
     a: LadoGrupo
     b: LadoGrupo
     corrida_id: int | None = None
+
+
+class ComparaGrupos(DosGrupos):
     desenlace: str | None = None
 
 
@@ -109,6 +120,31 @@ def _ids(s: Session, corte: int, lado: LadoGrupo) -> list[str]:
     else:
         defn = lado.muestra or {'version': M.VERSION}
     return P.ids_de(s, corte, defn, muestreo=False)
+
+
+def _abrir(s: Session, u: Usuario, c: DosGrupos) -> tuple[Corrida, list[str], list[str], bool]:
+    """La corrida y los niños de cada lado; la consulta queda en la auditoría (con la huella de cada grupo, sin códigos).
+    El último valor dice si los conteos van redondeados (para quien solo consulta, D46)."""
+    corrida = corrida_de(s, c.corrida_id)
+    if corrida.corte_id is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, 'Los datos de esa corrida ya no están en la base.')
+    ids_a, ids_b = _ids(s, corrida.corte_id, c.a), _ids(s, corrida.corte_id, c.b)
+    auditar(s, u, 'analitica.comparar_grupos', f'corrida:{corrida.id}',
+            {'huella_a': M.huella(ids_a), 'huella_b': M.huella(ids_b), 'n_a': len(ids_a), 'n_b': len(ids_b)})
+    s.commit()
+    return corrida, ids_a, ids_b, u.rol == 'visualizador'
+
+
+def _lado_grupo(nombre: str | None, ids: list[str], defecto: str, red: bool) -> dict:
+    n = len(ids)
+    return {'nombre': nombre or defecto, 'n': P.proteger(n, red) if n >= AN.MIN_CELDA else None}
+
+
+def _faltan_ninos(ids_a: list[str], ids_b: list[str]) -> dict | None:
+    """El aviso cuando un lado no llega al mínimo de niños (D52): sin él, ninguna cifra de ninguno de los dos."""
+    if min(len(ids_a), len(ids_b)) >= AN.MIN_DISTRIBUCION:
+        return None
+    return {'estado': 'insuficiente', 'mensaje': f'Cada grupo necesita al menos {AN.MIN_DISTRIBUCION} niños para compararse.'}
 
 
 def _composicion(cat: pd.DataFrame, ids_a: list[str], ids_b: list[str]) -> dict:
@@ -191,23 +227,11 @@ def _faltantes_por_grupo(s: Session, corte: int, esq: dict, ids_a: list[str], id
 
 @ruta.post('/grupos')
 def grupos(c: ComparaGrupos, s: Session = Depends(sesion), u: Usuario = Depends(CUALQUIERA)) -> dict:
-    corrida = corrida_de(s, c.corrida_id)
-    if corrida.corte_id is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, 'Los datos de esa corrida ya no están en la base.')
-    ids_a, ids_b = _ids(s, corrida.corte_id, c.a), _ids(s, corrida.corte_id, c.b)
-    auditar(s, u, 'analitica.comparar_grupos', f'corrida:{corrida.id}',
-            {'huella_a': M.huella(ids_a), 'huella_b': M.huella(ids_b), 'n_a': len(ids_a), 'n_b': len(ids_b)})
-    s.commit()
-    red = u.rol == 'visualizador'
-
-    def lado(nombre: str | None, ids: list[str], defecto: str) -> dict:
-        n = len(ids)
-        return {'nombre': nombre or defecto, 'n': P.proteger(n, red) if n >= AN.MIN_CELDA else None}
+    corrida, ids_a, ids_b, red = _abrir(s, u, c)
     base = {'corrida_id': corrida.id, 'minimo_ninos': AN.MIN_DISTRIBUCION, 'replicas': CM.REPLICAS_GRUPOS,
-            'a': lado(c.a.nombre, ids_a, 'Grupo A'), 'b': lado(c.b.nombre, ids_b, 'Grupo B')}
-    if min(len(ids_a), len(ids_b)) < AN.MIN_DISTRIBUCION:
-        return {**base, 'estado': 'insuficiente',
-                'mensaje': f'Cada grupo necesita al menos {AN.MIN_DISTRIBUCION} niños para compararse.'}
+            'a': _lado_grupo(c.a.nombre, ids_a, 'Grupo A', red), 'b': _lado_grupo(c.b.nombre, ids_b, 'Grupo B', red)}
+    if faltan := _faltan_ninos(ids_a, ids_b):
+        return {**base, **faltan}
 
     riesgos = pd.DataFrame(s.execute(text(
         'SELECT sujeto, clave, desenlace, max(percentil) AS p FROM resultados.riesgos WHERE corrida_id = :c AND NOT silencio '
@@ -239,3 +263,82 @@ def grupos(c: ComparaGrupos, s: Session = Depends(sesion), u: Usuario = Depends(
             'composicion': _composicion(cat, ids_a, ids_b),
             'aviso': 'Las diferencias son asociaciones entre grupos, no causas. Un asterisco marca una diferencia clara: '
                      'su intervalo del 95 % no incluye cero.'}
+
+
+# ---------------------------------------------------------------------------------- comparar grupos, por pregunta
+
+INDICADOR_TALLA = 'talla'
+
+
+def _valores_observados(s: Session, corrida: int, familia: str, ids_a: list[str], ids_b: list[str]) -> tuple[np.ndarray, np.ndarray]:
+    """Lo que pasó (1) o no (0) a los 12 meses, de los niños de cada lado que tienen dato."""
+    filas = s.execute(text('SELECT sujeto, valor FROM resultados.desenlaces_observados WHERE corrida_id = :c '
+                           'AND familia = :f AND sujeto = ANY(:ids)'),
+                      {'c': corrida, 'f': familia, 'ids': list({*ids_a, *ids_b})})
+    por_nino = {f.sujeto: float(f.valor) for f in filas}
+    va, vb = ([por_nino[x] for x in set(ids) if x in por_nino] for ids in (ids_a, ids_b))
+    return np.array(va), np.array(vb)
+
+
+def _riesgo_por_corte(s: Session, corrida: Corrida, familia: str, ids_a: list[str], ids_b: list[str], dic: Dic,
+                      red: bool) -> list[dict]:
+    """Por corte de la familia, cuántos niños de cada lado tienen riesgo calculado y cuántos están en alerta. Es el
+    riesgo estimado por el modelo, no lo observado: la pantalla lo rotula así. Un lado con menos de 5 niños no da cifra."""
+    cortes = [{f['clave']: f for f in CLI.riesgo_de(s, corrida.id, corrida.corte_id, familia, ids, dic, red)}
+              for ids in (ids_a, ids_b)]
+    mapa = etapas(s, corrida.corte_id)
+    filas = []
+    for clave in {*cortes[0], *cortes[1]}:
+        propio = cortes[0].get(clave) or cortes[1][clave]
+        filas.append({k: propio[k] for k in ('momento', 'momento_nombre', 'clave', 'estado')}
+                     | {lado: {k: c[clave][k] for k in ('calculados', 'en_alerta')} if clave in c else None
+                        for lado, c in zip(('a', 'b'), cortes, strict=True)})
+    return sorted(filas, key=lambda f: (mapa.get(f['momento'], {}).get('orden', 99), f['clave']))
+
+
+def _desenlace(s: Session, corrida: Corrida, familia: dict, ids_a: list[str], ids_b: list[str], dic: Dic, red: bool) -> dict:
+    """Lo observado a los 12 meses en cada lado, con la diferencia de B frente a A y su intervalo por réplicas (cada
+    lado pide 20 niños con dato), y el riesgo estimado por corte."""
+    clave = familia['clave']
+    va, vb = _valores_observados(s, corrida.id, clave, ids_a, ids_b)
+    comparacion = CM.comparar_valores(va, vb, escala=100, unidad='pp')
+
+    def observado(ids: list[str], pct: float | None) -> dict | None:
+        o = CLI.observado_de(s, corrida.id, clave, ids, len(ids), red)
+        return None if o is None else {**o, 'pct': pct}
+    return {**familia, 'a': observado(ids_a, comparacion['a']), 'b': observado(ids_b, comparacion['b']),
+            'dif': {'valor': comparacion['diferencia'], 'ic_bajo': comparacion['ic_bajo'], 'ic_alto': comparacion['ic_alto'],
+                    'clara': comparacion['clara']},
+            'riesgo': _riesgo_por_corte(s, corrida, clave, ids_a, ids_b, dic, red)}
+
+
+def _talla_por_visita(s: Session, corrida: Corrida, ids_a: list[str], ids_b: list[str], dic: Dic, red: bool) -> dict:
+    """La mediana del puntaje z de talla en cada visita, de cada lado, con los niños que tienen dato y los que no (el
+    porcentaje que falta es sobre todos los niños del lado). Una visita con menos de 5 niños con dato no da cifra."""
+    por_lado = [CLI.trayectoria_de(s, corrida.id, corrida.corte_id, INDICADOR_TALLA, ids, dic, red) for ids in (ids_a, ids_b)]
+    totales = [P.proteger(len(ids), red) for ids in (ids_a, ids_b)]
+
+    def celda(e: dict, total: int) -> dict | None:
+        g = e['grupo']
+        if g is None:
+            return None
+        sin = max(total - g['n'], 0)
+        return {'n': g['n'], 'mediana': g['mediana'], 'sin_dato': sin, 'pct_sin_dato': round(100 * sin / total, 1)}
+    visitas = [{'etapa': ea['etapa'], 'etapa_nombre': ea['etapa_nombre'], 'a': celda(ea, totales[0]), 'b': celda(eb, totales[1])}
+               for ea, eb in zip(por_lado[0]['etapas'], por_lado[1]['etapas'], strict=True)]
+    return {**{k: por_lado[0][k] for k in ('indicador', 'nombre', 'unidad', 'referencia', 'umbral')}, 'etapas': visitas}
+
+
+@ruta.post('/grupos/clinico')
+def grupos_clinico(c: DosGrupos, s: Session = Depends(sesion), u: Usuario = Depends(CUALQUIERA)) -> dict:
+    corrida, ids_a, ids_b, red = _abrir(s, u, c)
+    base = {'corrida_id': corrida.id, 'minimo_ninos': AN.MIN_DISTRIBUCION,
+            'a': _lado_grupo(c.a.nombre, ids_a, 'Grupo A', red), 'b': _lado_grupo(c.b.nombre, ids_b, 'Grupo B', red)}
+    if faltan := _faltan_ninos(ids_a, ids_b):
+        return {**base, **faltan}
+    total = P.proteger(P.n_base(s, corrida.corte_id), red)
+    dic = CLI.diccionario_clinico(s)
+    return {**base, 'estado': 'ok', 'alerta_percentil': PERCENTIL_ALTO,
+            'a': {**base['a'], 'n_total': total}, 'b': {**base['b'], 'n_total': total},
+            'desenlaces': [_desenlace(s, corrida, f, ids_a, ids_b, dic, red) for f in CLI.familias_de(s, corrida.id, dic)],
+            'trayectoria': _talla_por_visita(s, corrida, ids_a, ids_b, dic, red)}

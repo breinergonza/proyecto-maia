@@ -179,7 +179,7 @@ describe('navegación', () => {
     await waitFor(() => expect(document.title).toBe('Resumen del programa · Observatorio Canguro'))
   })
 
-  it('«/comparar» abre «Comparar grupos» con la vista de grupos de siempre', async () => {
+  it('«/comparar» abre «Comparar grupos» con el grupo A y un atajo para elegir el B', async () => {
     simularApi((url) => {
       if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('experto') } }
       if (url.startsWith('/api/analitica/contexto')) return { cuerpo: { entrenamiento: 1, desenlaces: [], modelos: [], submodulos: [], estado: 'ok' } }
@@ -188,8 +188,8 @@ describe('navegación', () => {
     })
     montar('/comparar')
     expect(await screen.findByRole('heading', { level: 1, name: 'Comparar grupos' })).toBeInTheDocument()
-    expect(await screen.findByRole('button', { name: 'Comparar grupos' })).toBeInTheDocument()
-    expect(await screen.findByRole('group', { name: 'Grupo A' })).toBeInTheDocument()
+    expect(await screen.findByRole('region', { name: 'Grupo A' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Comparar con todos los niños' })).toBeInTheDocument()
   })
 
   it('«/explorar» sigue abierto aunque ya no esté en el menú', async () => {
