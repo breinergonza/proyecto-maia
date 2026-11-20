@@ -5,16 +5,19 @@ import { Link } from 'react-router'
 import type { AnaliticaMeta } from '../../api/tipos'
 import { paqueteQueContiene } from '../../api/modelos'
 import { puede, useSesion } from '../../auth/sesion'
+import { cn } from '../../lib/cn'
 import { usePaqueteActivo } from '../../lib/consultas'
-import { fecha, fechaHora, numero } from '../../lib/formato'
+import { fecha, numero } from '../../lib/formato'
 import { datosAl } from '../../lib/lenguaje'
 import { Panel } from '../ui'
 
-function Datos({ filas }: { filas: [string, string | null | undefined][] }) {
+/** `columnas`: una lista larga de datos cortos (los hiperparámetros) se reparte en dos columnas en pantallas anchas, para no alargar el panel. */
+function Datos({ filas, columnas }: { filas: [string, string | null | undefined][]; columnas?: boolean }) {
   return (
-    <dl className="divide-y divide-linea/70 text-sm">
+    <dl className={columnas ? 'grid gap-x-8 text-sm 2xl:grid-cols-2' : 'divide-y divide-linea/70 text-sm'}>
       {filas.flatMap(([rotulo, valor]) => (valor ? [(
-        <div key={rotulo} className="grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)] gap-x-4 py-2 first:pt-0 sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)]">
+        <div key={rotulo} className={cn('grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)] gap-x-4 py-2 sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)]',
+          columnas ? 'border-b border-linea/70' : 'first:pt-0')}>
           <dt className="font-semibold">{rotulo}</dt>
           <dd className="min-w-0 break-words">{valor}</dd>
         </div>
@@ -37,7 +40,7 @@ export function ConfiguracionModelo({ meta }: { meta: AnaliticaMeta | undefined 
       {meta?.hiperparametros?.length ? (
         <div className="mt-4">
           <h3 className="mb-2 text-sm font-semibold">Hiperparámetros</h3>
-          <Datos filas={meta.hiperparametros.map((h) => [h.etiqueta, numero(h.valor)])} />
+          <Datos columnas filas={meta.hiperparametros.map((h) => [h.etiqueta, numero(h.valor)])} />
         </div>
       ) : null}
       {puede(usuario, ['admin']) && (
@@ -54,7 +57,7 @@ export function TrazabilidadModelo({ meta }: { meta: AnaliticaMeta | undefined }
     <Panel titulo="Trazabilidad">
       <Datos filas={[
         ['Entrenamiento', meta ? `N.º ${meta.entrenamiento}` : null],
-        ['Fecha', meta?.creada ? `${fecha(meta.creada)} (${fechaHora(meta.creada)})` : null],
+        ['Fecha', meta?.creada ? fecha(meta.creada) : null],
         ['Versión registrada', meta?.version_registro != null ? `${meta.registro ? `${meta.registro} ` : ''}versión ${meta.version_registro}` : null],
         ['Versión del modelo', meta?.version_modelo != null ? String(meta.version_modelo) : null],
         ['Paquete', delPaquete ?? (paquete.isSuccess && meta ? 'No está en el paquete activo' : null)],

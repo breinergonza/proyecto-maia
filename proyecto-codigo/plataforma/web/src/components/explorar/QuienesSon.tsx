@@ -5,7 +5,7 @@ import { pct } from '../../lib/formato'
 import { COLOR, LeyendaSeries, SERIES_COLOR, type Serie } from '../graficos'
 
 const LEYENDA: Serie[] = [{ clave: 'grupo', nombre: 'Grupo elegido', color: 0 }, { clave: 'todos', nombre: 'Todos los niños', color: 2 }]
-const ANCHO = 640, ETIQUETA = 220, BARRA = 8, FILA = 26, TITULO = 24, SEPARACION = 14, FIN = 56
+const ANCHO = 640, ETIQUETA = 220, BARRA = 14, FILA = 40, TITULO = 26, SEPARACION = 14, FIN = 56
 
 export function QuienesSon({ distribuciones }: { distribuciones: Record<string, DistribucionGrupo> }) {
   const bloques = Object.entries(distribuciones)
@@ -23,19 +23,19 @@ export function QuienesSon({ distribuciones }: { distribuciones: Record<string, 
     <>
       <LeyendaSeries series={LEYENDA} marca="barra" />
       <svg viewBox={`0 0 ${ANCHO} ${y}`} width="100%" role="img" aria-label={`Quiénes son los niños del grupo frente a todos. ${descripcion}`}
-        className="mt-1 block max-w-full" style={{ fontSize: 12.8 }}>
+        className="mt-1 block max-w-3xl" style={{ fontSize: 15 }}>
         {dibujo.map(({ clave, d, arriba }) => (
           <g key={clave} transform={`translate(0 ${arriba})`}>
-            <text x={0} y={14} fontWeight={700} fill="currentColor">{d.etiqueta}</text>
+            <text x={0} y={16} fontWeight={700} fill="currentColor">{d.etiqueta}</text>
             {d.categorias.map((c, i) => {
               const top = TITULO + i * FILA
               return (
                 <g key={c.categoria} transform={`translate(0 ${top})`}>
-                  <text x={0} y={BARRA + 4} fill="currentColor">{c.etiqueta}</text>
+                  <text x={0} y={BARRA + 5} fill="currentColor">{c.etiqueta}</text>
                   <rect x={ETIQUETA} y={0} width={Math.max(0, (c.grupo ?? 0) / 100 * util)} height={BARRA} rx={2} fill={SERIES_COLOR[0]} />
-                  <text x={ETIQUETA + Math.max(0, (c.grupo ?? 0) / 100 * util) + 4} y={BARRA} fill={COLOR.eje}>{c.grupo == null ? '—' : pct(c.grupo)}</text>
+                  <text x={ETIQUETA + Math.max(0, (c.grupo ?? 0) / 100 * util) + 4} y={BARRA / 2 + 4.5} fill={COLOR.eje}>{c.grupo == null ? '—' : pct(c.grupo)}</text>
                   <rect x={ETIQUETA} y={BARRA + 2} width={Math.max(0, c.todos / 100 * util)} height={BARRA} rx={2} fill={SERIES_COLOR[2]} />
-                  <text x={ETIQUETA + Math.max(0, c.todos / 100 * util) + 4} y={2 * BARRA + 2} fill={COLOR.eje}>{pct(c.todos)}</text>
+                  <text x={ETIQUETA + Math.max(0, c.todos / 100 * util) + 4} y={BARRA + 2 + BARRA / 2 + 4.5} fill={COLOR.eje}>{pct(c.todos)}</text>
                 </g>
               )
             })}

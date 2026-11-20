@@ -1,7 +1,9 @@
-// La cola de mediciones por revisar: filtros (visita, medición, detectado por, estado) y una tabla con el niño, la visita, la
-// medición, el valor, por qué es dudosa, quién la detectó, su estado y la acción. Responder «¿es un error de registro?»
-// guarda la respuesta del administrador; el dato en su contexto (la serie del niño) se abre aparte para no alargar la fila.
-import { Check, ChevronDown } from 'lucide-react'
+// La cola de mediciones por revisar: filtros (visita, medición, detectado por, estado) y una tabla de una línea por medición con
+// el niño (y su estado), la medición con su visita, el valor, por qué es dudosa y la acción. Responder «¿es un error de
+// registro?» guarda la respuesta del administrador. Lo que sobra para decidir (quién la detectó, lo más probable, cuándo se
+// midió, la serie del niño y el comentario, con el botón de la flecha) se abre aparte para no alargar la fila. En escritorio las filas se desplazan por
+// dentro con el encabezado fijo, para que los filtros y la completitud sigan a la vista.
+import { Check, ChevronDown, Circle } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { TAMANO_COLA, useColaDatos, useResponderDato, type EstadoCola, type FiltrosCola, type ResumenCalidad } from '../../api/calidad'
@@ -19,6 +21,8 @@ const ACCION: Record<Respuesta, { boton: string; estado: string }> = {
   no: { boton: 'No es un error', estado: 'No es un error' },
   no_se: { boton: 'No sé', estado: 'Sin saber' },
 }
+/** Lo que cada botón dice a la vista: la pregunta está en el encabezado de la columna, así que basta «Sí», «No» o «No sé». */
+const CORTO: Record<Respuesta, string> = { si: 'Sí', no: 'No', no_se: 'No sé' }
 const TIPOS_ALERTA = ['1', '2', '3'] as const
 const COLUMNAS = 5
 
@@ -38,9 +42,10 @@ export function ColaDatos({ resumen }: { resumen: ResumenCalidad | undefined }) 
   const cola = useColaDatos(filtros)
   const cambiar = (cambio: Partial<FiltrosCola>) => setFiltros((f) => ({ ...f, ...cambio, pagina: 1 }))
   return (
-    <section aria-labelledby="titulo-cola" className="min-w-0 rounded-panel border border-linea/80 bg-papel p-4 shadow-suave sm:p-5">
+    <section aria-labelledby="titulo-cola"
+      className="flex min-w-0 flex-col rounded-panel border border-linea/80 bg-papel p-4 shadow-suave sm:p-5 xl:min-h-0">
       <h2 id="titulo-cola" className="text-base">Mediciones por revisar</h2>
-      <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mt-2 grid shrink-0 grid-cols-2 gap-3 lg:grid-cols-4">
         <Filtro id="filtro-visita" etiqueta="Visita" value={filtros.etapa} onChange={(e) => cambiar({ etapa: e.target.value })}>
           <option value="">Todas</option>
           {filtros.etapa && !resumen?.etapas.some((e) => e.etapa === filtros.etapa) && <option value={filtros.etapa}>{filtros.etapa}</option>}
@@ -62,7 +67,7 @@ export function ColaDatos({ resumen }: { resumen: ResumenCalidad | undefined }) 
         </Filtro>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-3 flex min-h-0 flex-col xl:flex-1">
         {cola.isPending ? <Cargando />
           : cola.isError ? (
             <ErrorConReintento error={cola.error} que="la lista de mediciones" reintentando={cola.isFetching} reintentar={() => void cola.refetch()} />
@@ -72,18 +77,20 @@ export function ColaDatos({ resumen }: { resumen: ResumenCalidad | undefined }) 
             </Vacio>
           ) : (
             <>
-              <p className="mb-2 text-sm">{num(cola.data.total)} {cola.data.total === 1 ? 'medición' : 'mediciones'}. Primero las que tienen más alertas y más fuertes.</p>
-              <Tabla densa apilar>
-                <thead>
+              <p className="mb-1 shrink-0 text-sm">{num(cola.data.total)} {cola.data.total === 1 ? 'medición' : 'mediciones'}. Primero las que tienen más alertas y más fuertes.</p>
+              <Tabla densa apilar className="relative xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
+                <thead className="sticky top-0 z-10 bg-papel">
                   <tr>
-                    <th>Niño</th><th>Medición</th><th>Valor registrado</th><th>Por qué es dudosa</th><th>Revisión</th>
+                    <th>Niño</th><th>Medición</th><th>Valor registrado</th><th>Por qué es dudosa</th><th>¿Es un error de registro?</th>
                   </tr>
                 </thead>
                 <tbody>
                   {cola.data.items.map((d) => <FilaDato key={d.id} dato={d} />)}
                 </tbody>
               </Tabla>
-              <Paginador pagina={filtros.pagina} tamano={TAMANO_COLA} total={cola.data.total} cambiar={(pagina) => setFiltros((f) => ({ ...f, pagina }))} />
+              <div className="shrink-0">
+                <Paginador pagina={filtros.pagina} tamano={TAMANO_COLA} total={cola.data.total} cambiar={(pagina) => setFiltros((f) => ({ ...f, pagina }))} />
+              </div>
             </>
           )}
       </div>
@@ -91,18 +98,20 @@ export function ColaDatos({ resumen }: { resumen: ResumenCalidad | undefined }) 
   )
 }
 
+/** El estado de la fila junto al niño: un punto si falta revisarla y una marca si ya tiene respuesta; el texto es para lectores de pantalla. */
 function Estado({ respuesta }: { respuesta: Respuesta | null }) {
   return respuesta ? (
-    <span className="inline-flex items-center gap-1.5 font-semibold text-teal"><Check size={16} aria-hidden />Revisada: {ACCION[respuesta].estado.toLowerCase()}</span>
+    <span className="inline-flex text-teal" title={`Revisada: ${ACCION[respuesta].estado.toLowerCase()}`}>
+      <Check size={16} aria-hidden /><span className="sr-only">Revisada: {ACCION[respuesta].estado.toLowerCase()}</span>
+    </span>
   ) : (
-    <span className="inline-flex items-center gap-1.5"><span className="size-2.5 shrink-0 rounded-full bg-ocre" aria-hidden />Por revisar</span>
+    <span className="inline-flex text-ocre" title="Por revisar"><Circle size={10} aria-hidden fill="currentColor" /><span className="sr-only">Por revisar</span></span>
   )
 }
 
 function FilaDato({ dato }: { dato: DatoRevision }) {
   const [comentario, setComentario] = useState(dato.comentario ?? '')
-  const [comentando, setComentando] = useState(Boolean(dato.comentario))
-  const [contexto, setContexto] = useState(false)
+  const [abierta, setAbierta] = useState(Boolean(dato.comentario))   // el detalle se abre solo si ya hay un comentario
   const [elegida, setElegida] = useState<Respuesta | null>(dato.es_error)
   const m = useResponderDato(dato.id)
   const responder = (es_error: Respuesta) => m.mutate({ es_error, comentario }, { onSuccess: () => setElegida(es_error) })
@@ -110,65 +119,67 @@ function FilaDato({ dato }: { dato: DatoRevision }) {
   const extra = motivoExtra(dato.motivo)
   const rango = dato.rango_bajo != null || dato.rango_alto != null
   const nombre = dato.etiqueta ?? dato.variable
+  // la etiqueta del diccionario suele traer la visita («Peso a 6 m EC»): entonces no se repite
+  const visita = dato.etapa_nombre?.replace(' (edad corregida)', ' EC') ?? 'Visita sin nombre'
+  const visitaEnNombre = dato.etapa != null && nombre.toLowerCase().includes(dato.etapa.toLowerCase())
   return (
     <>
       <tr>
         <td className="whitespace-nowrap font-semibold">
-          <Link className="text-teal underline-offset-2 hover:underline" to={`/ninos/${encodeURIComponent(dato.sujeto)}`}>{dato.sujeto}</Link>
+          <span className="inline-flex items-center gap-1.5">
+            <Estado respuesta={elegida} />
+            <Link className="text-teal underline-offset-2 hover:underline" to={`/ninos/${encodeURIComponent(dato.sujeto)}`}>{dato.sujeto}</Link>
+          </span>
         </td>
         <td>
           <span className="font-semibold">{nombre}</span>
-          <span className="block text-xs">{dato.etapa_nombre ?? 'Visita sin nombre'}{dato.fecha && <>, {fecha(dato.fecha)}</>}</span>
+          {!visitaEnNombre && <span className="text-xs"> · {visita}</span>}
         </td>
         <td className="whitespace-nowrap font-semibold tabular-nums text-coral-hondo">{medida(dato.valor)}{unidad}</td>
-        <td className="min-w-[12rem]">
-          {rango && (
-            <p>
-              Para este niño se esperaba entre {aproximado(dato.rango_bajo)} y {aproximado(dato.rango_alto)}{unidad}
-              {dato.esperado != null && <> (lo más probable: {aproximado(dato.esperado)})</>}.
-            </p>
-          )}
-          {extra && <p>{frase(extra)}.</p>}
-          {!rango && !extra && <p>El modelo de anomalías lo marcó como raro para este niño.</p>}
-          <p className="mt-1 text-xs">
-            Detectado por:{' '}
-            {dato.capas.map((c, i) => <span key={c} title={ayudaAlerta(c)}>{i > 0 && ', '}{alerta(c)}</span>)}
-          </p>
-          <button type="button" aria-expanded={contexto} onClick={() => setContexto(!contexto)}
-            className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-teal hover:underline">
-            Ver en el tiempo<ChevronDown size={14} aria-hidden className={cn('transition-transform', contexto && 'rotate-180')} />
-          </button>
+        <td className="min-w-[9rem]">
+          {rango && <span>Esperado entre {aproximado(dato.rango_bajo)} y {aproximado(dato.rango_alto)}{unidad}.</span>}
+          {extra && <> <span>{frase(extra)}.</span></>}
+          {!rango && !extra && <span>El modelo de anomalías lo marcó como raro para este niño.</span>}
         </td>
-        <td className="min-w-[11rem]">
-          <p className="mb-1.5"><Estado respuesta={elegida} /></p>
-          <div role="group" aria-label={`¿Es un error de registro? ${nombre} de ${dato.sujeto}`} className="flex flex-wrap gap-1.5">
-            {(['si', 'no', 'no_se'] as Respuesta[]).map((r) => (
-              <Boton key={r} chico className="whitespace-nowrap" variante={elegida === r ? 'primario' : 'secundario'} aria-pressed={elegida === r}
-                disabled={m.isPending} onClick={() => responder(r)}>
-                {ACCION[r].boton}
-              </Boton>
-            ))}
-            <button type="button" aria-expanded={comentando} onClick={() => setComentando(!comentando)}
-              className="h-8 px-1 text-xs font-semibold text-teal hover:underline">Comentar</button>
+        <td>
+          <div className="flex items-center gap-1">
+            <div role="group" aria-label={`¿Es un error de registro? ${nombre} de ${dato.sujeto}`} className="flex gap-1">
+              {(['si', 'no', 'no_se'] as Respuesta[]).map((r) => (
+                <Boton key={r} chico className="whitespace-nowrap px-2.5" variante={elegida === r ? 'primario' : 'secundario'} aria-pressed={elegida === r}
+                  aria-label={ACCION[r].boton} title={ACCION[r].boton} disabled={m.isPending} onClick={() => responder(r)}>
+                  {CORTO[r]}
+                </Boton>
+              ))}
+            </div>
+            <button type="button" aria-expanded={abierta} aria-label="Ver detalle y comentar" title="Ver detalle y comentar: quién lo detectó, las otras visitas y un comentario"
+              onClick={() => setAbierta(!abierta)} className="grid size-8 shrink-0 place-content-center rounded-control text-teal hover:bg-teal-tinte/60">
+              <ChevronDown size={16} aria-hidden className={cn('transition-transform', abierta && 'rotate-180')} />
+            </button>
           </div>
-          {comentando && (
-            <>
-              <label className="sr-only" htmlFor={`com-${dato.id}`}>Comentario</label>
-              <Texto id={`com-${dato.id}`} rows={2} maxLength={2000} className="mt-1.5 text-sm" placeholder="Comentario (opcional)"
-                value={comentario} onChange={(e) => setComentario(e.target.value)} />
-            </>
-          )}
-          <p className={cn('mt-1 text-xs', m.error ? 'text-coral-hondo' : 'text-tinta/80')} role="status">
+          <p className={cn('text-xs', m.error ? 'text-coral-hondo' : 'text-tinta/80', !m.error && !m.isSuccess && 'sr-only')} role="status">
             {m.error ? m.error.message : m.isSuccess ? 'Respuesta guardada.' : ''}
           </p>
         </td>
       </tr>
-      {contexto && (
+      {abierta && (
         <tr>
           <td colSpan={COLUMNAS}>
-            <div className="max-w-xl">
-              <SerieDato dato={dato} />
-              {dato.serie.length < 2 && !rango && <p className="text-sm">No hay otras visitas de este niño para comparar.</p>}
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="max-w-xl text-sm">
+                  <p>
+                    Detectado por:{' '}
+                    {dato.capas.map((c, i) => <span key={c} title={ayudaAlerta(c)}>{i > 0 && ', '}{alerta(c)}</span>)}.
+                    {dato.esperado != null && <> Lo más probable para este niño: {aproximado(dato.esperado)}{unidad}.</>}
+                    {dato.fecha && <> Medido el {fecha(dato.fecha)}.</>}
+                  </p>
+                  <SerieDato dato={dato} />
+                  {dato.serie.length < 2 && !rango && <p>No hay otras visitas de este niño para comparar.</p>}
+              </div>
+              <div>
+                <label className="sr-only" htmlFor={`com-${dato.id}`}>Comentario</label>
+                <Texto id={`com-${dato.id}`} rows={2} maxLength={2000} className="text-sm" placeholder="Comentario (opcional): se guarda con tu respuesta"
+                  value={comentario} onChange={(e) => setComentario(e.target.value)} />
+              </div>
             </div>
           </td>
         </tr>

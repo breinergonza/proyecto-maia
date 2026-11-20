@@ -73,7 +73,7 @@ export function EntrenarAhora({ fuente }: { fuente: Fuente }) {
         <form className="mt-4 space-y-4" onSubmit={(ev) => { ev.preventDefault(); entrenar.mutate() }}>
           <p className="text-sm text-salvia">
             Trae los datos de <strong>{FUENTES[fuente]}</strong> y entrena con los hiperparámetros de abajo (parten del
-            ajuste guardado o del núcleo). El modelo queda en MLflow como <em>candidato</em>; para usarlo en la solución,
+            ajuste guardado o de los valores por defecto). El modelo queda en MLflow como <em>candidato</em>; para usarlo en la solución,
             apruébelo más abajo.
           </p>
           <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">

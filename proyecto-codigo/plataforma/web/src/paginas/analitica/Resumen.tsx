@@ -44,7 +44,7 @@ export default function Resumen() {
         <EstadoVacio estado={sinAnalitica.estado} mensaje={sinAnalitica.estado === 'pendiente' ? sinAnalitica.mensaje : undefined} />
       ) : cargando ? <Cargando /> : (
         <>
-          <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
+          <div className="grid items-start gap-4 lg:grid-cols-2 [&>*]:min-w-0">
             <ConfiguracionModelo meta={meta} />
             <TrazabilidadModelo meta={meta} />
           </div>
@@ -57,7 +57,6 @@ export default function Resumen() {
             {evaluacion && <ComparacionTecnica rend={evaluacion} />}
           </div>
           <RevisionRapida semaforos={(resumen.data?.estado === 'ok' && desenlace ? resumen.data.desenlaces?.[desenlace]?.semaforos : undefined) ?? []} />
-          <p className="text-sm">Apoyo a la decisión, no diagnóstico. El riesgo ordena a los niños; la decisión es del equipo clínico.</p>
         </>
       )}
     </div>

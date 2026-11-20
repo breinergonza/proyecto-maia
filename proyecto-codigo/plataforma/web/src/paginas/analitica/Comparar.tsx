@@ -13,7 +13,7 @@ import { useConfirmar } from '../../components/Confirmar'
 import { Grafica, TablaDatos } from '../../components/grafica'
 import { Aviso, Boton, Selector, Tabla } from '../../components/ui'
 import { descripcionDe } from '../../lib/descripciones'
-import { dec2, fechaHora, num, pct } from '../../lib/formato'
+import { dec2, fecha, num, pct } from '../../lib/formato'
 import { jerga, N_MENOR_QUE_5 } from '../../lib/lenguaje'
 import { difTexto } from './ComparaGrupos'
 import { Guia, Resultado, useTecnico } from './comun'
@@ -109,7 +109,7 @@ function ComparaEntrenamientos() {
     <label className="block text-sm">
       <span className="mb-1 block font-semibold">{etiqueta}</span>
       <Selector value={valor ?? ''} onChange={(e) => { cambiar(Number(e.target.value)); setMantiene(false); aprobacion.reset() }}>
-        {todos.map((m) => <option key={m.entrenamiento} value={m.entrenamiento}>Entrenamiento {m.entrenamiento}{m.creada ? ` · ${fechaHora(m.creada)}` : ''}</option>)}
+        {todos.map((m) => <option key={m.entrenamiento} value={m.entrenamiento}>N.º {m.entrenamiento}{m.creada ? ` · ${fecha(m.creada)}` : ''}</option>)}
       </Selector>
     </label>
   )
@@ -151,7 +151,6 @@ function ComparaEntrenamientos() {
                   <TablaDatos titulo={dMet.titulo} descripcion={dMet.descripcion}
                     exportar={{ nombre: 'comparar-metricas', muestra: c ? `A: ${num(c.a?.n)} niños, ${num(c.a?.casos)} casos · B: ${num(c.b?.n)} niños, ${num(c.b?.casos)} casos` : undefined,
                       filas: medidas.map((m) => ({ medida: m.texto, A: m.valor(datoA), B: m.valor(datoB), diferencia: intervalos.get(m.id)?.diferencia ?? null, ic_bajo: intervalos.get(m.id)?.ic_bajo ?? null, ic_alto: intervalos.get(m.id)?.ic_alto ?? null, clara: intervalos.get(m.id)?.clara ? 'sí' : 'no' })) }}>
-                    {c && <p className="mb-2 text-sm text-salvia">A: {num(c.a?.n)} niños y {num(c.a?.casos)} casos · B: {num(c.b?.n)} niños y {num(c.b?.casos)} casos</p>}
                     <Tabla densa apilar>
                       <thead><tr><th>Medida</th><th>A (entrenamiento {a})</th><th>B (entrenamiento {b})</th><th>Diferencia de B frente a A</th><th>Certeza</th></tr></thead>
                       <tbody>

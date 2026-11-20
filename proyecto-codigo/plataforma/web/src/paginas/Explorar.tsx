@@ -29,19 +29,20 @@ export default function Explorar() {
   const r = resumen.data
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 lg:h-full">
       <Encabezado titulo="Explorar">
         {r && !r.insuficiente ? <>{datosAl(r.corte)}. </> : null}
         Elija un grupo de niños y vea su riesgo, su crecimiento y quiénes son, frente a todos.
       </Encabezado>
       {/* el panel de filtros ya está a la vista en esta página: la barra solo dice qué grupo es */}
       <GrupoActivo conPanel={false} ninos={r?.ninos} total={r && !r.insuficiente ? r.ninos_total : undefined} minimo={r?.minimo} error={resumen.isError} />
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-        <aside className="lg:col-span-4 xl:col-span-3">
+      {/* en escritorio los filtros y los resultados se desplazan cada uno por su lado: el grupo activo y el encabezado quedan a la vista */}
+      <div className="grid grid-cols-1 gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-12">
+        <aside className="lg:col-span-4 lg:min-h-0 lg:overflow-y-auto xl:col-span-3">
           <PanelFacetas facetas={facetas.data} cargando={facetas.isPending} filtros={filtros} esExperto={esExperto} conTiempo
             error={facetas.isError} reintentar={() => facetas.refetch()} />
         </aside>
-        <div className="flex min-w-0 flex-col gap-4 lg:col-span-8 xl:col-span-9">
+        <div className="flex min-w-0 flex-col gap-4 lg:col-span-8 lg:min-h-0 lg:overflow-y-auto xl:col-span-9">
           {resumen.isPending ? <Cargando />
             : resumen.error ? <Error error={resumen.error} />
               : r?.insuficiente && r.vacio ? (
@@ -71,9 +72,9 @@ function Cifras({ r, aproximado, filtros }: { r: ExplorarResumen; aproximado: bo
   const muestra = `${filtros ? 'Grupo elegido' : 'Todos los niños'}: ${num(r.ninos)} niños de ${num(r.ninos_total)}`
   return (
     <>
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <Indicador valor={num(r.ninos)} texto={`niños en el grupo, de ${num(r.ninos_total)}`} />
-        <Indicador valor={num(r.datos)} texto="datos leídos" />
+      {/* cuántos niños son el grupo y el total ya lo dice la barra del grupo activo */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Indicador valor={num(r.datos)} texto="datos registrados de los niños del grupo" />
         <Indicador valor={num(r.ninos_riesgo_alto)} texto="niños con algún riesgo alto" tono="coral"
           ayuda={`Un niño puede tenerlo en varios desenlaces: son ${num(r.riesgos_altos)} riesgos altos en total.`} />
         <Indicador valor={pct(r.pct_crecimiento_bajo)} texto="de los datos de crecimiento, bajos frente a la OMS" />
@@ -85,20 +86,21 @@ function Cifras({ r, aproximado, filtros }: { r: ExplorarResumen; aproximado: bo
         </p>
       )}
       {aproximado && <p className="text-xs text-salvia">Para proteger a los niños, las cifras menores de 100 se aproximan de 5 en 5.</p>}
+      {/* en pantallas anchas las dos de barras van lado a lado (cada una a su tamaño natural) y la de líneas ocupa todo el ancho debajo */}
       <div className="grid gap-4 2xl:grid-cols-2 [&>*]:min-w-0">
         <Grafica titulo={descripcionDe('explorar_riesgo').titulo} descripcion={descripcionDe('explorar_riesgo').descripcion}
-          exportar={{ nombre: 'explorar-riesgo', muestra }}>
+          exportar={{ nombre: 'explorar-riesgo', muestra, unidad: 'Niños con riesgo alto (percentil 90 o más) de los niños del grupo con riesgo calculado desde esa visita: el denominador está junto a cada barra' }}>
           <RiesgoGrupo filas={r.riesgos_por_desenlace} />
         </Grafica>
-        <Grafica titulo={descripcionDe('explorar_crecimiento').titulo} descripcion={descripcionDe('explorar_crecimiento').descripcion}
-          exportar={{ nombre: 'explorar-crecimiento', muestra }}>
+        <Grafica titulo={descripcionDe('explorar_quienes').titulo} descripcion={descripcionDe('explorar_quienes').descripcion}
+          exportar={{ nombre: 'explorar-quienes', muestra, unidad: '% de los niños con el dato, en el grupo y en todos' }}>
+          <QuienesSon distribuciones={r.distribuciones} />
+        </Grafica>
+        <Grafica className="2xl:col-span-2" titulo={descripcionDe('explorar_crecimiento').titulo} descripcion={descripcionDe('explorar_crecimiento').descripcion}
+          exportar={{ nombre: 'explorar-crecimiento', muestra, unidad: '% de las medidas del grupo en cada visita con z menor que −2 frente a la OMS: cada punto dice cuántos datos usa' }}>
           <CrecimientoGrupo filas={r.crecimiento_por_etapa} />
         </Grafica>
       </div>
-      <Grafica titulo={descripcionDe('explorar_quienes').titulo} descripcion={descripcionDe('explorar_quienes').descripcion}
-        exportar={{ nombre: 'explorar-quienes', muestra }}>
-        <QuienesSon distribuciones={r.distribuciones} />
-      </Grafica>
     </>
   )
 }

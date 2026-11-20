@@ -160,16 +160,56 @@ describe('calidad de datos', () => {
       return { cuerpo: {} }
     })
     montar('/admin/calidad-datos')
-    expect(await screen.findByText(/Para este niño se esperaba entre/)).toBeInTheDocument()
+    expect(await screen.findByText(/Esperado entre/)).toBeInTheDocument()
     // la serie del niño para ese concepto se abre aparte, y sin el motivo que solo repite la etiqueta «Valor fuera de lo esperado»
-    await userEvent.click(screen.getByRole('button', { name: /Ver en el tiempo/ }))
+    await userEvent.click(screen.getByRole('button', { name: /Ver detalle/ }))
     expect(screen.getByRole('figure', { name: 'Peso a 40 sem de este niño en cada visita: Nacimiento, 1.500 g; 40 semanas, 9.999 g' }))
       .toBeInTheDocument()
     expect(screen.queryByText(/Valor muy distinto/)).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Comentar' }))
     await userEvent.type(screen.getByLabelText('Comentario'), 'La báscula estaba dañada')
     await userEvent.click(screen.getByRole('button', { name: 'Es un error' }))
     await waitFor(() => expect(enviados).toEqual([{ es_error: 'si', comentario: 'La báscula estaba dañada' }]))
     expect(await screen.findByText('Respuesta guardada.')).toBeInTheDocument()
+  })
+})
+
+describe('niños: lista', () => {
+  const fila = {
+    sujeto: 's1', eg_semanas: 27, grupo: null, percentil_max: 97, riesgo_max: 0.9, clave_max: 'des6_desde_40', n_riesgos: 6, n_alertas: 0,
+    desenlace_max: 'desarrollo psicomotor bajo a los 6 meses (riesgo calculado a 40 sem)', n_bajo_2de: 0, n_caida_1de: 0, n_crecimiento: 4,
+    ultima_visita: '3 meses', ultima_fecha: '2026-03-01', ultima_edad_corregida: 90,
+  }
+  const sinDato = { ...fila, sujeto: 's2', percentil_max: 40, n_riesgos: 0, desenlace_max: null, n_crecimiento: 0 }
+  const api = () => simularApi((url) => {
+    if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('experto') } }
+    if (url.startsWith('/api/ninos?')) return { cuerpo: { total: 2, pagina: 1, tamano: 25, items: [fila, sinDato] } }
+    if (url === '/api/tablero/resumen') return { cuerpo: { riesgos_por_desenlace: [] } }
+    return { cuerpo: {} }
+  })
+
+  it('«Riesgo más alto» queda corto: el desenlace con «+5» y el detalle (visita y cuántos más) en el title', async () => {
+    api()
+    montar('/ninos')
+    const celda = (await screen.findByText('desarrollo psicomotor bajo a los 6 meses')).closest('td')!
+    expect(celda).toHaveTextContent('+5')
+    expect(celda.querySelector('[title]')).toHaveAttribute('title', expect.stringMatching(/riesgo calculado a 40 sem.*5 más/s))
+    expect(screen.queryByText(/riesgo calculado a 40 sem/)).not.toBeInTheDocument()
+  })
+
+  it('el subtítulo es una línea y dice qué es «alto» y «muy alto» con los porcentajes del filtro', async () => {
+    api()
+    montar('/ninos')
+    const subtitulo = (await screen.findByRole('heading', { name: 'Niños' })).nextElementSibling!
+    expect(subtitulo.textContent).toMatch(/Alto: el 10 % de niños con más riesgo en su desenlace; muy alto: el 5 %/)
+    expect(subtitulo.textContent).toMatch(/seudonimizados/)
+    expect(subtitulo.textContent!.length).toBeLessThan(170)
+  })
+
+  it('lo que no hay que mirar («Sin dato», «Sin controles») va apagado y sin insignia', async () => {
+    api()
+    montar('/ninos')
+    const sin = await screen.findByText('Sin dato')
+    expect(sin).toHaveClass('text-salvia')
+    expect(sin.closest('.rounded-full')).toBeNull()
   })
 })

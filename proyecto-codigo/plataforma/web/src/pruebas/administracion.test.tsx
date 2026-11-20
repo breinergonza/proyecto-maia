@@ -72,7 +72,7 @@ describe('administración de las ejecuciones', () => {
     expect(JSON.parse(String(post.init!.body))).toMatchObject({ fuente: 'kmc', cron: '0 2 1 1,7 *', solo_si_nuevo: true, parametros: { anio_desde: 2015 } })
   })
 
-  it('configuración: la meta de falsas alertas se lee en su unidad y avisa si se aleja 10 veces del núcleo', async () => {
+  it('configuración: la meta de falsas alertas se lee en su unidad y avisa si se aleja 10 veces del valor por defecto', async () => {
     const anomalias = [{ modelo: 'anomalias', actualizado_en: '2026-10-28T22:13:42Z', campos: [
       { nombre: 'alpha', etiqueta: 'Meta de falsas alertas por dato (capa 2)', tipo: 'float', minimo: 0.0005, maximo: 0.05,
         ayuda: 'Fracción de los datos sanos que la capa 2 puede marcar.', escala: 'por_mil', defecto: 0.05, valor: 0.005 },
@@ -86,15 +86,17 @@ describe('administración de las ejecuciones', () => {
     montar('/admin/configuracion')
     const alpha = await screen.findByLabelText('Meta de falsas alertas por dato (capa 2)')
     expect(screen.getByText(/0,005 = 5 por cada 1\.000 datos/)).toBeInTheDocument()
-    expect(screen.getByText(/10 veces menos que el valor del núcleo \(0,05\)/)).toBeInTheDocument()
-    expect(screen.getByText(/De 0,0005 a 0,05 · núcleo: 0,05/)).toBeInTheDocument()
-    expect(screen.getByText('1 ajustado(s)')).toBeInTheDocument()        // 300 rondas es el valor del núcleo
+    expect(within(screen.getByRole('main')).queryByText(/núcleo/i)).not.toBeInTheDocument()   // el equipo clínico no conoce «el núcleo»
+    expect(screen.getByText(/Si lo deja vacío se usa el valor por defecto \(en gris\)/)).toBeInTheDocument()
+    expect(screen.getByText(/10 veces menos que el valor por defecto \(0,05\)/)).toBeInTheDocument()
+    expect(screen.getByText(/De 0,0005 a 0,05 · por defecto: 0,05/)).toBeInTheDocument()
+    expect(screen.getByText('1 ajustado(s)')).toBeInTheDocument()        // 300 rondas es el valor por defecto
     expect(screen.queryByText(/p\. m\.\./)).not.toBeInTheDocument()
     await userEvent.clear(alpha)
     await userEvent.type(alpha, '0.05')
     expect(screen.getByText(/0,05 = 50 por cada 1\.000 datos/)).toBeInTheDocument()
-    expect(screen.queryByText(/veces (más|menos) que el valor del núcleo/)).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Volver a los del núcleo' }))
+    expect(screen.queryByText(/veces (más|menos) que el valor por defecto/)).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Volver a los valores por defecto' }))
     const d = await screen.findByRole('alertdialog')
     expect(d).toHaveTextContent('No se puede deshacer')
     await userEvent.click(within(d).getByRole('button', { name: 'Cancelar' }))
@@ -146,6 +148,28 @@ describe('administración de las ejecuciones', () => {
     expect(await screen.findByText('Extracción y cálculo')).toBeInTheDocument()
     expect(screen.queryByText(/equipo local/)).not.toBeInTheDocument()
     expect(within(screen.getByRole('main')).getByRole('link', { name: 'Programación' })).toHaveAttribute('href', '/admin/programacion')
+  })
+
+  it('corridas: si todas son del mismo tipo se dice una vez y no en una columna que repite lo mismo', async () => {
+    const corrida = (id: number) => ({ id, tipo: 'demo', estado: 'ok', silencio: false, corte_id: 1, fuente: 'simulado', fecha_corte: '2026-06-30',
+      paquete: 'p', iniciada: '2026-10-30T23:36:00Z', terminada: null, resumen: { ninos: 10, datos_revisar: 3 }, paso: null, mensaje: null })
+    simularApi((url) => comoAdmin(url) ?? (url === '/api/corridas' ? { cuerpo: [corrida(2), corrida(1)] } : undefined))
+    montar('/admin/corridas')
+    const tabla = await screen.findByRole('table')
+    expect(within(tabla).queryByRole('columnheader', { name: 'Detalle' })).not.toBeInTheDocument()
+    expect(within(tabla).queryByText('Recálculo con el corte vigente')).not.toBeInTheDocument()
+    expect(screen.getAllByText(/Todas son: recálculo con el corte vigente/)).toHaveLength(1)
+  })
+
+  it('corridas: la columna Detalle aparece cuando una corrida tiene algo que decir (error o paso en curso)', async () => {
+    const corrida = (id: number, extra: object) => ({ id, tipo: 'demo', estado: 'ok', silencio: false, corte_id: 1, fuente: 'simulado',
+      fecha_corte: '2026-06-30', paquete: 'p', iniciada: '2026-10-30T23:36:00Z', terminada: null, resumen: { ninos: 10, datos_revisar: 3 }, paso: null, mensaje: null, ...extra })
+    simularApi((url) => comoAdmin(url) ?? (url === '/api/corridas'
+      ? { cuerpo: [corrida(2, { estado: 'error', mensaje: 'Falló la lectura' }), corrida(1, {})] } : undefined))
+    montar('/admin/corridas')
+    const tabla = await screen.findByRole('table')
+    expect(within(tabla).getByRole('columnheader', { name: 'Detalle' })).toBeInTheDocument()
+    expect(within(tabla).getByText('Falló la lectura')).toBeInTheDocument()
   })
 
   it('entrenamientos: hiperparámetros, métricas, comparación y aprobación', async () => {

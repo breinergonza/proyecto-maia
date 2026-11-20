@@ -15,18 +15,18 @@ import { SUBMODULOS } from './analitica/submodulos'
 
 const NOMBRE_MODELO: Record<string, string> = { clinico: 'Clínico', anomalias: 'Anomalías', crecimiento: 'Crecimiento' }
 
-/** El contexto de análisis: desenlace, visita desde la que se calcula y entrenamiento (en la dirección), y de dónde salen los datos. */
-function Contexto() {
+/** El contexto de análisis: desenlace, visita desde la que se calcula y entrenamiento (en la dirección), y de dónde salen los datos.
+ *  El Resumen ya dice de dónde salen en Configuración y Trazabilidad: allí la línea sobra. */
+function Contexto({ conOrigen }: { conOrigen: boolean }) {
   const { modelo } = useContextoAnalitica()
   const modeloTexto = modelo?.modelo ? `${NOMBRE_MODELO[modelo.modelo] ?? `${modelo.modelo.charAt(0).toUpperCase()}${modelo.modelo.slice(1)}`}${modelo.version_registro != null ? ` · versión ${modelo.version_registro}` : ''}` : null
   const fuente = modelo?.fuente ? (modelo.fuente === 'simulado' ? 'Datos simulados' : 'Base de la Fundación') : null
   return (
     <div className="space-y-3">
       <SelectoresModelo />
-      <p className="text-xs text-tinta/80">
-        {[fuente, modelo?.corte ? datosAl(modelo.corte) : null, modeloTexto].filter(Boolean).join(' · ')}
-        {fuente || modelo?.corte || modeloTexto ? '. ' : ''}El contexto vive en el enlace y se conserva al cambiar de análisis.
-      </p>
+      {conOrigen && (
+        <p className="text-sm text-tinta/80">{[fuente, modelo?.corte ? datosAl(modelo.corte) : null, modeloTexto].filter(Boolean).join(' · ')}</p>
+      )}
     </div>
   )
 }
@@ -70,7 +70,7 @@ export default function AnaliticaLayout() {
         <div id="contexto-analisis" className={cn('mt-3 lg:mt-0', plegado && 'hidden lg:block')}>
           {consulta.isPending ? <Cargando /> : consulta.isError ? (
             <ErrorConReintento error={consulta.error} que="el contexto de análisis" reintentando={consulta.isFetching} reintentar={() => void consulta.refetch()} />
-          ) : <Contexto />}
+          ) : <Contexto conOrigen={submodulo !== 'resumen'} />}
         </div>
       </section>
 

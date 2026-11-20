@@ -136,7 +136,7 @@ describe('comparar entrenamientos: intervalos y Aprobar B', () => {
     const llamadas = api('experto')
     montar('/analitica/comparar?entrenamiento=7&desenlace=des_a')
     expect(await screen.findByText('Diferencia clara *')).toBeInTheDocument()
-    expect(screen.getByText(/A: 1\.500 niños y 90 casos/)).toBeInTheDocument()
+    expect(screen.getByText(/A: 1\.500 niños, 90 casos/)).toBeInTheDocument()
     expect(screen.getAllByText('No es clara').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Sin intervalo').length).toBeGreaterThan(0)
     expect(screen.getByText(/el intervalo de la diferencia es aproximado/)).toBeInTheDocument()

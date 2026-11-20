@@ -4,13 +4,13 @@
 import { useMemo } from 'react'
 import { useEntrenamientosAnalitica } from '../../api/analitica'
 import { useContextoAnalitica } from '../../paginas/analitica/contexto'
-import { fechaHora } from '../../lib/formato'
+import { fecha } from '../../lib/formato'
 import { Selector } from '../ui'
 import { familiasDeModelo } from './desenlaces'
 
 const AYUDA_ESTADO = {
   'En uso': 'Da las alertas de la aplicación.',
-  'En prueba': 'Todavía no da alertas: se muestra para seguirlo y evaluarlo, y no está validado.',
+  'En prueba': 'No da alertas todavía y no está validado.',
 } as const
 
 function Campo({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
@@ -30,7 +30,7 @@ export function SelectoresModelo() {
   const corte = familia?.cortes.find((c) => c.clave === desenlace)
   const estado = corte?.enPrueba ? 'En prueba' : 'En uso'
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.2fr)]">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_10rem_20rem]">
       <Campo etiqueta="Desenlace">
         <Selector value={familia?.clave ?? ''} disabled={!familias.length}
           onChange={(e) => fijar({ desenlace: familias.find((f) => f.clave === e.target.value)?.cortes[0]?.clave ?? null })}>
@@ -46,21 +46,19 @@ export function SelectoresModelo() {
         <Selector value={entrenamiento ?? ''} onChange={(e) => fijar({ entrenamiento: Number(e.target.value) })}>
           {entrenamiento != null && !lista.some((m) => m.entrenamiento === entrenamiento) && <option value={entrenamiento}>N.º {entrenamiento}</option>}
           {lista.map((m) => (
-            <option key={m.entrenamiento} value={m.entrenamiento}>N.º {m.entrenamiento}{m.creada ? ` · ${fechaHora(m.creada)}` : ''}</option>
+            <option key={m.entrenamiento} value={m.entrenamiento}>N.º {m.entrenamiento}{m.creada ? ` · ${fecha(m.creada)}` : ''}</option>
           ))}
         </Selector>
       </Campo>
-      <div className="min-w-0 text-sm">
-        <p className="mb-1 font-semibold">Estado</p>
-        {corte ? (
-          <p className={estado === 'En prueba' ? 'text-ocre-hondo' : 'text-teal'}>
-            <b>{estado}</b>
-            <span className="block text-xs text-tinta/80">{AYUDA_ESTADO[estado]}</span>
-          </p>
-        ) : <p>—</p>}
-      </div>
+      {corte && (
+        <p className="min-w-0 text-sm sm:col-span-2 lg:col-span-3">
+          <span className="font-semibold">Estado: </span>
+          <b className={estado === 'En prueba' ? 'text-ocre-hondo' : 'text-teal'}>{estado}</b>
+          <span className="text-tinta/80"> · {AYUDA_ESTADO[estado]}</span>
+        </p>
+      )}
       {contexto?.estado === 'sin_artefactos' && entrenamiento != null && (
-        <p className="text-sm font-semibold text-ocre-hondo sm:col-span-2 lg:col-span-4">Este entrenamiento no tiene analítica.</p>
+        <p className="text-sm font-semibold text-ocre-hondo sm:col-span-2 lg:col-span-3">Este entrenamiento no tiene analítica.</p>
       )}
     </div>
   )

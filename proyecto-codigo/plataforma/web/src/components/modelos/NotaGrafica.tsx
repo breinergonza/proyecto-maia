@@ -19,7 +19,20 @@ const ROTULOS: [keyof DatosNota, string][] = [
   ['validos', 'Datos válidos'], ['porcentaje', 'Porcentaje y denominador'],
 ]
 
-export function NotaGrafica({ datos, className }: { datos: DatosNota; className?: string }) {
+/** `apilada`: en un panel angosto cada rótulo va sobre su texto en vez de a su lado. */
+export function NotaGrafica({ datos, className, apilada }: { datos: DatosNota; className?: string; apilada?: boolean }) {
+  if (apilada) {
+    return (
+      <dl className={cn('grid gap-y-2 text-xs text-tinta/80', className)}>
+        {ROTULOS.map(([clave, rotulo]) => (
+          <div key={clave}>
+            <dt className="font-semibold text-tinta">{rotulo}</dt>
+            <dd>{datos[clave]}</dd>
+          </div>
+        ))}
+      </dl>
+    )
+  }
   return (
     <dl className={cn('grid grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs text-tinta/80', className)}>
       {ROTULOS.map(([clave, rotulo]) => (

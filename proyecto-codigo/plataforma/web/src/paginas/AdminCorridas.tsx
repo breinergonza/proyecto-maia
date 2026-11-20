@@ -1,11 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { pedir } from '../api/cliente'
 import type { Corrida } from '../api/tipos'
 import { Aviso, Boton, Cargando, Encabezado, Insignia, Panel, Tabla, Vacio } from '../components/ui'
 import { usePaqueteActivo } from '../lib/consultas'
 import { ESTADOS_CORRIDA, fecha, fechaHora, num, TIPOS_CORRIDA } from '../lib/formato'
+
+/** Lo que una corrida dice de sí misma además de su fila: el paso en curso o el error. El tipo solo cuando las corridas no son todas del mismo. */
+function detalleDe(c: Corrida, tipoUniforme: boolean): ReactNode {
+  if (c.estado === 'en_curso') return `Paso: ${c.paso ?? '…'}`
+  if (c.estado === 'error') return <span className="text-coral-hondo">{c.mensaje}</span>
+  return tipoUniforme ? null : TIPOS_CORRIDA[c.tipo] ?? c.tipo
+}
 
 export default function AdminCorridas() {
   const cliente = useQueryClient()
@@ -35,7 +42,7 @@ export default function AdminCorridas() {
   return (
     <>
       <Encabezado titulo="Corridas">
-        Una corrida pasa los datos por los dos modelos del paquete activo y deja los resultados en el tablero. Aquí se
+        Una corrida pasa los datos por los dos modelos del paquete activo y deja los resultados en Resumen. Aquí se
         recalcula con el corte que ya está cargado; para traer antes los datos nuevos de la base de la entidad, use{' '}
         <strong>Corrida ahora</strong> en <Link className="text-teal underline" to="/admin/programacion">Programación</Link>.
       </Encabezado>
@@ -57,29 +64,41 @@ export default function AdminCorridas() {
       {lista.isPending ? <Cargando /> : lista.error ? <Aviso>{lista.error.message}</Aviso> : lista.data.length === 0 ? (
         <Vacio titulo="Todavía no hay corridas" />
       ) : (
-        <div className="rounded-panel border border-linea bg-papel p-2">
-          <Tabla apilar>
-            <thead><tr><th>N.º</th><th>Estado</th><th>Corte</th><th>Paquete</th><th>Inició</th><th className="text-right">Niños</th><th className="text-right">Por revisar</th><th>Detalle</th></tr></thead>
-            <tbody>
-              {lista.data.map((c) => (
-                <tr key={c.id}>
-                  <td>{c.id}</td>
-                  <td>
-                    <Insignia tono={c.estado === 'ok' ? 'teal' : c.estado === 'error' ? 'coral' : 'ocre'}>{ESTADOS_CORRIDA[c.estado] ?? c.estado}</Insignia>
-                    {c.silencio && <Insignia className="ml-1">En silencio</Insignia>}
-                  </td>
-                  <td>{fecha(c.fecha_corte)} <span className="text-salvia">{c.fuente}</span></td>
-                  <td className="text-sm">{c.paquete ?? c.modelo_clinico ?? '—'}</td>
-                  <td className="whitespace-nowrap">{fechaHora(c.iniciada)}</td>
-                  <td className="text-right">{num(c.resumen?.ninos as number | undefined)}</td>
-                  <td className="text-right">{num(c.resumen?.datos_revisar as number | undefined)}</td>
-                  <td className="text-sm">{c.estado === 'en_curso' ? `Paso: ${c.paso ?? '…'}` : c.estado === 'error' ? <span className="text-coral-hondo">{c.mensaje}</span> : TIPOS_CORRIDA[c.tipo] ?? c.tipo}</td>
-                </tr>
-              ))}
-            </tbody>
-          </Tabla>
-        </div>
+        <CorridasTabla corridas={lista.data} />
       )}
+    </>
+  )
+}
+
+/** La lista de corridas. Una columna que dice lo mismo en todas las filas sobra: ese tipo se dice una vez, arriba. */
+function CorridasTabla({ corridas }: { corridas: Corrida[] }) {
+  const tipoUniforme = corridas.length > 1 && corridas.every((c) => c.tipo === corridas[0].tipo)
+  const conDetalle = corridas.some((c) => detalleDe(c, tipoUniforme) != null)
+  return (
+    <>
+      {tipoUniforme && <p className="mb-2 text-sm">Todas son: {(TIPOS_CORRIDA[corridas[0].tipo] ?? corridas[0].tipo).toLowerCase()}.</p>}
+      <div className="rounded-panel border border-linea bg-papel p-2">
+        <Tabla apilar>
+          <thead><tr><th>N.º</th><th>Estado</th><th>Corte</th><th>Paquete</th><th>Inició</th><th className="text-right">Niños</th><th className="text-right">Por revisar</th>{conDetalle && <th>Detalle</th>}</tr></thead>
+          <tbody>
+            {corridas.map((c) => (
+              <tr key={c.id}>
+                <td>{c.id}</td>
+                <td>
+                  <Insignia tono={c.estado === 'ok' ? 'teal' : c.estado === 'error' ? 'coral' : 'ocre'}>{ESTADOS_CORRIDA[c.estado] ?? c.estado}</Insignia>
+                  {c.silencio && <Insignia className="ml-1">En silencio</Insignia>}
+                </td>
+                <td>{fecha(c.fecha_corte)} <span className="text-salvia">{c.fuente}</span></td>
+                <td className="text-sm">{c.paquete ?? c.modelo_clinico ?? '—'}</td>
+                <td className="whitespace-nowrap">{fechaHora(c.iniciada)}</td>
+                <td className="text-right">{num(c.resumen?.ninos as number | undefined)}</td>
+                <td className="text-right">{num(c.resumen?.datos_revisar as number | undefined)}</td>
+                {conDetalle && <td className="text-sm">{detalleDe(c, tipoUniforme)}</td>}
+              </tr>
+            ))}
+          </tbody>
+        </Tabla>
+      </div>
     </>
   )
 }

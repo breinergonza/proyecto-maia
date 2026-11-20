@@ -220,9 +220,9 @@ describe('pantallas del equipo clínico sin términos técnicos', () => {
   it('calidad de datos', async () => {
     api('admin')
     montar('/admin/calidad-datos')
-    expect(await screen.findByText(/Para este niño se esperaba entre/)).toBeInTheDocument()
+    expect(await screen.findByText(/Esperado entre/)).toBeInTheDocument()
     // sin serie (la variable no tiene concepto): el valor frente a su rango, que se abre aparte; del motivo queda solo lo que agrega
-    await userEvent.click(screen.getByRole('button', { name: /Ver en el tiempo/ }))
+    await userEvent.click(screen.getByRole('button', { name: /Ver detalle/ }))
     expect(screen.getByRole('img', { name: 'Peso a los 3 meses: 9.999 g; se esperaba entre 4.000 y 6.500' })).toBeInTheDocument()
     expect(screen.getByText('La fecha no corresponde a esta visita.')).toBeInTheDocument()
     expect(visible()).not.toMatch(/Valor muy distinto/)

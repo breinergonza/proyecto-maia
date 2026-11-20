@@ -34,8 +34,8 @@ export function ComparacionTecnica({ rend }: { rend: DatosRendimiento }) {
         </tbody>
       </Tabla>
       <p className="mt-3 text-sm">
-        AUROC mide qué tan bien ordena el modelo a los niños (0,5 es azar, 1 es perfecto). La diferencia es cuánto mejor ordena el modelo
-        completo que la regla de referencia; si los intervalos se montan, la ventaja puede ser casualidad.
+        La diferencia es cuánto mejor ordena el modelo completo que la regla de referencia; si los intervalos se montan, la ventaja
+        puede ser casualidad.
       </p>
     </Panel>
   )

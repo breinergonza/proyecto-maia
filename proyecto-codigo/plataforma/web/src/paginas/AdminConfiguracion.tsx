@@ -69,7 +69,7 @@ function Pasos({ r }: { r: ResumenAdministracion }) {
         </Paso>
       </ol>
       <p className="mt-4 text-sm text-salvia">
-        Hiperparámetros: {r.hiperparametros_ajustados ? 'hay ajustes de administración.' : 'los del núcleo (sin ajustes).'}
+        Hiperparámetros: {r.hiperparametros_ajustados ? 'hay ajustes de administración.' : 'los valores por defecto (sin ajustes).'}
         {' '}Zona horaria de los horarios: {r.zona_horaria}.
         {r.ultima_ejecucion && <> Última ejecución: n.º {r.ultima_ejecucion.id} ({r.ultima_ejecucion.estado}, {fechaHora(r.ultima_ejecucion.creada_en)}).</>}
       </p>
@@ -173,15 +173,15 @@ function PanelModelo({ h }: { h: Hiperparametros }) {
       for (const k of ['hiperparametros', 'resumen']) void cliente.invalidateQueries({ queryKey: ['administracion', k] })
     },
   })
-  // un valor guardado igual al del núcleo no es un ajuste
+  // un valor guardado igual al valor por defecto no es un ajuste
   const ajustados = h.campos.filter((c) => c.valor != null && c.valor !== c.defecto).length
   const { confirmar, dialogo } = useConfirmar()
   const volver = async () => {
     const ok = await confirmar({
-      titulo: `Volver a los valores del núcleo en ${MODELOS[h.modelo]}`,
+      titulo: `Volver a los valores por defecto en ${MODELOS[h.modelo]}`,
       mensaje: ajustados > 0 ? `Hoy hay ${ajustados} hiperparámetro(s) con un valor propio.` : 'Se borran los valores guardados para este modelo.',
-      efecto: 'Se borran los ajustes guardados y el próximo entrenamiento de este modelo usa los valores del núcleo. Afecta a todo el equipo.',
-      reversible: false, textoConfirmar: 'Volver a los del núcleo', tono: 'peligro',
+      efecto: 'Se borran los ajustes guardados y el próximo entrenamiento de este modelo usa los valores por defecto. Afecta a todo el equipo.',
+      reversible: false, textoConfirmar: 'Volver a los valores por defecto', tono: 'peligro',
     })
     if (ok) guardar.mutate(Object.fromEntries(h.campos.map((c) => [c.nombre, ''])))
   }
@@ -190,12 +190,12 @@ function PanelModelo({ h }: { h: Hiperparametros }) {
       <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); guardar.mutate(v) }}>
         {dialogo}
         <p className="text-sm text-salvia">
-          Vacío = el valor del núcleo (en gris). Aplican al próximo entrenamiento y MLflow registra los valores usados.
+          Si lo deja vacío se usa el valor por defecto (en gris). Aplican al próximo entrenamiento, que guarda los valores que usó.
           {h.actualizado_en && <> Último cambio: {conPunto(fechaHora(h.actualizado_en))}</>}
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {h.campos.map((c) => (
-            <CampoHiperparametro key={c.nombre} c={c} id={`hp-${h.modelo}-${c.nombre}`} sugerirNucleo
+            <CampoHiperparametro key={c.nombre} c={c} id={`hp-${h.modelo}-${c.nombre}`} sugerirDefecto
               valor={v[c.nombre] ?? ''} cambiar={(x) => setV({ ...v, [c.nombre]: x })} />
           ))}
         </div>
@@ -204,7 +204,7 @@ function PanelModelo({ h }: { h: Hiperparametros }) {
         <div className="flex flex-wrap gap-2">
           <Boton type="submit" disabled={guardar.isPending}>Guardar</Boton>
           <Boton variante="fantasma" disabled={guardar.isPending || !h.campos.some((c) => c.valor != null)} onClick={volver}>
-            Volver a los del núcleo
+            Volver a los valores por defecto
           </Boton>
         </div>
       </form>

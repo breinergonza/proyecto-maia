@@ -61,9 +61,10 @@ describe('explorar', () => {
   it('muestra las cifras del grupo frente al total y las tres gráficas', async () => {
     api('experto')
     montar('/explorar')
-    expect(await screen.findByText('niños en el grupo, de 600')).toBeInTheDocument()
-    expect(cifra('niños en el grupo, de 600')).toBe('240')
+    expect(await screen.findByText('niños con algún riesgo alto')).toBeInTheDocument()
+    expect(screen.queryByText(/niños en el grupo, de/)).not.toBeInTheDocument()   // el grupo activo ya dice cuántos son
     expect(cifra('niños con algún riesgo alto')).toBe('25')
+    expect(cifra('datos registrados de los niños del grupo')).toBe('4.800')
     expect(cifra('de los datos de crecimiento, bajos frente a la OMS')).toBe('12,5 %')
     for (const t of ['Riesgo del grupo elegido', 'Crecimiento del grupo elegido', 'Quiénes son los niños del grupo']) {
       expect(screen.getByRole('heading', { name: t })).toBeInTheDocument()
@@ -75,7 +76,7 @@ describe('explorar', () => {
   it('el filtro se lee de la dirección y se manda en la consulta', async () => {
     const llamadas = api('admin')
     montar('/explorar?f=sexo|lista|F&f=eg_categoria|lista|muy_prematuro;a_termino')
-    await screen.findByText('niños en el grupo, de 600')
+    await screen.findByText('niños con algún riesgo alto')
     const cuerpo = JSON.parse(String(llamadas.find((l) => l.url === '/api/exploracion/resumen')!.init!.body))
     expect(cuerpo.muestra.y).toEqual([
       { variable: 'sexo', tipo: 'lista', op: 'en', valores: ['F'], cuando: 'primera' },
@@ -124,7 +125,7 @@ describe('explorar', () => {
   it('el tiempo y el muestreo se leen de la dirección, se mandan en la consulta y se pueden compartir', async () => {
     const llamadas = api('admin')
     montar('/explorar?t=fecha_nacimiento|periodo|2018|2019-12&m=sede|300|11')
-    await screen.findByText('niños en el grupo, de 600')
+    await screen.findByText('niños con algún riesgo alto')
     const cuerpo = JSON.parse(String(llamadas.find((l) => l.url === '/api/exploracion/resumen')!.init!.body))
     expect(cuerpo.muestra).toEqual({
       version: 2, y: [],
@@ -241,7 +242,7 @@ describe('explorar', () => {
   it('quien solo consulta no ve los filtros guardados y se le avisa de las cifras aproximadas', async () => {
     const llamadas = api('visualizador')
     montar('/explorar')
-    await screen.findByText('niños en el grupo, de 600')
+    await screen.findByText('niños con algún riesgo alto')
     expect(screen.queryByRole('button', { name: 'Guardar este filtro' })).not.toBeInTheDocument()
     expect(screen.getByText(/se aproximan de 5 en 5/)).toBeInTheDocument()
     expect(llamadas.some((l) => l.url === '/api/muestras')).toBe(false)
@@ -263,5 +264,40 @@ describe('explorar', () => {
     montar('/explorar')
     expect((await screen.findAllByRole('link', { name: 'Vista clínica' })).length).toBeGreaterThan(0)
     expect(screen.queryAllByRole('link', { name: 'Explorar' })).toHaveLength(0)
+  })
+})
+
+describe('explorar: el riesgo agrupado por desenlace', () => {
+  const fila = (clave: string, desenlace: string, momento_nombre: string, ninos: number, altos: number) =>
+    ({ clave, desenlace, momento: 'x', momento_nombre, ninos, altos, riesgo_medio: 0.1 })
+  const riesgos = [
+    fila('desarrollo_12m', 'desarrollo psicomotor bajo a los 12 meses', '6 meses (edad corregida)', 126, 12),
+    fila('desarrollo_12m_desde_3', 'desarrollo psicomotor bajo a los 12 meses (riesgo calculado a 3 m EC)', '3 meses (edad corregida)', 95, 10),
+    fila('desarrollo_12m_desde_40', 'desarrollo psicomotor bajo a los 12 meses (riesgo calculado a 40 sem)', '40 semanas', 93, 7),
+    fila('readm_3m', 'readmisión entre las 40 semanas y los 3 meses', '40 semanas', 93, 10),
+  ]
+
+  it('cada desenlace se dice una vez y cada visita desde la que se calcula es una fila', async () => {
+    api('experto', { ...resumen, riesgos_por_desenlace: riesgos })
+    montar('/explorar')
+    const grafica = (await screen.findByRole('heading', { name: 'Riesgo del grupo elegido' })).closest('section')!
+    const dibujo = within(grafica).getByRole('img')
+    // en el dibujo y en la tabla: una sola vez cada uno
+    expect(within(dibujo).getAllByText('desarrollo psicomotor bajo a los 12 meses')).toHaveLength(1)
+    expect(within(grafica).queryByText(/riesgo calculado a/)).not.toBeInTheDocument()
+    for (const visita of ['Desde 6 meses (edad corregida)', 'Desde 3 meses (edad corregida)', 'Desde 40 semanas']) {
+      expect(within(dibujo).getAllByText(visita).length).toBeGreaterThan(0)
+    }
+    expect(within(dibujo).getByText('7 de 93', { exact: false })).toBeInTheDocument()
+    expect(within(dibujo).getByText(/^readmisión entre las 40 semanas/, { selector: 'tspan' })).toBeInTheDocument()
+  })
+
+  it('el filtro y los resultados se desplazan cada uno por su lado en escritorio', async () => {
+    api('experto')
+    montar('/explorar')
+    const filtros = (await screen.findByText('Elija el grupo')).closest('aside')!.className
+    expect(filtros).toContain('lg:overflow-y-auto')
+    const resultados = (await screen.findByRole('heading', { name: 'Riesgo del grupo elegido' })).closest('section')!.parentElement!.parentElement!
+    expect(resultados.className).toContain('lg:overflow-y-auto')
   })
 })

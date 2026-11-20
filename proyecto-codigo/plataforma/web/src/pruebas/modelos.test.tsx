@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event'
 import { useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Usuario } from '../api/tipos'
+import { fecha } from '../lib/formato'
 import { datosAl } from '../lib/lenguaje'
 import { SUBMODULOS } from '../paginas/analitica/submodulos'
 import { montar, simularApi, usuario } from './util'
@@ -200,6 +201,34 @@ describe('modelos: comparación técnica', () => {
     montar(`/analitica?entrenamiento=7&desenlace=${T3}`)
     await screen.findByRole('heading', { name: 'Evaluación en prueba' })
     expect(screen.queryByRole('heading', { name: 'Comparación técnica' })).not.toBeInTheDocument()
+  })
+})
+
+describe('modelos: sin jerga ni repeticiones', () => {
+  it('no explica cómo funciona la pantalla ni repite la advertencia del pie', async () => {
+    api()
+    montar(`/analitica?entrenamiento=7&desenlace=${T3}`)
+    await screen.findByRole('heading', { name: 'Evaluación en prueba' })
+    const principal = within(screen.getByRole('main'))
+    expect(principal.queryByText(/El contexto vive en el enlace/)).not.toBeInTheDocument()
+    expect(principal.queryByText(/Apoyo a la decisión, no diagnóstico/)).not.toBeInTheDocument()
+  })
+
+  it('la fecha del entrenamiento se dice una vez, y las opciones del selector no llevan la hora', async () => {
+    api()
+    montar(`/analitica?entrenamiento=7&desenlace=${T3}`)
+    const traza = (await screen.findByRole('heading', { name: 'Trazabilidad' })).closest('section')!
+    expect(within(traza).getByText('Fecha').nextElementSibling).toHaveTextContent(new RegExp(`^${fecha('2026-07-01T10:00:00Z')}$`))
+    expect(within(screen.getByLabelText('Entrenamiento')).getAllByRole('option').map((o) => o.textContent)).toEqual([
+      `N.º 7 · ${fecha('2026-07-01T10:00:00Z')}`, `N.º 6 · ${fecha('2026-06-01T10:00:00Z')}`])
+  })
+
+  it('la comparación técnica no repite lo que AUROC mide: ya lo dice la evaluación', async () => {
+    api()
+    montar(`/analitica?entrenamiento=7&desenlace=${T3}`)
+    const panel = (await screen.findByRole('heading', { name: 'Comparación técnica' })).closest('section')!
+    expect(within(panel).queryByText(/AUROC mide qué tan bien ordena/)).not.toBeInTheDocument()
+    expect(within(panel).getByText(/si los intervalos se montan/)).toBeInTheDocument()
   })
 })
 
