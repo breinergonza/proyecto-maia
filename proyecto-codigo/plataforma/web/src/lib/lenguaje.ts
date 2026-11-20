@@ -8,6 +8,12 @@ import { CAPAS, dec2, fecha, frase, indicador, numero, RIESGO_ALTO } from './for
 /** El 5 % con más riesgo; es también el mínimo por defecto de los correos de alerta. */
 export const RIESGO_MUY_ALTO = 95
 
+/** Por qué no hay riesgo estimado que mostrar: el paquete no calcula el desenlace, o lo calcula pero ningún niño elegido
+ *  lo tiene ahora (solo se calcula para quienes siguen en seguimiento, y con menos de 5 no se da la cifra). */
+export const sinRiesgoEstimado = (conModelo: boolean, quienes: string) => conModelo
+  ? `Ningún niño ${quienes} tiene riesgo estimado ahora: se calcula solo para los niños que siguen en seguimiento, y con menos de 5 no se da la cifra.`
+  : `El paquete de modelos activo aún no calcula este desenlace: no hay riesgo estimado ${quienes}.`
+
 export const AYUDA_RIESGO_ALTO = `Riesgo alto: estar entre el ${100 - RIESGO_ALTO} % de niños con más riesgo para ese desenlace. Es una ` +
   'comparación entre los niños del programa, no un umbral clínico.'
 

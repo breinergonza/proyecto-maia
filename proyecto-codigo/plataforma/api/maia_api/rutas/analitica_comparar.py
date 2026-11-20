@@ -315,7 +315,8 @@ def _desenlace(s: Session, corrida: Corrida, familia: dict, ids_a: list[str], id
     return {**familia, 'a': observado(ids_a, comparacion['a']), 'b': observado(ids_b, comparacion['b']),
             'dif': {'valor': comparacion['diferencia'], 'ic_bajo': comparacion['ic_bajo'], 'ic_alto': comparacion['ic_alto'],
                     'clara': comparacion['clara']},
-            'riesgo': _riesgo_por_corte(s, corrida, clave, ids_a, ids_b, dic, red)}
+            'riesgo': _riesgo_por_corte(s, corrida, clave, ids_a, ids_b, dic, red),
+            'riesgo_con_modelo': CLI.riesgo_con_modelo(s, corrida.id, clave)}
 
 
 def _talla_por_visita(s: Session, corrida: Corrida, ids_a: list[str], ids_b: list[str], dic: Dic, red: bool) -> dict:

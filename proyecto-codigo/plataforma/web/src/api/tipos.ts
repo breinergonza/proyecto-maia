@@ -630,6 +630,8 @@ export interface ClinicaResumen {
   observado: { grupo: ObservadoClinico | null; poblacion: ObservadoClinico | null }
   trayectoria: { indicador: string; unidad: string; etapas: EtapaClinica[] }
   riesgo: RiesgoCorte[]
+  /** La corrida calcula el riesgo de este desenlace para algún niño (aunque ninguno del grupo lo tenga ahora). */
+  riesgo_con_modelo: boolean
   /** Un niño está en alerta si su percentil de riesgo es mayor o igual a este. */
   alerta_percentil: number
   /** ``null`` para quien no ve niños individuales. */

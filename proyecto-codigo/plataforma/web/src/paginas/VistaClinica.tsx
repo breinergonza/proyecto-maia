@@ -105,7 +105,7 @@ function Contenido({ r, activa, elegir }: { r: ClinicaResumen; activa: string; e
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] [&>*]:min-w-0">
         <Observado grupo={r.observado.grupo} poblacion={r.observado.poblacion} />
         <Trayectoria indicador={r.trayectoria.indicador} unidad={r.trayectoria.unidad} etapas={r.trayectoria.etapas} muestra={muestra} />
-        <RiesgoPorCorte nombre={familia?.nombre ?? r.familia} filas={r.riesgo} alertaPercentil={r.alerta_percentil} />
+        <RiesgoPorCorte nombre={familia?.nombre ?? r.familia} filas={r.riesgo} conModelo={r.riesgo_con_modelo} alertaPercentil={r.alerta_percentil} />
         {r.ninos && <NinosMasRiesgo ninos={r.ninos} medida={r.trayectoria.indicador === 'talla' ? 'Última talla (z)' : 'Última medida (z)'} />}
       </div>
     </div>

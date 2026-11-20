@@ -47,6 +47,8 @@ export interface RiesgoPorCorteLados {
 export interface DesenlaceComparado {
   clave: string; nombre: string; definicion: string; estado: 'en_uso' | 'en_prueba'; indicador: string | null
   a: ObservadoLado | null; b: ObservadoLado | null; dif: DiferenciaObservada; riesgo: RiesgoPorCorteLados[]
+  /** La corrida calcula el riesgo de este desenlace para algún niño (aunque ninguno de los grupos lo tenga ahora). */
+  riesgo_con_modelo: boolean
 }
 /** Lo de un grupo en una visita: niños con z de talla, su mediana y los que no tienen dato (con su porcentaje). */
 export interface TallaDeVisita { n: number; mediana: number; sin_dato: number; pct_sin_dato: number }

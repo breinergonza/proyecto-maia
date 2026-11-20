@@ -36,6 +36,7 @@ const resumen = {
     { momento: '40 sem', clave: 'talla_baja_12m_desde_40sem', estado: 'en_prueba', calculados: 290, en_alerta: 58, pct_en_alerta: 20 },
     { momento: '3 m EC', clave: 'talla_baja_12m_desde_3m', estado: 'en_prueba', calculados: 268, en_alerta: 61, pct_en_alerta: 22.8 },
   ],
+  riesgo_con_modelo: true,
   alerta_percentil: 90,
   ninos: [
     { sujeto: 'S-01633', semanas: null, momento: '3 m EC', riesgo: 0.61, percentil: 97, ultima_z: -1.9 },
@@ -149,9 +150,16 @@ describe('vista clínica', () => {
   })
 
   it('un desenlace sin modelo en el paquete activo lo dice en lugar de mostrar riesgo', async () => {
-    api('experto', () => ({ ...resumen, riesgo: [] }))
+    api('experto', () => ({ ...resumen, riesgo: [], riesgo_con_modelo: false }))
     montar('/')
-    expect(await screen.findByText(/este desenlace aún no tiene modelo en el paquete activo/i)).toBeInTheDocument()
+    expect(await screen.findByText('El paquete de modelos activo aún no calcula este desenlace: no hay riesgo estimado del grupo.')).toBeInTheDocument()
+  })
+
+  it('con modelo pero sin niños del grupo en seguimiento no dice «sin modelo»: explica por qué no hay riesgo', async () => {
+    api('experto', () => ({ ...resumen, riesgo: [], riesgo_con_modelo: true }))
+    montar('/')
+    expect(await screen.findByText(/Ningún niño del grupo tiene riesgo estimado ahora: se calcula solo para los niños que siguen en seguimiento/)).toBeInTheDocument()
+    expect(screen.queryByText(/aún no calcula este desenlace/)).not.toBeInTheDocument()
   })
 
   it('los niños con más riesgo enlazan a su ficha', async () => {

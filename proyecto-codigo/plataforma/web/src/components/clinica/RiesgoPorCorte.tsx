@@ -2,6 +2,7 @@
 // alerta. Un desenlace sin modelo en el paquete activo no tiene filas: se dice en vez de dejar el panel vacío.
 import type { RiesgoCorte } from '../../api/tipos'
 import { num, pct } from '../../lib/formato'
+import { sinRiesgoEstimado } from '../../lib/lenguaje'
 import { Insignia, Panel } from '../ui'
 
 /** «40 sem» → «las 40 semanas»; «3 m EC» → «los 3 meses»; lo que no se reconoce se deja como llega. */
@@ -15,13 +16,15 @@ export function momentoTexto(momento: string): string {
 
 const minuscula = (t: string) => t.charAt(0).toLowerCase() + t.slice(1)
 
-export function RiesgoPorCorte({ nombre, filas, alertaPercentil }: { nombre: string; filas: RiesgoCorte[]; alertaPercentil: number }) {
+export function RiesgoPorCorte({ nombre, filas, conModelo, alertaPercentil }: {
+  nombre: string; filas: RiesgoCorte[]; conModelo: boolean; alertaPercentil: number
+}) {
   const enPrueba = filas.some((f) => f.estado === 'en_prueba')
   return (
     <Panel titulo={`Riesgo estimado de ${minuscula(nombre)}`}
       descripcion="Niños del grupo en alerta, según el riesgo calculado con lo medido hasta cada visita.">
       {filas.length === 0 ? (
-        <p className="text-sm">Este desenlace aún no tiene modelo en el paquete activo: todavía no hay riesgo estimado para el grupo.</p>
+        <p className="text-sm">{sinRiesgoEstimado(conModelo, 'del grupo')}</p>
       ) : (
         <>
           {enPrueba && <p className="mb-3 text-sm font-semibold text-ocre-hondo">En prueba: este modelo aún no está validado.</p>}

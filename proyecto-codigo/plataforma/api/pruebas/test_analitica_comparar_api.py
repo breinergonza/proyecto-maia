@@ -257,6 +257,7 @@ def test_clinico_riesgo_estimado_por_corte_de_cada_lado(cliente, tokens, corrida
     # desarrollo: solo 3 varones tienen riesgo de esa familia, así que el lado A no da cifra y B sí
     assert [f['clave'] for f in desarrollo['riesgo']] == ['desarrollo_12m']
     assert desarrollo['riesgo'][0]['a'] is None and desarrollo['riesgo'][0]['b']['calculados'] > 5
+    assert talla['riesgo_con_modelo'] is True and desarrollo['riesgo_con_modelo'] is True
     assert desarrollo['a'] is None and desarrollo['b']['con_dato'] > 5 and desarrollo['dif']['valor'] is None
 
 

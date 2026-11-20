@@ -198,6 +198,15 @@ def riesgo_de(s: Session, corrida: int, corte_id: int, familia: str, ids: list[s
             for f in filas]
 
 
+def riesgo_con_modelo(s: Session, corrida: int, familia: str) -> bool:
+    """¿La corrida calculó el riesgo de la familia para algún niño? Distingue «el paquete no la calcula» de «ningún niño
+    del grupo tiene riesgo ahora» (se calcula solo para quienes siguen en seguimiento) o «son menos de 5»."""
+    return bool(_filas(s, """
+        SELECT 1 AS hay FROM resultados.riesgos
+        WHERE corrida_id = :c AND NOT silencio AND (clave = :f OR clave LIKE :l) LIMIT 1""",
+                       c=corrida, f=familia, l=familia.replace('_', r'\_') + _DESDE))
+
+
 def _ninos(s: Session, corrida: int, corte_id: int, familia: str, ids: list[str] | None, indicador: str) -> list[dict]:
     """Los ``NINOS_LISTADOS`` niños con el percentil más alto de la familia (el más alto de sus claves), con la edad
     gestacional y el último puntaje z del indicador."""
@@ -268,6 +277,7 @@ def resumen(consulta: ConsultaClinica, s: Session = Depends(sesion), u: Usuario 
                       'poblacion': observado_de(s, corrida.id, familia, None, total, red) if familia else None},
         'trayectoria': trayectoria_de(s, corrida.id, corrida.corte_id, indicador, grupo, dic, red),
         'riesgo': riesgo_de(s, corrida.id, corrida.corte_id, familia, grupo, dic, red) if familia else [],
+        'riesgo_con_modelo': riesgo_con_modelo(s, corrida.id, familia) if familia else False,
         'alerta_percentil': PERCENTIL_ALTO,
         'ninos': ninos,
     }

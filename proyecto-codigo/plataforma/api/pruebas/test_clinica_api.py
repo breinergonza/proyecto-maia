@@ -185,6 +185,7 @@ def test_celdas_de_menos_de_5_no_se_dan(cliente, tokens, corrida, datos):  # noq
     doce = next(e for e in r['trayectoria']['etapas'] if e['etapa'] == '12 m EC')
     assert doce['grupo'] is None and doce['poblacion']['n'] > POCOS
     assert r['riesgo'] == []   # solo 3 varones tienen riesgo de esa familia
+    assert r['riesgo_con_modelo'] is True   # la corrida sí calcula esa familia: la pantalla no dice «sin modelo»
     assert r['grupo']['n'] == len(datos['varones'])   # el grupo sí se cuenta: tiene 20 o más niños
 
 

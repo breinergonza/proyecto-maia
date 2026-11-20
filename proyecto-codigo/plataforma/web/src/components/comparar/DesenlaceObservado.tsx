@@ -3,6 +3,7 @@
 // cada corte. Lo observado es lo que pasó; el riesgo estimado no, y no se mezclan.
 import type { DesenlaceComparado, GruposClinicoOk, RiesgoDeCorte } from '../../api/comparar'
 import { num } from '../../lib/formato'
+import { sinRiesgoEstimado } from '../../lib/lenguaje'
 import { Panel, Tabla } from '../ui'
 import { BarrasObservado, claridad, FichaDelDato, MENOS_DE_5, ninos, porcentaje, textoDiferencia, variableDe } from './comun'
 
@@ -22,7 +23,7 @@ function RiesgoEstimado({ d, alerta }: { d: DesenlaceComparado; alerta: number }
         hasta esa visita; no es lo que ocurrió a los 12 meses.
       </p>
       {d.riesgo.length === 0 ? (
-        <p className="mt-2 text-sm">El paquete de modelos activo no calcula este desenlace para estos grupos.</p>
+        <p className="mt-2 text-sm">{sinRiesgoEstimado(d.riesgo_con_modelo, 'de estos grupos')}</p>
       ) : (
         <div className="mt-2">
           <Tabla densa apilar>
