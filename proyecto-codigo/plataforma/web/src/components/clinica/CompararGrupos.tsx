@@ -15,7 +15,8 @@ import { FaltantesPorVisita } from '../comparar/FaltantesPorVisita'
 import { estadoDe, grupoVacio, restoDe, useGrupoLocal } from '../comparar/grupoLocal'
 import { LadoComparado } from '../comparar/LadoComparado'
 import { usePantallaAlta } from '../comparar/pantalla'
-import { ID_PANEL, idPestana, preguntaDe, Preguntas, type Pregunta } from '../comparar/Preguntas'
+import { PREFIJO_PREGUNTA, preguntaDe, Preguntas, type Pregunta } from '../comparar/Preguntas'
+import { PanelPestana } from '../ui/Pestanas'
 import { SERIE_A, SERIE_B, ninos } from '../comparar/comun'
 import { TallaPorVisita } from '../comparar/TallaPorVisita'
 import { cuerpoDeFiltros } from '../GrupoActivo'
@@ -138,10 +139,10 @@ export default function CompararGrupos() {
           ) : (
             <>
               <Preguntas activa={pregunta} elegir={(p) => ponerParam('pregunta', p)} />
-              <div role="tabpanel" id={ID_PANEL} aria-labelledby={idPestana(pregunta)} aria-busy={consulta.isPlaceholderData}
+              <PanelPestana prefijo={PREFIJO_PREGUNTA} activa={pregunta} ocupado={consulta.isPlaceholderData}
                 className={consulta.isPlaceholderData ? 'opacity-60 transition-opacity' : undefined}>
                 <Respuesta r={r} pregunta={pregunta} vista={vista} elegirVista={(v) => ponerParam('vista', v)} />
-              </div>
+              </PanelPestana>
             </>
           )}
     </div>
