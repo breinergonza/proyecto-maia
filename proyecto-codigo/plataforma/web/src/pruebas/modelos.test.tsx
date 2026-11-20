@@ -119,7 +119,7 @@ describe('modelos: configuración y trazabilidad', () => {
     expect(within(config).getByText(/Temporal por fecha de nacimiento/)).toBeInTheDocument()
     expect(within(config).getByText('Gradient boosting (LightGBM)')).toBeInTheDocument()
     expect(within(config).queryByRole('link', { name: /hiperparámetros/ })).not.toBeInTheDocument()   // solo administración
-    const hp = within(config).getByRole('heading', { name: 'Hiperparámetros' }).parentElement!   // todos los perfiles los ven
+    const hp = screen.getByRole('heading', { name: 'Hiperparámetros' }).closest('section')!   // todos los perfiles los ven, en su propia tarjeta
     expect(within(hp).getByText('Rondas de boosting (máximo)').nextElementSibling).toHaveTextContent('1.200')
     expect(within(hp).getByText('Tasa de aprendizaje').nextElementSibling).toHaveTextContent('0,05')
     const traza = screen.getByRole('heading', { name: 'Trazabilidad' }).closest('section')!
@@ -134,7 +134,7 @@ describe('modelos: configuración y trazabilidad', () => {
     montar(`/analitica?entrenamiento=6&desenlace=${T3}`)
     const config = (await screen.findByRole('heading', { name: 'Configuración' })).closest('section')!
     await within(config).findByText('Gradient boosting (LightGBM)')
-    expect(within(config).queryByRole('heading', { name: 'Hiperparámetros' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Hiperparámetros' })).not.toBeInTheDocument()
   })
 
   it('el administrador ve el enlace a los hiperparámetros; un entrenamiento que no está en el paquete activo lo dice', async () => {
@@ -149,7 +149,7 @@ describe('modelos: configuración y trazabilidad', () => {
 describe('modelos: evaluación en prueba', () => {
   it('cada métrica trae su cifra y una frase que la explica; F1 sale de sensibilidad y precisión', async () => {
     api()
-    montar(`/analitica?entrenamiento=7&desenlace=${T3}`)
+    montar(`/analitica?entrenamiento=7&desenlace=${T3}&ver=evaluacion`)
     const panel = (await screen.findByRole('heading', { name: 'Evaluación en prueba' })).closest('section')!
     expect(await within(panel).findByText(/1\.204 niños, 16,0 % con el desenlace/)).toBeInTheDocument()
     expect(within(panel).getByText(/Alertando al 10 % de niños con más riesgo/)).toBeInTheDocument()
@@ -169,7 +169,7 @@ describe('modelos: evaluación en prueba', () => {
 
   it('la matriz de aciertos y errores y la calibración con su diagonal dicen variable, unidad, momento, población, datos válidos y denominador', async () => {
     api()
-    montar(`/analitica?entrenamiento=7&desenlace=${T3}`)
+    montar(`/analitica?entrenamiento=7&desenlace=${T3}&ver=graficas`)
     const matriz = await screen.findByRole('table', { name: 'Aciertos y errores de la alerta' })
     expect(within(matriz).getByText('79')).toBeInTheDocument()
     expect(within(matriz).getByText('849')).toBeInTheDocument()
@@ -188,7 +188,7 @@ describe('modelos: evaluación en prueba', () => {
 describe('modelos: comparación técnica', () => {
   it('compara el modelo completo con la regla de referencia', async () => {
     api()
-    montar(`/analitica?entrenamiento=7&desenlace=${T3}`)
+    montar(`/analitica?entrenamiento=7&desenlace=${T3}&ver=evaluacion`)
     const panel = (await screen.findByRole('heading', { name: 'Comparación técnica' })).closest('section')!
     const fila = (t: string) => within(panel).getByText(t).closest('tr')!
     expect(fila('Modelo de referencia')).toHaveTextContent('0,68')
@@ -198,7 +198,7 @@ describe('modelos: comparación técnica', () => {
 
   it('un entrenamiento sin regla de referencia no muestra el panel', async () => {
     api('experto', undefined, false)
-    montar(`/analitica?entrenamiento=7&desenlace=${T3}`)
+    montar(`/analitica?entrenamiento=7&desenlace=${T3}&ver=evaluacion`)
     await screen.findByRole('heading', { name: 'Evaluación en prueba' })
     expect(screen.queryByRole('heading', { name: 'Comparación técnica' })).not.toBeInTheDocument()
   })
@@ -207,7 +207,7 @@ describe('modelos: comparación técnica', () => {
 describe('modelos: sin jerga ni repeticiones', () => {
   it('no explica cómo funciona la pantalla ni repite la advertencia del pie', async () => {
     api()
-    montar(`/analitica?entrenamiento=7&desenlace=${T3}`)
+    montar(`/analitica?entrenamiento=7&desenlace=${T3}&ver=evaluacion`)
     await screen.findByRole('heading', { name: 'Evaluación en prueba' })
     const principal = within(screen.getByRole('main'))
     expect(principal.queryByText(/El contexto vive en el enlace/)).not.toBeInTheDocument()
@@ -225,7 +225,7 @@ describe('modelos: sin jerga ni repeticiones', () => {
 
   it('la comparación técnica no repite lo que AUROC mide: ya lo dice la evaluación', async () => {
     api()
-    montar(`/analitica?entrenamiento=7&desenlace=${T3}`)
+    montar(`/analitica?entrenamiento=7&desenlace=${T3}&ver=evaluacion`)
     const panel = (await screen.findByRole('heading', { name: 'Comparación técnica' })).closest('section')!
     expect(within(panel).queryByText(/AUROC mide qué tan bien ordena/)).not.toBeInTheDocument()
     expect(within(panel).getByText(/si los intervalos se montan/)).toBeInTheDocument()
@@ -236,7 +236,7 @@ describe('modelos: falla de red', () => {
   it('explica qué pasó, ofrece reintentar y conserva el desenlace y el entrenamiento elegidos', async () => {
     let caida = true
     api('experto', (url) => (caida && /\/analitica\/7\/rendimiento/.test(url) ? { estado: 503, cuerpo: { detail: 'El servidor no responde por ahora.' } } : undefined))
-    montar(`/analitica?entrenamiento=7&desenlace=${T40}`, <Ubicacion />)
+    montar(`/analitica?entrenamiento=7&desenlace=${T40}&ver=evaluacion`, <Ubicacion />)
     const aviso = await screen.findByRole('alert', undefined, { timeout: 20_000 })
     expect(aviso).toHaveTextContent('No se pudo cargar este análisis')
     expect(aviso).toHaveTextContent('El servidor no responde por ahora.')
@@ -252,7 +252,7 @@ describe('modelos: falla de red', () => {
 describe('modelos: los demás submódulos siguen funcionando', () => {
   it('Rendimiento abre con el mismo contexto y los selectores nuevos', async () => {
     api()
-    montar(`/analitica/rendimiento?entrenamiento=7&desenlace=${T3}`)
+    montar(`/analitica/rendimiento?entrenamiento=7&desenlace=${T3}&ver=linea`)
     expect(await screen.findByRole('heading', { level: 1, name: 'Rendimiento' })).toBeInTheDocument()
     expect(await screen.findByRole('slider')).toHaveValue('10')
     expect(screen.getByLabelText('Calculado a')).toHaveValue(T3)

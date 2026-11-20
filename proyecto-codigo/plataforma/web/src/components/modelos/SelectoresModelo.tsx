@@ -4,6 +4,7 @@
 import { useMemo } from 'react'
 import { useEntrenamientosAnalitica } from '../../api/analitica'
 import { useContextoAnalitica } from '../../paginas/analitica/contexto'
+import { cn } from '../../lib/cn'
 import { fecha } from '../../lib/formato'
 import { Selector } from '../ui'
 import { familiasDeModelo } from './desenlaces'
@@ -13,16 +14,18 @@ const AYUDA_ESTADO = {
   'En prueba': 'No da alertas todavía y no está validado.',
 } as const
 
-function Campo({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
+/** La etiqueta va a la izquierda de su selector: una sola fila de selectores en vez de una pila de etiquetas y cajas. */
+function Campo({ etiqueta, className, children }: { etiqueta: string; className?: string; children: React.ReactNode }) {
   return (
-    <label className="block min-w-0 text-sm">
-      <span className="mb-1 block font-semibold">{etiqueta}</span>
+    <label className={cn('flex min-w-0 items-center gap-2 text-sm', className)}>
+      <span className="shrink-0 font-semibold">{etiqueta}</span>
       {children}
     </label>
   )
 }
 
-export function SelectoresModelo() {
+/** Los selectores en una fila y, debajo, una línea con el estado del desenlace elegido y `origen` (de dónde salen los datos). */
+export function SelectoresModelo({ origen }: { origen?: string | null }) {
   const { entrenamiento, desenlace, desenlaces, contexto, fijar } = useContextoAnalitica()
   const lista = useEntrenamientosAnalitica().data?.entrenamientos ?? []
   const familias = useMemo(() => familiasDeModelo(desenlaces), [desenlaces])
@@ -30,35 +33,46 @@ export function SelectoresModelo() {
   const corte = familia?.cortes.find((c) => c.clave === desenlace)
   const estado = corte?.enPrueba ? 'En prueba' : 'En uso'
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_10rem_20rem]">
-      <Campo etiqueta="Desenlace">
-        <Selector value={familia?.clave ?? ''} disabled={!familias.length}
-          onChange={(e) => fijar({ desenlace: familias.find((f) => f.clave === e.target.value)?.cortes[0]?.clave ?? null })}>
-          {familias.map((f) => <option key={f.clave} value={f.clave}>{f.nombre}</option>)}
-        </Selector>
-      </Campo>
-      <Campo etiqueta="Calculado a">
-        <Selector value={desenlace ?? ''} disabled={!familia} onChange={(e) => fijar({ desenlace: e.target.value })}>
-          {familia?.cortes.map((c) => <option key={c.clave} value={c.clave}>{c.corte}</option>)}
-        </Selector>
-      </Campo>
-      <Campo etiqueta="Entrenamiento">
-        <Selector value={entrenamiento ?? ''} onChange={(e) => fijar({ entrenamiento: Number(e.target.value) })}>
-          {entrenamiento != null && !lista.some((m) => m.entrenamiento === entrenamiento) && <option value={entrenamiento}>N.º {entrenamiento}</option>}
-          {lista.map((m) => (
-            <option key={m.entrenamiento} value={m.entrenamiento}>N.º {m.entrenamiento}{m.creada ? ` · ${fecha(m.creada)}` : ''}</option>
-          ))}
-        </Selector>
-      </Campo>
-      {corte && (
-        <p className="min-w-0 text-sm sm:col-span-2 lg:col-span-3">
-          <span className="font-semibold">Estado: </span>
-          <b className={estado === 'En prueba' ? 'text-ocre-hondo' : 'text-teal'}>{estado}</b>
-          <span className="text-tinta/80"> · {AYUDA_ESTADO[estado]}</span>
-        </p>
-      )}
+    <div className="space-y-2">
+      {/* dos filas: el desenlace y la visita, y el entrenamiento con el estado y el origen de los datos a su lado; así ningún
+          selector corta su texto */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <Campo etiqueta="Desenlace" className="flex-[1_1_28rem]">
+          <Selector value={familia?.clave ?? ''} disabled={!familias.length}
+            onChange={(e) => fijar({ desenlace: familias.find((f) => f.clave === e.target.value)?.cortes[0]?.clave ?? null })}>
+            {familias.map((f) => <option key={f.clave} value={f.clave}>{f.nombre}</option>)}
+          </Selector>
+        </Campo>
+        <Campo etiqueta="Calculado a" className="flex-[0_0_14rem]">
+          <Selector value={desenlace ?? ''} disabled={!familia} onChange={(e) => fijar({ desenlace: e.target.value })}>
+            {familia?.cortes.map((c) => <option key={c.clave} value={c.clave}>{c.corte}</option>)}
+          </Selector>
+        </Campo>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        <Campo etiqueta="Entrenamiento" className="flex-[0_1_27rem]">
+          <Selector value={entrenamiento ?? ''} onChange={(e) => fijar({ entrenamiento: Number(e.target.value) })}>
+            {entrenamiento != null && !lista.some((m) => m.entrenamiento === entrenamiento) && <option value={entrenamiento}>N.º {entrenamiento}</option>}
+            {lista.map((m) => (
+              <option key={m.entrenamiento} value={m.entrenamiento}>N.º {m.entrenamiento}{m.creada ? ` · ${fecha(m.creada)}` : ''}</option>
+            ))}
+          </Selector>
+        </Campo>
+        {(corte || origen) && (
+          <p data-linea-contexto className="flex min-w-0 flex-1 basis-72 flex-wrap gap-x-5 gap-y-0.5 text-sm">
+            {corte && (
+              <span>
+                <span className="font-semibold">Estado: </span>
+                <b className={estado === 'En prueba' ? 'text-ocre-hondo' : 'text-teal'}>{estado}</b>
+                <span className="text-tinta/80"> · {AYUDA_ESTADO[estado]}</span>
+              </span>
+            )}
+            {origen && <span className="text-tinta/80">{origen}</span>}
+          </p>
+        )}
+      </div>
       {contexto?.estado === 'sin_artefactos' && entrenamiento != null && (
-        <p className="text-sm font-semibold text-ocre-hondo sm:col-span-2 lg:col-span-3">Este entrenamiento no tiene analítica.</p>
+        <p className="text-sm font-semibold text-ocre-hondo">Este entrenamiento no tiene analítica.</p>
       )}
     </div>
   )

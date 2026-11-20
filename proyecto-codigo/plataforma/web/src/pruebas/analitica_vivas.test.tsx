@@ -62,12 +62,13 @@ function api(rol: Usuario['rol'], pendiente = false) {
 describe('analítica viva', () => {
   it('trayectorias: tabla frente a la OMS, niños individuales con enlace y selectores', async () => {
     const llamadas = api('experto')
-    montar('/analitica/trayectorias?entrenamiento=7')
+    montar('/analitica/trayectorias?entrenamiento=7&ver=oms')   // cada pregunta tiene su pestaña (?ver=): aquí, la tabla frente a la OMS
     expect(await screen.findByText('Diferencia con la OMS (z)')).toBeInTheDocument()
     expect(screen.getAllByText('Riesgo alto').length).toBeGreaterThan(0)
-    expect(screen.getByRole('link', { name: 'N-001' }).getAttribute('href')).toBe('/ninos/N-001')
     expect(screen.getAllByText(/5,2 kg/).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/n menor que 5/).length).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('tab', { name: 'Niños individuales' }))
+    expect((await screen.findByRole('link', { name: 'N-001' })).getAttribute('href')).toBe('/ninos/N-001')
     fireEvent.change(screen.getByLabelText('Indicador'), { target: { value: 'peso_para_talla' } })
     await waitFor(() => expect(llamadas.some((l) => l.url.includes('indicador=peso_para_talla&agrupar=riesgo&eje=edad_corregida'))).toBe(true))
     expect(await screen.findAllByText('En prueba')).not.toHaveLength(0)
@@ -89,9 +90,11 @@ describe('analítica viva', () => {
     montar('/analitica/anticipacion?entrenamiento=7')
     expect(await screen.findByText('Casos avisados al menos una visita antes')).toBeInTheDocument()
     expect(screen.getByText('50,0 %')).toBeInTheDocument()
-    expect(screen.getByText('Avisar antes detecta menos casos y da más ventaja.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: 'Qué cuesta avisar antes' }))   // el costo de avisar antes tiene su pestaña
+    expect(await screen.findByText('Avisar antes detecta menos casos y da más ventaja.')).toBeInTheDocument()
     expect(screen.getAllByText('En prueba').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('n menor que 5').length).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('tab', { name: /^Tabla/ }))   // la tabla por visita, con sus cifras pequeñas omitidas, tiene su pestaña
+    expect((await screen.findAllByText('n menor que 5')).length).toBeGreaterThan(0)
   })
 
   it.each(['trayectorias', 'perfiles', 'anticipacion'])('%s: estado pendiente con mensaje', async (sub) => {

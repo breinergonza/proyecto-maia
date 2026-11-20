@@ -1,6 +1,7 @@
-// Rendimiento (plan v3.7, 6.3.2): aciertos frente a falsas alarmas, casos detectados frente a alertas acertadas, a cuántos
-// niños alertar (control deslizante, calculado en el navegador), aciertos y errores en 2×2, qué pasa según dónde se ponga
-// la línea y qué tan bien ordena cada desenlace. La revisión de los primeros (lift) y a cuántos revisar viven en Calibración.
+// Rendimiento (plan v3.7, 6.3.2), en tres pestañas: «Curvas» (aciertos frente a falsas alarmas y alertas acertadas frente a
+// casos detectados), «Línea de alerta» (a cuántos niños alertar con un control deslizante calculado en el navegador, los
+// aciertos y errores en 2×2 y qué pasa según dónde se ponga la línea) y «Por desenlace» (qué tan bien ordena cada uno, en una
+// lista que se desplaza dentro de su tarjeta). La revisión de los primeros (lift) y a cuántos revisar viven en Calibración.
 import { useState, type ReactNode } from 'react'
 import { useSubmodulo } from '../../api/analitica'
 import type { DatosRendimiento, DatosResumen } from '../../api/tipos'
@@ -8,11 +9,12 @@ import { Bosque } from '../../components/graficos/equidad'
 import { CurvaXY } from '../../components/graficos/xy'
 import { Grafica, TablaDatos } from '../../components/grafica'
 import { Cifra, Panel, Tabla } from '../../components/ui'
+import type { Pestana } from '../../components/ui/Pestanas'
 import { descripcionDe } from '../../lib/descripciones'
 import { cn } from '../../lib/cn'
 import { dec2, num } from '../../lib/formato'
 import { jerga } from '../../lib/lenguaje'
-import { Guia, ic, MatrizAlerta, muestraDe, omitida, PorDesenlace, pctN, useNombreDesenlace, useTecnico, type ModoMatriz } from './comun'
+import { ConPestanas, Guia, ic, MatrizAlerta, muestraDe, omitida, PorDesenlace, pctN, useNombreDesenlace, useTecnico, type ModoMatriz } from './comun'
 import { useContextoAnalitica } from './contexto'
 
 /** El control de «a cuántos niños se alerta»: recalcula en el navegador desde los 100 puntos de `metricas_por_percentil`. */
@@ -44,6 +46,8 @@ export function ControlAlerta({ datos, p, setP }: { datos: DatosRendimiento; p: 
 
 const MODOS: { id: ModoMatriz; texto: string }[] = [{ id: 'conteos', texto: 'Conteos' }, { id: 'fila', texto: '% por fila' }, { id: 'total', texto: '% del total' }]
 
+type Ver = 'curvas' | 'linea' | 'desenlaces'
+
 export default function Rendimiento() {
   const { entrenamiento, desenlace } = useContextoAnalitica()
   const consulta = useSubmodulo<DatosRendimiento>(entrenamiento, 'rendimiento', desenlace)
@@ -55,8 +59,13 @@ export default function Rendimiento() {
   const dRoc = descripcionDe('roc'), dPr = descripcionDe('curva_pr'), dLinea = descripcionDe('que_pasa_segun_linea')
   const dAe = descripcionDe('aciertos_errores'), dOrd = descripcionDe('ordena_por_desenlace')
   const porDesenlace = resumen.data?.estado === 'ok' ? Object.entries(resumen.data.desenlaces ?? {}) : []
+  const pestanas: Pestana<Ver>[] = [
+    { clave: 'curvas', texto: 'Curvas' },
+    { clave: 'linea', texto: 'Línea de alerta' },
+    { clave: 'desenlaces', texto: porDesenlace.length ? 'Por desenlace' : 'Orden del modelo' },
+  ]
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-3 lg:min-h-0 lg:flex-1">
       <Guia>
         <p>«Qué tan bien ordena» dice si el modelo pone primero a los niños que sí tendrán el desenlace. Con el control deslizante se elige a cuántos niños alertar y se ve cuántos casos se detectan y cuántas alertas aciertan.</p>
         <p>Alertar a más niños detecta más casos, pero también da más falsas alarmas: el equipo decide el equilibrio. La revisión de los primeros y a cuántos niños revisar están en Calibración y decisión.</p>
@@ -69,50 +78,65 @@ export default function Rendimiento() {
           const topMatriz = tops.length ? tops.reduce((a, b) => (Math.abs(b - p) < Math.abs(a - p) ? b : a)) : null
           const conf = d.confusion_por_top.find((c) => c.top_pct === topMatriz)
           return (
-            <>
-              <div className="grid gap-4 xl:grid-cols-3">
-                <Grafica titulo={dRoc.titulo} descripcion={dRoc.descripcion}
-                  exportar={{ nombre: 'rendimiento-roc', filas: d.roc.puntos.map(([x, y]) => ({ falsas_alarmas: x, casos_detectados: y })), muestra }}>
-                  <CurvaXY etiqueta="Aciertos frente a falsas alarmas" ejeX="Falsas alarmas" ejeY="Casos detectados" diagonal alto={260}
-                    formatoX={(v) => `${Math.round(v * 100)} %`} formatoY={(v) => `${Math.round(v * 100)} %`}
-                    series={[{ clave: 'roc', nombre: `${jerga(tecnico, 'Modelo', 'Curva ROC')} · ${ic(d.auc_desenlace)}`, color: 0, puntos: d.roc.puntos, sinPuntos: true }]} />
-                </Grafica>
-                <Grafica titulo={dPr.titulo} descripcion={dPr.descripcion}
-                  exportar={{ nombre: 'rendimiento-pr', filas: d.pr.puntos.map(([x, y]) => ({ casos_detectados: x, alertas_acertadas: y })), muestra }}>
-                  <CurvaXY etiqueta="Alertas acertadas frente a casos detectados" ejeX="Casos detectados" ejeY="Alertas acertadas" referenciaY={d.pr.prevalencia} alto={260}
-                    formatoX={(v) => `${Math.round(v * 100)} %`} formatoY={(v) => `${Math.round(v * 100)} %`}
-                    series={[{ clave: 'pr', nombre: jerga(tecnico, 'Modelo', 'Curva precisión-exhaustividad'), color: 0, puntos: d.pr.puntos, sinPuntos: true }]} />
-                </Grafica>
-                <ControlAlerta datos={d} p={p} setP={setP} />
-              </div>
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_minmax(0,1fr)]">
-                <TablaDatos titulo={dAe.titulo} descripcion={topMatriz != null ? `Alertando al ${topMatriz} %: cuántos niños se acertaron y cuántos fueron falsa alarma.` : dAe.descripcion}
-                  exportar={{ nombre: 'rendimiento-confusion', filas: d.confusion_por_top.map((c) => ({ porcentaje_alertado: c.top_pct, casos_detectados: c.tp, falsas_alarmas: c.fp, casos_no_detectados: c.fn, sin_falsa_alarma: c.tn })), muestra }}>
-                  <div role="group" aria-label="Cómo mostrar la matriz" className="mb-3 flex flex-wrap gap-1.5">
-                    {MODOS.map((m) => (
-                      <button key={m.id} type="button" aria-pressed={modo === m.id} onClick={() => setModo(m.id)}
-                        className={cn('rounded-full border px-3 py-1 text-xs font-semibold', modo === m.id ? 'border-teal bg-teal text-white' : 'border-teal-tinte bg-teal-tinte text-teal')}>
-                        {m.texto}
-                      </button>
-                    ))}
-                  </div>
-                  {conf ? <MatrizAlerta c={conf} modo={modo} /> : <p className="text-sm text-salvia">Sin datos.</p>}
-                </TablaDatos>
-                <TablaDatos titulo={dLinea.titulo} descripcion={`${dLinea.descripcion} Resaltada, la elegida en el control.`}
-                  exportar={{ nombre: 'rendimiento-por-top', filas: d.metricas_por_top.map((t) => ({ porcentaje_alertado: t.top_pct, alertas: t.alertas, casos_detectados_pct: t.casos_detectados_pct, alertas_acertadas_pct: t.alertas_acertadas_pct, sin_falsa_alarma_pct: t.sin_falsa_alarma_pct, alertas_por_1000: t.alertas_por_1000 })), muestra }}>
-                  <Tabla densa>
-                    <thead><tr><th>Alertar al</th><th>{jerga(tecnico, 'Detectados', 'Sensibilidad')}</th><th>{jerga(tecnico, 'Acertadas', 'VPP')}</th>
-                      <th>{jerga(tecnico, 'Sin falsa alarma', 'Especificidad')}</th><th>Por 1.000</th></tr></thead>
-                    <tbody>
-                      {d.metricas_por_top.map((t) => (
-                        <tr key={t.top_pct} className={cn(t.top_pct === topMatriz && 'bg-teal-tinte font-semibold')}>
-                          <td>{t.top_pct} %</td><td>{pctN(t.casos_detectados_pct)}</td><td>{pctN(t.alertas_acertadas_pct)}</td>
-                          <td>{pctN(t.sin_falsa_alarma_pct)}</td><td>{omitida(t.alertas_por_1000, num)}</td></tr>
+            <ConPestanas etiqueta="Qué ver del rendimiento" pestanas={pestanas}>
+              {(ver) => ver === 'curvas' ? (
+                <div className="grid gap-4 xl:grid-cols-2 [&>*]:min-w-0">
+                  <Grafica titulo={dRoc.titulo} descripcion={dRoc.descripcion}
+                    exportar={{ nombre: 'rendimiento-roc', filas: d.roc.puntos.map(([x, y]) => ({ falsas_alarmas: x, casos_detectados: y })), muestra }}>
+                    <CurvaXY etiqueta="Aciertos frente a falsas alarmas" ejeX="Falsas alarmas" ejeY="Casos detectados" diagonal alto={300}
+                      formatoX={(v) => `${Math.round(v * 100)} %`} formatoY={(v) => `${Math.round(v * 100)} %`}
+                      series={[{ clave: 'roc', nombre: `${jerga(tecnico, 'Modelo', 'Curva ROC')} · ${ic(d.auc_desenlace)}`, color: 0, puntos: d.roc.puntos, sinPuntos: true }]} />
+                  </Grafica>
+                  <Grafica titulo={dPr.titulo} descripcion={dPr.descripcion}
+                    exportar={{ nombre: 'rendimiento-pr', filas: d.pr.puntos.map(([x, y]) => ({ casos_detectados: x, alertas_acertadas: y })), muestra }}>
+                    <CurvaXY etiqueta="Alertas acertadas frente a casos detectados" ejeX="Casos detectados" ejeY="Alertas acertadas" referenciaY={d.pr.prevalencia} alto={300}
+                      formatoX={(v) => `${Math.round(v * 100)} %`} formatoY={(v) => `${Math.round(v * 100)} %`}
+                      series={[{ clave: 'pr', nombre: jerga(tecnico, 'Modelo', 'Curva precisión-exhaustividad'), color: 0, puntos: d.pr.puntos, sinPuntos: true }]} />
+                  </Grafica>
+                </div>
+              ) : ver === 'linea' ? (
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1.3fr)] [&>*]:min-w-0">
+                  <ControlAlerta datos={d} p={p} setP={setP} />
+                  <TablaDatos titulo={dAe.titulo} descripcion={topMatriz != null ? `Alertando al ${topMatriz} %: cuántos niños se acertaron y cuántos fueron falsa alarma.` : dAe.descripcion}
+                    exportar={{ nombre: 'rendimiento-confusion', filas: d.confusion_por_top.map((c) => ({ porcentaje_alertado: c.top_pct, casos_detectados: c.tp, falsas_alarmas: c.fp, casos_no_detectados: c.fn, sin_falsa_alarma: c.tn })), muestra }}>
+                    <div role="group" aria-label="Cómo mostrar la matriz" className="mb-3 flex flex-wrap gap-1.5">
+                      {MODOS.map((m) => (
+                        <button key={m.id} type="button" aria-pressed={modo === m.id} onClick={() => setModo(m.id)}
+                          className={cn('rounded-full border px-3 py-1 text-xs font-semibold', modo === m.id ? 'border-teal bg-teal text-white' : 'border-teal-tinte bg-teal-tinte text-teal')}>
+                          {m.texto}
+                        </button>
                       ))}
-                    </tbody>
-                  </Tabla>
-                </TablaDatos>
-                <Panel titulo={dOrd.titulo} descripcion={dOrd.descripcion}>
+                    </div>
+                    {conf ? <MatrizAlerta c={conf} modo={modo} /> : <p className="text-sm text-salvia">Sin datos.</p>}
+                  </TablaDatos>
+                  <TablaDatos titulo={dLinea.titulo} descripcion={`${dLinea.descripcion} Resaltada, la elegida en el control.`}
+                    exportar={{ nombre: 'rendimiento-por-top', filas: d.metricas_por_top.map((t) => ({ porcentaje_alertado: t.top_pct, alertas: t.alertas, casos_detectados_pct: t.casos_detectados_pct, alertas_acertadas_pct: t.alertas_acertadas_pct, sin_falsa_alarma_pct: t.sin_falsa_alarma_pct, alertas_por_1000: t.alertas_por_1000 })), muestra }}>
+                    <Tabla densa>
+                      <thead><tr><th>Alertar al</th><th>{jerga(tecnico, 'Detectados', 'Sensibilidad')}</th><th>{jerga(tecnico, 'Acertadas', 'VPP')}</th>
+                        <th>{jerga(tecnico, 'Sin falsa alarma', 'Especificidad')}</th><th>Por 1.000</th></tr></thead>
+                      <tbody>
+                        {d.metricas_por_top.map((t) => (
+                          <tr key={t.top_pct} className={cn(t.top_pct === topMatriz && 'bg-teal-tinte font-semibold')}>
+                            <td>{t.top_pct} %</td><td>{pctN(t.casos_detectados_pct)}</td><td>{pctN(t.alertas_acertadas_pct)}</td>
+                            <td>{pctN(t.sin_falsa_alarma_pct)}</td><td>{omitida(t.alertas_por_1000, num)}</td></tr>
+                        ))}
+                      </tbody>
+                    </Tabla>
+                  </TablaDatos>
+                </div>
+              ) : (
+                // la lista de desenlaces es larga y de filas iguales: se desplaza dentro de su tarjeta, que no pasa del alto de la ventana
+                <Panel llenar titulo={dOrd.titulo} descripcion={dOrd.descripcion}>
+                  {/* relative: el texto solo para lectores de pantalla de la lista queda dentro de lo que se desplaza */}
+                  <div className="relative">
+                  {d.referencia && (
+                    <p className="mb-3 text-sm tabular-nums">
+                      <strong>Frente a la regla de referencia</strong> (edad gestacional y pesos al nacer): ordena{' '}
+                      {d.referencia.auc_desenlace.auc != null ? dec2(d.referencia.auc_desenlace.auc) : '—'} ({ic(d.referencia.auc_desenlace)})
+                      contra {d.auc_desenlace.auc != null ? dec2(d.auc_desenlace.auc) : '—'} del modelo
+                      {d.referencia.casos_top10_pct != null && <>; el 10 % de mayor riesgo reúne {d.referencia.casos_top10_pct} % de los casos con la regla.</>}
+                    </p>
+                  )}
                   {porDesenlace.length ? (
                     <Bosque etiqueta="Qué tan bien ordena el modelo, por desenlace" nombreValor={jerga(tecnico, 'Ordena', 'AUC')}
                       puntos={porDesenlace.map(([clave, f]) => ({ etiqueta: nombre(clave).nombre + (nombre(clave).enPrueba ? ' (En prueba)' : ''), valor: f.auc ?? null, bajo: f.ic_bajo ?? null, alto: f.ic_alto ?? null, ref: f.auc_ref ?? null }))} />
@@ -120,17 +144,10 @@ export default function Rendimiento() {
                     <Cifra valor={d.auc_desenlace.auc != null ? dec2(d.auc_desenlace.auc) : '—'}
                       texto={`${jerga(tecnico, 'Qué tan bien ordena a los niños', 'AUC con intervalo de confianza')}: ${ic(d.auc_desenlace)}. ${muestra ?? ''}`} />
                   )}
-                  {d.referencia && (
-                    <p className="mt-3 text-sm tabular-nums">
-                      <strong>Frente a la regla de referencia</strong> (edad gestacional y pesos al nacer): ordena{' '}
-                      {d.referencia.auc_desenlace.auc != null ? dec2(d.referencia.auc_desenlace.auc) : '—'} ({ic(d.referencia.auc_desenlace)})
-                      contra {d.auc_desenlace.auc != null ? dec2(d.auc_desenlace.auc) : '—'} del modelo
-                      {d.referencia.casos_top10_pct != null && <>; el 10 % de mayor riesgo reúne {d.referencia.casos_top10_pct} % de los casos con la regla.</>}
-                    </p>
-                  )}
+                  </div>
                 </Panel>
-              </div>
-            </>
+              )}
+            </ConPestanas>
           )
         }}
       </PorDesenlace>

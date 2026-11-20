@@ -73,15 +73,18 @@ describe('anticipación', () => {
     expect(screen.getByText('50,0 %')).toBeInTheDocument()
     expect(llamadas.some((l) => l.url === '/api/analitica/7/anticipacion')).toBe(true)
     expect(screen.getByText('Cuántas visitas antes se avisó cada caso')).toBeInTheDocument()
-    expect(screen.getByText('El precio de avisar antes')).toBeInTheDocument()
-    const tabla = screen.getByText('Cada visita de cálculo').closest('section, div') as HTMLElement
-    expect(within(tabla.parentElement as HTMLElement).getAllByText('0,72').length).toBeGreaterThan(0)
     expect(screen.getByText(/Las partes con menos de 5 casos se omiten \(n menor que 5\)/)).toBeInTheDocument()
+    // el resto de los artefactos está en las otras pestañas
+    fireEvent.click(screen.getByRole('tab', { name: 'Qué cuesta avisar antes' }))
+    expect(await screen.findByText('El precio de avisar antes')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: 'Tabla y niños de ejemplo' }))
+    const tabla = (await screen.findByText('Cada visita de cálculo')).closest('section, div') as HTMLElement
+    expect(within(tabla.parentElement as HTMLElement).getAllByText('0,72').length).toBeGreaterThan(0)
   })
 
   it('el porcentaje de alerta cambia los casos detectados de la tabla', async () => {
     api('experto')
-    montar('/analitica/anticipacion?entrenamiento=7')
+    montar('/analitica/anticipacion?entrenamiento=7&ver=tabla')
     await screen.findByText('Cada visita de cálculo')
     expect(screen.getAllByText('40,0 %').length).toBeGreaterThan(0)   // 3 m EC con el 10 %
     fireEvent.change(screen.getByLabelText('Alertar a los niños con más riesgo'), { target: { value: '40' } })
@@ -90,7 +93,7 @@ describe('anticipación', () => {
 
   it('el experto ve niños de ejemplo con su primera alerta; el visualizador no los pide', async () => {
     const experto = api('experto')
-    montar('/analitica/anticipacion?entrenamiento=7')
+    montar('/analitica/anticipacion?entrenamiento=7&ver=tabla')
     expect(await screen.findByRole('link', { name: 'N-017' })).toBeInTheDocument()
     expect(screen.getByText('Primera alerta: Entrada al programa')).toBeInTheDocument()
     expect(experto.some((l) => l.url.startsWith('/api/analitica/riesgo-por-visita?desenlace=readm_6m'))).toBe(true)
@@ -104,9 +107,9 @@ describe('anticipación', () => {
 
   it('sin corrida o sin modelo activo avisa y no rompe la pantalla', async () => {
     api('experto', 'error')
-    montar('/analitica/anticipacion?entrenamiento=7')
+    montar('/analitica/anticipacion?entrenamiento=7&ver=tabla')
     expect(await screen.findByText(/Todavía no hay una corrida con un modelo activo/)).toBeInTheDocument()
-    expect(screen.getByText('Casos avisados al menos una visita antes')).toBeInTheDocument()
+    expect(screen.getByText('Cada visita de cálculo')).toBeInTheDocument()
   })
 })
 

@@ -7,6 +7,7 @@ import type { RespuestaAnalitica } from '../../api/tipos'
 import { puede, useSesion } from '../../auth/sesion'
 import { ErrorConReintento } from '../../components/ErrorConReintento'
 import { Aviso, Boton, Cargando, Vacio } from '../../components/ui'
+import { PanelPestana, Pestanas, usePestanaEnUrl, type Pestana } from '../../components/ui/Pestanas'
 import { cn } from '../../lib/cn'
 import { dec2, pct } from '../../lib/formato'
 import { N_MENOR_QUE_5 } from '../../lib/lenguaje'
@@ -75,6 +76,37 @@ export function Guia({ children }: { children: ReactNode }) {
     </div>
   )
   return ranura ? createPortal(guia, ranura) : <div className="mb-4">{guia}</div>
+}
+
+// ------------------------------------------------------------------ pestañas de una página
+/** El nombre del parámetro de la dirección con la pestaña elegida (`?ver=`). */
+export const PARAM_PESTANA = 'ver'
+const CONTENIDO_PESTANA = 'lg:flex lg:min-h-0 lg:flex-1 lg:flex-col'
+
+/** Reparte una página de Analítica en pestañas por la pregunta que contesta cada bloque. La elegida vive en `?ver=` (sin ella o
+ *  con una que no existe, la primera, que responde la pregunta de la página). `aparte` va a la derecha de las pestañas, en la
+ *  misma fila (un selector que vale para varias pestañas). Con una sola pestaña no se dibuja la lista: no hay qué elegir. */
+export function ConPestanas<K extends string>({ etiqueta, pestanas, aparte, children }: {
+  etiqueta: string
+  pestanas: readonly Pestana<K>[]
+  aparte?: ReactNode
+  children: (activa: K) => ReactNode
+}) {
+  const [activa, elegir] = usePestanaEnUrl(PARAM_PESTANA, pestanas.map((p) => p.clave))
+  const sola = pestanas.length < 2
+  return (
+    <>
+      {(!sola || aparte) && (
+        <div className="flex flex-wrap items-end gap-x-4 gap-y-1 border-b border-linea">
+          {!sola && <Pestanas className="min-w-0 flex-1 border-b-0" prefijo={PARAM_PESTANA} etiqueta={etiqueta} pestanas={pestanas} activa={activa} elegir={elegir} />}
+          {aparte && <div className="flex min-h-11 items-center pb-0.5">{aparte}</div>}
+        </div>
+      )}
+      {sola
+        ? <div className={CONTENIDO_PESTANA}>{children(activa)}</div>
+        : <PanelPestana prefijo={PARAM_PESTANA} activa={activa} className={CONTENIDO_PESTANA}>{children(activa)}</PanelPestana>}
+    </>
+  )
 }
 
 // ------------------------------------------------------------------ estados de la respuesta

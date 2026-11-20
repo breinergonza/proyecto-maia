@@ -15,20 +15,15 @@ import { SUBMODULOS } from './analitica/submodulos'
 
 const NOMBRE_MODELO: Record<string, string> = { clinico: 'Clínico', anomalias: 'Anomalías', crecimiento: 'Crecimiento' }
 
-/** El contexto de análisis: desenlace, visita desde la que se calcula y entrenamiento (en la dirección), y de dónde salen los datos.
- *  El Resumen ya dice de dónde salen en Configuración y Trazabilidad: allí la línea sobra. */
+/** El contexto de análisis: desenlace, visita desde la que se calcula y entrenamiento (en la dirección), el estado del desenlace
+ *  y de dónde salen los datos, todo en la misma tarjeta. El Resumen ya dice de dónde salen en Configuración y Trazabilidad:
+ *  allí la línea de origen sobra. */
 function Contexto({ conOrigen }: { conOrigen: boolean }) {
   const { modelo } = useContextoAnalitica()
   const modeloTexto = modelo?.modelo ? `${NOMBRE_MODELO[modelo.modelo] ?? `${modelo.modelo.charAt(0).toUpperCase()}${modelo.modelo.slice(1)}`}${modelo.version_registro != null ? ` · versión ${modelo.version_registro}` : ''}` : null
   const fuente = modelo?.fuente ? (modelo.fuente === 'simulado' ? 'Datos simulados' : 'Base de la Fundación') : null
-  return (
-    <div className="space-y-3">
-      <SelectoresModelo />
-      {conOrigen && (
-        <p className="text-sm text-tinta/80">{[fuente, modelo?.corte ? datosAl(modelo.corte) : null, modeloTexto].filter(Boolean).join(' · ')}</p>
-      )}
-    </div>
-  )
+  const origen = conOrigen ? [fuente, modelo?.corte ? datosAl(modelo.corte) : null, modeloTexto].filter(Boolean).join(' · ') : null
+  return <SelectoresModelo origen={origen} />
 }
 
 export default function AnaliticaLayout() {
@@ -43,19 +38,21 @@ export default function AnaliticaLayout() {
   return (
     <ProveedorTecnico>
       <RanuraGuia.Provider value={ranura}>
-      <header className="mb-4 flex animate-aparecer flex-wrap items-end justify-between gap-3 lg:mb-3">
-        <div className="max-w-[110ch]">
+      {/* en escritorio la página ocupa justo la ventana: el título, el contexto y la pregunta en pocas líneas dejan el alto a los datos */}
+      <div className="flex flex-col lg:h-full">
+      <header className="mb-3 flex animate-aparecer flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
           <p className="text-sm font-semibold text-teal-medio">Analítica ›</p>
           <h1>{actual?.titulo ?? 'Analítica de los modelos'}</h1>
-          <p className="mt-1 text-sm text-salvia">{actual?.pregunta ?? 'Cómo se comporta el modelo: qué tan bien ordena, si su riesgo es fiable y si funciona igual para todos.'}</p>
         </div>
+        <p className="min-w-0 max-w-[110ch] basis-72 text-sm text-salvia lg:flex-1">{actual?.pregunta ?? 'Cómo se comporta el modelo: qué tan bien ordena, si su riesgo es fiable y si funciona igual para todos.'}</p>
         <div className="flex flex-wrap items-center gap-4">
           <div ref={setRanura} />
           <InterruptorTecnico />
         </div>
       </header>
 
-      <section aria-label="Contexto de análisis" className="mb-4 rounded-panel border border-linea/80 bg-papel p-4 shadow-suave">
+      <section aria-label="Contexto de análisis" className="mb-3 rounded-panel border border-linea/80 bg-papel p-3 shadow-suave">
         <button type="button" className="flex w-full items-center justify-between gap-2 text-left lg:hidden" aria-expanded={!plegado}
           aria-controls="contexto-analisis" onClick={() => setPlegado(!plegado)}>
           <span className="min-w-0">
@@ -89,7 +86,8 @@ export default function AnaliticaLayout() {
         </ul>
       </nav>
 
-      <Outlet />
+      <div className="flex flex-col lg:min-h-0 lg:flex-1"><Outlet /></div>
+      </div>
       </RanuraGuia.Provider>
     </ProveedorTecnico>
   )
