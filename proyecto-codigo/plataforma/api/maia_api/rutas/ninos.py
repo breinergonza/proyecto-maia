@@ -230,7 +230,7 @@ def linea_temporal(sujeto: str, corrida_id: int | None = None, s: Session = Depe
         'perfil': perfil_provisional(datos_nino['eg_semanas'], lub, actual['nombre'] if actual else None),
         'anio_nacimiento': datos_nino['anio_nacimiento'] or (datos_nino['fecha_nacimiento'].year
                                                               if datos_nino['fecha_nacimiento'] else None),
-        'corte': str(c.fecha_corte) if c.fecha_corte else None, 'corrida_id': c.id,
+        'corte': str(c.fecha_corte) if c.fecha_corte else None, 'corrida_id': c.id, 'modelo_clinico': c.modelo_clinico,
         'visitas': ordenadas,
         'contexto': sin_visita,
         'crecimiento': {k: v for k, v in serie.items()},

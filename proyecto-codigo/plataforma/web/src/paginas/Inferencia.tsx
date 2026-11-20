@@ -17,7 +17,7 @@ import { usePaqueteActivo } from '../lib/consultas'
 import { CrecimientoOms, TarjetaRiesgo } from '../components/ficha'
 import { RiesgoA12Meses } from '../components/ficha/RiesgoA12Meses'
 import { RangoEsperado } from '../components/graficos'
-import { familiaDe, familiasConRiesgo } from '../lib/familias'
+import { estadoDe, familiaDe, familiasConRiesgo } from '../lib/familias'
 import { aproximado, dec, edad, indicador, medida } from '../lib/formato'
 import { alerta, AYUDA_DOS_CIFRAS, AYUDA_OMS, ayudaAlerta, ayudaZ, CAYO, frenteOms, motivoExtra } from '../lib/lenguaje'
 
@@ -415,7 +415,8 @@ function Resultado({ r, varios }: { r: ResultadoConHistoria; varios: boolean }) 
           <p className="text-sm">{AYUDA_DOS_CIFRAS}</p>
           {/* el resultado ocupa una columna angosta junto al formulario: una tarjeta por fila */}
           <div className="grid grid-cols-1 gap-4">
-            {riesgos.map((x) => <TarjetaRiesgo key={`${x.sujeto}-${x.clave}`} r={x} nota={varios ? `Niño ${x.sujeto}` : undefined} />)}
+            {riesgos.map((x) => <TarjetaRiesgo key={`${x.sujeto}-${x.clave}`} r={x} nota={varios ? `Niño ${x.sujeto}` : undefined}
+              origen={{ estado: estadoDe(x.clave), version: r.modelo_clinico }} />)}
           </div>
         </section>
       )}

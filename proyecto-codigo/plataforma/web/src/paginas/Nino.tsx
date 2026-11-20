@@ -14,7 +14,7 @@ import { RiesgoA12Meses } from '../components/ficha/RiesgoA12Meses'
 import { Boton, Cargando, Insignia, Panel, Tabla, Vacio } from '../components/ui'
 import { ErrorConReintento } from '../components/ErrorConReintento'
 import { cn } from '../lib/cn'
-import { familiaDe, familiasConRiesgo } from '../lib/familias'
+import { estadoDe, familiaDe, familiasConRiesgo } from '../lib/familias'
 import { aproximado, dec, edad, fecha, indicador, RIESGO_ALTO } from '../lib/formato'
 import { alerta, AYUDA_DOS_CIFRAS, AYUDA_OMS, ayudaAlerta, ayudaZ, datosAl, frenteOms, motivo } from '../lib/lenguaje'
 
@@ -84,7 +84,8 @@ export default function Nino() {
         <section aria-label="Riesgo calculado" className="space-y-3">
           <p className="text-sm">{AYUDA_DOS_CIFRAS}</p>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-1">
-            {riesgos.map((r) => <TarjetaRiesgo key={r.id} r={r} nota={`Calculado con lo medido hasta ${r.visita}`} />)}
+            {riesgos.map((r) => <TarjetaRiesgo key={r.id} r={r} nota={`Calculado con lo medido hasta ${r.visita}`}
+              origen={{ estado: estadoDe(r.clave), version: n.modelo_clinico }} />)}
           </div>
         </section>
       )}

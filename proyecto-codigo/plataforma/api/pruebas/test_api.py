@@ -267,6 +267,8 @@ def test_ninos_y_linea_temporal(cliente, admin, corrida):
     assert lt.status_code == 200, lt.text
     lt = lt.json()
     assert lt['sujeto'] == sujeto and lt['visitas']
+    # la versión del modelo clínico con que se calcularon sus riesgos (la de la corrida)
+    assert lt['modelo_clinico'] and lt['modelo_clinico'] == corrida['modelo_clinico']
     assert all(lt['visitas'][i]['orden'] <= lt['visitas'][i + 1]['orden'] for i in range(len(lt['visitas']) - 1))
     assert cliente.get('/api/ninos/no-existe/linea-temporal', headers=admin).status_code == 404
     if r['items'][0]['percentil_max'] is not None:
@@ -487,6 +489,7 @@ def test_inferencia(cliente, admin, corrida):
     assert r.status_code == 200, r.text
     out = r.json()
     assert out['crecimiento'] and isinstance(out['riesgos'], list)
+    assert isinstance(out['modelo_clinico'], str) and out['modelo_clinico']
     assert all(isinstance(x['motivos'], list) for x in out['riesgos'])
     malo = dict(peticion, mediciones=[dict(peticion['mediciones'][0], sujeto='otro')])
     assert cliente.post('/api/inferencia', headers=admin, json=malo).status_code == 422

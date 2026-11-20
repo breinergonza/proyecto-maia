@@ -11,6 +11,7 @@ import { aCsv, descargar, nombreArchivo, type FilaCsv } from '../../lib/exportar
 import { type ColumnaDeRiesgo, type FamiliaDelNino, familiasDelNino, fraseCalibrada, razonSinRiesgo, sinFamilia, textoPorcentaje } from '../../lib/familias'
 import { fecha, RIESGO_ALTO } from '../../lib/formato'
 import { AYUDA_MOTIVOS, ayudaPosicion, frenteDemas, motivosRiesgo, nivelAlto } from '../../lib/lenguaje'
+import { EnPrueba } from '../ficha'
 import { MiniSerie, type PuntoSerie } from '../graficos'
 import { Aviso, Boton, Cargando, Insignia, Panel, Tabla } from '../ui'
 
@@ -95,12 +96,6 @@ function Familia({ f }: { f: FamiliaDelNino }) {
     </Panel>
   )
 }
-
-const EnPrueba = () => (
-  <Insignia tono="ocre" className="font-semibold">
-    <span title="Aún no se usa para dar alertas: se muestra para seguirlo y evaluarlo.">En prueba</span>
-  </Insignia>
-)
 
 function Columnas({ columnas, enUso }: { columnas: ColumnaDeRiesgo[]; enUso: boolean }) {
   return (

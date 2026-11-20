@@ -146,7 +146,7 @@ def inferir(p: PeticionInferencia, s: Session = Depends(sesion), u: Usuario = De
     auditar(s, u, 'inferencia', manifest['version'], {'sujetos': len(sujetos), 'mediciones': len(mediciones)})
     s.commit()
     return {'paquete': manifest['version'], 'fuente': manifest['fuente'], 'variables_ignoradas': ignoradas,
-            'alertas_dato': alertas, 'riesgos': riesgos, 'crecimiento': crecimiento,
+            'modelo_clinico': modelos.clinico.version, 'alertas_dato': alertas, 'riesgos': riesgos, 'crecimiento': crecimiento,
             'historia': _historia(p, mediciones, base, modelos, manifest)}
 
 

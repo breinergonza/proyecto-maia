@@ -25,7 +25,7 @@ const formulario = {
   ],
 }
 const resultado = {
-  paquete: 'p1', fuente: 'simulado', variables_ignoradas: [],
+  paquete: 'p1', fuente: 'simulado', variables_ignoradas: [], modelo_clinico: 'a1b2c3d4e5',
   riesgos: [{ sujeto: 'calculo', clave: 'des6', desenlace: 'desarrollo psicomotor bajo a los 6 meses', momento: '3 m EC', riesgo: 0.31,
     percentil: 96, motivos: ['Peso al nacer (peso_nacer) = 900'], fecha_visita: '2026-05-10' }],
   alertas_dato: [{ sujeto: 'calculo', variable: 'peso_3m', etiqueta: 'Peso a 3 m EC', etapa: '3 m EC', valor: '9999', esperado: 5000,
@@ -81,6 +81,8 @@ describe('calcular el riesgo de un niño', () => {
     })
 
     const riesgo = (await screen.findByText('desarrollo psicomotor bajo a los 6 meses', { selector: 'h2' })).closest('article')!
+    expect(within(riesgo).getByText('En uso')).toBeInTheDocument()
+    expect(within(riesgo).getByText('Modelo clínico a1b2c3d4e5')).toBeInTheDocument()
     expect(within(riesgo).getByText('Riesgo muy alto')).toBeInTheDocument()
     expect(within(riesgo).getByText('9 de 10')).toBeInTheDocument()
     expect(within(riesgo).getByText('Peso al nacer: 900')).toBeInTheDocument()

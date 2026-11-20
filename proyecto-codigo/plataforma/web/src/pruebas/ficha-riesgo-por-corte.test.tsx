@@ -46,6 +46,20 @@ function api(historiaDe: () => { estado?: number; cuerpo: unknown }, extra: { li
 }
 
 describe('ficha del niño: riesgo a los 12 meses', () => {
+  it('cada tarjeta dice si su modelo está en uso o en prueba y con qué versión se calculó', async () => {
+    const otra = riesgoNino(3, 'desarrollo_12m_desde_3', 'desarrollo bajo a los 12 meses (riesgo calculado a 3 m EC)', '3 m EC')
+    api(() => ({ cuerpo: historia }), { linea: { ...linea, modelo_clinico: 'f00dcafe12', visitas: [{ ...linea.visitas[0], riesgos: [...linea.visitas[0].riesgos, otra] }] } })
+    montar('/ninos/s1')
+    const tarjeta = async (nombre: string) => (await screen.findByText(nombre, { selector: 'h2' })).closest('article')!
+    const enUso = await tarjeta('desarrollo psicomotor bajo a los 6 meses')
+    expect(within(enUso).getByText('En uso')).toBeInTheDocument()
+    expect(within(enUso).getByText('Modelo clínico f00dcafe12')).toBeInTheDocument()
+    const enPrueba = await tarjeta('desarrollo bajo a los 12 meses (riesgo calculado a 3 m EC)')
+    expect(within(enPrueba).getByText('En prueba')).toBeInTheDocument()
+    expect(within(enPrueba).queryByText('En uso')).not.toBeInTheDocument()
+    expect(within(enPrueba).getByText('Modelo clínico f00dcafe12')).toBeInTheDocument()
+  })
+
   it('va arriba de las tarjetas y no las repite', async () => {
     const llamadas = api(() => ({ cuerpo: historia }))
     montar('/ninos/s1')

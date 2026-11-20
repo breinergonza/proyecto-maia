@@ -228,6 +228,8 @@ export interface LineaTemporal {
   anio_nacimiento: number | null
   corte: string | null
   corrida_id: number
+  /** Versión del modelo clínico con que la corrida calculó sus riesgos (null en corridas sin modelo clínico). */
+  modelo_clinico: string | null
   visitas: Visita[]
   contexto: (MedicionVisita | { variable: string; etiqueta: string | null; valor: string | null; alerta: AlertaDato })[]
   crecimiento: Record<string, PuntoCrecimiento[]>
@@ -358,6 +360,8 @@ export interface ResultadoInferencia {
   paquete: string
   fuente: string
   variables_ignoradas: string[]
+  /** Versión del modelo clínico del paquete activo con que se calculó. */
+  modelo_clinico: string
   alertas_dato: (Omit<AlertaDato, 'id'> & { sujeto: string })[]
   riesgos: (Omit<RiesgoNino, 'id'> & { sujeto: string })[]
   crecimiento: (PuntoCrecimiento & { sujeto: string })[]

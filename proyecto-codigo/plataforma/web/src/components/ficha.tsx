@@ -8,6 +8,7 @@ import { cn } from '../lib/cn'
 import { aproximado, dec, edad, indicador, meses, posicion, riesgo, RIESGO_ALTO } from '../lib/formato'
 import { AYUDA_DOS_CIFRAS, AYUDA_MOTIVOS, AYUDA_OMS, ayudaPosicion, BAJO_EDAD, CAYO, cuantosMenos, desviaciones, familia, frenteDemas, frenteOms,
   motivosRiesgo, nivelAlto, nombreFamilia, RIESGO_MUY_ALTO } from '../lib/lenguaje'
+import type { EstadoDesenlace } from '../api/ninos'
 import { Distribucion, MiniSerie, Muestra, ticksEnteros, type PuntoSerie } from './graficos'
 import { descripcionDe } from '../lib/descripciones'
 import { Grafica } from './grafica'
@@ -24,7 +25,17 @@ export interface DatosTarjeta {
   riesgo_medio?: number | null
 }
 
-export function TarjetaRiesgo({ r, nota }: { r: DatosTarjeta; nota?: string }) {
+/** «En prueba»: se muestra para seguirlo y evaluarlo, sin dar alertas. Igual en la tarjeta y en el riesgo por visita. */
+export const EnPrueba = () => (
+  <Insignia tono="ocre" className="font-semibold">
+    <span title="Aún no se usa para dar alertas: se muestra para seguirlo y evaluarlo.">En prueba</span>
+  </Insignia>
+)
+
+/** De qué modelo sale el riesgo: si ya se usa para dar alertas y su versión (la del pie de «Cómo se calculó»). */
+export interface OrigenRiesgo { estado: EstadoDesenlace; version: string | null }
+
+export function TarjetaRiesgo({ r, nota, origen }: { r: DatosTarjeta; nota?: string; origen?: OrigenRiesgo }) {
   const alto = r.percentil >= RIESGO_ALTO
   const { suben, faltan } = motivosRiesgo(r.motivos)
   return (
@@ -60,6 +71,12 @@ export function TarjetaRiesgo({ r, nota }: { r: DatosTarjeta; nota?: string }) {
             También suben el riesgo: {faltan.join(', ')}. Si se midieron, conviene registrarlos.
           </p>
         </>
+      )}
+      {origen && (
+        <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-linea pt-2 text-xs">
+          {origen.estado === 'en_prueba' ? <EnPrueba /> : <span className="font-semibold" title="Ya se usa para dar alertas.">En uso</span>}
+          {origen.version && <span>Modelo clínico {origen.version}</span>}
+        </p>
       )}
     </article>
   )
