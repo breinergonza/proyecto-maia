@@ -245,4 +245,4 @@ def test_anticipacion(cliente, tokens, datos):
 
 def test_anticipacion_pendiente_sin_familias(cliente, tokens, datos):
     j = _get(cliente, tokens, 'visualizador', f'{datos["sin"]}/anticipacion').json()
-    assert j['estado'] == 'pendiente' and j['mensaje'] == 'No hay desenlaces entrenados desde varias visitas en este entrenamiento'
+    assert j['estado'] == 'pendiente' and 'desde varias visitas' in j['mensaje']

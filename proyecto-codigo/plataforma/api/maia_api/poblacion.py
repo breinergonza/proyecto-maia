@@ -114,8 +114,18 @@ def elegir_facetas(esquema: pd.DataFrame, hay_sedes: bool, extra: Sequence[str] 
 def etiqueta_de(filas: dict, v: str) -> str:
     if v in M.VIRTUALES:
         return M.VIRTUALES[v][1]
+    if v == PF.VARIABLE_LUBCHENCO:
+        return PF.ETIQUETA_VARIABLE_LUBCHENCO
     e = filas[v].get('etiqueta')
     return e if isinstance(e, str) and e.strip() else v.replace('_', ' ')
+
+
+def etiquetas_de(esq: pd.DataFrame) -> dict[str, dict[float, str]]:
+    """Las etiquetas de cada código del Diccionario; las de Lubchenco se muestran con su texto completo."""
+    etiquetas = SV.etiquetas_categoria(esq)
+    if PF.VARIABLE_LUBCHENCO in etiquetas:
+        etiquetas[PF.VARIABLE_LUBCHENCO] = {k: PF.lubchenco_completo(e) for k, e in etiquetas[PF.VARIABLE_LUBCHENCO].items()}
+    return etiquetas
 
 
 def tipo_de(filas: dict, v: str) -> str:
@@ -152,7 +162,7 @@ def variables_ofrecidas(s: Session, corte_id: int) -> list[dict]:
     ``reglas`` que se pueden elegir)."""
     esq = esquema_de_db(s, corte_id)
     filas = {str(r['variable']): r for r in esq.to_dict('records')}
-    etiquetas = SV.etiquetas_categoria(esq)
+    etiquetas = etiquetas_de(esq)
     salida = []
     for v in elegir_facetas(esq, len(sedes(s, corte_id)) > 1):
         tipo = tipo_de(filas, v)
@@ -408,7 +418,7 @@ def facetas(s: Session, corte_id: int, muestra: dict | None, redondear: bool = F
     esq = esquema_de_db(s, corte_id)
     marca('esquema')
     filas = {str(r['variable']): r for r in esq.to_dict('records')}
-    etiquetas = SV.etiquetas_categoria(esq)
+    etiquetas = etiquetas_de(esq)
     m = M.exigir(muestra or {'version': M.VERSION}, esq)
     por_variable = {e['variable']: e for e in m['y']}
     pedidas = {str(e['variable']): e['cuando'] for e in (extra or []) if e.get('variable') and e.get('cuando')}
@@ -531,7 +541,7 @@ def categorias_por_nino(s: Session, corte_id: int) -> pd.DataFrame:
         return pd.DataFrame(f, columns=['sujeto', 'valor', 'valor_num']).set_index('sujeto')
 
     sexo = primera(sexo_v)
-    etiquetas = SV.etiquetas_categoria(esq).get(sexo_v or '', {})
+    etiquetas = etiquetas_de(esq).get(sexo_v or '', {})
     lub = primera(PF.VARIABLE_LUBCHENCO if PF.VARIABLE_LUBCHENCO in nombres else None)
     out = pd.DataFrame(index=base.index)
     # sin fila de atributo, reindex deja NaN (no None): ese niño no tiene el dato, no la opción «nan»
