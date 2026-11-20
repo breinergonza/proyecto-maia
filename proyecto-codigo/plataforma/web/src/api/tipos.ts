@@ -610,7 +610,7 @@ export type CuerpoClinica = CuerpoExplorar & { familia?: string | null; indicado
 export interface FamiliaClinica { clave: string; nombre: string; definicion: string; estado: 'en_uso' | 'en_prueba'; indicador: string | null }
 /** Niños con el desenlace entre los que tienen dato a los 12 meses; un conteo menor que 5 llega nulo. */
 /** ``pct``: casos entre quienes tienen dato, de los conteos exactos (los conteos se redondean para quien solo consulta). */
-export interface ObservadoClinico { casos: number | null; con_dato: number | null; sin_dato: number | null; pct: number }
+export interface ObservadoClinico { casos: number | null; con_dato: number | null; sin_dato: number | null; pct: number; pct_sin_dato: number | null }
 export interface EtapaClinica {
   etapa: string
   grupo: { n: number; p25: number | null; mediana: number | null; p75: number | null } | null

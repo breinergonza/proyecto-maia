@@ -1,6 +1,7 @@
 // Barra «Grupo activo»: el grupo de niños que mira la página (su nombre, sus criterios legibles y cuántos niños son frente
 // al total). El grupo vive en la dirección (useFiltros), así que la barra se actualiza sola cuando cambia el filtro y
-// «Cambiar grupo» abre el mismo panel de filtros de Explorar sin sacar a nadie de la página.
+// «Cambiar grupo» abre el mismo panel de filtros de Explorar sin sacar a nadie de la página. Cabe en una línea en escritorio:
+// sin criterios el nombre «Todos los niños» ya lo dice, y un grupo que es el total no lo repite («5.000 de 5.000»).
 import { useId, useState } from 'react'
 import { useFacetasExplorar, useMuestras } from '../api/exploracion'
 import type { CuerpoExplorar } from '../api/tipos'
@@ -55,27 +56,25 @@ export function GrupoActivo({ ninos, total, minimo, error, conDato, conPanel = t
   const cuantos = error ? 'No se pudo contar los niños del grupo.'
     : ninos === undefined ? 'Contando niños…'
     : ninos === null ? `Menos de ${minimo ?? 20} niños elegibles${total == null ? '' : ` de ${num(total)}`}`
-      : `${num(ninos)} niños elegibles${total == null ? '' : ` de ${num(total)}`}`
+      : ninos === total ? `${num(ninos)} niños elegibles`
+        : `${num(ninos)} niños elegibles${total == null ? '' : ` de ${num(total)}`}`
 
   return (
     <>
-      <section aria-label="Grupo activo" className="rounded-panel border border-linea/80 bg-papel px-4 py-3 shadow-suave lg:sticky lg:top-0 lg:z-20 sm:px-5">
-        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-salvia" aria-hidden>Grupo activo</p>
-            <h2 className="mt-0.5 text-lg leading-tight">{nombreDelGrupo(guardado, criterios.length)}</h2>
-            <p className="mt-1 text-sm">
-              {textoCriterios(criterios)}
+      {/* quién es el grupo y cuántos son, en una línea: deja la altura de la pantalla para las cifras */}
+      <section aria-label="Grupo activo" className="rounded-panel border border-linea/80 bg-papel px-4 py-2 shadow-suave lg:sticky lg:top-0 lg:z-20 sm:px-5">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span className="text-sm font-semibold text-salvia" aria-hidden>Grupo activo:</span>
+            <h2 className="text-base leading-tight">{nombreDelGrupo(guardado, criterios.length)}</h2>
+            {criterios.length > 0 && <p className="text-sm">{textoCriterios(criterios)}</p>}
+            <p className="flex flex-wrap gap-x-3 text-sm">
+              <span className="font-semibold text-teal">{cuantos}</span>
+              {conDato && <span>{conDato.n === null ? 'Menos de 5' : num(conDato.n)} con el dato de «{conDato.desenlace}»</span>}
             </p>
-            <p className="mt-0.5 text-sm font-semibold text-teal">{cuantos}</p>
-            {conDato && (
-              <p className="text-sm">
-                {conDato.n === null ? 'Menos de 5' : num(conDato.n)} con el dato de «{conDato.desenlace}»
-              </p>
-            )}
           </div>
           {conPanel && (
-            <Boton variante="secundario" aria-expanded={abierto} aria-controls={idPanel} onClick={() => setAbierto(!abierto)}>
+            <Boton variante="secundario" chico aria-expanded={abierto} aria-controls={idPanel} onClick={() => setAbierto(!abierto)}>
               Cambiar grupo
             </Boton>
           )}

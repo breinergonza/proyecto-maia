@@ -1,50 +1,55 @@
-// «Riesgo estimado de …»: por cada momento en que se calcula, cuántos niños del grupo tienen cálculo y cuántos están en
-// alerta. Un desenlace sin modelo en el paquete activo no tiene filas: se dice en vez de dejar el panel vacío.
+// «Riesgo estimado»: por cada momento en que se calcula, una línea con cuántos niños del grupo tienen riesgo calculado
+// (solo los que siguen en seguimiento a esa visita: es el denominador) y cuántos están en alerta. «En prueba» sale una
+// sola vez, en el título, y dice qué cortes no lo están. Un desenlace sin modelo en el paquete activo no tiene filas: se
+// dice en vez de dejar el panel vacío.
 import type { RiesgoCorte } from '../../api/tipos'
-import { num, pct } from '../../lib/formato'
+import { frase, num, pct } from '../../lib/formato'
 import { sinRiesgoEstimado } from '../../lib/lenguaje'
 import { Insignia, Panel } from '../ui'
 
-/** «40 sem» → «las 40 semanas»; «3 m EC» → «los 3 meses»; lo que no se reconoce se deja como llega. */
+/** «40 sem» → «las 40 semanas»; «3 m EC» → «los 3 meses»; «hospitalización» → «la hospitalización»; lo demás, tal cual. */
 export function momentoTexto(momento: string): string {
   const semanas = /^(\d+)\s*sem/i.exec(momento)
   if (semanas) return `las ${semanas[1]} semanas`
   const meses = /^(\d+)\s*m(?:\b|$)/i.exec(momento)
   if (meses) return Number(meses[1]) === 1 ? '1 mes' : `los ${meses[1]} meses`
+  if (/^hospitali/i.test(momento)) return `la ${momento.toLowerCase()}`
   return momento
 }
 
-const minuscula = (t: string) => t.charAt(0).toLowerCase() + t.slice(1)
+/** «a las 40 semanas», «a los 3 meses», «en la hospitalización». */
+export const aMomento = (momento: string) => {
+  const texto = momentoTexto(momento)
+  return /^hospitali/i.test(momento) ? `en ${texto}` : `a ${texto}`
+}
 
-export function RiesgoPorCorte({ nombre, filas, conModelo, alertaPercentil }: {
-  nombre: string; filas: RiesgoCorte[]; conModelo: boolean; alertaPercentil: number
+/** Una sola marca para los cortes en prueba: «En prueba», o «En prueba, salvo a los 6 meses» si alguno está en uso. */
+export function marcaEnPrueba(filas: RiesgoCorte[]): string | null {
+  if (!filas.some((f) => f.estado === 'en_prueba')) return null
+  const enUso = filas.filter((f) => f.estado !== 'en_prueba').map((f) => aMomento(f.momento))
+  return enUso.length ? `En prueba, salvo ${enUso.join(' y ')}` : 'En prueba'
+}
+
+export function RiesgoPorCorte({ filas, conModelo, alertaPercentil, className }: {
+  filas: RiesgoCorte[]; conModelo: boolean; alertaPercentil: number; className?: string
 }) {
-  const enPrueba = filas.some((f) => f.estado === 'en_prueba')
+  const marca = marcaEnPrueba(filas)
   return (
-    <Panel titulo={`Riesgo estimado de ${minuscula(nombre)}`}
-      descripcion="Niños del grupo en alerta, según el riesgo calculado con lo medido hasta cada visita.">
+    <Panel className={className} titulo="Riesgo estimado" accion={marca && <Insignia tono="ocre">{marca}</Insignia>}
+      descripcion={filas.length ? `Solo tienen riesgo calculado los niños del grupo que siguen en seguimiento. En alerta: entre el ${100 - alertaPercentil} % con más riesgo.` : undefined}>
       {filas.length === 0 ? (
         <p className="text-sm">{sinRiesgoEstimado(conModelo, 'del grupo')}</p>
       ) : (
-        <>
-          {enPrueba && <p className="mb-3 text-sm font-semibold text-ocre-hondo">En prueba: este modelo aún no está validado.</p>}
-          <ul className="divide-y divide-linea">
-            {filas.map((f) => (
-              <li key={f.clave} className="py-3 first:pt-0">
-                <p className="flex flex-wrap items-center gap-2 text-sm">
-                  Calculado a {momentoTexto(f.momento)}:
-                  {f.estado === 'en_prueba' && <Insignia tono="ocre">En prueba</Insignia>}
-                </p>
-                <p className="mt-0.5 text-lg font-semibold text-teal">
-                  {num(f.en_alerta)} de {num(f.calculados)} niños en alerta ({pct(f.pct_en_alerta)})
-                </p>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-1 text-xs text-salvia">
-            En alerta: entre el {100 - alertaPercentil} % de los niños con más riesgo para este desenlace. Apoyo a la decisión, no diagnóstico.
-          </p>
-        </>
+        // en pantallas anchas cada momento es una columna: usa el ancho del panel en vez de dejarlo vacío
+        <ul className="-my-1 divide-y divide-linea/70 text-sm 2xl:my-0 2xl:grid 2xl:auto-cols-fr 2xl:grid-flow-col 2xl:divide-x 2xl:divide-y-0">
+          {filas.map((f) => (
+            <li key={f.clave} className="py-1 tabular-nums 2xl:px-4 2xl:py-0 2xl:first:pl-0 2xl:last:pr-0">
+              <span className="font-semibold 2xl:block">{frase(aMomento(f.momento))}<span className="2xl:hidden">:</span></span>{' '}
+              <span className="2xl:block">{num(f.calculados)} con riesgo calculado<span className="2xl:hidden"> ·</span></span>{' '}
+              <strong className="text-teal 2xl:block 2xl:text-base">{num(f.en_alerta)} en alerta ({pct(f.pct_en_alerta)})</strong>
+            </li>
+          ))}
+        </ul>
       )}
     </Panel>
   )
