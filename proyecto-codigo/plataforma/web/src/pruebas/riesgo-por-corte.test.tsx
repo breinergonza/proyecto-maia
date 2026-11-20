@@ -113,6 +113,26 @@ describe('RiesgoA12Meses', () => {
     expect(pie.textContent).toMatch(/Calibrado con los niños más recientes \(nacidos de 2019 a 2021\)/)
   })
 
+  it('el pie «Cómo se calculó» sale una sola vez por página, aunque haya dos desenlaces, y cada desenlace sigue diciendo su visita y «En prueba»', () => {
+    const desarrollo: FamiliaDelPaquete = { ...tallaBaja, clave: 'desarrollo_12m', nombre: 'desarrollo bajo a los 12 meses',
+      cortes: [corte('desarrollo_12m_desde_40', '40 sem', '40 semanas', 3), corte('desarrollo_12m_desde_3', '3 m EC', '3 meses', 4)] }
+    const p = [...historia().puntos, ...desarrollo.cortes.map((c) => punto(c, 0.3, 60))]
+    render(<RiesgoA12Meses historia={historia({ familias: [tallaBaja, desarrollo], puntos: p })} />)
+    expect(screen.getAllByRole('heading', { level: 3, name: /^Riesgo de / })).toHaveLength(2)
+    expect(screen.getAllByRole('heading', { name: 'Cómo se calculó' })).toHaveLength(1)
+    expect(screen.getAllByText('En prueba', { selector: 'h3 *' })).toHaveLength(2)
+    expect(screen.getAllByText('Calculado a 40 semanas')).toHaveLength(2)
+  })
+
+  it('con dos visitas no hay gráfica de evolución (las columnas ya dicen el cambio); con tres, sí', () => {
+    const { unmount } = render(<RiesgoA12Meses historia={historia()} />)
+    expect(screen.queryByRole('figure', { name: /por visita:/ })).not.toBeInTheDocument()
+    unmount()
+    const tres = { ...tallaBaja, cortes: [c40, c3, { ...c6, motivo_sin_riesgo: null }] }
+    render(<RiesgoA12Meses historia={historia({ familias: [tres], puntos: [...historia().puntos, punto(c6, 0.4, 91)] })} />)
+    expect(screen.getByRole('figure', { name: /por visita:/ })).toBeInTheDocument()
+  })
+
   it('«En prueba» solo en las visitas que lo están cuando la familia ya se usa', () => {
     const uso: FamiliaDelPaquete = { ...tallaBaja, clave: 'desarrollo_12m', nombre: 'desarrollo bajo a los 12 meses', estado: 'en_uso',
       cortes: [corte('desarrollo_12m_desde_40', '40 sem', '40 semanas', 3), corte('desarrollo_12m', '6 m EC', '6 meses', 5)] }

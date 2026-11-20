@@ -75,7 +75,7 @@ describe('predicción', () => {
   it('ofrece los tres modos como pestañas y el enlace «Calcular un niño» en Clínica', async () => {
     api('experto')
     montar('/prediccion?vista=grupo')
-    expect(await screen.findByRole('heading', { name: 'Predicción' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Calcular un grupo de niños' })).toBeInTheDocument()
     const pestanas = screen.getAllByRole('tab').map((t) => t.textContent)
     expect(pestanas).toEqual(['Un niño', 'Un grupo de niños', 'Muestra', 'Todo el universo', 'Niño nuevo desde un perfil'])
     expect(screen.getAllByRole('link', { name: 'Calcular un niño' }).length).toBeGreaterThan(0)

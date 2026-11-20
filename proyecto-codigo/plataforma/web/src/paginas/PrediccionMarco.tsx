@@ -28,7 +28,7 @@ export default function PrediccionMarco() {
 
   return (
     <div>
-      <div role="tablist" aria-label="Qué desea predecir" className="mb-5 flex gap-1 border-b border-linea">
+      <div role="tablist" aria-label="Qué desea predecir" className="mb-3 flex gap-1 border-b border-linea">
         {VISTAS.map((v, i) => {
           const activa = v.id === vista
           return (

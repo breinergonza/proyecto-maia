@@ -105,14 +105,15 @@ export function PerfilDelNino({ perfil }: { perfil?: PerfilProvisional }) {
   )
 }
 
-export function TrayectoriaRiesgo({ sujeto }: { sujeto: string }) {
+/** `excluir`: familias de desenlaces que la ficha ya cuenta con su riesgo por visita (no se repiten aquí). */
+export function TrayectoriaRiesgo({ sujeto, excluir }: { sujeto: string; excluir?: ReadonlySet<string> }) {
   const q = useQuery({
     queryKey: ['nino', sujeto, 'historia-riesgo'],
     queryFn: () => pedir<HistoriaRiesgo>(`/ninos/${encodeURIComponent(sujeto)}/historia-riesgo`),
     staleTime: 5 * 60_000,
   })
   const [todas, setTodas] = useState(false)
-  const familias = useMemo(() => familiasDeRiesgo(q.data?.puntos ?? []), [q.data])
+  const familias = useMemo(() => familiasDeRiesgo(q.data?.puntos ?? []).filter((f) => !excluir?.has(f.clave)), [q.data, excluir])
   const visitas = useMemo(() => {
     const m = new Map<number, string>()
     for (const p of q.data?.puntos ?? []) m.set(p.orden, p.momento_nombre)
@@ -191,7 +192,15 @@ export function ticksMeses([a, b]: [number, number]): number[] {
   return ticks
 }
 
-export function CrecimientoOms({ crecimiento }: { crecimiento: Record<string, PuntoCrecimiento[]> }) {
+// una sola frase por gráfica: qué mide el eje y cuándo es bajo
+const DESCRIPCION_CRECIMIENTO = 'Desviaciones frente a lo esperado para la edad corregida: 0 es lo esperado; por debajo de −2, bajo para la edad.'
+
+/** `grilla` es la distribución de las gráficas (una por medida); por defecto, las tres en una fila donde hay ancho. */
+export function CrecimientoOms({ crecimiento, grilla = 'sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3', alto }: {
+  crecimiento: Record<string, PuntoCrecimiento[]>; grilla?: string
+  /** Alto de cada gráfica en px; sin él, el de siempre. */
+  alto?: number
+}) {
   const series = useMemo(() => Object.entries(crecimiento)
     .map(([k, ps]) => ({
       k,
@@ -206,17 +215,13 @@ export function CrecimientoOms({ crecimiento }: { crecimiento: Record<string, Pu
   const dominioX: [number, number] = edades.length ? [Math.min(...edades), Math.max(...edades)] : [0, 0]
   if (dominioX[0] === dominioX[1]) { dominioX[0] -= DIA_MES; dominioX[1] += DIA_MES }
   const ticksX = ticksMeses(dominioX)
-  const dc = descripcionDe('crecimiento_ficha')
   return (
-    <Grafica titulo={dc.titulo} descripcion={dc.descripcion} exportar={{ nombre: 'crecimiento-oms' }}
+    <Grafica titulo={descripcionDe('crecimiento_ficha').titulo} descripcion={DESCRIPCION_CRECIMIENTO} exportar={{ nombre: 'crecimiento-oms' }}
       accion={<span className="flex flex-wrap gap-x-3 gap-y-1 text-xs" title={AYUDA_OMS}>
         <Muestra tipo="franja">rango esperado (−2 a +2)</Muestra>
         <Muestra tipo="marcado">bajo para la edad o caída</Muestra>
       </span>}>
-      <p className="mb-3 text-sm" title={AYUDA_OMS}>
-        Desviaciones frente a lo esperado para la edad corregida: 0 es lo esperado; por debajo de −2, bajo para la edad.
-      </p>
-      <ul className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
+      <ul className={cn('grid grid-cols-1 gap-x-6 gap-y-4', grilla)}>
         {series.map(({ k, puntos, improbables }) => {
           const nota = improbables > 0 && (
             <p className="text-xs font-semibold text-coral-hondo">
@@ -249,7 +254,7 @@ export function CrecimientoOms({ crecimiento }: { crecimiento: Record<string, Pu
                 }))}
                 dominioY={dominioY} ticksY={ticksEnteros(dominioY, [-2, 0, 2])} formatoY={(v) => (v > 0 ? `+${v}` : `${v}`).replace('-', '−')}
                 franjas={[{ desde: -2, hasta: 2 }]} guias={[{ y: 0 }]}
-                dominioX={dominioX} ticksX={ticksX} formatoX={meses}
+                dominioX={dominioX} ticksX={ticksX} formatoX={meses} alto={alto}
               />
               {nota}
             </li>

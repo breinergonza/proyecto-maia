@@ -1,5 +1,7 @@
 // La historia de un niño: sus visitas en orden, lo que se midió en cada una, los datos por revisar, el riesgo
 // calculado (y cómo fue cambiando visita a visita), su crecimiento frente a la OMS y cómo nació frente a los demás.
+// Es un documento y se desplaza; un índice bajo el título lleva a cada sección, y el crecimiento va antes que las tarjetas
+// del resto de desenlaces.
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Printer } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -37,6 +39,12 @@ export default function Nino() {
   // lo que «Riesgo a los 12 meses» ya cuenta visita por visita no se repite en una tarjeta de la última visita
   const enSeccion = familiasConRiesgo(historia.data)
   const riesgos = n.visitas.flatMap((v) => v.riesgos.map((r) => ({ ...r, visita: v.nombre }))).filter((r) => !enSeccion.has(familiaDe(r.clave)))
+  const conCrecimiento = Object.values(n.crecimiento).some((ps) => ps.length > 0)
+  const secciones = [
+    ...(enSeccion.size > 0 || historia.isPending ? [{ id: 'riesgo-12-meses', texto: 'Riesgo a 12 meses' }] : []),
+    ...(conCrecimiento ? [{ id: 'crecimiento', texto: 'Crecimiento' }] : []),
+    ...(n.visitas.length > 0 ? [{ id: 'visitas', texto: 'Visitas' }] : []),
+  ]
 
   return (
     <>
@@ -57,13 +65,21 @@ export default function Nino() {
         </Boton>
       </div>
 
-      <div className="mb-4 empty:hidden">
+      {secciones.length > 1 && (
+        <nav aria-label="En esta ficha" className="no-imprimir -mt-2 mb-4 flex flex-wrap gap-x-5 gap-y-1 text-sm font-semibold">
+          {secciones.map((s) => <a key={s.id} href={`#${s.id}`} className="text-teal hover:underline">{s.texto}</a>)}
+        </nav>
+      )}
+
+      <div id="riesgo-12-meses" className="mb-4 scroll-mt-4 empty:hidden">
         <RiesgoA12Meses historia={historia.data} cargando={historia.isPending} error={historia.error}
           reintentar={() => { void historia.refetch() }} />
       </div>
 
       <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
       <div className="space-y-4">
+      <div id="crecimiento" className="scroll-mt-4 empty:hidden"><CrecimientoOms crecimiento={n.crecimiento} /></div>
+      <PerfilDelNino perfil={n.perfil} />
       {riesgos.length > 0 && (
         <section aria-label="Riesgo calculado" className="space-y-3">
           <p className="text-sm">{AYUDA_DOS_CIFRAS}</p>
@@ -73,12 +89,11 @@ export default function Nino() {
         </section>
       )}
 
-      <PerfilDelNino perfil={n.perfil} />
-      <TrayectoriaRiesgo sujeto={n.sujeto} />
-      <CrecimientoOms crecimiento={n.crecimiento} />
+      <TrayectoriaRiesgo sujeto={n.sujeto} excluir={enSeccion} />
       <PerfilCohorte sujeto={n.sujeto} />
       </div>
 
+      <div id="visitas" className="scroll-mt-4">
       <Panel titulo="Visitas">
         {n.visitas.length === 0 ? <Vacio titulo="Este niño no tiene visitas registradas" /> : (
           <>
@@ -87,6 +102,7 @@ export default function Nino() {
           </>
         )}
       </Panel>
+      </div>
       </div>
       <p className="solo-imprimir">
         Impreso el {fecha(new Date().toISOString())} · Observatorio Canguro · Documento de apoyo clínico: no reemplaza el criterio médico

@@ -39,7 +39,12 @@ const COLUMNAS: Columna[] = [
   },
   {
     id: 'desenlace_max', titulo: 'Riesgo más alto', primero: 'asc',
-    celda: (n) => <>{n.desenlace_max ?? <span className="text-salvia">Sin riesgo calculado</span>}{n.n_riesgos > 1 && <span className="text-salvia"> y {n.n_riesgos - 1} más</span>}</>,
+    celda: (n) => (n.desenlace_max == null ? <span className="text-salvia">Sin riesgo calculado</span> : (
+      // corto en la fila; la visita del cálculo y cuántos desenlaces más tiene el niño, al pasar el mouse
+      <span title={n.n_riesgos > 1 ? `${n.desenlace_max}; ${n.n_riesgos - 1} más` : n.desenlace_max}>
+        {sinVisita(n.desenlace_max)}{n.n_riesgos > 1 && <span className="ml-1 whitespace-nowrap font-semibold text-salvia">+{n.n_riesgos - 1}</span>}
+      </span>
+    )),
   },
   {
     id: 'n_alertas', titulo: 'Datos por revisar', derecha: true, primero: 'desc',
@@ -56,7 +61,7 @@ const COLUMNAS: Columna[] = [
         {n.n_bajo_2de > 0 && <span title={AYUDA_OMS}><Insignia tono="ocre">{BAJO_EDAD} ×{n.n_bajo_2de}</Insignia></span>}
         {n.n_caida_1de > 0 && <span title={`${CAYO}. ${AYUDA_OMS}`}><Insignia>Cayó ×{n.n_caida_1de}</Insignia></span>}
         {!n.n_bajo_2de && !n.n_caida_1de && (n.n_crecimiento > 0
-          ? <span className="text-teal" title={`${num(n.n_crecimiento)} medidas, ninguna baja para la edad ni con caída. ${AYUDA_OMS}`}>Sin alerta</span>
+          ? <span className="text-salvia" title={`${num(n.n_crecimiento)} medidas, ninguna baja para la edad ni con caída. ${AYUDA_OMS}`}>Sin alerta</span>
           : <span className="text-salvia" title="No hay peso, talla ni perímetro con que compararlo">Sin dato</span>)}
       </span>
     ),
@@ -74,6 +79,9 @@ const COLUMNAS: Columna[] = [
     )),
   },
 ]
+/** «… a los 6 meses (riesgo calculado a 40 sem)» → «… a los 6 meses»: la visita del cálculo queda en el title de la celda. */
+const sinVisita = (desenlace: string) => desenlace.replace(/\s*\(riesgo calculado a [^)]*\)\s*$/, '')
+
 const POR_ID = new Map(COLUMNAS.map((c) => [c.id, c]))
 const ORDEN_INICIAL = COLUMNAS.map((c) => c.id)
 
@@ -150,8 +158,7 @@ export default function Ninos() {
   return (
     <div className="flex flex-col lg:h-full">
       <Encabezado titulo="Niños">
-        Por defecto, ordenados por su riesgo más alto con los datos más recientes. Los códigos están seudonimizados: para saber quién es
-        un niño hay que consultar la base de la Fundación.
+        Alto: el {100 - RIESGO_ALTO} % de niños con más riesgo en su desenlace; muy alto: el {100 - RIESGO_MUY_ALTO} %. Los códigos están seudonimizados.
       </Encabezado>
 
       <div className="mb-4 grid grid-cols-1 shrink-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_16rem_14rem_auto]">

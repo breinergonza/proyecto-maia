@@ -40,7 +40,7 @@ export default function Prediccion() {
   const [modelo, setModelo] = useState<string>('')
   return (
     <div>
-      <Encabezado titulo="Predicción">
+      <Encabezado titulo="Calcular un grupo de niños">
         Calcule el riesgo de un grupo de niños o de un niño nuevo con el modelo que elija. Los resultados no se guardan: existen solo en esta pantalla.
       </Encabezado>
       <div role="tablist" aria-label="Qué calcular" className="mb-4 flex flex-wrap gap-2">

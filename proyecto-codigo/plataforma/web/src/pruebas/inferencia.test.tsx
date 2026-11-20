@@ -57,7 +57,10 @@ describe('calcular el riesgo de un niño', () => {
     await userEvent.type(await screen.findByLabelText('Fecha de nacimiento'), '2026-01-10')
     await userEvent.type(screen.getByLabelText('Semanas de gestación al nacer'), '30,5')
     await userEvent.click(screen.getByRole('button', { name: /3 meses \(edad corregida\)/ }))
-    expect(screen.getByText(/Aquí se calcula: desarrollo psicomotor bajo/)).toBeInTheDocument()
+    // la visita dice cuántos riesgos calcula; cuáles, en una lista al abrirla (no una frase corrida bajo el nombre)
+    expect(screen.getByText('Calcula 1 riesgo')).toBeInTheDocument()
+    expect(within(screen.getByRole('list', { name: 'Riesgos que se calculan con esta visita' })).getByText('desarrollo psicomotor bajo a los 6 meses')).toBeInTheDocument()
+    expect(screen.queryByText(/Aquí se calcula/)).not.toBeInTheDocument()
     await userEvent.type(screen.getByLabelText('Peso a 3 m EC (g)'), '9999')
     await userEvent.selectOptions(screen.getByLabelText('Oxígeno a los 3 meses'), '9')
 
@@ -88,6 +91,14 @@ describe('calcular el riesgo de un niño', () => {
     expect(screen.getByText('1 medida improbable (revisar) no se grafica')).toBeInTheDocument()
     expect(document.querySelector('main')?.textContent).not.toMatch(/posici[oó]n|puntaje z|capa \d|[−-]2 DE|\(peso_nacer\)/i)
     expect(screen.queryByRole('button', { name: 'Modo avanzado (JSON)' })).not.toBeInTheDocument()
+  })
+
+  it('la página se llama «Calcular un niño» (como el menú y la pestaña del navegador) y el resultado queda fijo junto al formulario', async () => {
+    api('experto')
+    montar('/prediccion')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Calcular un niño' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /Predicción: un niño/ })).not.toBeInTheDocument()
+    expect(screen.getByText('Aquí aparecerá el resultado').closest('[class~="xl:sticky"]')).not.toBeNull()
   })
 
   it('los datos generales van plegados y la administración tiene el modo avanzado', async () => {

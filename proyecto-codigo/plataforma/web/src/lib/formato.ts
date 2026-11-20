@@ -58,8 +58,9 @@ export function fechaHora(v: string | null | undefined): string {
 /** Cierra una frase que termina en un valor: «p. m.» ya trae su punto y no lleva otro. */
 export const conPunto = (texto: string) => (texto.endsWith('.') ? texto : `${texto}.`)
 
-/** Edad corregida (días) en meses, para un eje que no mezcle unidades: 0,5 m, 3 m, 13 m. */
-export const meses = (dias: number) => `${nf01.format(dias / 30.4375)} m`
+/** Edad corregida (días) en meses, para un eje que no mezcle unidades: 0,5 m, 3 m, 13 m. Redondea antes de formatear y
+ * suma 0 para que un valor que redondea a cero desde abajo (un día antes del nacimiento corregido) sea «0 m», no «-0 m». */
+export const meses = (dias: number) => `${nf01.format(Math.round((dias / 30.4375) * 10) / 10 + 0)} m`
 
 /** Edad corregida en días, en palabras cortas. */
 export function edad(dias: number | null | undefined): string {

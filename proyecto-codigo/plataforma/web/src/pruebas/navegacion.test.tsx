@@ -42,6 +42,17 @@ describe('navegación', () => {
     expect(await screen.findByRole('tab', { name: 'Todo el universo' })).toBeInTheDocument()
   })
 
+  it('/revision no es una página que no existe: lleva a Revisión de riesgos para los mismos perfiles', async () => {
+    api('experto')
+    const { unmount } = montar('/revision')
+    expect(await screen.findByRole('heading', { name: 'Revisión de riesgos' })).toBeInTheDocument()
+    expect(screen.queryByText('No existe esa página')).toBeNull()
+    unmount()
+    api('visualizador')
+    montar('/revision')
+    expect(await screen.findByRole('heading', { name: 'Sin permiso' })).toBeInTheDocument()
+  })
+
   it('el menú ofrece una sola entrada para calcular un niño, «Calcular un niño», que lleva a la predicción', async () => {
     api('experto')
     montar('/prediccion')
@@ -189,7 +200,7 @@ describe('navegación', () => {
     montar('/comparar')
     expect(await screen.findByRole('heading', { level: 1, name: 'Comparar grupos' })).toBeInTheDocument()
     expect(await screen.findByRole('region', { name: 'Grupo A' })).toBeInTheDocument()
-    expect(await screen.findByRole('button', { name: 'Comparar con todos los niños' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Elegir los criterios del grupo B' })).toBeInTheDocument()
   })
 
   it('«/explorar» sigue abierto aunque ya no esté en el menú', async () => {

@@ -1,7 +1,8 @@
 // «Riesgo a los 12 meses, visita por visita» (S7): por cada desenlace a 12 meses del paquete activo, el riesgo del niño con lo
 // medido hasta cada visita a la que fue (40 semanas, 3 meses, ...), lo que más pesó en cada una y cuánto cambió al sumar la
 // visita. La usan la ficha del niño y «Calcular un niño»; cada columna sale de la misma consulta del servidor, que no usa
-// datos de visitas posteriores.
+// datos de visitas posteriores. «Cómo se calculó» (modelo, entrenamiento, calibración) sale una vez al pie de la sección: el
+// modelo es el mismo para todos los desenlaces; cada uno dice su visita («Calculado a …») y si está «En prueba».
 import { ArrowDown, ArrowUp, Minus } from 'lucide-react'
 import { useId, useState } from 'react'
 import type { RiesgoPorCorte } from '../../api/ninos'
@@ -43,7 +44,8 @@ export function RiesgoA12Meses({ historia, cargando, error, reintentar }: {
           Cada columna es el riesgo del niño con lo medido hasta esa visita: no usa datos de visitas posteriores. Así se ve cuánto cambia con cada visita.
         </p>
       </div>
-      {mostradas.map((f) => <Familia key={f.familia.clave} f={f} historia={historia} />)}
+      {mostradas.map((f) => <Familia key={f.familia.clave} f={f} />)}
+      <ComoSeCalculo familias={mostradas} historia={historia} />
       {ausentes.length > 0 && (
         <ul className="space-y-1 text-sm">{ausentes.map((a) => <li key={a.clave}>{sinFamilia(a.nombre)}</li>)}</ul>
       )}
@@ -51,7 +53,7 @@ export function RiesgoA12Meses({ historia, cargando, error, reintentar }: {
   )
 }
 
-function Familia({ f, historia }: { f: FamiliaDelNino; historia: RiesgoPorCorte }) {
+function Familia({ f }: { f: FamiliaDelNino }) {
   const { familia, columnas, sinRiesgo } = f
   const [tabla, setTabla] = useState(false)
   const ultima = columnas[columnas.length - 1]
@@ -82,14 +84,14 @@ function Familia({ f, historia }: { f: FamiliaDelNino; historia: RiesgoPorCorte 
       ) : tabla ? <TablaDeColumnas filas={filas} nombre={familia.nombre} /> : (
         <>
           <Columnas columnas={columnas} enUso={familia.estado === 'en_uso'} />
-          <Evolucion columnas={columnas} nombre={familia.nombre} />
+          {/* con dos visitas la gráfica sería una raya entre dos puntos: las columnas ya dicen el cambio */}
+          {columnas.length >= 3 && <Evolucion columnas={columnas} nombre={familia.nombre} />}
           <Razones cortes={sinRiesgo} />
         </>
       )}
       {ultima && (
         <p className="mt-4 border-t border-linea pt-3 font-semibold">{fraseCalibrada(ultima.punto.riesgo, familia.nombre)}</p>
       )}
-      {ultima && <ComoSeCalculo ultima={ultima} historia={historia} />}
     </Panel>
   )
 }
@@ -175,15 +177,23 @@ function Razones({ cortes }: { cortes: FamiliaDelNino['sinRiesgo'] }) {
   )
 }
 
-function ComoSeCalculo({ ultima, historia }: { ultima: ColumnaDeRiesgo; historia: RiesgoPorCorte }) {
+/** El modelo con que se calculó todo lo de arriba, una sola vez; la calibración se dice por desenlace solo si difiere. */
+function ComoSeCalculo({ familias, historia }: { familias: FamiliaDelNino[]; historia: RiesgoPorCorte }) {
+  const conRiesgo = familias.filter((f) => f.columnas.length > 0)
+  if (conRiesgo.length === 0) return null
+  const calibraciones = conRiesgo.map((f) => ({ nombre: f.familia.nombre, con: f.columnas[f.columnas.length - 1].corte.calibrado_con }))
+  const distintas = new Set(calibraciones.map((c) => c.con).filter((c): c is string => c != null))
+  const calibrado = distintas.size === 0 ? null
+    : distintas.size === 1 ? `Calibrado con los niños más recientes (${[...distintas][0]})`
+      : `Calibrado con los niños más recientes: ${calibraciones.filter((c) => c.con).map((c) => `${c.nombre} (${c.con})`).join('; ')}`
   const partes = [
     'Cada columna se calculó solo con lo medido hasta su visita',
     historia.modelo ? `Modelo clínico ${historia.modelo.version}` : `Paquete de modelos ${historia.paquete}`,
     historia.modelo?.entrenado ? `Entrenamiento del ${fecha(historia.modelo.entrenado)}` : null,
-    ultima.corte.calibrado_con ? `Calibrado con los niños más recientes (${ultima.corte.calibrado_con})` : null,
+    calibrado,
   ].filter((p): p is string => p != null)
   return (
-    <div className="mt-3 border-t border-linea pt-3">
+    <div className="border-t border-linea pt-3">
       <h4 className="text-sm">Cómo se calculó</h4>
       <p className="mt-0.5 text-sm">{partes.join(' · ')}</p>
     </div>

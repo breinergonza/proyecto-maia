@@ -89,7 +89,9 @@ describe('tablero', () => {
     expect(await screen.findByRole('figure', { name: 'Porcentaje de niños medidos con crecimiento bajo frente a la OMS en cada visita: '
       + 'Peso para la edad, 40 semanas 12,0 %, 3 meses EC 8,0 %; Talla para la edad, 40 semanas 15,0 %, 3 meses EC sin dato' }))
       .toBeInTheDocument()
-    expect(screen.getByText('Ver la tabla')).toBeInTheDocument()
+    // la tabla de la gráfica va en su botón, no en un desplegable aparte
+    expect(screen.getByRole('button', { name: 'Ver como tabla' })).toBeInTheDocument()
+    expect(screen.queryByText('Ver la tabla')).not.toBeInTheDocument()
     // el trimestre sin alarmas (2025 T3) cuenta en el eje; las señales se dicen en palabras del equipo clínico
     expect(await screen.findByRole('figure', { name: '3 alarmas de grupo entre 2025 T2 y 2025 T4: '
       + '2025 T2, 2 por más valores redondeados; 2025 T4, 1 por más datos faltantes' })).toBeInTheDocument()
@@ -131,5 +133,47 @@ describe('tablero: claridad y enlaces de revisión', () => {
     expect(screen.getByText('Niños con riesgo alto en cada desenlace.')).toBeInTheDocument()
     expect(screen.getByText('Cambios de toda una sede o de todo un trimestre.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Descargar PNG: Crecimiento frente a la OMS' })).toBeInTheDocument()
+  })
+
+  it('sin «datos leídos»: la cifra no le sirve al clínico; el total queda en la ayuda de «por mil»', async () => {
+    api('experto')
+    montar('/tablero')
+    await screen.findByText('niños con datos')
+    expect(screen.queryByText('datos leídos')).not.toBeInTheDocument()
+    expect(screen.getByText('datos por revisar · 12,5 por mil').closest('div, a')).toHaveAttribute('title', expect.stringContaining('16.000 datos'))
+  })
+
+  it('«Riesgo por desenlace»: un nombre por desenlace con su visita aparte, y dice qué es «alto»', async () => {
+    simularApi((url) => {
+      if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('experto') } }
+      if (url === '/api/tablero/resumen') {
+        return { cuerpo: { ...resumen, riesgos_por_desenlace: [{ clave: 'des12_desde_3', desenlace: 'desarrollo psicomotor bajo a los 12 meses (riesgo calculado a 3 m EC)',
+          momento: '3 m EC', momento_nombre: '3 meses (edad corregida)', ninos: 95, altos: 10, riesgo_medio: 0.087 }] } }
+      }
+      return { cuerpo: [] }
+    })
+    montar('/tablero')
+    const panel = (await screen.findByRole('heading', { name: 'Riesgo por desenlace' })).closest('section')!
+    // la visita ya se dice en su línea: no se repite entre paréntesis en el nombre
+    expect(within(panel).getByText('desarrollo psicomotor bajo a los 12 meses')).toBeInTheDocument()
+    expect(within(panel).getByText('Visita: 3 meses EC')).toBeInTheDocument()
+    expect(within(panel).queryByText(/riesgo calculado a/)).not.toBeInTheDocument()
+    // «alto» dicho una vez, con el mismo 10 % que usa el resto de la web
+    expect(within(panel).getByText('Alto: el 10 % de niños con más riesgo en ese desenlace')).toBeInTheDocument()
+  })
+
+  it('cada panel dice una sola vez qué muestra: sin la frase repetida de crecimiento ni la de alarmas', async () => {
+    simularApi((url) => {
+      if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('experto') } }
+      if (url === '/api/tablero/resumen') return { cuerpo: resumen }
+      if (url === '/api/tablero/alarmas-grupo') return { cuerpo: alarmas }
+      return { cuerpo: [] }
+    })
+    montar('/tablero')
+    await screen.findByText('niños con datos')
+    // la gráfica de crecimiento dice una vez qué cuenta (variable, población y denominador) y no repite el rótulo en otra línea
+    expect(screen.getAllByText(/con crecimiento bajo frente a la OMS/)).toHaveLength(1)
+    expect(await screen.findByText('Cambios de toda una sede o de todo un trimestre.')).toBeInTheDocument()
+    expect(screen.queryByText(/suelen venir de un cambio en la forma de medir/)).not.toBeInTheDocument()
   })
 })

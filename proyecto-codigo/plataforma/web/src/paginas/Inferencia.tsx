@@ -105,6 +105,9 @@ export function armarPeticion(f: FormularioCalculo, nino: Nino, valores: Valores
   return { peticion, errores }
 }
 
+/** Los desenlaces que calcula una visita, sin «(riesgo calculado a …)»: la visita ya es la que se está mirando, y sin repetidos. */
+const riesgosDe = (v: VisitaFormulario) => [...new Set(v.desenlaces.map((d) => d.replace(/\s*\(riesgo calculado a [^)]*\)\s*$/, '')))]
+
 /** Llena el formulario con el niño simulado de ejemplo, hasta la última visita en que se calcula un riesgo: el riesgo
  * sale de la última visita con datos, y una posterior sin desenlaces dejaría el ejemplo sin riesgo que mostrar. */
 function desdeEjemplo(f: FormularioCalculo, p: PeticionInferencia) {
@@ -138,14 +141,14 @@ export default function Inferencia() {
   if (activo.data === null) {
     return (
       <>
-        <Encabezado titulo="Predicción: un niño" />
+        <Encabezado titulo="Calcular un niño" />
         <Vacio titulo="No hay un paquete de modelos activo"><ActivarModelo admin={puede(usuario, ['admin'])} /></Vacio>
       </>
     )
   }
   return (
     <>
-      <Encabezado titulo="Predicción: un niño"
+      <Encabezado titulo="Calcular un niño"
         accion={puede(usuario, ['admin']) && (
           <Boton chico variante="fantasma" onClick={() => { setAvanzado((a) => !a); calcular.reset() }} aria-pressed={avanzado}>
             {avanzado ? 'Volver al formulario' : 'Modo avanzado (JSON)'}
@@ -157,7 +160,8 @@ export default function Inferencia() {
       <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
         {avanzado ? <ModoAvanzado calcular={calcular.mutate} pendiente={calcular.isPending} />
           : <Formulario calcular={calcular.mutate} pendiente={calcular.isPending} />}
-        <div ref={resultado} className="scroll-mt-4 space-y-4">
+        {/* el resultado acompaña al formulario: queda a la vista mientras se llenan las visitas y se desplaza por dentro si es más largo que la ventana */}
+        <div ref={resultado} className="scroll-mt-4 space-y-4 xl:sticky xl:top-0 xl:max-h-[calc(100dvh-3rem)] xl:overflow-y-auto xl:pr-1">
           {calcular.error && (
             <Aviso>
               {calcular.error.message}
@@ -245,7 +249,7 @@ function Formulario({ calcular, pendiente }: { calcular: (p: PeticionInferencia)
                 className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left sm:px-5">
                 <span className="min-w-0">
                   <span className="block font-semibold">{v.nombre}</span>
-                  {v.desenlaces.length > 0 && <span className="mt-0.5 block text-xs text-salvia">Aquí se calcula: {v.desenlaces.join(' · ')}</span>}
+                  {v.desenlaces.length > 0 && <span className="mt-0.5 block text-xs text-salvia">Calcula {riesgosDe(v).length} {riesgosDe(v).length === 1 ? 'riesgo' : 'riesgos'}</span>}
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
                   {llenos > 0 && <Insignia tono="teal">{llenos} {llenos === 1 ? 'dato' : 'datos'}</Insignia>}
@@ -254,6 +258,14 @@ function Formulario({ calcular, pendiente }: { calcular: (p: PeticionInferencia)
               </button>
               {abierta && (
                 <div className="border-t border-linea px-4 pb-4 pt-3 sm:px-5">
+                  {v.desenlaces.length > 0 && (
+                    <div className="mb-3 text-sm">
+                      <p className="font-semibold" id={`riesgos-${v.etapa}`}>Con esta visita se calculan:</p>
+                      <ul aria-label="Riesgos que se calculan con esta visita" className="mt-0.5 list-disc space-y-0.5 pl-5 text-salvia">
+                        {riesgosDe(v).map((d) => <li key={d}>{d}</li>)}
+                      </ul>
+                    </div>
+                  )}
                   {alNacer(v) ? (
                     <p className="mb-3 text-sm text-salvia">Se toman con la fecha de nacimiento.</p>
                   ) : (
@@ -395,7 +407,7 @@ function Resultado({ r, varios }: { r: ResultadoConHistoria; varios: boolean }) 
         <Panel titulo={descripcionDe('riesgo').titulo} descripcion={descripcionDe('riesgo').descripcion}>
           <p className="text-sm text-salvia">
             No se calculó ningún riesgo. El riesgo se calcula en la <strong>última visita con datos</strong>: para verlo, esa
-            visita debe ser una de las que dicen «Aquí se calcula» (deje vacías las posteriores).
+            visita debe ser una de las que calculan riesgos, y lo dice bajo su nombre (deje vacías las posteriores).
           </p>
         </Panel>
       ) : riesgos.length > 0 && (

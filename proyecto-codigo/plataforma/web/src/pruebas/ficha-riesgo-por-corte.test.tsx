@@ -34,12 +34,12 @@ const historia: RiesgoPorCorte = {
   puntos: [punto(c40, 0.22, 78), punto(c3, 0.35, 89)],
 }
 
-function api(historiaDe: () => { estado?: number; cuerpo: unknown }) {
+function api(historiaDe: () => { estado?: number; cuerpo: unknown }, extra: { linea?: unknown; trayectoria?: unknown[] } = {}) {
   return simularApi((url) => {
     if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('experto') } }
-    if (url === '/api/ninos/s1/linea-temporal') return { cuerpo: linea }
+    if (url === '/api/ninos/s1/linea-temporal') return { cuerpo: extra.linea ?? linea }
     if (url === '/api/ninos/s1/historia-riesgo?motivos=true') return historiaDe()
-    if (url === '/api/ninos/s1/historia-riesgo') return { cuerpo: { paquete: 'p1', paquete_corrida: 'p1', puntos: [] } }
+    if (url === '/api/ninos/s1/historia-riesgo') return { cuerpo: { paquete: 'p1', paquete_corrida: 'p1', puntos: extra.trayectoria ?? [] } }
     if (url === '/api/ninos/s1/perfil') return { cuerpo: { variables: [] } }
     return undefined
   })
@@ -79,5 +79,32 @@ describe('ficha del niño: riesgo a los 12 meses', () => {
     expect(await screen.findByRole('region', { name: 'Riesgo calculado' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Riesgo a los 12 meses, visita por visita' })).not.toBeInTheDocument()
     expect(screen.getByText('talla baja a los 12 meses (riesgo calculado a 3 m EC)')).toBeInTheDocument()
+  })
+
+  it('el índice de la ficha lleva a riesgo, crecimiento y visitas, y las curvas de crecimiento van antes que el resto', async () => {
+    const z = (edad: number, valor: number) => ({ etapa: '3 m EC', indicador: 'talla', fecha: null, edad_corregida: edad, valor: 50, unidad: 'cm', z: valor, bajo_2de: false, caida_1de: false, improbable: false })
+    const conCrecimiento = { ...linea, crecimiento: { talla: [z(10, -0.5), z(60, -1)] } }
+    api(() => ({ cuerpo: historia }), { linea: conCrecimiento })
+    montar('/ninos/s1')
+    const indice = await screen.findByRole('navigation', { name: 'En esta ficha' })
+    expect(indice).toHaveClass('no-imprimir')
+    const enlaces = within(indice).getAllByRole('link').map((a) => [a.textContent, a.getAttribute('href')])
+    expect(enlaces).toEqual([['Riesgo a 12 meses', '#riesgo-12-meses'], ['Crecimiento', '#crecimiento'], ['Visitas', '#visitas']])
+    for (const [, href] of enlaces) expect(document.querySelector(href!)).not.toBeNull()
+    // el crecimiento viene antes que las tarjetas del resto de desenlaces
+    const crecimiento = screen.getByRole('heading', { name: 'Crecimiento frente a la OMS' })
+    const tarjetas = await screen.findByRole('region', { name: 'Riesgo calculado' })
+    expect(crecimiento.compareDocumentPosition(tarjetas) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('«Riesgo en cada visita» no repite los desenlaces que la sección de 12 meses ya cuenta', async () => {
+    const punto = (clave: string, desenlace: string) => ({ clave, desenlace, momento: '3 m EC', momento_nombre: '3 meses', orden: 4, riesgo: 0.3, percentil: 70, fecha_visita: null })
+    api(() => ({ cuerpo: historia }), { trayectoria: [
+      punto('talla_baja_12m_desde_3', 'talla baja a los 12 meses (riesgo calculado a 3 m EC)'),
+      punto('desarrollo_6m', 'desarrollo psicomotor bajo a los 6 meses'),
+    ] })
+    montar('/ninos/s1')
+    expect(await screen.findByRole('heading', { level: 3, name: 'Desarrollo psicomotor bajo a los 6 meses' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { level: 3, name: 'Talla baja a los 12 meses' })).not.toBeInTheDocument()
   })
 })

@@ -67,4 +67,37 @@ describe('Revisión de riesgos simplificada', () => {
     montar('/revision/riesgos')
     expect(await screen.findByRole('heading', { name: 'Sin permiso' })).toBeInTheDocument()
   })
+
+  it('no dice la visita dos veces: el encabezado del caso la trae y las líneas de datos no la repiten', async () => {
+    simularApi(api('experto', [caso(1, { resumen: ['Edad gestacional: 30 semanas', 'Peso a 40 sem (40 semanas): 3514 g'] })]))
+    montar('/revision/riesgos')
+    expect(await screen.findByText(/Niño 1 de 1 · N-1 · 40 semanas/)).toBeInTheDocument()
+    expect(screen.getByText('Peso a 40 sem: 3514 g')).toBeInTheDocument()
+    expect(screen.queryByText(/\(40 semanas\)/)).not.toBeInTheDocument()
+  })
+
+  it('las respuestas quedan a la vista mientras la evidencia se desplaza', async () => {
+    simularApi(api('experto'))
+    montar('/revision/riesgos')
+    const respuestas = await screen.findByRole('group', { name: '¿Le preocupa este niño?' })
+    expect(respuestas).toHaveClass('lg:sticky')
+    expect(respuestas.closest('section')?.firstElementChild).toHaveClass('lg:overflow-auto')   // la evidencia es la que se desplaza
+  })
+
+  it('una sola explicación sobre las gráficas de crecimiento', async () => {
+    const z = (edad: number, valor: number) => ({ etapa: '40s', indicador: 'talla', fecha: null, edad_corregida: edad, valor: 50, unidad: 'cm', z: valor, bajo_2de: false, caida_1de: false, improbable: false })
+    simularApi(api('experto', [caso(1, { crecimiento: { talla: [z(10, -0.5), z(40, -1)] } })]))
+    montar('/revision/riesgos')
+    expect(await screen.findByRole('heading', { name: 'Crecimiento frente a la OMS' })).toBeInTheDocument()
+    expect(screen.getAllByText(/Desviaciones frente a lo esperado/)).toHaveLength(1)
+    expect(screen.queryByText(/Un gráfico por medida/)).not.toBeInTheDocument()
+  })
+
+  it('la tarjeta del caso se ajusta a su contenido (no se estira para dejar un hueco vacío en pantallas grandes)', async () => {
+    simularApi(api('experto'))
+    montar('/revision/riesgos')
+    const caso = (await screen.findByRole('group', { name: '¿Le preocupa este niño?' })).closest('section')!
+    expect(caso).not.toHaveClass('lg:flex-1')
+    expect(caso).toHaveClass('lg:flex-initial')
+  })
 })

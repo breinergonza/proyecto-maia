@@ -62,6 +62,7 @@ export function Rutas() {
         <Route path="ninos/:sujeto" element={<Nino />} />
         <Route path="revision/datos" element={<Requiere roles={ROLES_ADMIN}><Navigate to="/admin/calidad-datos" replace /></Requiere>} />
         <Route path="admin/calidad-datos" element={<Requiere roles={ROLES_ADMIN}><AdminCalidadDatos /></Requiere>} />
+        <Route path="revision" element={<Requiere roles={ROLES_CLINICOS}><Navigate to="/revision/riesgos" replace /></Requiere>} />
         <Route path="revision/riesgos" element={<Requiere roles={ROLES_CLINICOS}><RevisionRiesgos /></Requiere>} />
         <Route path="inferencia" element={<Navigate to="/prediccion" replace />} />
         <Route path="prediccion" element={<Requiere roles={ROLES_CLINICOS}><PrediccionMarco /></Requiere>} />
