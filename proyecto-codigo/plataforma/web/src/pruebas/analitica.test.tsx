@@ -185,7 +185,7 @@ describe('analítica: acceso y menú', () => {
   it('el perfil de consulta (visualizador) entra a la analítica', async () => {
     api('visualizador')
     montar('/analitica/resumen?entrenamiento=7')
-    expect(await screen.findByRole('heading', { level: 1, name: 'Resumen' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Modelos' })).toBeInTheDocument()
     expect(screen.queryByText('Sin permiso')).not.toBeInTheDocument()
   })
 
@@ -200,7 +200,7 @@ describe('analítica: acceso y menú', () => {
   it('en la analítica el grupo del menú se abre solo y lista los submódulos', async () => {
     api('experto')
     montar('/analitica/resumen?entrenamiento=7')
-    await screen.findByRole('heading', { level: 1, name: 'Resumen' })
+    await screen.findByRole('heading', { level: 1, name: 'Modelos' })
     for (const s of SUBMODULOS) expect(screen.getAllByRole('link', { name: s.texto }).length).toBeGreaterThan(0)
   })
 })

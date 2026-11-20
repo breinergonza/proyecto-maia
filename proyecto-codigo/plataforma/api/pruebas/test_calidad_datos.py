@@ -144,3 +144,55 @@ def test_concentracion_sin_sede_real_solo_por_variable(cliente, admin, corrida):
     r = cliente.get('/api/revision/datos/concentracion', headers=admin, params={'corrida_id': corrida}).json()
     assert not r['hay_sede'] and r['celdas'] == [] and r['otras_celdas'] == 0
     assert [v['variable'] for v in r['por_variable']] == ['peso', 'talla']
+
+
+@pytest.fixture(scope='module')
+def corrida_visitas(cliente, admin):
+    """Una corrida con dos visitas (40 semanas y 12 meses): quién tiene alguna medida de crecimiento en cada una y de
+    ellos quién tiene talla, y diez alertas repartidas entre las dos visitas, dos de ellas ya respondidas."""
+    from maia_comun import db
+    from maia_comun.modelos_db import AlertaDato, Corrida, Corte, Crecimiento, Etapa
+    with db.sesion() as s:
+        corte = Corte(fuente='simulado', fecha_corte=date(2020, 2, 1), filas={})
+        s.add(corte)
+        s.flush()
+        s.add_all([Etapa(corte_id=corte.id, etapa='e40', orden=3, edad_min=-21, edad_max=35, base='corregida', nombre='40 sem'),
+                   Etapa(corte_id=corte.id, etapa='e12', orden=6, edad_min=315, edad_max=450, base='corregida', nombre='12 m')])
+        c = Corrida(corte_id=corte.id, fuente='simulado', tipo='revision', estado='ok')
+        s.add(c)
+        s.flush()
+        filas = [Crecimiento(corrida_id=c.id, sujeto=f'v{i}', etapa='e40', indicador='peso', valor=3.0, z=0.0) for i in range(10)]
+        filas += [Crecimiento(corrida_id=c.id, sujeto=f'v{i}', etapa='e40', indicador='talla', valor=50.0, z=0.0) for i in range(8)]
+        filas += [Crecimiento(corrida_id=c.id, sujeto=f'v{i}', etapa='e12', indicador='peso', valor=9.0, z=0.0) for i in range(5)]
+        filas += [Crecimiento(corrida_id=c.id, sujeto=f'v{i}', etapa='e12', indicador='talla', valor=75.0, z=0.0) for i in range(2)]
+        filas += [Crecimiento(corrida_id=c.id, sujeto='v9', etapa='e12', indicador='talla', valor=None, z=None)]   # sin dato
+        s.add_all(filas)
+        s.add_all([AlertaDato(corrida_id=c.id, sujeto=f'v{i}', variable='peso' if i < 6 else 'talla', etiqueta='Peso' if i < 6 else 'Talla',
+                              etapa='e40' if i < 6 else 'e12', capas=['1'] if i % 2 else ['2'], prioridad=i + 1) for i in range(10)])
+        s.commit()
+        return c.id
+
+
+def test_resumen_cifras_y_completitud_por_visita(cliente, admin, experto, corrida_visitas):
+    assert cliente.get('/api/revision/datos/resumen', headers=experto, params={'corrida_id': corrida_visitas}).status_code == 403
+    ids = [d['id'] for d in cliente.get('/api/revision/datos', headers=admin, params={'corrida_id': corrida_visitas}).json()['items']]
+    for alerta in ids[:2]:
+        assert cliente.post(f'/api/revision/datos/{alerta}', headers=admin, json={'es_error': 'si'}).status_code == 204
+    r = cliente.get('/api/revision/datos/resumen', headers=admin, params={'corrida_id': corrida_visitas}).json()
+    assert (r['por_revisar'], r['revisadas'], r['revisadas_mes']) == (8, 2, 2)
+    assert [(e['etapa'], e['etapa_nombre'], e['alertas']) for e in r['etapas']] == [('e40', '40 sem', 6), ('e12', '12 m', 4)]
+    assert [(v['variable'], v['etiqueta'], v['alertas']) for v in r['variables']] == [('peso', 'Peso', 6), ('talla', 'Talla', 4)]
+    comp = r['completitud']
+    assert comp['indicador'] == 'talla'
+    # con talla de los niños que tienen alguna medida de crecimiento en la visita; la talla vacía no cuenta
+    assert comp['etapas'] == [
+        {'etapa': 'e40', 'etapa_nombre': '40 sem', 'con_dato': 8, 'con_visita': 10, 'pct': 80.0, 'a_12_meses': False},
+        {'etapa': 'e12', 'etapa_nombre': '12 m', 'con_dato': 2, 'con_visita': 5, 'pct': 40.0, 'a_12_meses': True}]
+
+
+def test_cola_se_filtra_por_visita_y_conserva_su_contrato(cliente, admin, corrida_visitas):
+    r = cliente.get('/api/revision/datos', headers=admin, params={'corrida_id': corrida_visitas, 'etapa': 'e12', 'estado': 'todos'}).json()
+    assert r['total'] == 4 and {d['etapa'] for d in r['items']} == {'e12'} and {d['etapa_nombre'] for d in r['items']} == {'12 m'}
+    todas = cliente.get('/api/revision/datos', headers=admin, params={'corrida_id': corrida_visitas, 'estado': 'todos'}).json()
+    assert todas['total'] == 10   # sin el filtro nuevo, igual que antes
+    assert {'id', 'sujeto', 'variable', 'etiqueta', 'valor', 'capas', 'motivo', 'es_error', 'comentario', 'serie'} <= set(todas['items'][0])

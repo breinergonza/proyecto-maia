@@ -1,6 +1,7 @@
 // Calibración (riesgo con y sin el desenlace), Población (muestra frente a todos los niños) y Comparar con intervalos,
-// «Aprobar B» solo para administración y grupos de niños. Siempre con celdas de menos de 5 niños ocultas.
-import { configure, fireEvent, screen, waitFor, within } from '@testing-library/react'
+// «Aprobar B» solo para administración. Siempre con celdas de menos de 5 niños ocultas. Los grupos de niños se comparan en
+// Comparar grupos (/comparar), no aquí.
+import { configure, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Usuario } from '../api/tipos'
@@ -193,57 +194,15 @@ describe('comparar entrenamientos: intervalos y Aprobar B', () => {
   })
 })
 
-describe('comparar grupos de niños', () => {
-  const facetas = {
-    n: 400, n_base: 400, minimo: 20, insuficiente: false,
-    facetas: {
-      ern_sexo: { etiqueta: 'Sexo', tipo: 'lista', cuando: 'primera', opciones: [{ valor: 'M', etiqueta: 'Masculino', n: 200, texto: '200' }, { valor: 'F', etiqueta: 'Femenino', n: 200, texto: '200' }] },
-    },
-  }
-  const valor = (a: number, b: number, clara: boolean) => ({ unidad: 'pp', n_a: 200, n_b: 200, a, b, ic_a: [a - 2, a + 2], ic_b: [b - 2, b + 2], diferencia: b - a, ic_bajo: b - a - 3, ic_alto: b - a + 3, clara })
-  const resultado = {
-    estado: 'ok', corrida_id: 1, minimo_ninos: 20, replicas: 300, a: { nombre: 'Masculino', n: 200 }, b: { nombre: 'Femenino', n: 200 }, percentil_alto: 90,
-    riesgo: [{ clave: 'des_a', desenlace: 'x', ...valor(10, 18, true) }],
-    crecimiento: { indicador: 'peso', etiqueta: 'Peso para la edad (puntaje z frente a la OMS)', ...valor(-0.4, -0.5, false), unidad: 'z' },
-    composicion: { sede: { etiqueta: 'Sede', categorias: [{ categoria: 'S1', etiqueta: 'S1', n_a: 100, n_b: null, pct_a: 50, pct_b: null }] } },
-    aviso: 'Las diferencias son asociaciones entre grupos, no causas.',
-  }
-
-  it('envía cada lado como combinación de facetas y muestra la diferencia con su intervalo y la marca', async () => {
-    const llamadas = api('experto', (url, init) => {
-      if (url === '/api/exploracion/facetas') return { cuerpo: facetas }
-      if (url === '/api/muestras') return { cuerpo: [] }
-      if (url === '/api/analitica/comparar/grupos') return { cuerpo: resultado, estado: init?.method === 'POST' ? 200 : 405 }
-      return undefined
-    })
+describe('comparar: solo entrenamientos', () => {
+  it('no mezcla grupos de niños con entrenamientos: no hay pestañas y una línea lleva a Comparar grupos', async () => {
+    api('experto')
     montar('/analitica/comparar?entrenamiento=7&desenlace=des_a')
-    await userEvent.click(await screen.findByRole('tab', { name: 'Grupos de niños' }))
-    fireEvent.change(await screen.findByLabelText('Grupo A: Sexo'), { target: { value: 'M' } })
-    fireEvent.change(screen.getByLabelText('Grupo B: Sexo'), { target: { value: 'F' } })
-    await userEvent.click(screen.getByRole('button', { name: 'Comparar grupos' }))
-    const tabla = (await screen.findByText('Diferencia de B frente a A', { selector: 'th' })).closest('table')!
-    expect(within(tabla).getByText(/\+8 puntos \*/)).toBeInTheDocument()
-    expect(within(tabla).getByText(/IC 95 %: \+5 puntos a \+11 puntos/)).toBeInTheDocument()
-    const cuerpo = JSON.parse(String(llamadas.find((l) => l.url === '/api/analitica/comparar/grupos')!.init!.body))
-    expect(cuerpo.a.muestra.y[0]).toMatchObject({ variable: 'ern_sexo', tipo: 'lista', valores: ['M'] })
-    expect(cuerpo.b.nombre).toBe('Femenino')
-    expect(cuerpo.desenlace).toBe('des_a')
-    expect(screen.getAllByText(/n menor que 5/).length).toBeGreaterThan(0)    // el lado con menos de 5 niños en la sede
-    expect(screen.getByText(/asociaciones entre grupos, no causas/)).toBeInTheDocument()
-  })
-
-  it('con menos de 20 niños en un lado dice que no hay cifras', async () => {
-    api('visualizador', (url) => {
-      if (url === '/api/exploracion/facetas') return { cuerpo: facetas }
-      if (url === '/api/analitica/comparar/grupos') {
-        return { cuerpo: { estado: 'insuficiente', mensaje: 'Cada grupo necesita al menos 20 niños para compararse.', corrida_id: 1, minimo_ninos: 20, replicas: 300, a: { nombre: 'Grupo A', n: null }, b: { nombre: 'Grupo B', n: 200 } } }
-      }
-      return undefined
-    })
-    montar('/analitica/comparar?entrenamiento=7&desenlace=des_a')
-    await userEvent.click(await screen.findByRole('tab', { name: 'Grupos de niños' }))
-    await userEvent.click(await screen.findByRole('button', { name: 'Comparar grupos' }))
-    expect(await screen.findByText(/Cada grupo necesita al menos 20 niños/)).toBeInTheDocument()
-    expect(screen.queryByText('Diferencia de B frente a A', { selector: 'th' })).not.toBeInTheDocument()
+    expect(await screen.findByText('Entrenamiento B')).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: 'Grupos de niños' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+    const linea = screen.getByText(/Aquí se comparan entrenamientos/).closest('p')!
+    expect(linea).toHaveTextContent('Aquí se comparan entrenamientos. Para comparar dos grupos de niños, use Comparar grupos.')
+    expect(within(linea).getByRole('link', { name: 'Comparar grupos' })).toHaveAttribute('href', '/comparar')
   })
 })

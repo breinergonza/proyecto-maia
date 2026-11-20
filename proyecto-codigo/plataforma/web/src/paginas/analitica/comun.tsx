@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
 import type { RespuestaAnalitica } from '../../api/tipos'
 import { puede, useSesion } from '../../auth/sesion'
+import { ErrorConReintento } from '../../components/ErrorConReintento'
 import { Aviso, Boton, Cargando, Vacio } from '../../components/ui'
 import { cn } from '../../lib/cn'
 import { dec2, pct } from '../../lib/formato'
@@ -97,10 +98,13 @@ export function EstadoVacio({ estado, mensaje }: { estado: 'sin_artefactos' | 'p
   )
 }
 
-/** Carga, error, `sin_artefactos` y `pendiente`; con datos entrega la respuesta completa. */
+/** Carga, error (con su motivo y un botón para reintentar; lo elegido vive en la dirección y no se pierde), `sin_artefactos` y
+ *  `pendiente`; con datos entrega la respuesta completa. */
 export function Resultado<T>({ consulta, children }: { consulta: UseQueryResult<RespuestaAnalitica<T>>; children: (r: RespuestaAnalitica<T>) => ReactNode }) {
   if (consulta.isPending) return consulta.fetchStatus === 'idle' ? <Cargando texto="Buscando el entrenamiento…" /> : <Cargando />
-  if (consulta.isError) return <Aviso>No se pudo cargar este análisis. Intente de nuevo en un momento.</Aviso>
+  if (consulta.isError) {
+    return <ErrorConReintento error={consulta.error} que="este análisis" reintentando={consulta.isFetching} reintentar={() => void consulta.refetch()} />
+  }
   const r = consulta.data
   if (r.estado !== 'ok') return <EstadoVacio estado={r.estado} mensaje={r.estado === 'pendiente' ? r.mensaje : undefined} />
   return <>{children(r)}</>

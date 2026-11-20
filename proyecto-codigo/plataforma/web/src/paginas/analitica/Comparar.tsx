@@ -1,7 +1,9 @@
-// Comparar: dos pestañas. «Entrenamientos» pone A (referencia) frente a B (candidato) con la diferencia, su intervalo por
-// réplicas bootstrap y los niños detrás de cada cifra; el administrador puede aprobar B (el mismo endpoint de
-// Administración › Entrenamientos, que deja la ejecución y la auditoría) o mantener A. «Grupos de niños» compara dos grupos.
+// Comparar entrenamientos: pone A (referencia) frente a B (candidato) con la diferencia, su intervalo por réplicas bootstrap
+// y los niños detrás de cada cifra; el administrador puede aprobar B (el mismo endpoint de Administración › Entrenamientos,
+// que deja la ejecución y la auditoría) o mantener A. Comparar dos grupos de niños no se hace aquí (S8: un grupo no es un
+// entrenamiento): vive en Comparar grupos (/comparar) y esta pantalla solo lo señala.
 import { useState } from 'react'
+import { Link } from 'react-router'
 import { useEntrenamientosAnalitica, useSubmodulo } from '../../api/analitica'
 import { anomaliasVigente, useAprobarB, useComparaEntrenamientos, useEntrenamientosRegistrados, type MedidaComparada } from '../../api/comparar'
 import type { DatosRendimiento } from '../../api/tipos'
@@ -10,11 +12,10 @@ import { CurvaXY } from '../../components/graficos/xy'
 import { useConfirmar } from '../../components/Confirmar'
 import { Grafica, TablaDatos } from '../../components/grafica'
 import { Aviso, Boton, Selector, Tabla } from '../../components/ui'
-import { cn } from '../../lib/cn'
 import { descripcionDe } from '../../lib/descripciones'
 import { dec2, fechaHora, num, pct } from '../../lib/formato'
 import { jerga, N_MENOR_QUE_5 } from '../../lib/lenguaje'
-import ComparaGruposVista, { difTexto } from './ComparaGrupos'
+import { difTexto } from './ComparaGrupos'
 import { Guia, Resultado, useTecnico } from './comun'
 import { useContextoAnalitica } from './contexto'
 
@@ -22,21 +23,14 @@ interface Medida { id: string; texto: string; valor: (d: DatosRendimiento) => nu
 
 const fila = (d: DatosRendimiento, top: number) => d.metricas_por_top.find((t) => t.top_pct === top)
 
-type Modo = 'entrenamientos' | 'grupos'
-
 export default function Comparar() {
-  const [modo, setModo] = useState<Modo>('entrenamientos')
   return (
     <div className="space-y-4">
-      <div role="tablist" aria-label="Qué se compara" className="flex gap-1 border-b border-linea">
-        {([['entrenamientos', 'Entrenamientos'], ['grupos', 'Grupos de niños']] as const).map(([id, texto]) => (
-          <button key={id} type="button" role="tab" aria-selected={modo === id} onClick={() => setModo(id)}
-            className={cn('-mb-px border-b-2 px-4 py-2 text-sm font-semibold', modo === id ? 'border-teal text-teal' : 'border-transparent text-salvia hover:text-tinta')}>
-            {texto}
-          </button>
-        ))}
-      </div>
-      {modo === 'entrenamientos' ? <ComparaEntrenamientos /> : <ComparaGruposVista />}
+      <p className="text-sm">
+        Aquí se comparan entrenamientos. Para comparar dos grupos de niños, use{' '}
+        <Link to="/comparar" className="font-semibold text-teal underline-offset-2 hover:underline">Comparar grupos</Link>.
+      </p>
+      <ComparaEntrenamientos />
     </div>
   )
 }

@@ -361,6 +361,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/revision/datos/resumen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Resumen Datos
+         * @description Lo que la pantalla de Calidad de datos pone sobre la cola: cuántas mediciones faltan por revisar (para quien
+         *     consulta), cuántas se revisaron este mes, las visitas y mediciones que tienen alertas (para filtrar la cola) y la
+         *     completitud de la talla por visita.
+         *
+         *     Completitud: de los niños con alguna medida de crecimiento en la visita (peso, talla o perímetro), el porcentaje que
+         *     tiene talla. No se compara con todos los niños del corte porque quien aún no llegó a la visita no tiene un dato
+         *     faltante. ``a_12_meses`` marca la visita cuya ventana de edad incluye los 12 meses (365 días).
+         */
+        get: operations["resumen_datos_api_revision_datos_resumen_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/revision/datos/aciertos": {
         parameters: {
             query?: never;
@@ -1306,6 +1332,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/analitica/comparar/grupos/clinico": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Grupos Clinico */
+        post: operations["grupos_clinico_api_analitica_comparar_grupos_clinico_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/analitica/riesgo-por-visita": {
         parameters: {
             query?: never;
@@ -2192,6 +2235,13 @@ export interface components {
             sin_cambios: boolean;
             /** Vigente */
             vigente?: number | null;
+        };
+        /** DosGrupos */
+        DosGrupos: {
+            a: components["schemas"]["LadoGrupo"];
+            b: components["schemas"]["LadoGrupo"];
+            /** Corrida Id */
+            corrida_id?: number | null;
         };
         /** Edicion */
         Edicion: {
@@ -3692,8 +3742,42 @@ export interface operations {
                 estado?: string;
                 capa?: string | null;
                 variable?: string | null;
+                etapa?: string | null;
                 pagina?: number;
                 tamano?: number;
+                corrida_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resumen_datos_api_revision_datos_resumen_get: {
+        parameters: {
+            query?: {
                 corrida_id?: number | null;
             };
             header?: never;
@@ -5452,6 +5536,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ComparaGrupos"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    grupos_clinico_api_analitica_comparar_grupos_clinico_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DosGrupos"];
             };
         };
         responses: {

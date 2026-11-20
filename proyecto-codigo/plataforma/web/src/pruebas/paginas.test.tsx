@@ -78,6 +78,7 @@ describe('calidad de datos', () => {
     otras_variables: 2, celdas: [{ grupo: 'Sede A', variable: 'peso', etiqueta: 'Peso', alertas: 20 }], otras_celdas: 3,
   }
   const resumen = { datos_revisar: 120, alertas_por_1000: 12.5, alarmas_grupo: 3, alertas_por_capa: { '1': 50, '2': 90 } }
+  const calidad = { corrida_id: 1, por_revisar: 120, revisadas: 6, revisadas_mes: 4, etapas: [], variables: [], completitud: { indicador: 'talla', nombre: 'Talla para la edad', etapas: [] } }
 
   it('el experto no ve el enlace ni entra a la página; el administrador sí', async () => {
     simularApi((url) => {
@@ -101,12 +102,15 @@ describe('calidad de datos', () => {
     simularApi((url) => {
       if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('admin') } }
       if (url === '/api/tablero/resumen') return { cuerpo: resumen }
+      if (url === '/api/revision/datos/resumen') return { cuerpo: calidad }
       if (url === '/api/revision/datos/aciertos') return { cuerpo: aciertos }
       if (url === '/api/revision/datos/concentracion') return { cuerpo: concentracion }
       if (url.startsWith('/api/revision/datos?')) return { cuerpo: { total: 0, pagina: 1, tamano: 12, items: [] } }
     })
     montar('/admin/calidad-datos')
     expect(await screen.findByRole('heading', { name: 'Calidad de datos' })).toBeInTheDocument()
+    expect(await screen.findByText('mediciones por revisar')).toBeInTheDocument()
+    await userEvent.click(screen.getByText('Cómo se comportan las alertas'))   // las tres medidas de la revisión van en el detalle
     for (const t of ['Alertas por tipo', 'Aciertos frente a la revisión', 'Dónde se concentran']) {
       expect(await screen.findByRole('heading', { name: t })).toBeInTheDocument()
     }
@@ -123,6 +127,7 @@ describe('calidad de datos', () => {
     simularApi((url) => {
       if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('admin') } }
       if (url.startsWith('/api/revision/datos?')) return { cuerpo: { total: 0, pagina: 1, tamano: 12, items: [] } }
+      if (url === '/api/revision/datos/resumen') return { cuerpo: calidad }
       if (url === '/api/revision/datos/aciertos') return { cuerpo: aciertos }
       if (url === '/api/revision/datos/concentracion') return { cuerpo: concentracion }
       return { cuerpo: {} }
@@ -145,6 +150,7 @@ describe('calidad de datos', () => {
     simularApi((url, init) => {
       if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('admin') } }
       if (url.startsWith('/api/revision/datos?')) return { cuerpo: { total: 1, pagina: 1, tamano: 10, items: [dato] } }
+      if (url === '/api/revision/datos/resumen') return { cuerpo: calidad }
       if (url === '/api/revision/datos/aciertos') return { cuerpo: aciertos }
       if (url === '/api/revision/datos/concentracion') return { cuerpo: concentracion }
       if (url === '/api/revision/datos/7') {
@@ -155,12 +161,14 @@ describe('calidad de datos', () => {
     })
     montar('/admin/calidad-datos')
     expect(await screen.findByText(/Para este niño se esperaba entre/)).toBeInTheDocument()
-    // la serie del niño para ese concepto, y sin el motivo que solo repite la etiqueta «Valor fuera de lo esperado»
+    // la serie del niño para ese concepto se abre aparte, y sin el motivo que solo repite la etiqueta «Valor fuera de lo esperado»
+    await userEvent.click(screen.getByRole('button', { name: /Ver en el tiempo/ }))
     expect(screen.getByRole('figure', { name: 'Peso a 40 sem de este niño en cada visita: Nacimiento, 1.500 g; 40 semanas, 9.999 g' }))
       .toBeInTheDocument()
     expect(screen.queryByText(/Valor muy distinto/)).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Comentar' }))
     await userEvent.type(screen.getByLabelText('Comentario'), 'La báscula estaba dañada')
-    await userEvent.click(screen.getByRole('button', { name: 'Sí' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Es un error' }))
     await waitFor(() => expect(enviados).toEqual([{ es_error: 'si', comentario: 'La báscula estaba dañada' }]))
     expect(await screen.findByText('Respuesta guardada.')).toBeInTheDocument()
   })

@@ -1162,6 +1162,22 @@
       }
      },
      {
+      "name": "etapa",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Etapa"
+      }
+     },
+     {
       "name": "pagina",
       "in": "query",
       "required": false,
@@ -1210,6 +1226,63 @@
          "type": "object",
          "additionalProperties": true,
          "title": "Response Datos Api Revision Datos Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/revision/datos/resumen": {
+   "get": {
+    "tags": [
+     "revisión"
+    ],
+    "summary": "Resumen Datos",
+    "description": "Lo que la pantalla de Calidad de datos pone sobre la cola: cuántas mediciones faltan por revisar (para quien\nconsulta), cuántas se revisaron este mes, las visitas y mediciones que tienen alertas (para filtrar la cola) y la\ncompletitud de la talla por visita.\n\nCompletitud: de los niños con alguna medida de crecimiento en la visita (peso, talla o perímetro), el porcentaje que\ntiene talla. No se compara con todos los niños del corte porque quien aún no llegó a la visita no tiene un dato\nfaltante. ``a_12_meses`` marca la visita cuya ventana de edad incluye los 12 meses (365 días).",
+    "operationId": "resumen_datos_api_revision_datos_resumen_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "corrida_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Corrida Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Resumen Datos Api Revision Datos Resumen Get"
         }
        }
       }
@@ -3931,6 +4004,55 @@
          "additionalProperties": true,
          "type": "object",
          "title": "Response Grupos Api Analitica Comparar Grupos Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/analitica/comparar/grupos/clinico": {
+   "post": {
+    "tags": [
+     "analitica",
+     "analitica"
+    ],
+    "summary": "Grupos Clinico",
+    "operationId": "grupos_clinico_api_analitica_comparar_grupos_clinico_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DosGrupos"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Grupos Clinico Api Analitica Comparar Grupos Clinico Post"
         }
        }
       }
@@ -6838,6 +6960,33 @@
      "sin_cambios"
     ],
     "title": "DiferenciasDiccionario"
+   },
+   "DosGrupos": {
+    "properties": {
+     "a": {
+      "$ref": "#/components/schemas/LadoGrupo"
+     },
+     "b": {
+      "$ref": "#/components/schemas/LadoGrupo"
+     },
+     "corrida_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Corrida Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "a",
+     "b"
+    ],
+    "title": "DosGrupos"
    },
    "Edicion": {
     "properties": {

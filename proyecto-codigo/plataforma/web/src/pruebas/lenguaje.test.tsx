@@ -1,6 +1,7 @@
 // Las pantallas del equipo clínico hablan como el equipo clínico: el glosario (lib/lenguaje) y una guardia que falla si
 // en el texto visible de esas pantallas vuelve a aparecer un término técnico. El término técnico puede seguir en title.
 import { screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { alerta, ayudaMinimo, cuantosMenos, desviaciones, familia, frenteDemas, frenteOms, motivo, motivoExtra, motivosRiesgo, nivelAlto, nivelCorto, nombreFamilia, peso, senal, trimestresSeguidos } from '../lib/lenguaje'
 import { montar, simularApi, usuario } from './util'
@@ -147,6 +148,7 @@ function api(rol: 'admin' | 'experto' = 'experto') {
     if (url === '/api/ninos/s1/historia-riesgo') return { cuerpo: historia }
     if (url === '/api/ninos/s1/perfil') return { cuerpo: perfil }
     if (url.startsWith('/api/revision/datos?')) return { cuerpo: { total: 1, pagina: 1, tamano: 10, items: [datoRevision] } }
+    if (url === '/api/revision/datos/resumen') return { cuerpo: { corrida_id: 3, por_revisar: 1, revisadas: 0, revisadas_mes: 0, etapas: [], variables: [], completitud: { indicador: 'talla', nombre: 'Talla para la edad', etapas: [] } } }
     if (url === '/api/revision/datos/aciertos') return { cuerpo: { corrida_id: 3, serie: [], respondidas: 0, confirmadas_error_pct: null } }
     if (url === '/api/revision/datos/concentracion') return { cuerpo: { corrida_id: 3, hay_sede: false, minimo_celda: 5, por_variable: [], otras_variables: 0, celdas: [], otras_celdas: 0 } }
     if (url === '/api/revision/riesgos') return { cuerpo: { corrida_id: 3, items: [] } }
@@ -219,7 +221,8 @@ describe('pantallas del equipo clínico sin términos técnicos', () => {
     api('admin')
     montar('/admin/calidad-datos')
     expect(await screen.findByText(/Para este niño se esperaba entre/)).toBeInTheDocument()
-    // sin serie (la variable no tiene concepto): el valor frente a su rango; del motivo queda solo lo que agrega
+    // sin serie (la variable no tiene concepto): el valor frente a su rango, que se abre aparte; del motivo queda solo lo que agrega
+    await userEvent.click(screen.getByRole('button', { name: /Ver en el tiempo/ }))
     expect(screen.getByRole('img', { name: 'Peso a los 3 meses: 9.999 g; se esperaba entre 4.000 y 6.500' })).toBeInTheDocument()
     expect(screen.getByText('La fecha no corresponde a esta visita.')).toBeInTheDocument()
     expect(visible()).not.toMatch(/Valor muy distinto/)
