@@ -15,7 +15,7 @@ import { Aviso, Cargando, Cifra, Selector, Tabla, Vacio } from '../../components
 import type { Pestana } from '../../components/ui/Pestanas'
 import { descripcionDe } from '../../lib/descripciones'
 import { dec2, num, pct, RIESGO_ALTO } from '../../lib/formato'
-import { cuantosMenos, familia, N_MENOR_QUE_5 } from '../../lib/lenguaje'
+import { cuantosMenos, familia, SIN_CIFRA } from '../../lib/lenguaje'
 import { ConPestanas, EnPrueba, Guia, pctN, Resultado } from './comun'
 import { useContextoAnalitica } from './contexto'
 
@@ -116,9 +116,9 @@ function Detalle({ clave, entrenamiento, a, selector }: { clave: string; entrena
                 exportar={{ nombre: 'anticipacion-avisados', muestra: a.top_pct ? `Se alerta al ${a.top_pct} % de mayor riesgo` : undefined,
                   filas: [{ desenlace: nombre, casos: av.casos, avisados: av.avisados, avisados_antes_pct: av.pct, meta: av.meta }] }}>
                 <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-1">
-                  <Cifra valor={av.pct == null ? N_MENOR_QUE_5 : pct(av.pct)} texto="Casos avisados al menos una visita antes" />
-                  <Cifra valor={av.casos == null ? N_MENOR_QUE_5 : num(av.casos)} texto="Casos del desenlace" />
-                  <Cifra valor={av.avisados == null ? N_MENOR_QUE_5 : num(av.avisados)} texto="Casos que recibieron aviso antes" />
+                  <Cifra valor={av.pct == null ? SIN_CIFRA : pct(av.pct)} texto="Casos avisados al menos una visita antes" />
+                  <Cifra valor={av.casos == null ? SIN_CIFRA : num(av.casos)} texto="Casos del desenlace" />
+                  <Cifra valor={av.avisados == null ? SIN_CIFRA : num(av.avisados)} texto="Casos que recibieron aviso antes" />
                 </div>
                 <p className="mt-2 text-sm text-salvia">Meta: {av.meta}.</p>
               </Grafica>
@@ -136,7 +136,6 @@ function Detalle({ clave, entrenamiento, a, selector }: { clave: string; entrena
                   {pa.ventaja_visitas.mediana != null
                     ? `Ventaja mediana: ${dec2(pa.ventaja_visitas.mediana)} visitas (media ${dec2(pa.ventaja_visitas.media)}), entre los casos que recibieron aviso.`
                     : `Las visitas de ventaja se resumen con 20 o más casos con aviso; ${pctN(pa.sin_alerta.pct)} de los casos no recibió aviso antes.`}
-                  {' '}Las partes con menos de 5 casos se omiten ({N_MENOR_QUE_5}).
                 </p>
               </Grafica>
             )}
@@ -176,7 +175,7 @@ function Detalle({ clave, entrenamiento, a, selector }: { clave: string; entrena
                 <Tabla densa>
                   <thead><tr><th>Se calcula en</th><th>Ventaja (visitas)</th><th>Casos</th><th>Alertas</th><th>AUC</th><th>Casos detectados</th><th>Alertas acertadas</th></tr></thead>
                   <tbody>{base.map((v) => (
-                    <tr key={v.desde}><td>{v.desde}</td><td>{num(v.ventaja)}</td><td>{v.casos == null ? N_MENOR_QUE_5 : num(v.casos)}</td>
+                    <tr key={v.desde}><td>{v.desde}</td><td>{num(v.ventaja)}</td><td>{v.casos == null ? SIN_CIFRA : num(v.casos)}</td>
                       <td>{num(v.alertas)}</td><td>{v.auc == null ? '—' : dec2(v.auc)}</td><td>{pctN(v.detectados)}</td><td>{pctN(v.acertadas)}</td></tr>
                   ))}</tbody>
                 </Tabla>

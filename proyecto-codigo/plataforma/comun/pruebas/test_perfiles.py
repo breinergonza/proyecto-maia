@@ -36,17 +36,18 @@ def test_perfiles_por_ninos_y_resumen(sev_demo):
     assert len(por) == len(sev_demo.sujetos)
     assert all(v['lubchenco'] is None for v in por.values())  # el simulador no trae Lubchenco
     res = P.resumen_perfiles(sev_demo)
-    n_visibles = sum(f['n'] for f in res['eg'] if not f['oculto'])
+    n_visibles = sum(f['n'] for f in res['eg'])
     assert 0 < n_visibles <= len(por)
     json.dumps(res)
     riesgos = pd.DataFrame({'sujeto': list(por), 'evento': [1, 0] * (len(por) // 2)})
     con_tasa = P.resumen_perfiles(sev_demo, riesgos)
-    assert all(0 <= f['tasa'] <= 1 for f in con_tasa['eg'] if not f['oculto'])
+    assert all(0 <= f['tasa'] <= 1 for f in con_tasa['eg'] if f['n'])
 
 
-def test_resumen_oculta_grupos_pequenos(sev_demo):
+def test_resumen_da_su_cifra_a_los_grupos_pequenos(sev_demo):
     chico = sev_demo.subconjunto(list(sev_demo.sujetos.sujeto[:3]))
-    assert all(f['oculto'] and f['n'] is None for f in P.resumen_perfiles(chico)['eg'])
+    filas = P.resumen_perfiles(chico)['eg']
+    assert sum(f['n'] for f in filas) == 3 and all(isinstance(f['n'], int) and 'oculto' not in f for f in filas)
 
 
 def test_perfil_al_nacer_reproducible_y_serializable(sev_demo):

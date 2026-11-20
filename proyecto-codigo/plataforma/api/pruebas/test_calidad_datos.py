@@ -124,13 +124,13 @@ def test_aciertos_con_respuestas(cliente, admin, corrida):
 
 def test_concentracion_por_sede_y_variable(cliente, admin, corrida):
     r = cliente.get('/api/revision/datos/concentracion', headers=admin, params={'corrida_id': corrida}).json()
-    assert r['hay_sede'] and r['minimo_celda'] == 5
-    assert [(v['variable'], v['alertas']) for v in r['por_variable']] == [('peso', 60), ('talla', 57)]
-    assert r['otras_variables'] == 3                      # «cefalico» tiene menos de 5 alertas: no sale solo
-    assert [(c['grupo'], c['variable'], c['alertas']) for c in r['celdas']] == [
+    # D63: nada se oculta ni se suma en «otras»; «cefalico», con 3 alertas, sale con su cifra
+    assert r['hay_sede'] and not {'minimo_celda', 'otras_variables', 'otras_celdas'} & set(r)
+    assert [(v['variable'], v['alertas']) for v in r['por_variable']] == [('peso', 60), ('talla', 57), ('cefalico', 3)]
+    assert [(c['grupo'], c['variable'], c['alertas']) for c in r['celdas'][:4]] == [
         ('A', 'peso', 40), ('A', 'talla', 30), ('B', 'talla', 27), ('B', 'peso', 20)]
-    assert r['otras_celdas'] == 3
-    assert all(c['alertas'] >= 5 for c in r['celdas'])
+    assert sum(c['alertas'] for c in r['celdas'] if c['variable'] == 'cefalico') == 3
+    assert sum(c['alertas'] for c in r['celdas']) == sum(v['alertas'] for v in r['por_variable'])
 
 
 def test_concentracion_sin_sede_real_solo_por_variable(cliente, admin, corrida):
@@ -142,8 +142,8 @@ def test_concentracion_sin_sede_real_solo_por_variable(cliente, admin, corrida):
                   {'c': corrida})
         s.commit()
     r = cliente.get('/api/revision/datos/concentracion', headers=admin, params={'corrida_id': corrida}).json()
-    assert not r['hay_sede'] and r['celdas'] == [] and r['otras_celdas'] == 0
-    assert [v['variable'] for v in r['por_variable']] == ['peso', 'talla']
+    assert not r['hay_sede'] and r['celdas'] == []
+    assert [v['variable'] for v in r['por_variable']] == ['peso', 'talla', 'cefalico']
 
 
 @pytest.fixture(scope='module')

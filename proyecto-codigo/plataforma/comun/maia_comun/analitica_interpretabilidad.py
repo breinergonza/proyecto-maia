@@ -1,8 +1,8 @@
 """Interpretabilidad agregada de un desenlace: ``shap_global``, ``pdp``, ``motivos_frecuentes`` e ``interaccion``.
 
 Funciones puras (sin LightGBM): reciben las contribuciones por variable (valores SHAP en el espacio del modelo) o una
-función que predice el riesgo, y devuelven solo agregados (D7). Una celda con menos de ``MIN_CELDA`` niños queda en
-``None`` (D4) y las distribuciones piden ``MIN_DISTRIBUCION`` niños o más (D52). Nada de lo que sale contiene un dato
+función que predice el riesgo, y devuelven solo agregados (D7). Una celda de 1 a 4 niños se da con su cifra y las
+distribuciones piden ``MIN_DISTRIBUCION`` niños o más (D52). Nada de lo que sale contiene un dato
 por niño. Es asociación del modelo, no causa.
 """
 from __future__ import annotations
@@ -12,7 +12,7 @@ from collections.abc import Callable, Mapping, Sequence
 import numpy as np
 import pandas as pd
 
-from maia_comun.analitica import MIN_CELDA, MIN_DISTRIBUCION, _r, limpio
+from maia_comun.analitica import MIN_DISTRIBUCION, _r, limpio
 
 METODO_SHAP = 'TreeSHAP (contribuciones exactas de LightGBM)'
 TOP_VARIABLES = 15
@@ -61,9 +61,9 @@ def shap_global(contrib: np.ndarray, columnas: Sequence[str], variables: pd.Data
         for c in range(len(cortes) + 1):
             m = caja == c
             ni = int(m.sum())
-            tramos.append({'tramo': c + 1, 'n': ni if ni >= MIN_CELDA else None,
-                           'valor_medio': _r(float(v[m].mean()), 4) if ni >= MIN_CELDA else None,
-                           'shap_medio': _r(float(s[m].mean()), 5) if ni >= MIN_CELDA else None})
+            tramos.append({'tramo': c + 1, 'n': ni,
+                           'valor_medio': _r(float(v[m].mean()), 4) if ni else None,
+                           'shap_medio': _r(float(s[m].mean()), 5) if ni else None})
         deciles[col] = tramos
     return limpio({'n': n, 'metodo': METODO_SHAP, 'advertencia': ADVERTENCIA, 'variables': filas, 'deciles': deciles})
 
@@ -100,7 +100,7 @@ def pdp(predecir: Callable[[pd.DataFrame], np.ndarray], variables: pd.DataFrame,
 def motivos_frecuentes(contrib: np.ndarray, columnas: Sequence[str], alerta: np.ndarray,
                        etiquetas: Mapping[str, str] | None = None, por_nino: int = 3, top: int = MAX_MOTIVOS) -> dict | None:
     """Qué variables aparecen entre los motivos que más suben el riesgo (los ``por_nino`` mayores de cada niño) de los
-    niños con alerta. Solo cuántos niños con alerta los tienen; un motivo con menos de 5 niños se oculta."""
+    niños con alerta. Solo cuántos niños con alerta los tienen."""
     contrib = np.asarray(contrib, dtype=float)
     alerta = np.asarray(alerta, dtype=bool)
     n_alerta = int(alerta.sum())
@@ -113,8 +113,7 @@ def motivos_frecuentes(contrib: np.ndarray, columnas: Sequence[str], alerta: np.
                 cuenta[j] += 1
     orden = [j for j in np.argsort(-cuenta) if cuenta[j] > 0][:top]
     filas = [{'variable': columnas[j], 'etiqueta': _etiqueta(etiquetas, columnas[j]),
-              'n': int(cuenta[j]) if cuenta[j] >= MIN_CELDA else None,
-              'pct': _r(100 * cuenta[j] / n_alerta, 2) if cuenta[j] >= MIN_CELDA else None} for j in orden]
+              'n': int(cuenta[j]), 'pct': _r(100 * cuenta[j] / n_alerta, 2)} for j in orden]
     return limpio({'n_alertas': n_alerta, 'por_nino': por_nino, 'advertencia': ADVERTENCIA, 'motivos': filas})
 
 
@@ -129,8 +128,8 @@ def _cajas(x: np.ndarray, cajas: int) -> tuple[np.ndarray, list[float]]:
 
 def interaccion(variables: pd.DataFrame, riesgo: np.ndarray, pares: Sequence[tuple[str, str]],
                 etiquetas: Mapping[str, str] | None = None, cajas: int = CAJAS_INTERACCION) -> dict | None:
-    """Riesgo medio del modelo por celdas de dos variables (cada una en cajas de igual tamaño). Una celda con menos
-    de 5 niños queda con ``n`` y ``riesgo_medio`` nulos."""
+    """Riesgo medio del modelo por celdas de dos variables (cada una en cajas de igual tamaño). Una celda sin niños
+    queda con ``riesgo_medio`` nulo."""
     riesgo = np.asarray(riesgo, dtype=float)
     if len(variables) < MIN_DISTRIBUCION:
         return None
@@ -147,8 +146,8 @@ def interaccion(variables: pd.DataFrame, riesgo: np.ndarray, pares: Sequence[tup
             for j in range(len(cb) + 1):
                 m = (ia == i) & (ib == j)
                 ni = int(m.sum())
-                celdas.append({'i': i, 'j': j, 'n': ni if ni >= MIN_CELDA else None,
-                               'riesgo_medio': _r(float(np.nanmean(riesgo[m])), 5) if ni >= MIN_CELDA else None})
+                celdas.append({'i': i, 'j': j, 'n': ni,
+                               'riesgo_medio': _r(float(np.nanmean(riesgo[m])), 5) if ni else None})
         salida.append({'a': a, 'b': b, 'etiqueta_a': _etiqueta(etiquetas, a), 'etiqueta_b': _etiqueta(etiquetas, b),
                        'cortes_a': [_r(c, 4) for c in ca], 'cortes_b': [_r(c, 4) for c in cb], 'celdas': celdas})
     if not salida:
@@ -157,32 +156,16 @@ def interaccion(variables: pd.DataFrame, riesgo: np.ndarray, pares: Sequence[tup
 
 
 def sanear(datos: Mapping | None) -> dict:
-    """Última defensa al servir un desenlace de interpretabilidad (D4, D52): oculta cualquier celda de menos de 5 niños
-    y descarta lo que no cumpla el mínimo. Los entrenamientos antiguos (sin los cuatro artefactos) pasan sin cambios."""
+    """Última defensa al servir un desenlace de interpretabilidad (D52): descarta lo que no llegue al mínimo de 20
+    niños. Las celdas de 1 a 4 niños se sirven con su cifra. Los entrenamientos antiguos (sin los cuatro artefactos)
+    pasan sin cambios."""
     d = dict(datos or {})
     sg = d.get('shap_global')
-    if isinstance(sg, dict):
-        if (sg.get('n') or 0) < MIN_DISTRIBUCION:
-            d['shap_global'] = None
-        else:
-            for tramos in (sg.get('deciles') or {}).values():
-                for t in tramos:
-                    if t.get('n') is None or t['n'] < MIN_CELDA:
-                        t.update(n=None, valor_medio=None, shap_medio=None)
+    if isinstance(sg, dict) and (sg.get('n') or 0) < MIN_DISTRIBUCION:
+        d['shap_global'] = None
     mf = d.get('motivos_frecuentes')
-    if isinstance(mf, dict):
-        if (mf.get('n_alertas') or 0) < MIN_DISTRIBUCION:
-            d['motivos_frecuentes'] = None
-        else:
-            for m in mf.get('motivos') or []:
-                if m.get('n') is None or m['n'] < MIN_CELDA:
-                    m.update(n=None, pct=None)
-    ix = d.get('interaccion')
-    if isinstance(ix, dict):
-        for p in ix.get('pares') or []:
-            for c in p.get('celdas') or []:
-                if c.get('n') is None or c['n'] < MIN_CELDA:
-                    c.update(n=None, riesgo_medio=None)
+    if isinstance(mf, dict) and (mf.get('n_alertas') or 0) < MIN_DISTRIBUCION:
+        d['motivos_frecuentes'] = None
     pp = d.get('pdp')
     if isinstance(pp, dict) and (pp.get('n') or 0) < MIN_DISTRIBUCION:
         d['pdp'] = None

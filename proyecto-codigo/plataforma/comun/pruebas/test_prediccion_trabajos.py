@@ -59,7 +59,8 @@ def test_leer_entrenados(tmp_path):
     assert PT.leer_entrenados(tmp_path) == {'N-1', 'N-2'}
 
 
-def test_por_visita_oculta_celdas_con_menos_de_5():
+def test_por_visita_da_cifras_aunque_la_celda_tenga_pocos_ninos():
+    # D63 (reemplaza a D4): una celda de 1 a 4 niños también lleva sus cifras
     rng = np.random.default_rng(0)
 
     def bloque(momento: str, n: int) -> pd.DataFrame:
@@ -70,8 +71,11 @@ def test_por_visita_oculta_celdas_con_menos_de_5():
     cel = PT.por_visita(hist, {'nac': 1, '3m': 2}, {'nac': 'Nacimiento', '3m': '3 meses'}, percentil_alto=90)
     assert [c['momento'] for c in cel] == ['nac', '3m']          # por orden de visita
     nac, tres = cel
-    assert nac['n'] == 40 and nac['oculta'] is False and nac['momento_nombre'] == 'Nacimiento'
+    assert nac['n'] == 40 and 'oculta' not in nac and nac['momento_nombre'] == 'Nacimiento'
     assert nac['altos'] == int((hist[hist.momento == 'nac'].percentil >= 90).sum())
     assert nac['pct_altos'] == pytest.approx(100 * nac['altos'] / 40, abs=0.1)
-    assert tres['oculta'] is True and tres['riesgo_mediano'] is None and tres['altos'] is None
+    chicos = hist[hist.momento == '3m']
+    assert tres['n'] == 4 and 'oculta' not in tres
+    assert tres['riesgo_mediano'] == pytest.approx(float(np.median(chicos.riesgo)))
+    assert tres['altos'] == int((chicos.percentil >= 90).sum()) and tres['pct_altos'] == pytest.approx(100 * tres['altos'] / 4, abs=0.1)
     assert PT.por_visita(hist.iloc[0:0], {}, {}, 90) == []

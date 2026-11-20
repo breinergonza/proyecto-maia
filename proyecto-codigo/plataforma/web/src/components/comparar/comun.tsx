@@ -4,7 +4,7 @@
 import type { DesenlaceComparado, DiferenciaObservada, ObservadoLado } from '../../api/comparar'
 import { num } from '../../lib/formato'
 import { cn } from '../../lib/cn'
-import { N_MENOR_QUE_5 } from '../../lib/lenguaje'
+import { SIN_CIFRA } from '../../lib/lenguaje'
 import { SERIES_COLOR, type Serie } from '../graficos'
 
 export const SERIE_A: Serie = { clave: 'a', nombre: 'Grupo A', color: 0 }
@@ -16,11 +16,11 @@ const nf1 = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 1, minimumFr
 export const porcentaje = (v: number) => `${nf1.format(v)} %`
 const conSigno = (v: number) => (v < 0 ? `−${nf1.format(-v)}` : nf1.format(v))
 
-/** «Menos de 5» se dice igual en toda la pantalla. */
-export const MENOS_DE_5 = N_MENOR_QUE_5
+/** Lo que dice una celda donde ningún niño tiene el dato: un cero verdadero, no una cifra oculta. */
+export const NINGUN_NINO = 'Ningún niño con dato'
 
-/** Cuántos niños: «498» o «menos de 5» si la cifra se ocultó. */
-export const ninos = (n: number | null | undefined) => (n == null ? 'menos de 5' : num(n))
+/** Cuántos niños: «498», o «sin cifra» si el servidor no la dio. */
+export const ninos = (n: number | null | undefined) => (n == null ? SIN_CIFRA : num(n))
 
 /** La población de cada gráfica: los niños elegibles de cada grupo, dicha igual en todas. */
 export const poblacionAB = (a: number | null, b: number | null) => `niños elegibles de A (${ninos(a)}) y de B (${ninos(b)})`
@@ -97,7 +97,7 @@ function FilaObservada({ serie, o, techo }: { serie: Serie; o: ObservadoLado | n
             <div className="h-full rounded-sm" style={{ width: `${Math.min(100, (100 * o.pct) / techo)}%`, background: SERIES_COLOR[serie.color] }} />
           </div>
         )}
-        {o == null ? <p className="text-sm">Menos de 5 niños con dato: no se da cifra.</p> : (
+        {o == null ? <p className="text-sm">{NINGUN_NINO}.</p> : (
           <p className="mt-1 text-sm">
             {o.pct != null && <strong className="mr-1.5 text-base">{porcentaje(o.pct)}</strong>}
             <span>{num(o.casos)} de {num(o.con_dato)} niños con dato · {num(o.sin_dato)} sin dato</span>

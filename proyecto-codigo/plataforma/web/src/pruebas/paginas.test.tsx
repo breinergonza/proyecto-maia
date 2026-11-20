@@ -74,8 +74,8 @@ describe('ingreso y permisos', () => {
 describe('calidad de datos', () => {
   const aciertos = { corrida_id: 1, serie: [{ k: 50, respondidas: 4, precision: 50 }, { k: 100, respondidas: 6, precision: 66.7 }], respondidas: 6, confirmadas_error_pct: 66.7 }
   const concentracion = {
-    corrida_id: 1, hay_sede: true, minimo_celda: 5, por_variable: [{ variable: 'peso', etiqueta: 'Peso', alertas: 30 }],
-    otras_variables: 2, celdas: [{ grupo: 'Sede A', variable: 'peso', etiqueta: 'Peso', alertas: 20 }], otras_celdas: 3,
+    corrida_id: 1, hay_sede: true, por_variable: [{ variable: 'peso', etiqueta: 'Peso', alertas: 30 }, { variable: 'talla', etiqueta: 'Talla', alertas: 3 }],
+    celdas: [{ grupo: 'Sede A', variable: 'peso', etiqueta: 'Peso', alertas: 20 }, { grupo: 'Sede B', variable: 'talla', etiqueta: 'Talla', alertas: 3 }],
   }
   const resumen = { datos_revisar: 120, alertas_por_1000: 12.5, alarmas_grupo: 3, alertas_por_capa: { '1': 50, '2': 90 } }
   const calidad = { corrida_id: 1, por_revisar: 120, revisadas: 6, revisadas_mes: 4, etapas: [], variables: [], completitud: { indicador: 'talla', nombre: 'Talla para la edad', etapas: [] } }
@@ -120,7 +120,9 @@ describe('calidad de datos', () => {
     expect(await screen.findByText('datos por revisar')).toBeInTheDocument()
     expect(await screen.findByText('66,7 %')).toBeInTheDocument()
     expect(await screen.findByText('Sede A · 20 alertas')).toBeInTheDocument()
-    expect(screen.getByText(/Otras: 3 alertas/)).toBeInTheDocument()
+    // D63: la celda con 3 alertas sale con su cifra, no sumada en «Otras»
+    expect(screen.getByText(/Sede B · 3 alertas/)).toBeInTheDocument()
+    expect(screen.queryByText(/Otras:/)).toBeNull()
   })
 
   it('la dirección vieja lleva a la nueva', async () => {

@@ -1,15 +1,15 @@
 // Barras agrupadas por categoría (muestra frente a universo, grupo A frente a B) e histograma de dos grupos con la misma
 // escala (% de cada grupo, para que se comparen formas y no tamaños). Colores de serie fijos; el coral nunca es una serie.
-// Un valor nulo (menos de 5 niños) queda sin barra. Cada gráfica es una figura con su etiqueta y un solo <svg>, para el PNG.
+// Un valor nulo (sin cifra) queda sin barra. Cada gráfica es una figura con su etiqueta y un solo <svg>, para el PNG.
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { COLOR, LeyendaSeries, SERIES_COLOR, textoSeries, type FilaSeries, type Serie } from './index'
 import { GraficaNavegable, resumenDe } from './navegacion'
-import { N_MENOR_QUE_5 } from '../../lib/lenguaje'
+import { SIN_CIFRA } from '../../lib/lenguaje'
 
 export function BarrasAgrupadas({ filas, series, etiqueta, formatoY = (v) => `${v} %`, alto = 220, dominioY }: {
   filas: FilaSeries[]; series: Serie[]; etiqueta: string; formatoY?: (v: number) => string; alto?: number; dominioY?: [number, number | 'auto']
 }) {
-  const items = filas.map((f) => `${f.x}. ${textoSeries(f, series, (v) => formatoY(v), N_MENOR_QUE_5)}`)
+  const items = filas.map((f) => `${f.x}. ${textoSeries(f, series, (v) => formatoY(v), SIN_CIFRA)}`)
   return (
     <div>
       <LeyendaSeries series={series} marca="barra" />
@@ -44,7 +44,7 @@ export function HistogramaDosGrupos({ tramos, casos, total, etiqueta, nombres, f
     sin: t.sin != null ? Math.round((1000 * t.sin) / sinCasos) / 10 : null,
   }))
   const series: Serie[] = [{ clave: 'con', nombre: nombres[0], color: 2 }, { clave: 'sin', nombre: nombres[1], color: 0 }]
-  const items = filas.map((f, i) => `${f.x || `Tramo ${i + 1}`}. ${textoSeries(f, series, (v) => `${v} %`, N_MENOR_QUE_5)}`)
+  const items = filas.map((f, i) => `${f.x || `Tramo ${i + 1}`}. ${textoSeries(f, series, (v) => `${v} %`, SIN_CIFRA)}`)
   return (
     <div>
       <LeyendaSeries series={series} marca="barra" />
@@ -54,7 +54,7 @@ export function HistogramaDosGrupos({ tramos, casos, total, etiqueta, nombres, f
             <CartesianGrid stroke={COLOR.rejilla} vertical={false} />
             <XAxis dataKey="x" stroke={COLOR.eje} fontSize={12} tickLine={false} interval="preserveStartEnd" />
             <YAxis stroke={COLOR.eje} fontSize={12} width={44} tickLine={false} axisLine={false} tickFormatter={(v) => `${v} %`} />
-            <Tooltip cursor={{ fill: COLOR.franja }} formatter={(v, nombre) => [typeof v === 'number' ? `${v} %` : 'n menor que 5', String(nombre)]} />
+            <Tooltip cursor={{ fill: COLOR.franja }} formatter={(v, nombre) => [typeof v === 'number' ? `${v} %` : SIN_CIFRA, String(nombre)]} />
             {series.map((s) => <Bar key={s.clave} dataKey={s.clave} name={s.nombre} fill={SERIES_COLOR[s.color]} isAnimationActive={false} />)}
           </BarChart>
         </ResponsiveContainer>

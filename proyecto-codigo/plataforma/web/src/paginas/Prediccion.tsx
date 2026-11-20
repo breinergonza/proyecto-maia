@@ -291,7 +291,7 @@ function ResultadoMuestra({ t, r, admin }: { t: TrabajoPrediccion; r: Extract<Re
   )
 }
 
-/** El porcentaje de niños con riesgo alto en cada visita, para los tres desenlaces con más casos; sin cifras si la celda tiene menos de 5. */
+/** El porcentaje de niños con riesgo alto en cada visita, para los tres desenlaces con más casos. */
 function RiesgoPorVisita({ celdas, muestra }: { celdas: CeldaVisitaPrediccion[]; muestra: string }) {
   const { titulo, descripcion } = descripcionDe('riesgo_alto_visita')
   const { series, filas } = useMemo(() => {
@@ -313,11 +313,11 @@ function RiesgoPorVisita({ celdas, muestra }: { celdas: CeldaVisitaPrediccion[];
     })
     return { series: s, filas: f }
   }, [celdas])
-  if (series.length === 0) return <Aviso tono="teal">Ninguna visita tiene 5 niños o más con riesgo calculado: no hay gráfica que mostrar.</Aviso>
+  if (series.length === 0) return <Aviso tono="teal">Ninguna visita tiene niños con riesgo calculado: no hay gráfica que mostrar.</Aviso>
   return (
     <Grafica titulo={titulo} descripcion={descripcion}
       exportar={{ nombre: 'riesgo-alto-por-visita', muestra,
-        filas: celdas.filter((c) => !c.oculta).map((c) => ({ Desenlace: c.desenlace, Visita: c.momento_nombre, Niños: c.n, 'Riesgo mediano': c.riesgo_mediano, 'Con riesgo alto (%)': c.pct_altos })) }}>
+        filas: celdas.map((c) => ({ Desenlace: c.desenlace, Visita: c.momento_nombre, Niños: c.n, 'Riesgo mediano': c.riesgo_mediano, 'Con riesgo alto (%)': c.pct_altos })) }}>
       <LeyendaSeries series={series} />
       <LineasSeries filas={filas} series={series} etiqueta={titulo} formatoY={(v) => `${Math.round(v)} %`} dominioY={[0, 100]} />
     </Grafica>

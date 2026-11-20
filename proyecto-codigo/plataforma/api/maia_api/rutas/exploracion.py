@@ -110,9 +110,6 @@ def resumen(consulta: Consulta, s: Session = Depends(sesion), u: Usuario = Depen
         WHERE corrida_id = :c AND NOT improbable{de}"""), p).scalar_one()
     datos = _datos(s, corrida, ids if filtrado else None)
 
-    if filtrado:   # D4: ningún desenlace ni visita con menos de 5 niños o datos
-        riesgos = [f for f in riesgos if f['ninos'] >= P.MIN_OPCION]
-        crec = [f for f in crec if f['datos'] >= P.MIN_OPCION]
     altos_total = sum(f['altos'] for f in riesgos)
     for f in riesgos:
         f['momento_nombre'] = nombre_etapa(mapa, f['momento'])
@@ -164,7 +161,7 @@ def facetas(consulta: Consulta, respuesta: Response, s: Session = Depends(sesion
     if insuficiente:
         for f in r['facetas'].values():
             for o in f.get('opciones', []):
-                o['n'], o['texto'] = None, '—'
+                o['n'] = None
             f.pop('bins', None)
             f.pop('cifra', None)
         r['n'] = 0 if vacio else None

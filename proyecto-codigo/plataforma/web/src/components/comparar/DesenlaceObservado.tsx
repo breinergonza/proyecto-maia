@@ -8,7 +8,7 @@ import { cn } from '../../lib/cn'
 import { num } from '../../lib/formato'
 import { definicionAlerta, sinRiesgoEstimado } from '../../lib/lenguaje'
 import { Insignia, Panel, Tabla } from '../ui'
-import { BarrasObservado, FichaDelDato, MENOS_DE_5, poblacionAB, porcentaje, variableDe, Veredicto } from './comun'
+import { BarrasObservado, FichaDelDato, poblacionAB, porcentaje, variableDe, Veredicto } from './comun'
 
 export type Vista = 'observado' | 'riesgo'
 /** La vista de la dirección (``?vista=``); sin ella, lo observado. */
@@ -53,7 +53,7 @@ export function AmbasVistas({ alerta }: { alerta: number }) {
 }
 
 function celdaRiesgo(r: RiesgoDeCorte | null): string {
-  if (r?.calculados == null || r.en_alerta == null || r.pct_en_alerta == null) return MENOS_DE_5
+  if (r?.calculados == null || r.en_alerta == null || r.pct_en_alerta == null) return 'Ningún niño con riesgo calculado'
   return `${porcentaje(r.pct_en_alerta)} (${num(r.en_alerta)} de ${num(r.calculados)})`
 }
 

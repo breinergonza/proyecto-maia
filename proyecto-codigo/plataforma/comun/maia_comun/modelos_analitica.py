@@ -1,6 +1,6 @@
 """Analítica de los modelos: artefactos agregados (curvas, tablas por grupo y trimestre) que se calculan una vez al
-terminar el entrenamiento y la web solo lee (D32). Nunca predicciones por niño (D7); celdas con menos de 5 niños
-se omiten y las distribuciones piden 20 o más (D4, D52).
+terminar el entrenamiento y la web solo lee (D32). Nunca predicciones por niño (D7); toda celda da su cifra, aunque
+tenga un solo niño (D63), y las distribuciones piden 20 o más (D52).
 
 Una fila por entrenamiento, desenlace y submódulo: ``tipo`` es ``meta`` (descripción del entrenamiento, sin desenlace),
 ``rendimiento``, ``calibracion``, ``poblacion``, ``equidad``, ``estabilidad``, ``interpretabilidad`` o ``chequeos``.

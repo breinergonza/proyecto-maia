@@ -132,11 +132,11 @@ describe('vista clínica', () => {
     expect(within(barra).queryByText(/elegibles de/)).toBeNull()
   })
 
-  it('con menos de 5 niños no hay cifra observada del grupo y se explica', async () => {
+  it('sin niños con dato a los 12 meses no hay cifra observada del grupo y se explica', async () => {
     api('experto', () => ({ ...resumen, observado: { grupo: null, poblacion: resumen.observado.poblacion } }))
     montar('/')
     const panel = (await screen.findByRole('heading', { name: 'Qué les pasó a los 12 meses' })).closest('section')!
-    expect(within(panel).getByText(/muy pocos niños con dato/)).toBeInTheDocument()
+    expect(within(panel).getByText('Ningún niño del grupo elegido tiene dato a los 12 meses.')).toBeInTheDocument()
     expect(within(panel).getByText(/Toda la población \(referencia\)/)).toBeInTheDocument()
   })
 

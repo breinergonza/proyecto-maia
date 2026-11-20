@@ -59,7 +59,8 @@ describe('interpretabilidad', () => {
     expect(screen.getByRole('figure', { name: 'Riesgo medio según Edad gestacional' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('tab', { name: 'Combinación' }))
     expect(await screen.findByText('Combinación de dos datos')).toBeInTheDocument()
-    expect(screen.getAllByText(/n menor que 5/).length).toBeGreaterThan(0)
+    expect(screen.queryByText(/n menor que 5/)).not.toBeInTheDocument()
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0)   // una celda que el entrenamiento no guardó queda sin color
     expect(screen.getAllByRole('button', { name: /CSV/ }).length).toBeGreaterThanOrEqual(1)
   })
 

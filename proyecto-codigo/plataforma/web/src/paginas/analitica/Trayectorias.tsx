@@ -1,5 +1,6 @@
 // Trayectorias: cómo crece cada grupo de niños frente a la curva de la OMS (z = 0). Se calcula al pedirlo, con el
-// indicador, la agrupación y el eje que se elijan. Grupos o visitas con menos de 5 niños no se muestran. Los selectores valen
+// indicador, la agrupación y el eje que se elijan. Cada grupo y visita dice cuántos niños tiene, también si son pocos; el
+// desvío pide 20 o más. Los selectores valen
 // para todo; debajo, una pestaña por pregunta (?ver=): la trayectoria media, la distancia a la OMS y cada niño.
 import { useState } from 'react'
 import { Link } from 'react-router'
@@ -12,7 +13,7 @@ import { Aviso, Boton, Selector, Tabla, Vacio } from '../../components/ui'
 import { PanelPestana, Pestanas, usePestanaEnUrl } from '../../components/ui/Pestanas'
 import { descripcionDe } from '../../lib/descripciones'
 import { dec2, num } from '../../lib/formato'
-import { N_MENOR_QUE_5 } from '../../lib/lenguaje'
+import { SIN_CIFRA } from '../../lib/lenguaje'
 import { EnPrueba, Guia } from './comun'
 import { useContextoAnalitica } from './contexto'
 import { ResultadoVivo } from './vivo'
@@ -36,8 +37,8 @@ const PANEL = 'flex flex-col gap-3 lg:min-h-0 lg:flex-1 lg:-mx-1 lg:overflow-y-a
 /** Encabezado de columna fijo mientras la tabla se desplaza dentro de su tarjeta. */
 const ENCABEZADO_FIJO = 'xl:overflow-visible [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-papel'
 
-const z = (v: number | null | undefined) => (v == null ? N_MENOR_QUE_5 : dec2(v))
-const valorUnidad = (v: number | null, u: string | null) => (v == null ? N_MENOR_QUE_5 : `${dec2(v)}${u ? ` ${u}` : ''}`)
+const z = (v: number | null | undefined) => (v == null ? SIN_CIFRA : dec2(v))
+const valorUnidad = (v: number | null, u: string | null) => (v == null ? SIN_CIFRA : `${dec2(v)}${u ? ` ${u}` : ''}`)
 // el coral nunca es color de serie: hay cuatro colores y los grupos que pasan de cuatro se resumen en la tabla
 const colorDe = (i: number): ColorSerie => (i % 4) as ColorSerie
 
@@ -174,7 +175,7 @@ export default function Trayectorias() {
                 <p className="flex shrink-0 items-center gap-2 text-sm"><EnPrueba /> El peso para la talla aún se está validando.</p>
               )}
               {grupos.length === 0 ? (
-                <Aviso tono="teal">{r.mensaje ?? 'Ningún grupo reúne 5 o más niños con este indicador.'}</Aviso>
+                <Aviso tono="teal">{r.mensaje ?? 'Ningún grupo tiene niños con este indicador.'}</Aviso>
               ) : (
                 <>
                   <Pestanas prefijo="trayectorias" etiqueta="Qué ver" pestanas={pestanas} activa={activa} elegir={elegir} />
@@ -202,12 +203,6 @@ export default function Trayectorias() {
                     {activa === 'ninos' && <Individuales ninos={r.individuales} grupos={grupos} />}
                   </PanelPestana>
                 </>
-              )}
-              {((r.celdas_omitidas ?? 0) > 0 || (r.grupos_omitidos ?? 0) > 0) && (
-                <p className="shrink-0 text-xs text-salvia">
-                  {r.grupos_omitidos ? `${r.grupos_omitidos} grupo(s): ${N_MENOR_QUE_5}. ` : ''}
-                  {r.celdas_omitidas ? `${r.celdas_omitidas} visita(s) de algún grupo: ${N_MENOR_QUE_5}.` : ''}
-                </p>
               )}
             </>
           )

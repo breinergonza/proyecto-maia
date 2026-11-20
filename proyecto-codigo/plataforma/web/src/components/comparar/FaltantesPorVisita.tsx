@@ -6,7 +6,7 @@ import { cn } from '../../lib/cn'
 import { TablaDatos } from '../grafica'
 import type { Serie } from '../graficos'
 import { Tabla } from '../ui'
-import { Barra, FichaDelDato, MENOS_DE_5, PctDe, poblacionAB, SERIE_A, SERIE_B, techoDe } from './comun'
+import { Barra, FichaDelDato, NINGUN_NINO, PctDe, poblacionAB, SERIE_A, SERIE_B, techoDe } from './comun'
 
 /** Los sin dato de un grupo sobre sus elegibles, o el texto que dice por qué no hay cifra. */
 type Celda = { sin: number; de: number; pct: number } | string
@@ -52,8 +52,8 @@ export function FaltantesPorVisita({ r, alta = false }: { r: GruposClinicoOk; al
   const poblacion = poblacionAB(r.a.n, r.b.n)
   const visitas = etapas.map((e) => ({
     clave: e.etapa, nombre: e.etapa,
-    a: e.a ? { sin: e.a.sin_dato, de: r.a.n, pct: e.a.pct_sin_dato } : MENOS_DE_5,
-    b: e.b ? { sin: e.b.sin_dato, de: r.b.n, pct: e.b.pct_sin_dato } : MENOS_DE_5,
+    a: e.a ? { sin: e.a.sin_dato, de: r.a.n, pct: e.a.pct_sin_dato } : NINGUN_NINO,
+    b: e.b ? { sin: e.b.sin_dato, de: r.b.n, pct: e.b.pct_sin_dato } : NINGUN_NINO,
   }))
   const csv = etapas.map((e) => ({
     Visita: e.etapa, 'Grupo A: sin dato': e.a?.sin_dato ?? null, 'Grupo A: %': e.a?.pct_sin_dato ?? null, 'Grupo A: elegibles': r.a.n,
@@ -61,8 +61,8 @@ export function FaltantesPorVisita({ r, alta = false }: { r: GruposClinicoOk; al
   }))
   const doce = r.desenlaces.filter((d) => d.a != null || d.b != null).map((d) => ({
     clave: d.clave, nombre: d.nombre.replace(/ a los 12 meses$/, ''),   // el título ya dice «a los 12 meses»
-    a: d.a?.sin_dato != null && d.a.pct_sin_dato != null ? { sin: d.a.sin_dato, de: r.a.n, pct: d.a.pct_sin_dato } : 'menos de 5 niños con dato',
-    b: d.b?.sin_dato != null && d.b.pct_sin_dato != null ? { sin: d.b.sin_dato, de: r.b.n, pct: d.b.pct_sin_dato } : 'menos de 5 niños con dato',
+    a: d.a?.sin_dato != null && d.a.pct_sin_dato != null ? { sin: d.a.sin_dato, de: r.a.n, pct: d.a.pct_sin_dato } : NINGUN_NINO,
+    b: d.b?.sin_dato != null && d.b.pct_sin_dato != null ? { sin: d.b.sin_dato, de: r.b.n, pct: d.b.pct_sin_dato } : NINGUN_NINO,
   }))
   return (
     <div className="grid items-start gap-4 xl:grid-cols-2 [&>*]:min-w-0">
@@ -73,7 +73,7 @@ export function FaltantesPorVisita({ r, alta = false }: { r: GruposClinicoOk; al
         <FichaDelDato items={{
           variable: 'medición de talla para la edad (puntaje z, referencia OMS)', unidad: '% de los niños elegibles del grupo sin dato',
           momento: 'cada visita, en edad corregida', poblacion,
-          validos: 'los elegibles de cada grupo (el denominador); con menos de 5 niños con dato no se da cifra',
+          validos: 'los elegibles de cada grupo (el denominador)',
         }} />
       </TablaDatos>
       {doce.length > 0 && (

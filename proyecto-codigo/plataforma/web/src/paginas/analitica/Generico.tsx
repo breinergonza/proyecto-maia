@@ -1,13 +1,13 @@
 // Página tolerante para los submódulos que el backend completa por partes (anticipación, trayectorias, perfiles): con
 // `pendiente` o `sin_artefactos` muestra el estado vacío; con datos, cada lista de filas planas se muestra como tabla y
-// cada cifra suelta como tarjeta. Toda celda de un grupo con menos de 5 niños dice «n menor que 5».
+// cada cifra suelta como tarjeta. Una celda sin valor dice «sin cifra»; ningún conteo se oculta por ser de pocos niños.
 import type { ReactNode } from 'react'
 import { useSubmodulo } from '../../api/analitica'
 import { TablaDatos } from '../../components/grafica'
 import { Cifra, Panel, Tabla } from '../../components/ui'
 import { descripcionDe } from '../../lib/descripciones'
 import { frase } from '../../lib/formato'
-import { N_MENOR_QUE_5 } from '../../lib/lenguaje'
+import { SIN_CIFRA } from '../../lib/lenguaje'
 import { Guia, PorDesenlace } from './comun'
 import { useContextoAnalitica } from './contexto'
 
@@ -16,8 +16,7 @@ const esFila = (v: unknown): v is Fila => !!v && typeof v === 'object' && !Array
 const esLista = (v: unknown): v is Fila[] => Array.isArray(v) && v.length > 0 && v.every(esFila)
 
 function celda(v: string | number | boolean | null | undefined): string {
-  if (v == null) return N_MENOR_QUE_5
-  if (v === 'n<5') return N_MENOR_QUE_5
+  if (v == null) return SIN_CIFRA
   if (typeof v === 'number') return Number.isInteger(v) ? v.toLocaleString('es-CO') : v.toLocaleString('es-CO', { maximumFractionDigits: 3 })
   return String(v)
 }
@@ -25,8 +24,7 @@ function celda(v: string | number | boolean | null | undefined): string {
 function Lista({ nombre, filas, clave }: { nombre: string; filas: Fila[]; clave: string }) {
   const d = descripcionDe(clave)
   const columnas = [...new Set(filas.flatMap((f) => Object.keys(f)))]
-  // un grupo con menos de 5 niños no enseña ninguna cifra
-  const visibles = filas.slice(0, 60).map((f) => (typeof f.n === 'number' && f.n < 5 ? Object.fromEntries(columnas.map((c) => [c, 'n<5'])) as Fila : f))
+  const visibles = filas.slice(0, 60)
   return (
     <TablaDatos titulo={`${d.titulo}: ${frase(nombre.replaceAll('_', ' '))}`} descripcion={d.descripcion}
       exportar={{ nombre: `${clave}-${nombre}`, filas: visibles as Record<string, string | number | null>[] }}>

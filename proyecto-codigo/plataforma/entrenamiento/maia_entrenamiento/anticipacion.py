@@ -73,10 +73,6 @@ def _alerta(r: np.ndarray, top_pct: int) -> np.ndarray:
     return alerta
 
 
-def _celda(n: int) -> int | None:
-    return n if n >= AN.MIN_CELDA else None
-
-
 def artefactos(preds: dict[str, dict], orden: dict[str, int], top_pct: int = TOP_POR_DEFECTO,
                etapa_de_variable: dict[str, str] | None = None) -> dict[str, dict[str, dict]]:
     """``{familia: {'anticipacion': ..., 'metricas_por_visita': ..., 'primera_alerta': ...}}`` de lo que dan
@@ -107,17 +103,17 @@ def artefactos(preds: dict[str, dict], orden: dict[str, int], top_pct: int = TOP
             visitas.append({**comun, **AN.anticipacion_visita(y, r, top_pct)})
             tops = AN.metricas_top(y, AN._orden(r))[0]
             n_casos = int(y.sum())
-            metricas.append({**comun, 'n': _celda(len(y)), 'casos': _celda(n_casos),
-                             'auc': AN._r(AN.auc(y, r), 4) if n_casos >= AN.MIN_CELDA else None,
+            metricas.append({**comun, 'n': int(len(y)), 'casos': n_casos,
+                             'auc': AN._r(AN.auc(y, r), 4),
                              'por_top': [{k: t[k] for k in ('top_pct', 'alertas', 'casos_detectados_pct',
                                                             'alertas_acertadas_pct')} for t in tops]})
         n_casos, n_av = len(casos), len(avisados)
-        ok = n_casos >= AN.MIN_CELDA
+        hay = n_casos > 0
         sal[familia] = {
             'anticipacion': {
                 'familia': familia, 'nombre': nombre, 'top_pct': top_pct, 'etiqueta': etiqueta, 'visitas': visitas,
-                'avisados_antes': {'casos': n_casos if ok else None, 'avisados': n_av if n_av >= AN.MIN_CELDA else None,
-                                   'pct': AN._r(100 * n_av / n_casos, 2) if ok else None, 'meta': META}},
+                'avisados_antes': {'casos': n_casos, 'avisados': n_av,
+                                   'pct': AN._r(100 * n_av / n_casos, 2) if hay else None, 'meta': META}},
             'metricas_por_visita': {'familia': familia, 'nombre': nombre, 'etiqueta': etiqueta, 'tops': list(AN.TOPS),
                                     'visitas': metricas},
             'primera_alerta': _primera_alerta(familia, nombre, etiqueta, top_pct, casos, alertas),
@@ -132,24 +128,22 @@ def _primera_alerta(familia: str, nombre: str, etiqueta: str, top_pct: int, caso
         for nino in ya:
             primera.setdefault(nino, m)
     n = len(casos)
-    ok = n >= AN.MIN_CELDA
+    hay = n > 0
     por_visita: dict[str, int] = {}
     for nino in casos:
         m = primera.get(nino)
         if m is not None:
             por_visita[m['desde']] = por_visita.get(m['desde'], 0) + 1
     distribucion = [{'desde': m['desde'], 'ventaja_visitas': m['ventaja'],
-                     'casos': _celda(por_visita.get(m['desde'], 0)) if ok else None,
-                     'pct': AN._r(100 * por_visita[m['desde']] / n, 2)
-                     if ok and por_visita.get(m['desde'], 0) >= AN.MIN_CELDA else None}
+                     'casos': por_visita.get(m['desde'], 0),
+                     'pct': AN._r(100 * por_visita.get(m['desde'], 0) / n, 2) if hay else None}
                     for m, _ in alertas]
     sin = n - sum(por_visita.values())
     ventajas = np.array([primera[x]['ventaja'] for x in casos if x in primera], dtype=float)
     estable = n >= AN.MIN_DISTRIBUCION and len(ventajas) >= AN.MIN_DISTRIBUCION     # D52: cuantiles con 20 o más
     return {'familia': familia, 'nombre': nombre, 'etiqueta': etiqueta, 'top_pct': top_pct,
-            'casos': n if ok else None, 'distribucion': distribucion,
-            'sin_alerta': {'casos': _celda(sin) if ok else None,
-                           'pct': AN._r(100 * sin / n, 2) if ok and sin >= AN.MIN_CELDA else None},
+            'casos': n, 'distribucion': distribucion,
+            'sin_alerta': {'casos': sin, 'pct': AN._r(100 * sin / n, 2) if hay else None},
             'ventaja_visitas': {'media': AN._r(float(ventajas.mean()), 2) if estable else None,
                                 'mediana': AN._r(float(np.median(ventajas)), 2) if estable else None},
             'meta': META}

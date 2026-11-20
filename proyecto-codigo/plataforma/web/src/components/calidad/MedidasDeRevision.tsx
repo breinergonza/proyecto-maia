@@ -75,8 +75,8 @@ export function MedidasDeRevision() {
             <NotaGrafica className="mt-3 border-t border-linea/70 pt-3" datos={{
               variable: 'Mediciones marcadas como raras, por sede y medición', unidad: 'Número de alertas (conteo)',
               momento: 'Todas las visitas, con los últimos datos', poblacion: 'Mediciones de todos los niños del programa',
-              validos: `${num((concentracion.data.hay_sede ? concentracion.data.celdas : concentracion.data.por_variable).reduce((a, x) => a + x.alertas, 0))} alertas en celdas de ${concentracion.data.minimo_celda} o más`,
-              porcentaje: 'No aplica: son conteos; lo que tiene menos alertas que ese mínimo se suma en «Otras»',
+              validos: `${num((concentracion.data.hay_sede ? concentracion.data.celdas : concentracion.data.por_variable).reduce((a, x) => a + x.alertas, 0))} alertas`,
+              porcentaje: 'No aplica: son conteos; cada sede y dato sale con su cifra, aunque tenga una sola alerta',
             }} />
           )}
         </Panel>
@@ -85,27 +85,26 @@ export function MedidasDeRevision() {
   )
 }
 
-/** Mapa de calor simple: sede por dato si hay sedes; si no, solo los datos con más alertas. Sin celdas pequeñas. */
+/** Mapa de calor simple: sede por dato si hay sedes; si no, por dato. Todos con su cifra, de más a menos alertas; la
+ *  lista se desplaza por dentro cuando son muchos. */
 function Concentracion({ c }: { c: ConcentracionAlertas }) {
-  const otras = c.hay_sede ? c.otras_celdas : c.otras_variables
   const filas = c.hay_sede
-    ? c.celdas.slice(0, 8).map((x) => ({ clave: `${x.grupo}|${x.variable}`, titulo: x.etiqueta ?? x.variable, sub: x.grupo, n: x.alertas }))
-    : c.por_variable.slice(0, 8).map((x) => ({ clave: x.variable, titulo: x.etiqueta ?? x.variable, sub: '', n: x.alertas }))
+    ? c.celdas.map((x) => ({ clave: `${x.grupo}|${x.variable}`, titulo: x.etiqueta ?? x.variable, sub: x.grupo, n: x.alertas }))
+    : c.por_variable.map((x) => ({ clave: x.variable, titulo: x.etiqueta ?? x.variable, sub: '', n: x.alertas }))
   const maximo = Math.max(1, ...filas.map((x) => x.n))
   const tono = (n: number) => ({ background: `color-mix(in srgb, var(--color-teal) ${Math.round(15 + 70 * n / maximo)}%, transparent)` })
   if (filas.length === 0) return <p className="text-sm text-tinta/80">Todavía no hay alertas suficientes para mostrar.</p>
   return (
     <div>
-      <ul className="grid grid-cols-2 gap-1.5" aria-label="Alertas por sede y dato">
+      <ul className="grid max-h-72 grid-cols-2 content-start gap-1.5 overflow-y-auto" aria-label="Alertas por sede y dato">
         {filas.map((x) => (
           <li key={x.clave} className="rounded-lg px-2 py-1.5 text-sm" style={tono(x.n)}>
             <span className="block truncate font-semibold" title={x.titulo}>{x.titulo}</span>
-            <span className="block truncate text-xs">{x.sub && <>{x.sub} · </>}{num(x.n)} alertas</span>
+            <span className="block truncate text-xs">{x.sub && <>{x.sub} · </>}{num(x.n)} {x.n === 1 ? 'alerta' : 'alertas'}</span>
           </li>
         ))}
       </ul>
       {!c.hay_sede && <p className="mt-2 text-xs text-tinta/80">Este corte no trae sedes: solo se muestra por dato.</p>}
-      {otras > 0 && <p className="mt-2 text-xs text-tinta/80">Otras: {num(otras)} alertas en grupos con menos de {c.minimo_celda}.</p>}
     </div>
   )
 }

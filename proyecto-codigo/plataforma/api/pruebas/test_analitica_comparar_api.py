@@ -53,7 +53,7 @@ def test_calibracion_y_poblacion_traen_los_nuevos_artefactos(cliente, tokens, en
     cal = cliente.get(f'/api/analitica/{entrenamientos["a"]}/calibracion', headers=h).json()['desenlaces']['readm_3m']
     hist = cal['hist_riesgo']
     assert {'bins', 'histograma', 'decision'} <= set(cal) and hist['estado'] == 'ok'
-    assert all(t['con'] is None or t['con'] >= 5 for t in hist['tramos'])
+    assert all(isinstance(t['con'], int) and isinstance(t['sin'], int) for t in hist['tramos'])
     pob = cliente.get(f'/api/analitica/{entrenamientos["a"]}/poblacion', headers=h).json()['desenlaces']['readm_3m']
     sexo = pob['distribuciones_muestra_universo']['categoricas']['sexo']
     assert sexo['n_universo'] == 1500 and sexo['n_muestra'] == 1000 and {'embudo', 'eventos', 'nulos'} <= set(pob)
@@ -157,7 +157,7 @@ def test_comparar_grupos_con_pocos_ninos_no_da_cifras_y_queda_en_auditoria(clien
     todos = {'muestra': _muestra(_y('sexo', 'lista', ['M']))}
     r = _grupos(cliente, tokens, 'visualizador', a=pocos, b=todos, corrida_id=corrida).json()
     assert r['estado'] == 'insuficiente' and 'riesgo' not in r and r['minimo_ninos'] == 20
-    assert r['a']['n'] is None or r['a']['n'] >= 5
+    assert r['a']['n'] >= 5, 'un grupo de 1 a 19 niños se dice con su cifra; el visualizador la ve redondeada, nunca en 0'
     with db.fabrica()() as s:
         n = len(s.scalars(select(Auditoria).where(Auditoria.accion == 'analitica.comparar_grupos')).all())
     assert n >= 1
@@ -226,7 +226,7 @@ def test_clinico_talla_por_visita_de_cada_lado_con_umbral_y_referencia(cliente, 
     for e in tr['etapas']:
         for lado, ids in (('a', lados['ids_a']), ('b', lados['ids_b'])):
             v = z[(z.etapa == e['etapa']) & z.sujeto.isin(ids)].z
-            if len(v) < 5:   # los varones casi no tienen dato a los 12 meses: la celda no se da
+            if len(v) == 0:   # ningún niño con dato en esa visita: no hay celda (un cero verdadero)
                 assert e[lado] is None
                 continue
             assert e[lado]['n'] == len(v) and e[lado]['mediana'] == pytest.approx(v.median())
@@ -242,7 +242,8 @@ def test_clinico_datos_faltantes_por_visita_con_su_denominador(cliente, tokens, 
             assert celda['sin_dato'] == n - celda['n']
             assert celda['pct_sin_dato'] == pytest.approx(100 * (n - celda['n']) / n, abs=0.05)
     doce = next(e for e in d['trayectoria']['etapas'] if e['etapa'] == '12 m EC')
-    assert doce['a'] is None and doce['b']['pct_sin_dato'] < 5   # varones: 3 con dato, no se dice; mujeres: todas con dato
+    assert doce['a']['n'] == 3 and doce['a']['sin_dato'] == d['a']['n'] - 3   # varones: 3 con dato, y se dice
+    assert doce['b']['pct_sin_dato'] < 5   # mujeres: casi todas con dato
 
 
 def test_clinico_riesgo_estimado_por_corte_de_cada_lado(cliente, tokens, corrida_clinica, lados, datos):  # noqa: F811
@@ -256,18 +257,19 @@ def test_clinico_riesgo_estimado_por_corte_de_cada_lado(cliente, tokens, corrida
             filas = ri[(ri.clave == f['clave']) & ri.sujeto.isin(ids)]
             alerta = int((filas.percentil >= 90).sum())
             assert f[lado] == {'calculados': len(filas), 'en_alerta': alerta, 'pct_en_alerta': round(100 * alerta / len(filas), 1)}
-    # desarrollo: solo 3 varones tienen riesgo de esa familia, así que el lado A no da cifra y B sí
+    # desarrollo: solo 3 varones tienen riesgo de esa familia: el lado A da su cifra (3), no la oculta
     assert [f['clave'] for f in desarrollo['riesgo']] == ['desarrollo_12m']
-    assert desarrollo['riesgo'][0]['a'] is None and desarrollo['riesgo'][0]['b']['calculados'] > 5
+    assert desarrollo['riesgo'][0]['a']['calculados'] == 3 and desarrollo['riesgo'][0]['b']['calculados'] > 5
     assert talla['riesgo_con_modelo'] is True and desarrollo['riesgo_con_modelo'] is True
-    assert desarrollo['a'] is None and desarrollo['b']['con_dato'] > 5 and desarrollo['dif']['valor'] is None
+    assert 0 < desarrollo['a']['con_dato'] < 5 and desarrollo['a']['pct'] is None   # con su cifra, sin porcentaje (pide 20)
+    assert desarrollo['b']['con_dato'] > 5 and desarrollo['dif']['valor'] is None
 
 
 def test_clinico_con_menos_de_20_ninos_en_un_lado_no_da_cifras(cliente, tokens, corrida_clinica, lados):  # noqa: F811
     pocos = {'muestra': _muestra(_y('eg_semanas', 'numero', [None, 24]), _y('sexo', 'lista', ['F']))}
     r = _clinico(cliente, tokens, 'visualizador', a=pocos, b=lados['b'], corrida_id=corrida_clinica).json()
     assert r['estado'] == 'insuficiente' and r['minimo_ninos'] == 20 and 'mensaje' in r
-    assert not {'desenlaces', 'trayectoria'} & set(r) and (r['a']['n'] is None or r['a']['n'] >= 5)
+    assert not {'desenlaces', 'trayectoria'} & set(r) and r['a']['n'] >= 5
 
 
 def test_clinico_el_visualizador_ve_conteos_redondeados(cliente, tokens, corrida_clinica, sev):  # noqa: F811

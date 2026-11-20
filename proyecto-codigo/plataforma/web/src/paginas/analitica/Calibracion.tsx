@@ -12,7 +12,7 @@ import { Cifra, Panel, Tabla } from '../../components/ui'
 import type { Pestana } from '../../components/ui/Pestanas'
 import { descripcionDe } from '../../lib/descripciones'
 import { dec2, num } from '../../lib/formato'
-import { jerga, N_MENOR_QUE_5 } from '../../lib/lenguaje'
+import { jerga } from '../../lib/lenguaje'
 import { ConPestanas, fracPct, Guia, IrA, muestraDe, omitida, PorDesenlace, pctN, useTecnico } from './comun'
 import { useContextoAnalitica } from './contexto'
 
@@ -46,7 +46,7 @@ export default function Calibracion() {
           // revisar primero a los de más riesgo y el costo de equivocarse salen de la evaluación (rendimiento)
           const n = rd?.auc_desenlace.n, casos = rd?.auc_desenlace.casos
           const capacidad = capacidadElegida ?? Math.max(1, Math.round((n ?? 0) / 10))
-          // casos capturados acumulados por grupos de 10 (1 = más riesgo); si algún grupo trae menos de 5 casos no se dibuja
+          // casos capturados acumulados por grupos de 10 (1 = más riesgo); si algún grupo no trae su tasa (un entrenamiento anterior) no se dibuja
           const conCasos = (rd?.lift.deciles ?? []).map((x) => (x.tasa == null ? null : x.niños * x.tasa))
           const totalCasos = rd && conCasos.every((v) => v != null) ? conCasos.reduce<number>((a, b) => a + (b ?? 0), 0) : null
           let acum = 0
@@ -102,18 +102,17 @@ export default function Calibracion() {
                       {d.hist_riesgo.casos != null ? (
                         <HistogramaDosGrupos etiqueta="Riesgo de los niños con y sin el desenlace" tramos={d.hist_riesgo.tramos} casos={d.hist_riesgo.casos}
                           total={d.hist_riesgo.n} nombres={['Con el desenlace', 'Sin el desenlace']} formatoX={(v) => `${Math.round(v * 100)} %`} />
-                      ) : <p className="text-sm text-salvia">Hay menos de 5 niños con el desenlace: no se dibuja la comparación.</p>}
+                      ) : <p className="text-sm text-salvia">Este entrenamiento no guardó cuántos niños tuvieron el desenlace: no se dibuja la comparación.</p>}
                       <p className="mt-2 text-sm text-salvia">
                         Riesgo típico (mediana): con el desenlace {d.hist_riesgo.mediana_con != null ? fracPct(d.hist_riesgo.mediana_con) : 'n menor que 20'};
                         sin el desenlace {d.hist_riesgo.mediana_sin != null ? fracPct(d.hist_riesgo.mediana_sin) : 'n menor que 20'}.
-                        Los tramos con menos de 5 niños quedan sin barra.
                       </p>
                     </Grafica>
                   )}
                   <Grafica titulo={dHist.titulo} descripcion={dHist.descripcion}
                     exportar={{ nombre: 'calibracion-histograma', filas: d.histograma.map((h) => ({ desde: h.desde, hasta: h.hasta, ninos: h.n })), muestra }}>
                     <Histograma etiqueta="Cómo se reparte el riesgo" tramos={d.histograma} alto={300} formatoX={(v) => `${Math.round(v * 100)} %`} />
-                    {d.histograma.some((h) => h.n == null) && <p className="mt-1 text-xs text-salvia">Los tramos vacíos tienen {N_MENOR_QUE_5}.</p>}
+                    {d.histograma.some((h) => h.n == null) && <p className="mt-1 text-xs text-salvia">Algunos tramos no traen su cifra: el entrenamiento los guardó antes de que se dijeran todos los conteos.</p>}
                   </Grafica>
                 </div>
               ) : ver === 'revisar' && rd ? (
@@ -124,7 +123,7 @@ export default function Calibracion() {
                       <CurvaXY etiqueta="Casos capturados al revisar primero a los de más riesgo" ejeX="Niños revisados" ejeY="Casos encontrados" diagonal alto={240}
                         formatoX={(v) => `${Math.round(v * 100)} %`} formatoY={(v) => `${Math.round(v * 100)} %`}
                         series={[{ clave: 'cap', nombre: 'Con el modelo', color: 0, puntos: capturados }]} />
-                    ) : <p className="text-sm text-salvia">Algún grupo tiene {N_MENOR_QUE_5} casos: no se dibuja la curva.</p>}
+                    ) : <p className="text-sm text-salvia">Este entrenamiento no guardó la tasa de algún grupo: no se dibuja la curva.</p>}
                   </Grafica>
                   <TablaDatos titulo={dK.titulo} descripcion={dK.descripcion}
                     exportar={{ nombre: 'calibracion-revisar', filas: rd.top_k.map((x) => ({ ninos_revisados: x.k, casos: x.casos, alertas_acertadas_pct: x.acertadas_pct, casos_detectados_pct: x.detectados_pct })), muestra: muestraDe(n, casos) }}>

@@ -23,14 +23,14 @@ const talla: DesenlaceComparado = {
     { momento: '40 sem', momento_nombre: '40 semanas', clave: 'talla_baja_12m_desde_40', estado: 'en_prueba',
       a: { calculados: 400, en_alerta: 40, pct_en_alerta: 10 }, b: { calculados: 250, en_alerta: 30, pct_en_alerta: 12 } },
     { momento: '3 m EC', momento_nombre: '3 meses', clave: 'talla_baja_12m_desde_3', estado: 'en_prueba',
-      a: { calculados: 380, en_alerta: 38, pct_en_alerta: 10 }, b: null },
+      a: { calculados: 380, en_alerta: 38, pct_en_alerta: 10 }, b: { calculados: 3, en_alerta: 1, pct_en_alerta: 33.3 } },
   ],
 }
 
 const desarrollo: DesenlaceComparado = {
   clave: 'desarrollo_12m', nombre: 'Desarrollo psicomotor bajo a los 12 meses', estado: 'en_uso', indicador: null,
   definicion: 'Desarrollo psicomotor entre el 10 % más bajo de los niños con que se entrenó el modelo.',
-  a: { casos: 20, con_dato: 200, sin_dato: 298, pct: 10, pct_sin_dato: 59.8 }, b: null,
+  a: { casos: 20, con_dato: 200, sin_dato: 298, pct: 10, pct_sin_dato: 59.8 }, b: { casos: 1, con_dato: 3, sin_dato: 309, pct: null, pct_sin_dato: 99 },
   dif: { valor: null, ic_bajo: null, ic_alto: null, clara: null },
   riesgo_con_modelo: true,
   riesgo: [{ momento: '40 sem', momento_nombre: '40 semanas', clave: 'desarrollo_12m', estado: 'en_uso',
@@ -58,14 +58,14 @@ const ok: GruposClinicoOk = {
 
 const insuficiente: RespuestaGruposClinico = {
   estado: 'insuficiente', corrida_id: 3, minimo_ninos: 20, mensaje: 'Cada grupo necesita al menos 20 niños para compararse.',
-  a: { nombre: 'Grupo A', n: 498 }, b: { nombre: 'Grupo B', n: null },
+  a: { nombre: 'Grupo A', n: 498 }, b: { nombre: 'Grupo B', n: 3 },
 }
 
 const facetas = {
   n: 498, minimo: 20,
   facetas: {
     sexo: { etiqueta: 'Sexo', tipo: 'lista', cuando: 'primera', opciones: [
-      { valor: 'M', etiqueta: 'Masculino', n: 250, texto: '250' }, { valor: 'F', etiqueta: 'Femenino', n: 248, texto: '248' }] },
+      { valor: 'M', etiqueta: 'Masculino', n: 250 }, { valor: 'F', etiqueta: 'Femenino', n: 248 }] },
   },
   etapas: [], disponibles: [],
   tiempo: { campos: [{ valor: 'fecha_nacimiento', etiqueta: 'Fecha de nacimiento' }], defecto: 'fecha_nacimiento',
@@ -214,7 +214,8 @@ describe('comparar grupos', () => {
     expect(within(dt()).getByText(/101 sin dato/)).toBeInTheDocument()
     expect(within(dt()).getByText(/89 sin dato/)).toBeInTheDocument()
     expect(within(dd()).getByText(/20 de 200 niños con dato/)).toBeInTheDocument()
-    expect(within(dd()).getByText(/Menos de 5 niños con dato/)).toBeInTheDocument()   // B no da cifra
+    expect(within(dd()).getByText(/1 de 3 niños con dato/)).toBeInTheDocument()   // B: 3 niños con dato, y se dice
+    expect(within(dd()).getByText(/Sin porcentaje: se necesitan 20 niños con dato/)).toBeInTheDocument()
     expect(within(dd()).getByText(/No se compara: cada lado necesita 20 niños con dato/)).toBeInTheDocument()
     fichaVisible(dd())
     expect(within(dd()).getByText(/Población: niños elegibles de A \(498\) y de B \(312\)/)).toBeVisible()
@@ -230,7 +231,7 @@ describe('comparar grupos', () => {
     expect(within(fila).getByText('10,0 % (40 de 400)')).toBeInTheDocument()
     expect(within(fila).getByText('12,0 % (30 de 250)')).toBeInTheDocument()
     expect(within(fila).getByText('En prueba')).toBeInTheDocument()
-    expect(within(within(riesgo).getByRole('row', { name: /3 m EC/ })).getByText('n menor que 5')).toBeInTheDocument()
+    expect(within(within(riesgo).getByRole('row', { name: /3 m EC/ })).getByText('33,3 % (1 de 3)')).toBeInTheDocument()   // 3 niños: su cifra
     expect(within(within(dd()).getByRole('table')).getByText('En uso')).toBeInTheDocument()
     fichaVisible(dt())
     expect(within(dt()).getByText(/Observaciones válidas: niños con riesgo calculado en cada corte/)).toBeVisible()
@@ -262,7 +263,7 @@ describe('comparar grupos', () => {
     const tabla = within(panel).getByRole('table', { name: /Niños sin dato de talla en cada visita/ })
     const celdas = (v: string) => within(within(tabla).getByRole('row', { name: new RegExp(v) })).getAllByRole('cell').map((c) => c.textContent)
     expect(celdas('40 sem')).toEqual(['40 sem', '5,2 % 26 de 498', '4,5 % 14 de 312'])
-    expect(celdas('6 m EC')).toEqual(['6 m EC', '13,5 % 67 de 498', 'n menor que 5'])
+    expect(celdas('6 m EC')).toEqual(['6 m EC', '13,5 % 67 de 498', 'Ningún niño con dato'])
     expect(within(panel).getByRole('button', { name: /Descargar CSV/ })).toBeInTheDocument()
     fichaVisible(panel)
     expect(within(panel).getByText(/Momento: cada visita, en edad corregida/)).toBeVisible()
@@ -349,9 +350,9 @@ describe('comparar grupos', () => {
     montar('/comparar?f=sexo|lista|F')
     await userEvent.click(await screen.findByRole('button', { name: 'Comparar con todos los niños' }))
     expect(await screen.findByText(/Cada grupo necesita al menos 20 niños para compararse/)).toBeInTheDocument()
-    expect(screen.getByText(/Grupo A: 498 niños\. Grupo B: menos de 5 niños\./)).toBeInTheDocument()
+    expect(screen.getByText(/Grupo A: 498 niños\. Grupo B: 3 niños\./)).toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: '¿Crecen distinto?' })).toBeNull()
-    expect(await within(ladoB()).findByText(/Menos de 5 niños elegibles/)).toBeInTheDocument()
+    expect(await within(ladoB()).findByText(/3 niños elegibles/)).toBeInTheDocument()
   })
 
   it('quien solo consulta compara grupos igual, sin filtros guardados', async () => {

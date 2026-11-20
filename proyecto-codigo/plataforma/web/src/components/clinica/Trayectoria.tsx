@@ -164,7 +164,7 @@ export function Trayectoria({ indicador, unidad, etapas, muestra, conPoblacion, 
             </ResponsiveContainer>
           </GraficaNavegable>
         </div>
-      ) : <p className="text-sm text-salvia">El grupo no tiene datos en ninguna visita, o son muy pocos niños para mostrarlos.</p>}
+      ) : <p className="text-sm text-salvia">Ningún niño del grupo tiene esta medida en alguna visita.</p>}
     </Grafica>
   )
 }

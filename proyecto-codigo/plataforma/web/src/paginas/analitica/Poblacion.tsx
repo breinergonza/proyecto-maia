@@ -11,7 +11,7 @@ import { PanelPestana, Pestanas, usePestanaEnUrl } from '../../components/ui/Pes
 import { descripcionDe } from '../../lib/descripciones'
 import { dec2, frase, num, pct } from '../../lib/formato'
 import { cn } from '../../lib/cn'
-import { N_MENOR_QUE_5, nombreVariable, variable } from '../../lib/lenguaje'
+import { nombreVariable, variable } from '../../lib/lenguaje'
 import { Guia, omitida, PorDesenlace, pctN, useNombreDesenlace, useTecnico } from './comun'
 import { useContextoAnalitica } from './contexto'
 
@@ -127,7 +127,7 @@ export default function Poblacion() {
                           series={[{ clave: 'muestra', nombre: 'Muestra', color: 0 }, { clave: 'universo', nombre: 'Todos los niños', color: 1 }]} />
                         <p className="mt-2 text-xs text-salvia">
                           {v.diferencia_maxima_pp != null ? `La mayor diferencia es de ${dec2(Math.abs(v.diferencia_maxima_pp))} puntos. ` : ''}
-                          Una categoría con menos de 5 niños queda sin barra ({N_MENOR_QUE_5}).
+                          Cada categoría dice su porcentaje, también si son pocos niños.
                         </p>
                       </Grafica>
                     ))}

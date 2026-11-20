@@ -21,7 +21,7 @@ export function Observado({ grupo, poblacion, esPoblacion, className }: {
           </p>
         </div>
       ) : (
-        <p className="text-sm">Con el grupo elegido hay muy pocos niños con dato a los 12 meses para dar una cifra.</p>
+        <p className="text-sm">Ningún niño del grupo elegido tiene dato a los 12 meses.</p>
       )}
       {esPoblacion ? (
         <p className="mt-2 text-sm">Referencia: el grupo es toda la población.</p>

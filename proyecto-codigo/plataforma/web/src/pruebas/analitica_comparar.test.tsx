@@ -1,5 +1,5 @@
 // Calibración (riesgo con y sin el desenlace), Población (muestra frente a todos los niños, en su pestaña) y Comparar con
-// intervalos (en pestañas), «Aprobar B» solo para administración. Siempre con celdas de menos de 5 niños ocultas. Los grupos de niños se comparan en
+// intervalos (en pestañas), «Aprobar B» solo para administración. Con cada celda y su cifra, también de 1 a 4 niños. Los grupos de niños se comparan en
 // Comparar grupos (/comparar), no aquí.
 import { configure, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -25,7 +25,7 @@ const contexto = {
   entrenamientos: [{ entrenamiento: 7, creada: '2026-07-01T10:00:00Z' }, { entrenamiento: 6, creada: '2026-06-01T10:00:00Z' }],
 }
 
-const tramos = Array.from({ length: 20 }, (_, i) => ({ desde: i * 0.05, hasta: (i + 1) * 0.05, con: i < 14 ? null : 12 + i, sin: i > 17 ? null : 100 - i * 3 }))
+const tramos = Array.from({ length: 20 }, (_, i) => ({ desde: i * 0.05, hasta: (i + 1) * 0.05, con: i < 14 ? 1 + (i % 4) : 12 + i, sin: i > 17 ? 2 : 100 - i * 3 }))
 const calibracion = {
   n: 1500, brier: 0.05, ece: 0.01, riesgo_medio: 0.06, observado: 0.06, razon_riesgo_observado: 1,
   bins: [{ bin: 1, n: 150, riesgo_medio: 0.02, observado: 0.02 }],
@@ -90,7 +90,7 @@ function api(rol: Usuario['rol'], extra?: Extra) {
 }
 
 describe('calibración: riesgo con y sin el desenlace', () => {
-  it('muestra la gráfica con descripción, PNG y CSV, y los tramos pequeños quedan vacíos', async () => {
+  it('muestra la gráfica con descripción, PNG y CSV, y los tramos de 1 a 4 niños salen con su cifra', async () => {
     api('experto')
     montar('/analitica/calibracion?entrenamiento=7&desenlace=des_a&ver=reparto')
     expect(await screen.findByText('Riesgo de los niños con y sin el desenlace', { selector: 'h2, h3' })).toBeInTheDocument()
@@ -99,7 +99,7 @@ describe('calibración: riesgo con y sin el desenlace', () => {
     expect(screen.getByRole('button', { name: 'Descargar PNG: Riesgo de los niños con y sin el desenlace' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Descargar CSV: Riesgo de los niños con y sin el desenlace' })).toBeInTheDocument()
     expect(screen.getByText(/con el desenlace 38,0 %/)).toBeInTheDocument()
-    expect(screen.getByText(/Los tramos con menos de 5 niños quedan sin barra/)).toBeInTheDocument()
+    expect(screen.queryByText(/menos de 5 niños|N menor que 5|n menor que 5/)).not.toBeInTheDocument()
   })
 
   it('un entrenamiento anterior sin hist_riesgo sigue mostrando el histograma de siempre', async () => {
@@ -152,6 +152,8 @@ describe('comparar entrenamientos: intervalos y Aprobar B', () => {
     expect(apiladas()).toBe(1)
     await userEvent.click(screen.getByRole('tab', { name: 'Niños y grupos' }))
     expect(await screen.findByText('sexo: femenino')).toBeInTheDocument()
+    // «sin cifra» en un grupo es un límite estadístico, y la tabla dice cuál (no es privacidad: D63)
+    expect(screen.getByText(/el AUC pide al menos 20 niños, 5 con el desenlace y 5 sin él/)).toBeInTheDocument()
     expect(apiladas()).toBe(2)
   })
 

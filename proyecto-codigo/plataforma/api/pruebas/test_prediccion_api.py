@@ -220,10 +220,9 @@ def test_trabajo_asincrono_coincide_con_el_sincrono(cliente, admin, experto, mue
     assert res['insuficiente'] is False and res['agregados']['n_puntuados'] == muestra['agregados']['n_puntuados']
     assert res['agregados']['niveles'] == muestra['agregados']['niveles']
     assert res['fuga_no_verificable'] is False and 'aviso_corte' in res
-    # riesgo por visita: celdas con su n y las chicas sin cifras
-    assert res['por_visita'] and all({'n', 'oculta', 'momento_nombre', 'orden'} <= set(c) for c in res['por_visita'])
-    assert all(c['riesgo_mediano'] is None for c in res['por_visita'] if c['oculta'])
-    assert any(not c['oculta'] and 0 <= c['pct_altos'] <= 100 for c in res['por_visita'])
+    # riesgo por visita: cada celda con su n y sus cifras, también las de pocos niños (D63)
+    assert res['por_visita'] and all({'n', 'momento_nombre', 'orden'} <= set(c) and 'oculta' not in c for c in res['por_visita'])
+    assert all(c['n'] >= 1 and c['riesgo_mediano'] is not None and 0 <= c['pct_altos'] <= 100 for c in res['por_visita'])
     # la primera página es la de la muestra síncrona: mismos niños, mismo riesgo
     p1 = cliente.get(f'/api/prediccion/trabajos/{tid}/tabla', headers=admin).json()
     assert p1['total'] == muestra['tabla']['total'] and p1['pagina'] == 1 and len(p1['filas']) <= 200

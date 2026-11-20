@@ -52,7 +52,7 @@ const etapa = (e: string, nombre: string, orden: number, z: number | null) => ({
   etapa: e, nombre, orden, n: 12, edad_media_meses: orden * 3, z_media: z, z_desvio: 0.8, diferencia_oms: z, valor_medio: 5.2, valor_desvio: 0.5, unidad: 'kg',
 })
 const trayectorias = {
-  estado: 'ok', entrenamiento: 7, indicador: 'peso', etiqueta: 'En uso', celdas_omitidas: 0, grupos_omitidos: 0, individuales_visibles: true,
+  estado: 'ok', entrenamiento: 7, indicador: 'peso', etiqueta: 'En uso', individuales_visibles: true,
   grupos: [{ grupo: 'Riesgo alto', ninos: 12, etapas: [etapa('3m', '3 meses', 1, -1.2), etapa('6m', '6 meses', 2, -1.5)] },
     { grupo: 'Resto', ninos: 40, etapas: [etapa('3m', '3 meses', 1, 0.1), etapa('6m', '6 meses', 2, 0.2)] }],
   individuales: [{ codigo: 'N-001', grupo: 'Riesgo alto', serie: [{ etapa: '3m', nombre: '3 meses', orden: 1, edad_meses: 3, z: -1.4 }] }],
@@ -85,8 +85,8 @@ function api(rol: Usuario['rol']) {
     if (m[2] === 'equidad') return por(equidad)
     if (m[2] === 'estabilidad') return por(estabilidad)
     if (m[2] === 'trayectorias') return { cuerpo: trayectorias }
-    if (m[2] === 'perfiles') return { cuerpo: { estado: 'ok', entrenamiento: 7, ninos: 100, unidad_peso: 'g', confianza: { minimo_ninos: 5, aprobacion: 'pendiente' },
-      eg: [{ categoria: 'a', etiqueta: 'Muy prematuro', n: 20, tasa: 0.25, oculto: false, eg_media: 29.5, peso_medio: 1200 }], lubchenco: [] } }
+    if (m[2] === 'perfiles') return { cuerpo: { estado: 'ok', entrenamiento: 7, ninos: 100, unidad_peso: 'g', confianza: { aprobacion: 'pendiente' },
+      eg: [{ categoria: 'a', etiqueta: 'Muy prematuro', n: 20, tasa: 0.25, eg_media: 29.5, peso_medio: 1200 }], lubchenco: [] } }
     if (m[2] === 'rendimiento') return { cuerpo: { estado: 'ok', entrenamiento: Number(m[1]), submodulo: 'rendimiento', meta: meta(Number(m[1]), '3'), desenlaces: { des_a: rend(m[1] === '7' ? 0.78 : 0.7) } } }
     return { cuerpo: {} }
   })
@@ -260,7 +260,7 @@ describe('Perfiles', () => {
     expect(await screen.findByText('Muy prematuro')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Por edad gestacional', pressed: true })).toBeInTheDocument()
     expect(screen.getByText(/Aún no hay perfiles reales aprobados por los expertos/)).toBeInTheDocument()
-    expect(screen.getByText('Niños mínimos para mostrar un perfil')).toBeInTheDocument()
+    expect(screen.queryByText('Niños mínimos para mostrar un perfil')).not.toBeInTheDocument()   // ya no hay mínimo de 5
   })
 })
 

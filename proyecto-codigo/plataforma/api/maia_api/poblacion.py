@@ -1,5 +1,5 @@
 """Lo que comparten /muestras y /exploracion: el corte con el que se trabaja, los niños de una muestra, las facetas
-(conteos por opción) y la reserva de cifras pequeñas (D4, D46). Todo se calcula en Postgres sobre
+(conteos por opción) y el mínimo de 20 niños y el redondeo del visualizador (D46). Todo se calcula en Postgres sobre
 ``sevarti.atributos_sujeto``; no se leen las mediciones."""
 from __future__ import annotations
 
@@ -29,7 +29,6 @@ from sevarti import contrato as SV
 FACETAS_POR_DEFECTO = ('sede', 'ern_sexo', 'eg_categoria', 'eg_semanas', 'ern_lubchencofenton')
 VARIABLES_SEXO = ('ern_sexo', 'sexo')
 MIN_NINOS = 20          # D46: con menos niños no se muestran cifras ni se guarda un filtro
-MIN_OPCION = PF.MIN_GRUPO   # D4: una opción con menos niños se muestra como «<5»
 MAX_OPCIONES = 30       # una variable con más opciones distintas es texto libre, no una faceta
 TOPE_REDONDEO = 100     # D46: para el rol visualizador, los conteos menores se redondean a múltiplos de 5
 TIPOS_FILTRABLES = {'categorical': 'lista', 'boolean': 'si_no', 'numeric': 'numero'}
@@ -64,16 +63,16 @@ def sin_filtros(muestra: dict | None) -> bool:
 
 
 def proteger(n: int, redondear: bool = False) -> int:
-    """D46: un conteo menor de 100 se redondea a múltiplos de 5 para quien solo consulta."""
-    return int(n / 5 + 0.5) * 5 if redondear and n < TOPE_REDONDEO else int(n)
+    """D46: un conteo menor de 100 se redondea a múltiplos de 5 para quien solo consulta. Con niños (1 a 4) nunca
+    baja a 0: sube a 5, porque un cero diría que no hay ninguno. Solo un cero verdadero queda en 0."""
+    if not redondear or n >= TOPE_REDONDEO:
+        return int(n)
+    return max(5, int(n / 5 + 0.5) * 5) if n > 0 else 0
 
 
-def cifra(n: int, redondear: bool = False, ocultar: bool = True) -> dict:
-    """Un conteo de opción: ``n`` y ``texto``. D4: de 1 a 4 niños no se da la cifra (``n`` nulo, texto «<5»)."""
-    if ocultar and 0 < n < MIN_OPCION:
-        return {'n': None, 'texto': f'<{MIN_OPCION}'}
-    v = proteger(n, redondear)
-    return {'n': v, 'texto': str(v)}
+def cifra(n: int, redondear: bool = False) -> dict:
+    """Un conteo de opción o de tramo: ``n``, con el redondeo del visualizador (D46)."""
+    return {'n': proteger(n, redondear)}
 
 
 # ---------------------------------------------------------------- qué variables se ofrecen
@@ -409,9 +408,9 @@ def _regla_de(filas: dict, v: str, entrada: dict | None, pedidas: dict[str, str]
 
 def facetas(s: Session, corte_id: int, muestra: dict | None, redondear: bool = False,
             extra: Sequence[dict] | None = None, tiempos: dict[str, float] | None = None) -> dict:
-    """Conteos por opción de cada faceta aplicando los demás filtros pero no el propio (D35). D4: opciones con 1 a 4
-    niños salen como «<5»; con ``redondear`` (visualizador) los conteos menores de 100 van de 5 en 5 (D46). Una opción
-    sin niños sale con ``n`` 0 y texto «0»: es un cero real, no un dato oculto. ``extra``: variables que se pidieron
+    """Conteos por opción de cada faceta aplicando los demás filtros pero no el propio (D35). Una opción con 1 a 4
+    niños sale con su cifra; con ``redondear`` (visualizador) los conteos menores de 100 van de 5 en 5 (D46). Una
+    opción sin niños sale con ``n`` 0: es un cero real. ``extra``: variables que se pidieron
     además de las de siempre, ``[{"variable", "cuando"}]``; las que ya están en el filtro se agregan solas."""
     marca = _Reloj(tiempos)
     _FASES.set(tiempos)
@@ -578,12 +577,12 @@ def distribuciones(cat: pd.DataFrame, ids: list[str]) -> dict:
 
 
 def resumen_poblacion(cat: pd.DataFrame, ids: list[str]) -> dict:
-    """Cuántos niños de la muestra hay en cada categoría, para guardar con ella; D4: de 1 a 4 niños no se anota."""
+    """Cuántos niños de la muestra hay en cada categoría, para guardar con ella."""
     grupo = cat[cat.index.isin(ids)]
     salida: dict[str, dict] = {}
     for col in _TITULOS:
         cuenta = grupo[col].dropna().value_counts()
         if cuenta.empty or (col == 'sede' and cat[col].dropna().nunique() < 2):
             continue
-        salida[col] = {str(k): (int(n) if n >= MIN_OPCION else None) for k, n in cuenta.items()}
+        salida[col] = {str(k): int(n) for k, n in cuenta.items()}
     return salida

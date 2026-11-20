@@ -419,7 +419,7 @@ export interface paths {
         /**
          * Concentracion
          * @description Dónde se acumulan las alertas: por variable y, si el corte trae más de un grupo o sede, por grupo y variable.
-         *     Lo que tenga menos de ``MINIMO_CELDA`` alertas no se muestra solo: se suma en «otras».
+         *     Cada variable y cada celda sale con su cifra, aunque tenga una sola alerta (D63).
          */
         get: operations["concentracion_api_revision_datos_concentracion_get"];
         put?: never;
@@ -1421,7 +1421,7 @@ export interface paths {
         /**
          * Trayectorias
          * @description Puntaje z de crecimiento por grupo y visita frente a la OMS, de la corrida pedida o la más reciente. Solo
-         *     agregados (D7): celdas de menos de 5 niños omitidas, desvíos con 20 o más. Los niños individuales (hasta 30, con su
+         *     agregados (D7): cada celda con su cifra, desvíos con 20 o más. Los niños individuales (hasta 30, con su
          *     código seudonimizado) solo los ven el experto y el administrador.
          */
         get: operations["trayectorias_api_analitica__entrenamiento__trayectorias_get"];
@@ -1442,7 +1442,7 @@ export interface paths {
         };
         /**
          * Perfiles
-         * @description Perfiles provisionales (edad gestacional y Lubchenco): niños por categoría (oculta si hay menos de 5), la tasa de
+         * @description Perfiles provisionales (edad gestacional y Lubchenco): niños por categoría, la tasa de
          *     riesgo alto del desenlace elegido (percentil >= PERCENTIL_ALTO) y qué los distingue (edad gestacional y peso al nacer
          *     medios). No son perfiles reales: ningún experto los ha aprobado todavía.
          */
@@ -1507,8 +1507,7 @@ export interface paths {
         put?: never;
         /**
          * Facetas
-         * @description Niños por opción de cada variable con los demás filtros aplicados (el propio no). Opciones con menos de 5 niños
-         *     salen como «<5».
+         * @description Niños por opción de cada variable con los demás filtros aplicados (el propio no).
          */
         post: operations["facetas_api_muestras_facetas_post"];
         delete?: never;

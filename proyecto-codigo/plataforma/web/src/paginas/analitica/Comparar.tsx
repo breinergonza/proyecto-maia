@@ -17,7 +17,7 @@ import { Aviso, Boton, Selector, Tabla } from '../../components/ui'
 import { PanelPestana, Pestanas, usePestanaEnUrl } from '../../components/ui/Pestanas'
 import { descripcionDe } from '../../lib/descripciones'
 import { dec2, fecha, num, pct } from '../../lib/formato'
-import { jerga, N_MENOR_QUE_5 } from '../../lib/lenguaje'
+import { jerga, SIN_CIFRA } from '../../lib/lenguaje'
 import { difTexto } from './ComparaGrupos'
 import { Guia, Resultado, useTecnico } from './comun'
 import { useContextoAnalitica } from './contexto'
@@ -110,7 +110,7 @@ function ComparaEntrenamientos() {
 
   const diferencia = (m: Medida, A: DatosRendimiento, B: DatosRendimiento) => {
     const va = m.valor(A), vb = m.valor(B)
-    if (va == null || vb == null) return N_MENOR_QUE_5
+    if (va == null || vb == null) return SIN_CIFRA
     const d = vb - va
     return `${d > 0 ? '+' : d < 0 ? '−' : ''}${m.unidad === 'pp' ? `${Math.abs(d).toLocaleString('es-CO', { maximumFractionDigits: 1 })} puntos` : m.formato(Math.abs(d))}`
   }
@@ -188,8 +188,8 @@ function ComparaEntrenamientos() {
                             {medidas.map((m) => (
                               <tr key={m.id}>
                                 <td className="lg:whitespace-nowrap">{m.texto}</td>
-                                <td>{m.valor(datoA) != null ? m.formato(m.valor(datoA) as number) : N_MENOR_QUE_5}</td>
-                                <td>{m.valor(datoB) != null ? m.formato(m.valor(datoB) as number) : N_MENOR_QUE_5}</td>
+                                <td>{m.valor(datoA) != null ? m.formato(m.valor(datoA) as number) : SIN_CIFRA}</td>
+                                <td>{m.valor(datoB) != null ? m.formato(m.valor(datoB) as number) : SIN_CIFRA}</td>
                                 <td>{diferencia(m, datoA, datoB)}</td>
                                 <td>{certeza(m.id)}</td>
                               </tr>
@@ -219,7 +219,7 @@ function ComparaEntrenamientos() {
                               <thead><tr><th>Entrenamiento</th><th>Niños evaluados</th><th>Casos</th><th>Corte de datos</th><th>Datos</th><th>Versión del modelo</th></tr></thead>
                               <tbody>
                                 {[{ nombre: 'A', l: c.a }, { nombre: 'B', l: c.b }].map(({ nombre, l }) => (
-                                  <tr key={nombre}><td>{nombre} (n.º {l.entrenamiento})</td><td>{num(l.n)}</td><td>{l.casos == null ? N_MENOR_QUE_5 : num(l.casos)}</td><td>{l.corte ?? '—'}</td><td>{l.fuente ?? '—'}</td><td>{l.version_registro ?? '—'}</td></tr>
+                                  <tr key={nombre}><td>{nombre} (n.º {l.entrenamiento})</td><td>{num(l.n)}</td><td>{l.casos == null ? SIN_CIFRA : num(l.casos)}</td><td>{l.corte ?? '—'}</td><td>{l.fuente ?? '—'}</td><td>{l.version_registro ?? '—'}</td></tr>
                                 ))}
                               </tbody>
                             </Tabla>
@@ -234,8 +234,8 @@ function ComparaEntrenamientos() {
                                 {(c.por_grupo ?? []).map((g) => (
                                   <tr key={`${g.variable}-${g.grupo}`}>
                                     <td>{g.variable}: {g.grupo}</td><td>{num(g.n_a)}</td><td>{num(g.n_b)}</td>
-                                    <td>{g.a != null ? dec2(g.a) : N_MENOR_QUE_5}</td><td>{g.b != null ? dec2(g.b) : N_MENOR_QUE_5}</td>
-                                    <td>{g.diferencia == null ? N_MENOR_QUE_5 : <>{difTexto(g.diferencia, 'abs')}{g.clara ? ' *' : ''}
+                                    <td>{g.a != null ? dec2(g.a) : SIN_CIFRA}</td><td>{g.b != null ? dec2(g.b) : SIN_CIFRA}</td>
+                                    <td>{g.diferencia == null ? SIN_CIFRA : <>{difTexto(g.diferencia, 'abs')}{g.clara ? ' *' : ''}
                                       {g.ic_bajo != null && g.ic_alto != null && <span className="block text-xs text-salvia lg:ml-2 lg:inline lg:whitespace-nowrap">IC 95 %: {difTexto(g.ic_bajo, 'abs')} a {difTexto(g.ic_alto, 'abs')}</span>}</>}</td>
                                   </tr>
                                 ))}

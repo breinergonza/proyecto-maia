@@ -225,8 +225,9 @@ Tablero, pero para el grupo de niños que usted elija; el Tablero no cambia y si
 * **Qué se ve:** niños en el grupo, datos leídos, niños con algún riesgo alto, crecimiento bajo frente a la OMS, y
   tres gráficas: riesgo del grupo, crecimiento del grupo y quiénes son los niños.
 * **Privacidad:** con menos de 20 niños no se muestran cifras; basta quitar algún filtro. Quien solo consulta ve las
-  cifras menores de 100 aproximadas de 5 en 5. Los grupos de menos de 5 niños se ocultan.
-* **Cómo leer los símbolos:** una opción sin niños se ve **0**; **<5** es un dato oculto por privacidad; **—** es un grupo
+  cifras menores de 100 aproximadas de 5 en 5, y nunca ven 0 donde hay niños (la cifra más baja es 5). Un grupo con 1 a
+  4 niños dice su número.
+* **Cómo leer los símbolos:** una opción sin niños se ve **0**; una opción con 1 a 4 niños dice cuántos son; **—** es un grupo
   de menos de 20 niños. Si ningún niño cumple, aparece «Ningún niño cumple estos filtros» con el botón para quitarlos.
   El muestreo no cambia las cifras de Explorar: solo dice con cuántos niños se entrenaría.
 
@@ -249,7 +250,9 @@ submódulos, como fichas arriba (en el teléfono se deslizan): **Resumen**, **Re
   resultados de analítica, aparece **Sin analítica** y la opción de reentrenar (no se recalcula en silencio). Una ficha con
   «pronto» o un análisis **pendiente** todavía no se calcula para ese modelo (por ejemplo Anticipación, si no hay
   desenlaces entrenados desde varias visitas).
-* Un grupo con menos de 5 niños dice «n menor que 5» y no muestra cifras.
+* Un grupo o una celda con 1 a 4 niños dice cuántos son. **sin cifra** es lo que no se puede calcular: un promedio o un AUC
+  piden 20 niños o más, y el intervalo del AUC pide además 5 niños con el desenlace y 5 sin él (es un límite estadístico, no de
+  privacidad).
 * **Perfiles** son provisionales: edad gestacional y clasificación de Lubchenco; ningún experto los ha aprobado todavía.
 * **Anticipación:** elija una familia de desenlaces y vea cuántos casos se avisaron antes, con qué ventaja, la primera
   visita con alerta y el costo de avisar antes. Experto y administración ven además tres niños visita por visita. Solo
@@ -303,8 +306,8 @@ como error** y **alarmas de grupo**) y tres paneles:
 * **Alertas por tipo.** Cuántos datos raros encontró cada revisión.
 * **Aciertos frente a la revisión.** Cuántas alertas confirmó el equipo al revisar las primeras: de las 50, 100, 200…
   primeras alertas de la cola que ya tienen respuesta, qué porcentaje se marcó como error.
-* **Dónde se concentran.** Sede y dato con más alertas. Si el corte no trae sedes, solo se muestra por dato. Los
-  grupos con menos de 5 alertas no se muestran solos: se suman en «Otras».
+* **Dónde se concentran.** Sede y dato con más alertas, de más a menos. Si el corte no trae sedes, solo se muestra por
+  dato. Cada uno sale con su cifra, aunque tenga una sola alerta.
 
 Debajo está la lista de **Datos por revisar**: datos que el modelo de anomalías encontró raros. Para cada uno, la
 pregunta es si cree que es un **error de registro**.
@@ -716,6 +719,8 @@ Estas son las definiciones que aparecen al pasar el mouse por un término subray
 * **No escriba datos que identifiquen** (nombres, documentos, direcciones, teléfonos) en los comentarios, en los
   motivos ni en **Predicción › Un niño**.
 * **Los datos reales no salen del equipo de la Fundación.** La versión de demostración usa solo niños simulados.
+* **Los conteos pequeños se dicen.** Una cifra de 1 a 4 niños se muestra con su número; las pantallas solo exigen un mínimo de
+  20 niños para dar cifras de grupo, distribuciones y promedios. Quien solo consulta ve los conteos menores de 100 de 5 en 5.
 * **Cuide su cuenta.** No comparta su contraseña, cierre la sesión en equipos compartidos y avise a la administración
   si cree que alguien más la conoce.
 * **No saque capturas, impresiones ni exportaciones con datos de niños** fuera de los canales que autorice la Fundación (esto incluye **Imprimir ficha**).

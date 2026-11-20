@@ -157,7 +157,7 @@ def trayectorias_riesgo(d: dict, crec: pd.DataFrame, orden: dict, nombres: dict,
 
 def perfiles_desenlace(d: dict, sev) -> dict:
     """Perfiles provisionales de los niños de validación con la **tasa observada** del desenlace y la proporción en
-    riesgo alto. Categorías de menos de 5 niños ocultas (D4)."""
+    riesgo alto. Cada categoría da su cifra, también con 1 a 4 niños."""
     from types import SimpleNamespace
     ids = pd.Index(d['variables'].index.astype(str))
     suj = sev.sujetos.assign(sujeto=sev.sujetos.sujeto.astype(str)).drop_duplicates('sujeto')

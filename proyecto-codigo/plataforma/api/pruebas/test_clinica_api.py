@@ -180,14 +180,16 @@ def test_un_filtro_cambia_cada_bloque(cliente, tokens, corrida, datos):  # noqa:
     assert v['ninos'] and all(x['sujeto'] in ids for x in v['ninos'])
 
 
-def test_celdas_de_menos_de_5_no_se_dan(cliente, tokens, corrida, datos):  # noqa: F811
-    # solo 3 varones tienen dato a los 12 meses y en el desarrollo: esas celdas del grupo salen vacías
+def test_celdas_de_menos_de_5_dan_su_cifra(cliente, tokens, corrida, datos):  # noqa: F811
+    # D63 (reemplaza a D4): solo 3 varones tienen dato a los 12 meses y en el desarrollo, y esas celdas dan su cifra
     m = _muestra(_y('sexo', 'lista', ['M']))
     r = _resumen(cliente, tokens, corrida_id=corrida, muestra=m, familia='desarrollo_12m', indicador='talla').json()
-    assert r['observado']['grupo'] is None and r['observado']['poblacion']['con_dato'] > POCOS
+    obs = r['observado']['grupo']
+    assert obs is not None and 1 <= obs['con_dato'] < 5 and obs['pct'] == round(100 * obs['casos'] / obs['con_dato'], 1)
+    assert r['observado']['poblacion']['con_dato'] > POCOS
     doce = next(e for e in r['trayectoria']['etapas'] if e['etapa'] == '12 m EC')
-    assert doce['grupo'] is None and doce['poblacion']['n'] > POCOS
-    assert r['riesgo'] == []   # solo 3 varones tienen riesgo de esa familia
+    assert doce['grupo'] is not None and 1 <= doce['grupo']['n'] < 5 and doce['poblacion']['n'] > POCOS
+    assert r['riesgo'] and all(1 <= c['calculados'] < 5 for c in r['riesgo'])   # solo 3 varones tienen riesgo de esa familia
     assert r['riesgo_con_modelo'] is True   # la corrida sí calcula esa familia: la pantalla no dice «sin modelo»
     assert r['grupo']['n'] == len(datos['varones'])   # el grupo sí se cuenta: tiene 20 o más niños
 

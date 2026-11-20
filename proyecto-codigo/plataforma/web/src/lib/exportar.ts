@@ -1,13 +1,13 @@
 // Exportación de gráficas y tablas: CSV (con BOM UTF-8) y PNG (el primer <svg> del contenido, sin librerías externas).
-// Regla de privacidad: las filas con menos niños que el mínimo se reemplazan por «n<5» (D52: distribuciones y cuantiles, 20).
+// Un conteo de 1 a 4 niños se exporta con su cifra. Solo las distribuciones y cuantiles piden un mínimo de niños (D52, 20).
 
 export type FilaCsv = Record<string, string | number | null>
 
-export const MINIMO_NINOS = 5
 export const MINIMO_NINOS_DISTRIBUCION = 20
 
-/** Reemplaza por «n<mínimo» todas las celdas (menos el campo de conteo) de las filas con menos niños que el mínimo. */
-export function ocultarCeldasPequenas(filas: FilaCsv[], campoN: string, minimo = MINIMO_NINOS): FilaCsv[] {
+/** Reemplaza por «n<mínimo» todas las celdas (menos el campo de conteo) de las filas con menos niños que el mínimo de una
+ *  distribución (D52, ``MINIMO_NINOS_DISTRIBUCION``). */
+export function ocultarCeldasPequenas(filas: FilaCsv[], campoN: string, minimo = MINIMO_NINOS_DISTRIBUCION): FilaCsv[] {
   return filas.map((fila) => {
     const n = fila[campoN]
     if (typeof n !== 'number' || !(n < minimo)) return fila

@@ -4,12 +4,12 @@
   diferencia lleva un intervalo aproximado (réplicas independientes de cada lado) y los niños o casos detrás de cada cifra.
 * ``POST /analitica/comparar/grupos``: dos grupos de niños (cada lado, un filtro guardado o una combinación de
   facetas) sobre una corrida: tamaño, riesgo alto por desenlace, crecimiento y composición. Con menos de 20 niños en
-  un lado no se da ninguna cifra (D52) y los conteos de 1 a 4 se ocultan (D4).
+  un lado no se da ninguna cifra (D52); los conteos de 1 a 4 niños se dan con su cifra.
 * ``POST /analitica/comparar/grupos/clinico``: los mismos dos grupos vistos como los ve el equipo clínico (Comparar
   grupos): qué les pasó a los 12 meses (lo observado, con la diferencia de B frente a A), la talla para la edad por
   visita y los datos que faltan en cada una, y el riesgo estimado por corte (aparte, porque no es lo observado). Las
   cifras de cada lado salen de las mismas funciones que la Vista clínica (``rutas.clinica``) y con sus reglas de
-  privacidad: 20 niños por lado, celdas de 5 o más y conteos redondeados para quien solo consulta.
+  privacidad: 20 niños por lado y conteos redondeados para quien solo consulta.
 
 Aprobar B no vive aquí: la pantalla llama a ``POST /entrenamientos/aprobar`` (solo administración, con auditoría).
 """
@@ -137,7 +137,7 @@ def _abrir(s: Session, u: Usuario, c: DosGrupos) -> tuple[Corrida, list[str], li
 
 def _lado_grupo(nombre: str | None, ids: list[str], defecto: str, red: bool) -> dict:
     n = len(ids)
-    return {'nombre': nombre or defecto, 'n': P.proteger(n, red) if n >= AN.MIN_CELDA else None}
+    return {'nombre': nombre or defecto, 'n': P.proteger(n, red)}
 
 
 def _faltan_ninos(ids_a: list[str], ids_b: list[str]) -> dict | None:
@@ -153,8 +153,8 @@ def _conteos(d: dict, red: bool) -> dict:
 
 
 def _composicion(cat: pd.DataFrame, ids_a: list[str], ids_b: list[str], red: bool) -> dict:
-    """Reparto en % de sexo, edad gestacional, Lubchenco y sede en cada grupo. Una categoría con menos de 5 niños en un
-    lado no da cifra; una variable con menos de 20 niños con dato en un lado no se muestra."""
+    """Reparto en % de sexo, edad gestacional, Lubchenco y sede en cada grupo. Una variable con menos de 20 niños con
+    dato en un lado no se muestra."""
     salida: dict[str, dict] = {}
     for col, titulo in P._TITULOS.items():
         ga, gb = cat.loc[cat.index.isin(ids_a), col].dropna(), cat.loc[cat.index.isin(ids_b), col].dropna()
@@ -166,10 +166,8 @@ def _composicion(cat: pd.DataFrame, ids_a: list[str], ids_b: list[str], red: boo
         for c in orden:
             na, nb = int((ga == c).sum()), int((gb == c).sum())
             filas.append({'categoria': c, 'etiqueta': nombres.get(c, c),
-                          'n_a': P.proteger(na, red) if na >= AN.MIN_CELDA else None,
-                          'n_b': P.proteger(nb, red) if nb >= AN.MIN_CELDA else None,
-                          'pct_a': round(100 * na / len(ga), 1) if na >= AN.MIN_CELDA else None,
-                          'pct_b': round(100 * nb / len(gb), 1) if nb >= AN.MIN_CELDA else None})
+                          'n_a': P.proteger(na, red), 'n_b': P.proteger(nb, red),
+                          'pct_a': round(100 * na / len(ga), 1), 'pct_b': round(100 * nb / len(gb), 1)})
         salida[col] = {'etiqueta': titulo, 'categorias': filas}
     return salida
 
@@ -177,7 +175,7 @@ def _composicion(cat: pd.DataFrame, ids_a: list[str], ids_b: list[str], red: boo
 def _motivos_por_grupo(s: Session, corrida_id: int, desenlace: str | None, esq: dict,
                        ids_a: list[str], ids_b: list[str], red: bool) -> list[dict]:
     """Qué razones se repiten entre los niños con riesgo alto de cada grupo (los motivos que dejó la corrida). Un lado
-    con menos de 20 niños de riesgo alto no da cifras; una razón con menos de 5 niños queda oculta."""
+    con menos de 20 niños de riesgo alto no da cifras."""
     filas = s.execute(text(
         'SELECT sujeto, motivos FROM resultados.riesgos WHERE corrida_id = :c AND NOT silencio AND percentil >= :p '
         + ('AND clave = :d ' if desenlace else '') + 'AND sujeto = ANY(:ids)'),
@@ -197,19 +195,16 @@ def _motivos_por_grupo(s: Session, corrida_id: int, desenlace: str | None, esq: 
         return []
 
     def celda(n: int, total: int) -> dict:
-        ok = n >= AN.MIN_CELDA
-        return {'n': P.proteger(n, red) if ok else None, 'pct': round(100 * n / total, 1) if ok else None}
+        return {'n': P.proteger(n, red), 'pct': round(100 * n / total, 1)}
     todos = {*lados[0][1], *lados[1][1]}
     filas_m = [{'motivo': m, 'a': celda(lados[0][1].get(m, 0), lados[0][0]), 'b': celda(lados[1][1].get(m, 0), lados[1][0])}
                for m in todos]
-    filas_m = [f for f in filas_m if f['a']['pct'] is not None or f['b']['pct'] is not None]
-    filas_m.sort(key=lambda f: -max(f['a']['pct'] or 0, f['b']['pct'] or 0))
+    filas_m.sort(key=lambda f: -max(f['a']['pct'], f['b']['pct']))
     return [{**f, 'altos_a': P.proteger(lados[0][0], red), 'altos_b': P.proteger(lados[1][0], red)} for f in filas_m[:MAX_FILAS]]
 
 
 def _faltantes_por_grupo(s: Session, corte: int, esq: dict, ids_a: list[str], ids_b: list[str], red: bool) -> list[dict]:
-    """Porcentaje de niños de cada grupo sin el dato, para los datos que más se distancian entre los dos grupos. Un
-    conteo de 1 a 4 niños (con dato o sin él) queda oculto."""
+    """Porcentaje de niños de cada grupo sin el dato, para los datos que más se distancian entre los dos grupos."""
     def con_dato(ids: list[str]) -> dict[str, int]:
         r = s.execute(text('SELECT variable, count(DISTINCT sujeto) AS n FROM sevarti.mediciones WHERE corte_id = :c '
                            'AND valor IS NOT NULL AND sujeto = ANY(:ids) GROUP BY variable'), {'c': corte, 'ids': ids})
@@ -218,12 +213,11 @@ def _faltantes_por_grupo(s: Session, corte: int, esq: dict, ids_a: list[str], id
 
     def celda(n: int, total: int) -> dict:
         faltan = total - n
-        ok = faltan >= AN.MIN_CELDA or faltan == 0
-        return {'faltan': P.proteger(faltan, red) if ok else None, 'pct': round(100 * faltan / total, 1) if ok else None}
+        return {'faltan': P.proteger(faltan, red), 'pct': round(100 * faltan / total, 1)}
     filas = []
     for v in {*ca, *cb}:
         a, b = celda(ca.get(v, 0), len(ids_a)), celda(cb.get(v, 0), len(ids_b))
-        if a['pct'] is None or b['pct'] is None or (a['pct'] == 0 and b['pct'] == 0):
+        if a['pct'] == 0 and b['pct'] == 0:
             continue
         filas.append({'variable': v, 'etiqueta': str((esq.get(v) or {}).get('etiqueta') or v), 'a': a, 'b': b,
                       'dif': abs(a['pct'] - b['pct'])})
@@ -289,7 +283,7 @@ def _valores_observados(s: Session, corrida: int, familia: str, ids_a: list[str]
 def _riesgo_por_corte(s: Session, corrida: Corrida, familia: str, ids_a: list[str], ids_b: list[str], dic: Dic,
                       red: bool) -> list[dict]:
     """Por corte de la familia, cuántos niños de cada lado tienen riesgo calculado y cuántos están en alerta. Es el
-    riesgo estimado por el modelo, no lo observado: la pantalla lo rotula así. Un lado con menos de 5 niños no da cifra."""
+    riesgo estimado por el modelo, no lo observado: la pantalla lo rotula así."""
     cortes = [{f['clave']: f for f in CLI.riesgo_de(s, corrida.id, corrida.corte_id, familia, ids, dic, red)}
               for ids in (ids_a, ids_b)]
     mapa = etapas(s, corrida.corte_id)
@@ -321,7 +315,7 @@ def _desenlace(s: Session, corrida: Corrida, familia: dict, ids_a: list[str], id
 
 def _talla_por_visita(s: Session, corrida: Corrida, ids_a: list[str], ids_b: list[str], dic: Dic, red: bool) -> dict:
     """La mediana del puntaje z de talla en cada visita, de cada lado, con los niños que tienen dato y los que no (el
-    porcentaje que falta es sobre todos los niños del lado). Una visita con menos de 5 niños con dato no da cifra. Se
+    porcentaje que falta es sobre todos los niños del lado). Se
     cuenta con los conteos exactos y solo se redondea lo que se muestra: restar o dividir conteos redondeados para quien
     solo consulta daría otras cifras."""
     por_lado = [CLI.trayectoria_de(s, corrida.id, corrida.corte_id, INDICADOR_TALLA, ids, dic, False) for ids in (ids_a, ids_b)]

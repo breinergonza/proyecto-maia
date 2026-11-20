@@ -7,6 +7,7 @@ import { useFacetasExplorar, useMuestras } from '../api/exploracion'
 import type { CuerpoExplorar } from '../api/tipos'
 import { puede, useSesion } from '../auth/sesion'
 import { num } from '../lib/formato'
+import { SIN_CIFRA } from '../lib/lenguaje'
 import { useFiltros, type Filtros } from '../lib/useFiltros'
 import { criteriosActivos, PanelFacetas } from './PanelFacetas'
 import { Boton } from './ui'
@@ -38,7 +39,7 @@ export function GrupoActivo({ ninos, total, minimo, error, conDato, conPanel = t
   minimo?: number
   /** La consulta de la página falló: no se sabe cuántos son. */
   error?: boolean
-  /** Cuántos niños del grupo tienen el dato del desenlace que muestra la página (nulo si son menos de 5). */
+  /** Cuántos niños del grupo tienen el dato del desenlace que muestra la página (nulo si el grupo no llega al mínimo). */
   conDato?: { n: number | null; desenlace: string }
   /** La página ya trae el panel de filtros a la vista (Explorar): no hace falta el botón. */
   conPanel?: boolean
@@ -70,7 +71,7 @@ export function GrupoActivo({ ninos, total, minimo, error, conDato, conPanel = t
             {criterios.length > 0 && <p className="text-sm">{textoCriterios(criterios)}</p>}
             <p className="flex flex-wrap gap-x-3 text-sm">
               <span className="font-semibold text-teal">{cuantos}</span>
-              {conDato && <span>{conDato.n === null ? 'Menos de 5' : num(conDato.n)} con el dato de «{conDato.desenlace}»</span>}
+              {conDato && <span>{conDato.n === null ? SIN_CIFRA : num(conDato.n)} con el dato de «{conDato.desenlace}»</span>}
             </p>
           </div>
           {conPanel && (

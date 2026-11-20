@@ -309,16 +309,13 @@ export interface AciertosRevision {
   confirmadas_error_pct: number | null
 }
 
-/** GET /revision/datos/concentracion: alertas por variable y, con más de un grupo o sede, por grupo y variable.
- * Lo que tiene menos de `minimo_celda` alertas viene sumado en `otras_*`. */
+/** GET /revision/datos/concentracion: alertas por variable y, con más de un grupo o sede, por grupo y variable. Todas
+ * con su cifra, aunque tengan una sola alerta (D63). */
 export interface ConcentracionAlertas {
   corrida_id: number
   hay_sede: boolean
-  minimo_celda: number
   por_variable: { variable: string; etiqueta: string | null; alertas: number }[]
-  otras_variables: number
   celdas: { grupo: string; variable: string; etiqueta: string | null; alertas: number }[]
-  otras_celdas: number
 }
 
 /** GET /inferencia/formulario: los campos del formulario de cálculo, armados con el esquema del paquete activo. */
@@ -559,8 +556,8 @@ export interface MuestreoJson { modo: 'todos' | 'estratificado'; por?: string; m
 export interface MuestraJson { version: 2; y: EntradaFiltro[]; tiempo?: TiempoJson; muestreo?: MuestreoJson }
 /** Una variable agregada al panel con la regla con que se lee (primera, ultima, alguna o etapa:<visita>). */
 export interface VariableExtra { variable: string; cuando: string }
-export interface OpcionFaceta { valor: string | number | boolean; etiqueta: string; n: number | null; texto: string; rango?: [number | null, number | null] }
-export interface BinFaceta { desde: number; hasta: number; n: number | null; texto: string }
+export interface OpcionFaceta { valor: string | number | boolean; etiqueta: string; n: number | null; rango?: [number | null, number | null] }
+export interface BinFaceta { desde: number; hasta: number; n: number | null }
 export interface Faceta {
   etiqueta: string
   tipo: 'lista' | 'si_no' | 'numero'
@@ -577,7 +574,7 @@ export interface Faceta {
 export interface DisponibleFaceta { variable: string; etiqueta: string; tipo: Faceta['tipo']; cuando: string | null; reglas: string[] }
 export interface RespuestaFacetas {
   n: number | null; facetas: Record<string, Faceta>; insuficiente?: boolean; minimo: number; n_base?: number
-  /** Ningún niño cumple los filtros (``n`` es 0): un cero verdadero, no una cifra oculta. */
+  /** Ningún niño cumple los filtros (``n`` es 0): un cero verdadero. */
   vacio?: boolean
   tiempo?: { campos: { valor: string; etiqueta: string }[]; defecto: string; hay_fecha_nacimiento: boolean; desde: number | null; hasta: number | null; corte: string | null }
   muestreo?: { por: { valor: string; etiqueta: string }[] }
@@ -593,7 +590,7 @@ export interface DistribucionGrupo {
   etiqueta: string
   categorias: { categoria: string; etiqueta: string; grupo: number | null; todos: number }[]
 }
-/** Menos de 20 niños (``ninos`` nulo: cifra oculta) o ninguno (``vacio``, ``ninos`` 0). */
+/** Menos de 20 niños (``ninos`` nulo: D46) o ninguno (``vacio``, ``ninos`` 0). */
 export interface ExplorarInsuficiente { insuficiente: true; vacio?: boolean; ninos: number | null; minimo: number }
 export interface ExplorarResumen {
   insuficiente: false
@@ -623,7 +620,7 @@ export type CuerpoExplorar = ({ muestra: MuestraJson; muestra_id?: undefined } |
 export type CuerpoClinica = CuerpoExplorar & { familia?: string | null; indicador?: string | null }
 /** Un desenlace a 12 meses (con sus cortes): ``en_prueba`` hasta que haya entrenamientos y métricas verificables. */
 export interface FamiliaClinica { clave: string; nombre: string; definicion: string; estado: 'en_uso' | 'en_prueba'; indicador: string | null }
-/** Niños con el desenlace entre los que tienen dato a los 12 meses; un conteo menor que 5 llega nulo. */
+/** Niños con el desenlace entre los que tienen dato a los 12 meses; sin niños con dato, nada. */
 /** ``pct``: casos entre quienes tienen dato, de los conteos exactos (los conteos se redondean para quien solo consulta). */
 export interface ObservadoClinico { casos: number | null; con_dato: number | null; sin_dato: number | null; pct: number; pct_sin_dato: number | null }
 export interface EtapaClinica {
@@ -715,7 +712,7 @@ export type PrediccionNino = { modelo: ResumenModeloPrediccion; visita: string; 
 
 // ---- Predicción asíncrona (muestra y universo) y niños nuevos guardados (a mano hasta regenerar esquema.d.ts)
 export interface CeldaVisitaPrediccion {
-  clave: string; desenlace: string; momento: string; momento_nombre: string; orden: number; n: number; oculta: boolean
+  clave: string; desenlace: string; momento: string; momento_nombre: string; orden: number; n: number
   riesgo_mediano: number | null; altos: number | null; pct_altos: number | null
 }
 export type EstadoTrabajo = 'pendiente' | 'en_curso' | 'ok' | 'error'
@@ -757,23 +754,23 @@ export interface NinoTrayectoria {
 export interface RespuestaTrayectorias {
   estado: 'ok' | 'pendiente' | 'sin_artefactos'; entrenamiento: number; mensaje?: string
   indicador?: IndicadorTrayectoria; etiqueta_indicador?: string; etiqueta?: string; agrupar?: AgruparTrayectoria; eje?: EjeTrayectoria
-  minimo_ninos?: number; grupos?: GrupoTrayectoria[]; celdas_omitidas?: number; grupos_omitidos?: number
+  grupos?: GrupoTrayectoria[]
   /** «sin_riesgo»: la corrida no calculó el riesgo de este desenlace (solo se calcula a los niños en seguimiento). */
   motivo?: 'sin_riesgo'
   fuente?: 'validacion'; nota?: string
   individuales_visibles?: boolean; individuales?: NinoTrayectoria[]
 }
 export interface FilaPerfil {
-  categoria: string; etiqueta: string; n: number | null; tasa: number | null; oculto: boolean
+  categoria: string; etiqueta: string; n: number | null; tasa: number | null
   eg_media?: number | null; peso_medio?: number | null
   /** Guardadas al entrenar con los niños de validación: tasa observada del desenlace y proporción en riesgo alto. */
   tasa_observada?: number | null; tasa_riesgo_alto?: number | null
 }
 export interface RespuestaPerfiles {
   estado: 'ok' | 'pendiente' | 'sin_artefactos'; entrenamiento: number; mensaje?: string
-  confianza?: { minimo_ninos: number; aprobacion: 'pendiente' | string; texto?: string }
-  tasa_significa?: string; ninos?: number; categorias_ocultas?: number; unidad_peso?: string | null
-  /** Si la corrida calculó el riesgo del desenlace; sin él, la tasa no existe (no es «n < 5»). */
+  confianza?: { aprobacion: 'pendiente' | string; texto?: string }
+  tasa_significa?: string; ninos?: number; unidad_peso?: string | null
+  /** Si la corrida calculó el riesgo del desenlace; sin él, la tasa no existe. */
   riesgo_disponible?: boolean; n_con_riesgo?: number; mensaje_riesgo?: string
   /** «validacion»: agregados guardados por el entrenamiento; sin él, calculados en vivo de la última corrida. */
   fuente?: 'validacion'; casos?: number

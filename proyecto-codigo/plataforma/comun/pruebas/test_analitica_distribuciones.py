@@ -1,10 +1,9 @@
-"""hist_riesgo y distribuciones_muestra_universo: celdas de menos de 5 niños ocultas, cohortes de 20 o más (D52)."""
+"""hist_riesgo y distribuciones_muestra_universo: toda celda con su cifra, cohortes de 20 o más (D52)."""
 import json
 
 import numpy as np
 import pandas as pd
 
-from maia_comun import analitica as AN
 from maia_comun import analitica_distribuciones as AD
 
 
@@ -14,14 +13,14 @@ def _datos(n=1500, semilla=2):
     return r, rng.random(n) < r
 
 
-def test_hist_riesgo_separa_con_y_sin_y_oculta_tramos_pequenos():
+def test_hist_riesgo_separa_con_y_sin_y_da_la_cifra_de_los_tramos_pequenos():
     r, y = _datos()
     h = AD.hist_riesgo(y, r)
     assert h['estado'] == 'ok' and len(h['tramos']) == AD.TRAMOS and h['n'] == len(y)
-    assert all(t['con'] is None or t['con'] >= AN.MIN_CELDA for t in h['tramos'])
-    assert all(t['sin'] is None or t['sin'] >= AN.MIN_CELDA for t in h['tramos'])
-    # la cola de riesgo alto tiene pocos niños sin el desenlace: hay tramos ocultos, no ceros inventados
-    assert any(t['con'] is None for t in h['tramos'])
+    assert all(isinstance(t['con'], int) and isinstance(t['sin'], int) for t in h['tramos'])
+    assert sum(t['con'] for t in h['tramos']) == h['casos'] and sum(t['sin'] for t in h['tramos']) == h['n'] - h['casos']
+    # la cola de riesgo alto tiene pocos niños sin el desenlace: esos tramos dicen 1 a 4, no se ocultan
+    assert any(0 < t['sin'] < 5 or 0 < t['con'] < 5 for t in h['tramos'])
     assert h['mediana_con'] > h['mediana_sin']
     json.dumps(h)
 
@@ -44,13 +43,13 @@ def test_hist_riesgo_cuantiles_solo_con_20_casos():
 def _universo(n=600, sesgo=False):
     idx = [f'N{i:04d}' for i in range(n)]
     sexo = pd.Series(np.where(np.arange(n) % 2 == 0, 'femenino', 'masculino'), index=idx)
-    banda = pd.Series(np.where(np.arange(n) < n - 3, 'a termino', 'extremo'), index=idx)   # 3 niños: <5
+    banda = pd.Series(np.where(np.arange(n) < n - 3, 'a termino', 'extremo'), index=idx)   # 3 niños
     eg = pd.Series(np.linspace(26, 41, n), index=idx)
     muestra = idx[: n // 2] if sesgo else idx[::2][: n // 3]
     return idx, {'sexo': sexo, 'edad gestacional': banda}, {'edad gestacional (semanas)': eg}, muestra
 
 
-def test_distribuciones_muestra_universo_porcentajes_y_celdas_pequenas():
+def test_distribuciones_muestra_universo_porcentajes_y_celdas_pequenas_con_su_cifra():
     _, cats, nums, muestra = _universo()
     d = AD.distribuciones_muestra_universo(muestra, cats, nums)
     assert d['estado'] == 'ok'
@@ -59,7 +58,7 @@ def test_distribuciones_muestra_universo_porcentajes_y_celdas_pequenas():
     assert abs(sum(c['pct_universo'] for c in sexo['categorias']) - 100) < 0.2
     eg = d['categoricas']['edad gestacional']
     extremo = next(c for c in eg['categorias'] if c['categoria'] == 'extremo')
-    assert extremo['n_universo'] is None and extremo['pct_universo'] is None and extremo['diferencia_pp'] is None
+    assert extremo['n_universo'] == 3 and extremo['pct_universo'] == 0.5 and extremo['diferencia_pp'] is not None
     q = d['numericas']['edad gestacional (semanas)']
     assert q['universo']['p50'] > q['universo']['p5'] and q['n_muestra'] == len(muestra)
     json.dumps(d)

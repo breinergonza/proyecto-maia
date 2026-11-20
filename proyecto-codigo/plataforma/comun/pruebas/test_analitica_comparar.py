@@ -76,11 +76,11 @@ def test_comparar_valores_de_dos_grupos():
     assert igual['diferencia'] == 0 and igual['clara'] is False
 
 
-def test_comparar_valores_privacidad():
+def test_comparar_valores_con_pocos_ninos_da_el_conteo_y_no_la_cifra():
     chico = CM.comparar_valores(np.ones(10), np.zeros(300))
     assert chico['a'] is None and chico['diferencia'] is None and chico['n_a'] == 10 and chico['n_b'] == 300
     muy_chico = CM.comparar_valores(np.ones(3), np.zeros(300))
-    assert muy_chico['n_a'] is None
+    assert muy_chico['n_a'] == 3 and muy_chico['a'] is None   # la cifra pide 20 niños (D52); el conteo se dice
 
 
 def test_comparar_valores_acota_las_filas():

@@ -22,10 +22,10 @@ const agregados = {
     riesgo_mediano: 0.05, altos: 59, muy_altos: 30 }],
 }
 const porVisita = [
-  { clave: 'des6', desenlace: 'desarrollo psicomotor bajo', momento: 'nac', momento_nombre: 'Nacimiento', orden: 1, n: 590, oculta: false,
+  { clave: 'des6', desenlace: 'desarrollo psicomotor bajo', momento: 'nac', momento_nombre: 'Nacimiento', orden: 1, n: 590,
     riesgo_mediano: 0.04, altos: 40, pct_altos: 6.8 },
-  { clave: 'des6', desenlace: 'desarrollo psicomotor bajo', momento: '3 m EC', momento_nombre: '3 meses', orden: 2, n: 3, oculta: true,
-    riesgo_mediano: null, altos: null, pct_altos: null },
+  { clave: 'des6', desenlace: 'desarrollo psicomotor bajo', momento: '3 m EC', momento_nombre: '3 meses', orden: 2, n: 3,
+    riesgo_mediano: 0.02, altos: 1, pct_altos: 33.3 },
 ]
 const fila = (i: number) => ({ sujeto: `N-${String(i).padStart(3, '0')}`, clave: 'des6', desenlace: 'desarrollo psicomotor bajo', momento: '3 m EC',
   momento_nombre: '3 meses', riesgo: 0.4, percentil: 97, nivel: 'muy_alto', perfil: 'Muy prematuro · Peso adecuado',
@@ -130,13 +130,18 @@ describe('predicción', () => {
     expect(screen.getByRole('progressbar', { name: 'Avance del cálculo' })).toHaveAttribute('value', '40')
   })
 
-  it('pagina la tabla de 200 en 200 y el riesgo por visita oculta las celdas chicas', async () => {
+  it('pagina la tabla de 200 en 200 y el riesgo por visita da cifras aunque la visita tenga pocos niños', async () => {
     const llamadas = api('experto')
     montar('/prediccion?vista=grupo')
     await userEvent.click(await screen.findByRole('tab', { name: 'Todo el universo' }))
     await userEvent.click(screen.getByRole('button', { name: 'Calcular el riesgo' }))
     await userEvent.click(await screen.findByRole('tab', { name: 'Por visita' }))
     expect(await screen.findByRole('heading', { name: 'Riesgo alto en cada visita' })).toBeInTheDocument()
+    // D63: la visita con 3 niños sale con sus cifras, no se oculta
+    await userEvent.click(screen.getByRole('button', { name: /Ver como tabla/ }))
+    const tresMeses = screen.getByRole('cell', { name: '3 meses' }).closest('tr')!
+    expect(tresMeses).toHaveTextContent('3')
+    expect(tresMeses).toHaveTextContent('33,3')
     await userEvent.click(screen.getByRole('tab', { name: 'Niños con más riesgo' }))
     expect(await screen.findByRole('link', { name: 'N-001' })).toBeInTheDocument()
     expect(screen.getByText(/Página 1 de 3/)).toBeInTheDocument()

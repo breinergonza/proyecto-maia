@@ -41,11 +41,11 @@ def test_una_sola_visita_o_sin_familias_no_genera_nada():
     assert AL.anticipacion_artefactos({}, ORDEN) == {}
 
 
-def test_pocos_casos_se_omiten():
+def test_pocos_casos_dan_su_cifra():
     p = _pred('3 m EC', n=30)
     p['y'] = np.zeros(30, dtype=bool)
     p['y'][:2] = True
     a = AL.anticipacion_artefactos({'x_12m_desde_3': p, 'x_12m_desde_6': {**p, 'desenlace': SimpleNamespace(
         nombre='x', momento='6 m EC', etapa='12 m EC')}}, ORDEN)['x_12m']
-    assert a['visitas'][0]['casos'] is None and a['visitas'][0]['casos_detectados_pct'] is None
-    assert a['avisados_antes']['pct'] is None
+    assert a['visitas'][0]['casos'] == 2 and a['visitas'][0]['casos_detectados_pct'] is not None
+    assert a['avisados_antes']['casos'] == 2 and a['avisados_antes']['pct'] is not None

@@ -30,6 +30,10 @@ const dato = (extra: object = {}) => ({
 })
 const cola = (items: object[]) => ({ total: items.length, pagina: 1, tamano: 12, items })
 
+// D63: un dato con una sola alerta también sale, con su cifra
+const concentracion = { corrida_id: 1, hay_sede: false, celdas: [], por_variable: [
+  { variable: 'peso', etiqueta: 'Peso', alertas: 12 }, { variable: 'pc', etiqueta: 'Perímetro cefálico', alertas: 1 }] }
+
 function api(items: object[] = [dato()], extra?: (url: string, init?: RequestInit) => { estado?: number; cuerpo?: unknown } | undefined) {
   return simularApi((url, init) => {
     if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('admin') } }
@@ -39,7 +43,7 @@ function api(items: object[] = [dato()], extra?: (url: string, init?: RequestIni
     if (url.startsWith('/api/revision/datos?')) return { cuerpo: cola(items) }
     if (url === '/api/revision/datos/aciertos') return { cuerpo: { corrida_id: 1, serie: [], respondidas: 0, confirmadas_error_pct: null } }
     if (url === '/api/revision/datos/concentracion') {
-      return { cuerpo: { corrida_id: 1, hay_sede: false, minimo_celda: 5, por_variable: [], otras_variables: 0, celdas: [], otras_celdas: 0 } }
+      return { cuerpo: concentracion }
     }
     if (url === '/api/tablero/resumen') return { cuerpo: { datos_revisar: 38, alertas_por_1000: 3, alarmas_grupo: 0, alertas_por_capa: {} } }
     if (url === '/api/revision/datos/7') return { estado: 204 }
@@ -229,5 +233,15 @@ describe('calidad de datos: las medidas de la revisión siguen ahí', () => {
     for (const t of ['Alertas por tipo', 'Aciertos frente a la revisión', 'Dónde se concentran']) {
       expect(await screen.findByRole('heading', { name: t })).toBeInTheDocument()
     }
+  })
+
+  it('dónde se concentran muestra cada dato con su cifra, aunque tenga una sola alerta', async () => {
+    api()
+    montar('/admin/calidad-datos')
+    await userEvent.click(await screen.findByText('Cómo se comportan las alertas'))
+    const lista = await screen.findByRole('list', { name: 'Alertas por sede y dato' })
+    expect(within(lista).getByText('Perímetro cefálico').closest('li')).toHaveTextContent(/\D1 alerta$/)
+    expect(within(lista).getByText('Peso').closest('li')).toHaveTextContent('12 alertas')
+    expect(screen.queryByText(/Otras:/)).not.toBeInTheDocument()
   })
 })

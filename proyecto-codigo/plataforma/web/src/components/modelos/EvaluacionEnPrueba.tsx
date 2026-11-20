@@ -103,7 +103,7 @@ export function EvaluacionAciertos(props: Props) {
             unidad: 'Número de niños',
             momento,
             poblacion,
-            validos: ninosMatriz != null ? `${num(ninosMatriz)} niños` : `${num(auc.n)} niños; las celdas con menos de 5 no se muestran`,
+            validos: ninosMatriz != null ? `${num(ninosMatriz)} niños` : `${num(auc.n)} niños`,
             porcentaje: 'Cada celda es un conteo. Sensibilidad = detectados entre los niños que tuvieron el desenlace; precisión = detectados entre los niños en alerta',
           }} />
         </>

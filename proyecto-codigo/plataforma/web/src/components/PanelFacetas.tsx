@@ -1,7 +1,7 @@
 // Panel de filtros de Explorar: casillas por variable con cuántos niños tendría cada opción (los demás filtros puestos),
 // los filtros activos como fichas, «+ Agregar variable», el tiempo y el muestreo, los filtros guardados y «Guardar este
-// filtro». Con menos de 5 niños en una opción solo dice «<5» (D4); con menos de 20 en el grupo no hay cifras (D46); una
-// opción sin niños dice «0» y se atenúa: un cero es un dato, no una cifra oculta. Cada categoría vale por sí sola: elegir
+// filtro». Cada opción dice cuántos niños tendría, también si son 1 a 4; con menos de 20 en el grupo no hay cifras
+// (D46, «—»); una opción sin niños dice «0» y se atenúa: un cero es un dato. Cada categoría vale por sí sola: elegir
 // «muy prematuro» y «a término» no incluye a los moderados.
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
@@ -71,7 +71,7 @@ function Casillas({ clave, faceta, entrada, cambiar }: { clave: string; faceta: 
             <input id={id} type="checkbox" className="size-4 accent-teal" checked={marcada} onChange={() => alternar(o, marcada)} />
             <label htmlFor={id} className="flex flex-1 cursor-pointer items-baseline justify-between gap-2">
               <span>{o.etiqueta}</span>
-              <span className="text-xs text-salvia">{o.texto}</span>
+              <span className="text-xs text-salvia">{o.n == null ? '—' : num(o.n)}</span>
             </label>
           </li>
         )

@@ -1,4 +1,4 @@
-"""Interpretabilidad en la API: devuelve los artefactos agregados, oculta lo pequeño y da estado vacío a lo antiguo."""
+"""Interpretabilidad en la API: devuelve los artefactos agregados, con la cifra de lo pequeño, y da estado vacío a lo antiguo."""
 from __future__ import annotations
 
 import numpy as np
@@ -96,8 +96,8 @@ def test_devuelve_los_cuatro_artefactos(cliente, tokens, entrenamiento):
         assert d['importancia'][0]['variable'] == 'peso'
         assert d['shap_global']['variables'][0]['etiqueta'] == 'Peso al nacer'
         assert d['pdp']['variables'] and d['motivos_frecuentes']['motivos'] and d['interaccion']['pares']
-        assert all(c['n'] is None or c['n'] >= 5 for p in d['interaccion']['pares'] for c in p['celdas'])
-        assert all(m['n'] is None or m['n'] >= 5 for m in d['motivos_frecuentes']['motivos'])
+        assert all(isinstance(c['n'], int) for p in d['interaccion']['pares'] for c in p['celdas'])
+        assert all(isinstance(m['n'], int) for m in d['motivos_frecuentes']['motivos'])
 
 
 def test_entrenamiento_antiguo_no_trae_los_artefactos(cliente, tokens, entrenamiento):

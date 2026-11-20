@@ -9,9 +9,9 @@ import { CAPAS, dec2, fecha, frase, indicador, numero, RIESGO_ALTO } from './for
 export const RIESGO_MUY_ALTO = 95
 
 /** Por qué no hay riesgo estimado que mostrar: el paquete no calcula el desenlace, o lo calcula pero ningún niño elegido
- *  lo tiene ahora (solo se calcula para quienes siguen en seguimiento, y con menos de 5 no se da la cifra). */
+ *  lo tiene ahora (solo se calcula para quienes siguen en seguimiento). */
 export const sinRiesgoEstimado = (conModelo: boolean, quienes: string) => conModelo
-  ? `Ningún niño ${quienes} tiene riesgo estimado ahora: se calcula solo para los niños que siguen en seguimiento, y con menos de 5 no se da la cifra.`
+  ? `Ningún niño ${quienes} tiene riesgo estimado ahora: se calcula solo para los niños que siguen en seguimiento.`
   : `El paquete de modelos activo aún no calcula este desenlace: no hay riesgo estimado ${quienes}.`
 
 /** Contra quiénes se ordena el riesgo de cada niño: los niños con que se calibró el modelo de ese desenlace (los más
@@ -245,7 +245,13 @@ export const GLOSARIO_ANALITICA: Record<string, string> = {
 /** Jerga o palabra clínica según el modo técnico. */
 export const jerga = (tecnico: boolean, clinico: string, tecnicoTexto: string) => (tecnico ? tecnicoTexto : clinico)
 
-export const N_MENOR_QUE_5 = 'n menor que 5'
+/** Lo que dice una celda sin cifra. Ningún conteo se oculta por ser de pocos niños (1 a 4 se dicen con su número): sin
+ *  cifra es lo que no se pudo calcular (un promedio o un intervalo pide 20 niños; el intervalo de un AUC, 5 de cada
+ *  clase) o lo que un entrenamiento anterior no guardó. */
+export const SIN_CIFRA = 'sin cifra'
+
+/** Por qué un AUC puede venir sin intervalo: es un límite estadístico, no de privacidad. */
+export const SIN_INTERVALO = 'Sin intervalo: hacen falta al menos 5 niños con el desenlace y 5 sin él para estimarlo.'
 
 /** El nombre clínico del estado de un semáforo. */
 export const SEMAFORO: Record<string, string> = { verde: 'Confiable', ambar: 'Mirar con cuidado', rojo: 'No confiable', gris: 'Sin datos para decidir' }

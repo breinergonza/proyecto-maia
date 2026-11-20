@@ -3,7 +3,7 @@
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { COLOR, LeyendaSeries, SERIES_COLOR, type ColorSerie } from './index'
 import { GraficaNavegable, resumenDe } from './navegacion'
-import { N_MENOR_QUE_5 } from '../../lib/lenguaje'
+import { SIN_CIFRA } from '../../lib/lenguaje'
 
 export interface SerieXY {
   clave: string
@@ -71,12 +71,12 @@ export function CurvaXY({ series, etiqueta, ejeX, ejeY, formatoX = (v) => String
   )
 }
 
-/** Barras verticales de conteos por tramo. Un tramo con `n` nulo (menos de 5 niños) queda vacío. */
+/** Barras verticales de conteos por tramo. Un tramo con `n` nulo (sin cifra) queda vacío. */
 export function Histograma({ tramos, etiqueta, formatoX = (v) => String(v), alto = 200 }: {
   tramos: { desde: number | null; hasta: number | null; n: number | null }[]; etiqueta: string; formatoX?: (v: number) => string; alto?: number
 }) {
   const filas = tramos.map((t) => ({ x: t.desde != null ? formatoX(t.desde) : '', n: t.n ?? 0 }))
-  const items = tramos.map((t, i) => `${filas[i].x || `Tramo ${i + 1}`}. ${t.n == null ? N_MENOR_QUE_5 : `${t.n} niños`}`)
+  const items = tramos.map((t, i) => `${filas[i].x || `Tramo ${i + 1}`}. ${t.n == null ? SIN_CIFRA : `${t.n} niños`}`)
   return (
     <GraficaNavegable etiqueta={etiqueta} resumen={resumenDe('Barras', tramos.length, ['tramo', 'tramos'])} items={items} style={{ height: alto }}>
       <ResponsiveContainer width="100%" height="100%">

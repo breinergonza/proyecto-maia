@@ -3,8 +3,8 @@
 ``POST /clinica/resumen`` junta lo que la pantalla pide de una vez: qué les pasó a los 12 meses (lo observado, que la
 corrida guarda en ``resultados.desenlaces_observados``), la talla para la edad por visita frente a la población, el
 riesgo estimado por corte y los niños con más riesgo. El grupo se elige igual que en Explorar y valen las mismas reglas
-de privacidad (D4, D46): menos de 20 niños no da cifras, una celda de menos de 5 no se muestra y para quien solo
-consulta los conteos menores de 100 se redondean a múltiplos de 5. Los niños individuales, con su código seudonimizado,
+de privacidad (D46): menos de 20 niños no da cifras y para quien solo consulta los conteos menores de 100 se
+redondean a múltiplos de 5; una celda de 1 a 4 niños se da con su cifra. Los niños individuales, con su código seudonimizado,
 solo los ven el experto y el administrador, y cada lista queda en la auditoría."""
 from __future__ import annotations
 
@@ -133,13 +133,13 @@ def _filas(s: Session, sql: str, **p) -> list[dict]:
 def observado_de(s: Session, corrida: int, familia: str, ids: list[str] | None, n: int, red: bool) -> dict | None:
     """Casos, niños con dato y sin dato de ``n`` niños (``ids``; ``None`` es todo el corte), el porcentaje de casos
     entre quienes tienen dato y el de niños sin dato entre los ``n``, de los conteos exactos (los conteos se redondean para quien solo consulta; dividir los
-    redondeados daría otro porcentaje). Con menos de 5 con dato, nada."""
+    redondeados daría otro porcentaje). Sin niños con dato, nada."""
     de = ' AND sujeto = ANY(:ids)' if ids is not None else ''
     p = {'c': corrida, 'f': familia, **({'ids': ids} if ids is not None else {})}
     casos, con_dato = s.execute(text(f"""
         SELECT count(*) FILTER (WHERE valor), count(*) FROM resultados.desenlaces_observados
         WHERE corrida_id = :c AND familia = :f{de}"""), p).one()
-    if con_dato < P.MIN_OPCION:
+    if not con_dato:
         return None
     sin_dato = max(n - con_dato, 0)
     return {'casos': P.proteger(casos, red), 'con_dato': P.proteger(con_dato, red),
@@ -165,7 +165,7 @@ def trayectoria_de(s: Session, corrida: int, corte_id: int, indicador: str, ids:
     mapa = etapas(s, corte_id)
 
     def celda(f: dict | None, completa: bool) -> dict | None:
-        if f is None or f['n'] < P.MIN_OPCION:
+        if f is None:
             return None
         base = {'n': P.proteger(f['n'], red), 'mediana': float(f['mediana'])}
         return {'n': base['n'], 'p25': float(f['p25']), 'mediana': base['mediana'], 'p75': float(f['p75'])} \
@@ -191,7 +191,6 @@ def riesgo_de(s: Session, corrida: int, corte_id: int, familia: str, ids: list[s
                    **({'ids': ids} if ids is not None else {}))
     mapa = etapas(s, corte_id)
     estados = dict(zip(dic.desenlaces.clave, dic.desenlaces.estado, strict=False)) if not dic.desenlaces.empty else {}
-    filas = [f for f in filas if f['calculados'] >= P.MIN_OPCION]
     filas.sort(key=lambda f: (mapa.get(f['momento'], {}).get('orden', 99), f['clave']))
     return [{'momento': f['momento'], 'momento_nombre': nombre_etapa(mapa, f['momento']), 'clave': f['clave'],
              'estado': estados.get(f['clave']) or CL.estado_de(f['clave']),
@@ -202,7 +201,7 @@ def riesgo_de(s: Session, corrida: int, corte_id: int, familia: str, ids: list[s
 
 def riesgo_con_modelo(s: Session, corrida: int, familia: str) -> bool:
     """¿La corrida calculó el riesgo de la familia para algún niño? Distingue «el paquete no la calcula» de «ningún niño
-    del grupo tiene riesgo ahora» (se calcula solo para quienes siguen en seguimiento) o «son menos de 5»."""
+    del grupo tiene riesgo ahora» (se calcula solo para quienes siguen en seguimiento)."""
     return bool(_filas(s, """
         SELECT 1 AS hay FROM resultados.riesgos
         WHERE corrida_id = :c AND NOT silencio AND (clave = :f OR clave LIKE :l) LIMIT 1""",

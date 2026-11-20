@@ -10,7 +10,7 @@ import { Aviso, Boton, Cargando, Vacio } from '../../components/ui'
 import { PanelPestana, Pestanas, usePestanaEnUrl, type Pestana } from '../../components/ui/Pestanas'
 import { cn } from '../../lib/cn'
 import { dec2, pct } from '../../lib/formato'
-import { N_MENOR_QUE_5 } from '../../lib/lenguaje'
+import { SIN_CIFRA } from '../../lib/lenguaje'
 import { useContextoAnalitica } from './contexto'
 
 // ------------------------------------------------------------------ modo técnico (preferencia del navegador)
@@ -163,8 +163,8 @@ export function PorDesenlace<T extends object>({ consulta, children }: {
 }
 
 // ------------------------------------------------------------------ formatos
-/** Texto de una cifra que puede venir omitida por tener menos de 5 niños. */
-export const omitida = (v: number | null | undefined, f: (x: number) => string) => (v == null ? N_MENOR_QUE_5 : f(v))
+/** Texto de una cifra que puede venir sin calcular (un entrenamiento anterior, o menos de 20 niños para un promedio). */
+export const omitida = (v: number | null | undefined, f: (x: number) => string) => (v == null ? SIN_CIFRA : f(v))
 export const pctN = (v: number | null | undefined) => omitida(v, pct)
 export const decN = (v: number | null | undefined) => omitida(v, dec2)
 /** Una fracción de 0 a 1 dicha como porcentaje. */
@@ -195,12 +195,12 @@ export type ModoMatriz = 'conteos' | 'fila' | 'total'
 interface Confusion { tp: number | null; fp: number | null; fn: number | null; tn: number | null }
 
 /** La matriz de aciertos y errores como un cuadro de 2×2: conteos, % por fila (de los que tuvieron o no el desenlace)
- *  o % del total. Las celdas con menos de 5 niños dicen «n menor que 5» y no entran en los porcentajes. */
+ *  o % del total. Una celda sin cifra (un entrenamiento anterior) dice «sin cifra» y no entra en los porcentajes. */
 export function MatrizAlerta({ c, modo = 'conteos', compacta }: { c: Confusion; modo?: ModoMatriz; compacta?: boolean }) {
   const suma = (...v: (number | null)[]) => (v.some((x) => x == null) ? null : v.reduce<number>((a, b) => a + (b ?? 0), 0))
   const total = suma(c.tp, c.fp, c.fn, c.tn), casos = suma(c.tp, c.fn), sanos = suma(c.fp, c.tn)
   const texto = (v: number | null, base: number | null) => {
-    if (v == null) return N_MENOR_QUE_5
+    if (v == null) return SIN_CIFRA
     if (modo === 'conteos') return v.toLocaleString('es-CO')
     const b = modo === 'fila' ? base : total
     return b ? pct((100 * v) / b) : '—'

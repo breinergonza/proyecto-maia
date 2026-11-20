@@ -9,7 +9,7 @@ import { Aviso, Tabla } from '../../components/ui'
 import { PanelPestana, Pestanas, usePestanaEnUrl } from '../../components/ui/Pestanas'
 import { descripcionDe } from '../../lib/descripciones'
 import { dec2, num } from '../../lib/formato'
-import { jerga, N_MENOR_QUE_5, nombreVariable, variable } from '../../lib/lenguaje'
+import { jerga, nombreVariable, variable } from '../../lib/lenguaje'
 import { Guia, ic, PorDesenlace, useTecnico } from './comun'
 import { useContextoAnalitica } from './contexto'
 
@@ -88,10 +88,10 @@ export default function Estabilidad() {
                 )}
                 {ver === 'datos' && (tri.length === 0 ? <p className="text-salvia">Todavía no hay trimestres con niños para mostrar.</p> : (
                   <TablaDatos llenar className="xl:max-w-4xl" titulo="Datos de cada trimestre"
-                    descripcion="Niños, casos y qué tan bien ordena el modelo en cada trimestre; con menos de 5 casos no se muestra la cifra.">
+                    descripcion="Niños, casos y qué tan bien ordena el modelo en cada trimestre; con menos de 20 niños no hay AUC.">
                     <Tabla densa className={ENCABEZADO_FIJO}>
                       <thead><tr><th>Trimestre</th><th>Niños</th><th>Casos</th><th>{jerga(tecnico, 'Qué tan bien ordena', 'AUC (IC)')}</th></tr></thead>
-                      <tbody>{tri.map((t) => <tr key={t.trimestre}><td>{t.trimestre}</td><td>{num(t.n)}</td><td>{t.casos == null || t.casos < 5 ? N_MENOR_QUE_5 : num(t.casos)}</td><td>{t.auc == null ? 'Pocos niños' : ic(t)}</td></tr>)}</tbody>
+                      <tbody>{tri.map((t) => <tr key={t.trimestre}><td>{t.trimestre}</td><td>{num(t.n)}</td><td>{t.casos == null ? '—' : num(t.casos)}</td><td>{t.auc == null ? 'Pide 20 niños' : ic(t)}</td></tr>)}</tbody>
                     </Tabla>
                   </TablaDatos>
                 ))}

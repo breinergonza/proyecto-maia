@@ -1,9 +1,10 @@
 """Artefactos agregados de la analítica de un modelo, a partir de las predicciones de evaluación (niños que el modelo
 no vio): riesgo ``r`` y evento ``y`` por niño, y opcionalmente grupos (sexo, edad gestacional, sede) y trimestre.
 
-Todo lo que sale es JSON serializable y *agregado* (D7): las predicciones por niño no se guardan. Una celda con menos de
-``MIN_CELDA`` niños se omite (queda ``None``, D4) y las distribuciones y cuantiles piden ``MIN_DISTRIBUCION`` o más
-(D52). Los umbrales de los semáforos de ``chequeos`` son visibles en cada resultado.
+Todo lo que sale es JSON serializable y *agregado* (D7): las predicciones por niño no se guardan. Un conteo de 1 a 4
+niños se da con su cifra (la regla de ocultarlo, D4, se abandonó). Las distribuciones y cuantiles piden
+``MIN_DISTRIBUCION`` o más (D52), y el intervalo del AUC pide ``MIN_CASOS_IC`` niños de cada clase: es un límite
+estadístico, no de privacidad. Los umbrales de los semáforos de ``chequeos`` son visibles en cada resultado.
 
 ``analizar`` devuelve un diccionario por submódulo (``rendimiento``, ``calibracion``, ``poblacion``, ``equidad``,
 ``estabilidad``, ``interpretabilidad``, ``chequeos``) con los artefactos de un desenlace.
@@ -17,7 +18,7 @@ from collections.abc import Mapping
 import numpy as np
 import pandas as pd
 
-MIN_CELDA = 5            # D4: una celda con menos niños se omite
+MIN_CASOS_IC = 5         # estadístico (no privacidad): el intervalo del AUC pide 5 niños con el evento y 5 sin él
 MIN_DISTRIBUCION = 20    # D52: distribuciones, cuantiles e intervalos
 TOPS = (5, 10, 20, 30, 40)
 MAX_PUNTOS = 100
@@ -78,7 +79,7 @@ def auc_con_ic(y: np.ndarray, r: np.ndarray, semilla: int = 0, remuestras: int =
     a = auc(y, r)
     n1 = int(y.sum())
     sal = {'auc': _r(a), 'ic_bajo': None, 'ic_alto': None, 'n': int(len(y)), 'casos': n1}
-    if len(y) < MIN_DISTRIBUCION or n1 < MIN_CELDA or len(y) - n1 < MIN_CELDA:
+    if len(y) < MIN_DISTRIBUCION or n1 < MIN_CASOS_IC or len(y) - n1 < MIN_CASOS_IC:
         return sal
     rng = np.random.default_rng(semilla)
     if len(y) > MAX_FILAS_BOOTSTRAP:
@@ -128,18 +129,14 @@ def _fila_top(ys: np.ndarray, k: int, p: int, n_sin: int) -> dict:
     n = len(ys)
     tp = int(ys[:k].sum())
     fp = k - tp
-    fila = {'k': int(k), 'alertas': int(k), 'casos_detectados_pct': None, 'alertas_acertadas_pct': None,
-            'sin_falsa_alarma_pct': None, 'alertas_por_1000': _r(1000 * k / n, 2)}
-    if k >= MIN_CELDA:
-        fila['casos_detectados_pct'] = _r(100 * tp / max(p, 1), 2)
-        fila['alertas_acertadas_pct'] = _r(100 * tp / k, 2)
-        fila['sin_falsa_alarma_pct'] = _r(100 * (n_sin - fp) / max(n_sin, 1), 2)
-    return fila
+    return {'k': int(k), 'alertas': int(k), 'casos_detectados_pct': _r(100 * tp / max(p, 1), 2),
+            'alertas_acertadas_pct': _r(100 * tp / k, 2), 'sin_falsa_alarma_pct': _r(100 * (n_sin - fp) / max(n_sin, 1), 2),
+            'alertas_por_1000': _r(1000 * k / n, 2)}
 
 
 def metricas_top(y: np.ndarray, orden: np.ndarray) -> tuple[list[dict], list[dict], list[dict]]:
     """Para alertar a los 5, 10, 20, 30 y 40 % de mayor riesgo y para cada uno de 100 percentiles: casos detectados,
-    alertas acertadas, niños sin falsa alarma y alertas por 1.000; la matriz de confusión (celdas < 5 omitidas)."""
+    alertas acertadas, niños sin falsa alarma y alertas por 1.000; la matriz de confusión."""
     ys = np.asarray(y, dtype=bool)[orden]
     n, p = len(ys), int(ys.sum())
     n_sin = n - p
@@ -149,7 +146,7 @@ def metricas_top(y: np.ndarray, orden: np.ndarray) -> tuple[list[dict], list[dic
         tops.append({'top_pct': t, **_fila_top(ys, k, p, n_sin)})
         tp = int(ys[:k].sum())
         celdas = {'tp': tp, 'fp': k - tp, 'fn': p - tp, 'tn': n_sin - (k - tp)}
-        confusion.append({'top_pct': t, **{c: (v if v >= MIN_CELDA else None) for c, v in celdas.items()}})
+        confusion.append({'top_pct': t, **celdas})
     percentiles = [{'percentil': q, **_fila_top(ys, max(1, int(round(n * q / 100))), p, n_sin)}
                    for q in range(1, 101)]
     return tops, percentiles, confusion
@@ -162,14 +159,14 @@ def lift(y: np.ndarray, orden: np.ndarray) -> dict:
     deciles = []
     for i, trozo in enumerate(np.array_split(ys, 10), start=1):
         fila = {'decil': i, 'niños': int(len(trozo)), 'tasa': None, 'lift': None}
-        if len(trozo) >= MIN_CELDA and base > 0:
+        if len(trozo) and base > 0:
             fila['tasa'] = _r(float(trozo.mean()))
             fila['lift'] = _r(float(trozo.mean()) / base, 3)
         deciles.append(fila)
     acumulado = []
     for t in TOPS:
         k = max(1, int(round(n * t / 100)))
-        acumulado.append({'top_pct': t, 'lift': _r(float(ys[:k].mean()) / base, 3) if base > 0 and k >= MIN_CELDA else None})
+        acumulado.append({'top_pct': t, 'lift': _r(float(ys[:k].mean()) / base, 3) if base > 0 else None})
     return {'tasa_general': _r(base), 'deciles': deciles, 'acumulado': acumulado}
 
 
@@ -179,10 +176,10 @@ def top_k(y: np.ndarray, orden: np.ndarray, ks: tuple[int, ...] = (10, 25, 50, 1
     p = int(ys.sum())
     sal = []
     for k in ks:
-        if k > len(ys) or k < MIN_CELDA:
+        if k > len(ys):
             continue
         tp = int(ys[:k].sum())
-        sal.append({'k': k, 'casos': tp if tp >= MIN_CELDA else None,
+        sal.append({'k': k, 'casos': tp,
                     'acertadas_pct': _r(100 * tp / k, 2), 'detectados_pct': _r(100 * tp / max(p, 1), 2)})
     return sal
 
@@ -235,8 +232,6 @@ def calibracion(y: np.ndarray, r: np.ndarray) -> dict:
     ece = 0.0
     for b in range(10):
         m = bins == b
-        if m.sum() < MIN_CELDA:
-            continue
         rm, ob = float(r[m].mean()), float(y[m].mean())
         ece += m.sum() / n * abs(rm - ob)
         out['bins'].append({'bin': b + 1, 'n': int(m.sum()), 'riesgo_medio': _r(rm), 'observado': _r(ob)})
@@ -244,7 +239,7 @@ def calibracion(y: np.ndarray, r: np.ndarray) -> dict:
     alto = float(r.max()) if r.max() > r.min() else float(r.min()) + 1
     cuentas, bordes = np.histogram(r, bins=20, range=(float(r.min()), alto))
     out['histograma'] = [{'desde': _r(bordes[i]), 'hasta': _r(bordes[i + 1]),
-                          'n': int(c) if c >= MIN_CELDA else None} for i, c in enumerate(cuentas)]
+                          'n': int(c)} for i, c in enumerate(cuentas)]
     return out
 
 
@@ -269,7 +264,7 @@ def decision(y: np.ndarray, r: np.ndarray, maximo: float = 0.5, pasos: int = 50)
 
 def subgrupos(y: np.ndarray, r: np.ndarray, grupos: Mapping[str, pd.Series], semilla: int = 0) -> dict:
     """AUC (con IC), n, casos, riesgo medio y qué parte de los casos cae en el 10 % de más riesgo global, por sexo,
-    categoría de edad gestacional, sede, etc. Un grupo con menos de 5 niños se omite."""
+    categoría de edad gestacional, sede, etc. El AUC y la tasa de alerta piden 20 niños (D52)."""
     y = np.asarray(y, dtype=bool)
     r = np.asarray(r, dtype=float)
     k10 = max(1, int(round(0.10 * len(r))))
@@ -281,14 +276,12 @@ def subgrupos(y: np.ndarray, r: np.ndarray, grupos: Mapping[str, pd.Series], sem
         filas = []
         for nivel in sorted(g.dropna().unique(), key=str):
             m = (g == nivel).to_numpy()
-            if m.sum() < MIN_CELDA:
-                continue
             grande = m.sum() >= MIN_DISTRIBUCION
             fila = {'grupo': str(nivel), **auc_con_ic(y[m], r[m], semilla), 'riesgo_medio': _r(float(r[m].mean())),
                     'observado': _r(float(y[m].mean())),
                     'tasa_alerta_top10': _r(float(alto[m].mean())) if grande else None,
                     'sensibilidad_top10': (_r(float((alto & y)[m].sum() / y[m].sum()))
-                                           if grande and y[m].sum() >= MIN_CELDA else None)}
+                                           if grande and y[m].sum() > 0 else None)}
             if not grande:
                 fila['auc'] = fila['ic_bajo'] = fila['ic_alto'] = None
             filas.append(fila)
@@ -307,16 +300,14 @@ def por_trimestre(y: np.ndarray, r: np.ndarray, trimestre: pd.Series, semilla: i
     metricas, alertas = [], []
     for q in sorted({v for v in t if isinstance(v, str)}):
         m = t == q
-        if m.sum() < MIN_CELDA:
-            continue
         fila = {'trimestre': q, **auc_con_ic(y[m], r[m], semilla, remuestras=100)}
         if m.sum() < MIN_DISTRIBUCION:
             fila['auc'] = fila['ic_bajo'] = fila['ic_alto'] = None
         metricas.append(fila)
         a = int((r[m] >= umbral).sum())
-        alertas.append({'trimestre': q, 'n': int(m.sum()), 'alertas': a if a >= MIN_CELDA else None,
+        alertas.append({'trimestre': q, 'n': int(m.sum()), 'alertas': a,
                         'alertas_por_1000': _r(1000 * a / m.sum(), 2) if m.sum() >= MIN_DISTRIBUCION else None,
-                        'casos': int(y[m].sum()) if y[m].sum() >= MIN_CELDA else None})
+                        'casos': int(y[m].sum())})
     return {'umbral_riesgo': _r(umbral), 'metricas_trimestre': metricas, 'alertas_trimestre': alertas}
 
 
@@ -360,8 +351,8 @@ def poblacion(y: np.ndarray, variables: pd.DataFrame | None = None, embudo: list
               max_variables: int = 20) -> dict:
     """Embudo (cuántos niños quedan en cada paso), eventos y porcentaje de datos faltantes por variable."""
     y = np.asarray(y, dtype=bool)
-    out = {'embudo': [{**e, 'n': e['n'] if e['n'] >= MIN_CELDA else None} for e in (embudo or [])],
-           'eventos': {'niños': int(len(y)), 'casos': int(y.sum()) if y.sum() >= MIN_CELDA else None,
+    out = {'embudo': list(embudo or []),
+           'eventos': {'niños': int(len(y)), 'casos': int(y.sum()),
                        'tasa': _r(float(y.mean()))},
            'nulos': []}
     if variables is not None and len(variables) >= MIN_DISTRIBUCION:
@@ -480,24 +471,17 @@ def _modo(s: pd.Series):
 def trayectorias(df: pd.DataFrame, orden: Mapping[str, int], nombres: Mapping[str, str] | None = None,
                  unidad_de=None) -> dict:
     """Puntaje z (y valor) por grupo y visita. ``df``: ``sujeto``, ``grupo``, ``etapa``, ``z``, ``valor``, ``variable``
-    y ``x`` (edad en meses del eje elegido, o NaN). Cada celda cuenta niños distintos; con menos de 5 se omite (D4) y el
-    desvío exige 20 o más (D52). Un grupo con menos de 5 niños no se devuelve. La diferencia frente a la OMS es el z medio
-    (la OMS es z = 0). ``unidad_de(variable, etapa)`` da la unidad del valor, desde el esquema."""
+    y ``x`` (edad en meses del eje elegido, o NaN). Cada celda cuenta niños distintos y se da con su cifra aunque sean
+    pocos; el desvío exige 20 o más (D52). La diferencia frente a la OMS es el z medio (la OMS es z = 0). ``unidad_de(variable, etapa)`` da la unidad del valor, desde el esquema."""
     nombres = nombres or {}
-    sal: dict = {'grupos': [], 'grupos_omitidos': 0, 'celdas_omitidas': 0}
+    sal: dict = {'grupos': []}
     if df is None or df.empty:
         return sal
     df = df[df.z.notna()].sort_values(['sujeto', 'etapa', 'x']).drop_duplicates(['grupo', 'sujeto', 'etapa'])
     for grupo, g in df.groupby('grupo', sort=True):
-        if g.sujeto.nunique() < MIN_CELDA:
-            sal['grupos_omitidos'] += 1
-            continue
         etapas = []
         for etapa, c in sorted(g.groupby('etapa'), key=lambda kv: (orden.get(kv[0], 99), str(kv[0]))):
             n = int(c.sujeto.nunique())
-            if n < MIN_CELDA:
-                sal['celdas_omitidas'] += 1
-                continue
             z = c.z.to_numpy(dtype=float)
             valores = pd.to_numeric(c.valor, errors='coerce').dropna().to_numpy(dtype=float)
             grande = n >= MIN_DISTRIBUCION
@@ -507,7 +491,7 @@ def trayectorias(df: pd.DataFrame, orden: Mapping[str, int], nombres: Mapping[st
                 'edad_media_meses': _r(float(c.x.mean()), 2) if c.x.notna().any() else None,
                 'z_media': _r(float(z.mean())), 'z_desvio': _r(float(z.std(ddof=1))) if grande else None,
                 'diferencia_oms': _r(float(z.mean())),
-                'valor_medio': _r(float(valores.mean()), 2) if len(valores) >= MIN_CELDA else None,
+                'valor_medio': _r(float(valores.mean()), 2) if len(valores) else None,
                 'valor_desvio': _r(float(valores.std(ddof=1)), 2) if len(valores) >= MIN_DISTRIBUCION else None,
                 'unidad': unidad_de(variable, etapa) if unidad_de and variable else None})
         if etapas:
@@ -517,14 +501,12 @@ def trayectorias(df: pd.DataFrame, orden: Mapping[str, int], nombres: Mapping[st
 
 def trayectorias_individuales(df: pd.DataFrame, orden: Mapping[str, int], nombres: Mapping[str, str] | None = None,
                               maximo: int = MAX_INDIVIDUALES) -> list[dict]:
-    """Hasta ``maximo`` niños con su serie de z (código seudonimizado). Solo de grupos con 5 o más niños. El llamador
-    decide quién puede verlos: solo experto y administrador."""
+    """Hasta ``maximo`` niños con su serie de z (código seudonimizado). El llamador decide quién puede verlos: solo
+    experto y administrador."""
     nombres = nombres or {}
     if df is None or df.empty:
         return []
     df = df[df.z.notna()]
-    grandes = df.groupby('grupo').sujeto.nunique()
-    df = df[df.grupo.isin(grandes[grandes >= MIN_CELDA].index)]
     puntos = df.groupby('sujeto').size().sort_values(ascending=False, kind='stable')
     elegidos = sorted(puntos.index, key=lambda s: (-puntos[s], str(s)))[:maximo]
     sal = []
@@ -540,9 +522,8 @@ def trayectorias_individuales(df: pd.DataFrame, orden: Mapping[str, int], nombre
 # ------------------------------------------------------------------------------------------------ perfiles provisionales
 
 def resumen_perfiles_ampliado(sev, riesgos: pd.DataFrame | None, medidas: Mapping[str, float] | None = None) -> dict:
-    """Perfiles provisionales (edad gestacional y Lubchenco) con n por categoría (oculta si < 5), la tasa del evento y
-    qué los distingue: edad gestacional media y, si se pasan ``medidas`` {sujeto: peso al nacer}, el peso medio. Las
-    medias se dan con 5 niños o más."""
+    """Perfiles provisionales (edad gestacional y Lubchenco) con n por categoría, la tasa del evento y qué los
+    distingue: edad gestacional media y, si se pasan ``medidas`` {sujeto: peso al nacer}, el peso medio."""
     from maia_comun import perfiles as PF
     base = PF.resumen_perfiles(sev, riesgos)
     por_nino = PF.perfiles_por_ninos(sev)
@@ -551,13 +532,13 @@ def resumen_perfiles_ampliado(sev, riesgos: pd.DataFrame | None, medidas: Mappin
     for clave in ('eg', 'lubchenco'):
         for fila in base[clave]:
             fila['eg_media'] = fila['peso_medio'] = None
-            if fila['oculto']:
+            if not fila['n']:
                 continue
             ids = [s for s, p in por_nino.items() if p[clave] == fila['categoria']]
             e = eg.reindex(ids).dropna()
             w = peso.reindex(ids).dropna()
-            fila['eg_media'] = _r(float(e.mean()), 1) if len(e) >= MIN_CELDA else None
-            fila['peso_medio'] = _r(float(w.mean()), 1) if len(w) >= MIN_CELDA else None
+            fila['eg_media'] = _r(float(e.mean()), 1) if len(e) else None
+            fila['peso_medio'] = _r(float(w.mean()), 1) if len(w) else None
     return limpio(base)
 
 
@@ -580,6 +561,6 @@ def anticipacion_visita(y: np.ndarray, r: np.ndarray, top_pct: int = 10, semilla
     n, casos = int(len(y)), int(y.sum())
     k = max(1, int(round(n * top_pct / 100)))
     tp = int(y[_orden(r, semilla)[:k]].sum())
-    return {'n': n if n >= MIN_CELDA else None, 'casos': casos if casos >= MIN_CELDA else None, 'alertas': k,
-            'casos_detectados_pct': _r(100 * tp / casos, 2) if casos >= MIN_CELDA and k >= MIN_CELDA else None,
-            'alertas_acertadas_pct': _r(100 * tp / k, 2) if k >= MIN_CELDA and tp >= MIN_CELDA else None}
+    return {'n': n, 'casos': casos, 'alertas': k,
+            'casos_detectados_pct': _r(100 * tp / casos, 2) if casos else None,
+            'alertas_acertadas_pct': _r(100 * tp / k, 2)}

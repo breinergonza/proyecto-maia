@@ -1,6 +1,6 @@
 // Talla para la edad visita por visita, un grupo frente al otro: la mediana del puntaje z con el umbral de talla baja y,
-// bajo cada visita del eje, cuántos niños de cada grupo tienen dato en ella. Se dibuja un punto solo donde hay dato (5
-// niños o más): una visita sin dato queda como hueco y la línea no la cruza, así no se inventa una medición que no existe.
+// bajo cada visita del eje, cuántos niños de cada grupo tienen dato en ella. Se dibuja un punto solo donde hay dato (1
+// niño o más): una visita sin dato queda como hueco y la línea no la cruza, así no se inventa una medición que no existe.
 import { CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { GruposClinicoOk, VisitaComparada } from '../../api/comparar'
 import { dec2, num } from '../../lib/formato'
@@ -40,7 +40,7 @@ function MarcaVisita({ x, y, payload, filas }: { x?: number | string; y?: number
     <text x={cx} y={Number(y ?? 0)} textAnchor="middle" fill={COLOR.eje} fontSize={12}>
       <tspan x={cx} dy={12}>{visita}</tspan>
       {[{ s: SERIE_A, n: f?.nA }, { s: SERIE_B, n: f?.nB }].map(({ s, n }) => (
-        <tspan key={s.clave} x={cx} dy={14} fontSize={11}>{s.nombre.slice(-1)}: {n == null ? '<5' : num(n)}</tspan>
+        <tspan key={s.clave} x={cx} dy={14} fontSize={11}>{s.nombre.slice(-1)}: {n == null ? '0' : num(n)}</tspan>
       ))}
     </text>
   )
@@ -64,7 +64,7 @@ export function TallaPorVisita({ r, alta = false }: { r: GruposClinicoOk; alta?:
 
   return (
     <Grafica titulo={`${t.nombre}, visita por visita`}
-      descripcion="Mediana de cada grupo en cada visita; solo hay punto donde 5 niños o más tienen dato."
+      descripcion="Mediana de cada grupo en cada visita; solo hay punto donde algún niño tiene dato."
       exportar={{ nombre: 'comparar-grupos-talla-por-visita', filas: tabla, columnas: Object.keys(tabla[0] ?? {}) }}>
       {hayDatos ? (
         <div className="space-y-2">
@@ -95,7 +95,7 @@ export function TallaPorVisita({ r, alta = false }: { r: GruposClinicoOk; alta?:
             </ResponsiveContainer>
           </GraficaNavegable>
         </div>
-      ) : <p className="text-sm">Ningún grupo tiene 5 niños o más con dato de talla en una misma visita.</p>}
+      ) : <p className="text-sm">Ningún grupo tiene niños con dato de talla en una visita.</p>}
       <FichaDelDato items={{
         variable: `${t.nombre.toLowerCase()} (puntaje z, referencia ${t.referencia})`, unidad: t.unidad,
         momento: 'cada visita, en edad corregida', poblacion: poblacionAB(r.a.n, r.b.n),

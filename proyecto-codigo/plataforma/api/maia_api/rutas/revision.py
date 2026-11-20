@@ -147,7 +147,6 @@ def resumen_datos(corrida_id: int | None = None, s: Session = Depends(sesion), u
 
 
 PUNTOS_ACIERTOS = (50, 100, 200, 300, 400, 500)
-MINIMO_CELDA = 5   # D46/D4: una celda con menos alertas que esto no se muestra sola
 
 
 def _cortes_aciertos(maximo: int) -> list[int]:
@@ -185,7 +184,7 @@ def aciertos(corrida_id: int | None = None, s: Session = Depends(sesion), _: Usu
 @ruta.get('/datos/concentracion')
 def concentracion(corrida_id: int | None = None, s: Session = Depends(sesion), _: Usuario = Depends(ADMIN)) -> dict:
     """Dónde se acumulan las alertas: por variable y, si el corte trae más de un grupo o sede, por grupo y variable.
-    Lo que tenga menos de ``MINIMO_CELDA`` alertas no se muestra solo: se suma en «otras»."""
+    Cada variable y cada celda sale con su cifra, aunque tenga una sola alerta (D63)."""
     c = corrida_de(s, corrida_id)
     por_celda = s.execute(text("""SELECT su.grupo, a.variable, max(a.etiqueta) AS etiqueta, count(*) AS alertas
                                   FROM resultados.alertas_dato a
@@ -197,19 +196,10 @@ def concentracion(corrida_id: int | None = None, s: Session = Depends(sesion), _
     for f in por_celda:
         v = variables.setdefault(f.variable, {'variable': f.variable, 'etiqueta': f.etiqueta, 'alertas': 0})
         v['alertas'] += f.alertas
-    por_variable = sorted((v for v in variables.values() if v['alertas'] >= MINIMO_CELDA),
-                          key=lambda v: (-v['alertas'], v['variable']))
-    otras_variables = sum(v['alertas'] for v in variables.values() if v['alertas'] < MINIMO_CELDA)
-    celdas, otras_celdas = [], 0
-    if hay_sede:
-        for f in sorted(por_celda, key=lambda f: (-f.alertas, str(f.grupo), f.variable)):
-            if f.alertas >= MINIMO_CELDA:
-                celdas.append({'grupo': f.grupo or 'sin grupo', 'variable': f.variable, 'etiqueta': f.etiqueta,
-                               'alertas': f.alertas})
-            else:
-                otras_celdas += f.alertas
-    return {'corrida_id': c.id, 'hay_sede': hay_sede, 'minimo_celda': MINIMO_CELDA, 'por_variable': por_variable,
-            'otras_variables': otras_variables, 'celdas': celdas, 'otras_celdas': otras_celdas}
+    por_variable = sorted(variables.values(), key=lambda v: (-v['alertas'], v['variable']))
+    celdas = [{'grupo': f.grupo or 'sin grupo', 'variable': f.variable, 'etiqueta': f.etiqueta, 'alertas': f.alertas}
+              for f in sorted(por_celda, key=lambda f: (-f.alertas, str(f.grupo), f.variable))] if hay_sede else []
+    return {'corrida_id': c.id, 'hay_sede': hay_sede, 'por_variable': por_variable, 'celdas': celdas}
 
 
 def _factor(unidad: object) -> tuple[str, float] | None:

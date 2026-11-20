@@ -1363,7 +1363,7 @@
      "revisión"
     ],
     "summary": "Concentracion",
-    "description": "Dónde se acumulan las alertas: por variable y, si el corte trae más de un grupo o sede, por grupo y variable.\nLo que tenga menos de ``MINIMO_CELDA`` alertas no se muestra solo: se suma en «otras».",
+    "description": "Dónde se acumulan las alertas: por variable y, si el corte trae más de un grupo o sede, por grupo y variable.\nCada variable y cada celda sale con su cifra, aunque tenga una sola alerta (D63).",
     "operationId": "concentracion_api_revision_datos_concentracion_get",
     "security": [
      {
@@ -4290,7 +4290,7 @@
      "analitica"
     ],
     "summary": "Trayectorias",
-    "description": "Puntaje z de crecimiento por grupo y visita frente a la OMS, de la corrida pedida o la más reciente. Solo\nagregados (D7): celdas de menos de 5 niños omitidas, desvíos con 20 o más. Los niños individuales (hasta 30, con su\ncódigo seudonimizado) solo los ven el experto y el administrador.",
+    "description": "Puntaje z de crecimiento por grupo y visita frente a la OMS, de la corrida pedida o la más reciente. Solo\nagregados (D7): cada celda con su cifra, desvíos con 20 o más. Los niños individuales (hasta 30, con su\ncódigo seudonimizado) solo los ven el experto y el administrador.",
     "operationId": "trayectorias_api_analitica__entrenamiento__trayectorias_get",
     "security": [
      {
@@ -4418,7 +4418,7 @@
      "analitica"
     ],
     "summary": "Perfiles",
-    "description": "Perfiles provisionales (edad gestacional y Lubchenco): niños por categoría (oculta si hay menos de 5), la tasa de\nriesgo alto del desenlace elegido (percentil >= PERCENTIL_ALTO) y qué los distingue (edad gestacional y peso al nacer\nmedios). No son perfiles reales: ningún experto los ha aprobado todavía.",
+    "description": "Perfiles provisionales (edad gestacional y Lubchenco): niños por categoría, la tasa de\nriesgo alto del desenlace elegido (percentil >= PERCENTIL_ALTO) y qué los distingue (edad gestacional y peso al nacer\nmedios). No son perfiles reales: ningún experto los ha aprobado todavía.",
     "operationId": "perfiles_api_analitica__entrenamiento__perfiles_get",
     "security": [
      {
@@ -4604,7 +4604,7 @@
      "muestras"
     ],
     "summary": "Facetas",
-    "description": "Niños por opción de cada variable con los demás filtros aplicados (el propio no). Opciones con menos de 5 niños\nsalen como «<5».",
+    "description": "Niños por opción de cada variable con los demás filtros aplicados (el propio no).",
     "operationId": "facetas_api_muestras_facetas_post",
     "requestBody": {
      "content": {

@@ -22,13 +22,13 @@ const facetas = {
   n: 240, minimo: 20,
   facetas: {
     sexo: { etiqueta: 'Sexo', tipo: 'lista', cuando: 'primera', opciones: [
-      { valor: 'M', etiqueta: 'Masculino', n: 300, texto: '300' }, { valor: 'F', etiqueta: 'Femenino', n: null, texto: '<5' }] },
+      { valor: 'M', etiqueta: 'Masculino', n: 300 }, { valor: 'F', etiqueta: 'Femenino', n: 3 }] },
     eg_categoria: { etiqueta: 'Edad gestacional (categoría)', tipo: 'lista', cuando: null, opciones: [
-      { valor: 'muy_prematuro', etiqueta: 'Muy prematuro', n: 80, texto: '80', rango: [28, 32] },
-      { valor: 'moderado_tardio', etiqueta: 'Moderado o tardío', n: 0, texto: '0', rango: [32, 37] },
-      { valor: 'a_termino', etiqueta: 'A término', n: 90, texto: '90', rango: [37, null] }] },
+      { valor: 'muy_prematuro', etiqueta: 'Muy prematuro', n: 80, rango: [28, 32] },
+      { valor: 'moderado_tardio', etiqueta: 'Moderado o tardío', n: 0, rango: [32, 37] },
+      { valor: 'a_termino', etiqueta: 'A término', n: 90, rango: [37, null] }] },
     oxigeno: { etiqueta: 'Oxigenodependencia', tipo: 'si_no', cuando: 'alguna', destacada: true, reglas: ['primera', 'ultima', 'alguna'], opciones: [
-      { valor: true, etiqueta: 'Sí', n: 30, texto: '30' }, { valor: false, etiqueta: 'No', n: 210, texto: '210' }] },
+      { valor: true, etiqueta: 'Sí', n: 30 }, { valor: false, etiqueta: 'No', n: 210 }] },
     peso_nacer: { etiqueta: 'Peso al nacer', tipo: 'numero', cuando: 'primera', min: 900, max: 4200, bins: [] },
   },
   tiempo: { campos: [{ valor: 'fecha_nacimiento', etiqueta: 'Fecha de nacimiento' }, { valor: 'anio_nacimiento', etiqueta: 'Año de nacimiento' },
@@ -114,15 +114,17 @@ describe('explorar', () => {
     expect(screen.getByRole('checkbox', { name: /Moderado/ })).not.toBeChecked()
   })
 
-  it('una opción sin niños dice 0 y se atenúa; «<5» sigue siendo un dato oculto', async () => {
+  it('una opción sin niños dice 0 y se atenúa; una con 3 niños dice 3 (D63: no se oculta)', async () => {
     api('experto')
     montar('/explorar')
     const moderado = (await screen.findByRole('checkbox', { name: /Moderado/ })).closest('li')!
     expect(moderado).toHaveTextContent('0')
     expect(moderado).not.toHaveTextContent('<5')
     expect(moderado.className).toContain('opacity-60')
-    expect(screen.getByRole('checkbox', { name: /Femenino/ }).closest('li')).toHaveTextContent('<5')
-    expect(screen.getByRole('checkbox', { name: /Femenino/ }).closest('li')!.className).not.toContain('opacity-60')
+    const femenino = screen.getByRole('checkbox', { name: /Femenino/ }).closest('li')!
+    expect(femenino).toHaveTextContent('3')
+    expect(femenino).not.toHaveTextContent('<5')
+    expect(femenino.className).not.toContain('opacity-60')
   })
 
   it('ningún niño cumple: lo dice con un 0 y no como «menos de 20 niños»', async () => {
@@ -220,11 +222,11 @@ describe('explorar', () => {
     expect(decodificarMuestreo('sede|0|1')).toBeNull()
   })
 
-  it('marcar una opción cambia la dirección y quitar la ficha la limpia; «<5» no da la cifra', async () => {
+  it('marcar una opción cambia la dirección y quitar la ficha la limpia; una opción chica da su cifra', async () => {
     api('experto')
     montar('/explorar', <Ubicacion />)
     const masculino = await screen.findByRole('checkbox', { name: /Masculino/ })
-    expect(screen.getByRole('checkbox', { name: /Femenino/ }).closest('li')).toHaveTextContent('<5')
+    expect(screen.getByRole('checkbox', { name: /Femenino/ }).closest('li')).toHaveTextContent('3')
     fireEvent.click(masculino)
     await waitFor(() => expect(screen.getByTestId('ubicacion')).toHaveTextContent('f=sexo|lista|M'))
     fireEvent.click(screen.getByRole('button', { name: 'Quitar filtro Sexo' }))

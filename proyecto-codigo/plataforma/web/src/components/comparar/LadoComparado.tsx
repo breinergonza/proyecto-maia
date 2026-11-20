@@ -12,7 +12,7 @@ import { criteriosActivos, PanelFacetas } from '../PanelFacetas'
 import { SERIES_COLOR, type Serie } from '../graficos'
 import { Boton } from '../ui'
 
-/** Los niños del lado en la respuesta de la comparación: ausente mientras no hay respuesta; ``n`` nulo si son menos de 5. */
+/** Los niños del lado en la respuesta de la comparación: ausente mientras no hay respuesta; ``n`` nulo si son menos de 20 (D46). */
 export interface ResumenLado { n: number | null; n_total?: number }
 
 function textoPeriodo(t: TiempoJson | null, facetas?: RespuestaFacetas): string {
@@ -48,7 +48,7 @@ export function LadoComparado({ serie, filtros, elegido, resumen, contando, erro
   // El tamaño sale de la comparación; mientras no la hay (B sin elegir, o A y B iguales), del conteo del panel de filtros.
   const propio = elegido && facetas.data ? { n: facetas.data.n, ...(facetas.data.n_base == null ? {} : { n_total: facetas.data.n_base }) } : undefined
   const tamano = resumen ?? (error ? undefined : propio)
-  const cuantos = tamano ? (tamano.n == null ? 'Menos de 5 niños elegibles'
+  const cuantos = tamano ? (tamano.n == null ? 'Menos de 20 niños elegibles'
     : `${num(tamano.n)} niños elegibles${tamano.n_total == null ? '' : ` de ${num(tamano.n_total)}`}`)
     : error ? 'No se pudo contar los niños del grupo.' : contando ? 'Contando niños…' : null
 

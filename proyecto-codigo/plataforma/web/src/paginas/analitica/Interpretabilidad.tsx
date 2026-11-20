@@ -10,7 +10,7 @@ import { CurvaXY } from '../../components/graficos/xy'
 import { Aviso, Selector, Tabla, Vacio } from '../../components/ui'
 import { descripcionDe } from '../../lib/descripciones'
 import { dec2, num, pct } from '../../lib/formato'
-import { N_MENOR_QUE_5, variable } from '../../lib/lenguaje'
+import { SIN_CIFRA, variable } from '../../lib/lenguaje'
 import type { Pestana } from '../../components/ui/Pestanas'
 import { cn } from '../../lib/cn'
 import { ConPestanas, Guia, muestraDe, PorDesenlace, useTecnico } from './comun'
@@ -61,7 +61,7 @@ function Combinacion({ d, muestra }: { d: NonNullable<DatosInterpretabilidad['in
     etiqueta: `${par.etiqueta_a}: ${tramo(par.cortes_a, i)}`,
     celdas: Array.from({ length: par.cortes_b.length + 1 }, (_, j) => {
       const c = par.celdas.find((x) => x.i === i && x.j === j)
-      return { valor: c?.riesgo_medio ?? null, texto: c?.riesgo_medio == null ? '—' : pct(100 * c.riesgo_medio), pequena: c?.n == null }
+      return { valor: c?.riesgo_medio ?? null, texto: c?.riesgo_medio == null ? '—' : pct(100 * c.riesgo_medio) }
     }),
   }))
   const columnas = Array.from({ length: par.cortes_b.length + 1 }, (_, j) => `${par.etiqueta_b}: ${tramo(par.cortes_b, j)}`)
@@ -73,9 +73,9 @@ function Combinacion({ d, muestra }: { d: NonNullable<DatosInterpretabilidad['in
         </Selector>
       )}
       exportar={{ nombre: 'interpretabilidad-combinacion', muestra,
-        filas: par.celdas.map((c) => ({ [par.etiqueta_a]: tramo(par.cortes_a, c.i), [par.etiqueta_b]: tramo(par.cortes_b, c.j), ninos: c.n ?? N_MENOR_QUE_5, riesgo_medio: c.riesgo_medio })) }}>
+        filas: par.celdas.map((c) => ({ [par.etiqueta_a]: tramo(par.cortes_a, c.i), [par.etiqueta_b]: tramo(par.cortes_b, c.j), ninos: c.n ?? SIN_CIFRA, riesgo_medio: c.riesgo_medio })) }}>
       <MapaCalor etiqueta={`Riesgo medio según ${par.etiqueta_a} y ${par.etiqueta_b}`} columnas={columnas} filas={filas} escala={escala} />
-      <p className="mt-1 text-xs text-salvia">Más oscuro es más riesgo. Las celdas con menos de 5 niños dicen «{N_MENOR_QUE_5}».</p>
+      <p className="mt-1 text-xs text-salvia">Más oscuro es más riesgo. Una celda sin niños queda sin color.</p>
     </Grafica>
   )
 }
@@ -140,11 +140,11 @@ export default function Interpretabilidad() {
                     {mot && (
                       <TablaDatos llenar titulo={dMot.titulo} descripcion={dMot.descripcion}
                         exportar={{ nombre: 'interpretabilidad-motivos', muestra: `${mot.n_alertas} niños con alerta`,
-                          filas: mot.motivos.map((m) => ({ motivo: m.etiqueta, ninos_con_alerta: m.n ?? N_MENOR_QUE_5, pct_de_las_alertas: m.pct })) }}>
+                          filas: mot.motivos.map((m) => ({ motivo: m.etiqueta, ninos_con_alerta: m.n ?? SIN_CIFRA, pct_de_las_alertas: m.pct })) }}>
                         <Tabla densa className="xl:overflow-visible [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-papel">
                           <thead><tr><th>Dato</th><th>Niños con alerta</th><th>% de las alertas</th></tr></thead>
                           <tbody>{mot.motivos.map((m) => (
-                            <tr key={m.variable}><td>{m.etiqueta}</td><td>{m.n == null ? N_MENOR_QUE_5 : num(m.n)}</td><td>{m.pct == null ? '—' : pct(m.pct)}</td></tr>
+                            <tr key={m.variable}><td>{m.etiqueta}</td><td>{m.n == null ? SIN_CIFRA : num(m.n)}</td><td>{m.pct == null ? '—' : pct(m.pct)}</td></tr>
                           ))}</tbody>
                         </Tabla>
                       </TablaDatos>

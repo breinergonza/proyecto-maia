@@ -37,7 +37,7 @@ const familiaReadm = {
   },
   primera_alerta: {
     familia: 'readm_6m', nombre: 'readmisión entre los 3 y los 6 meses', top_pct: 10, casos: 44, meta: 'D12',
-    distribucion: [{ desde: 'entrada PMC', ventaja_visitas: 3, casos: 11, pct: 25 }, { desde: '3 m EC', ventaja_visitas: 1, casos: null, pct: null }],
+    distribucion: [{ desde: 'entrada PMC', ventaja_visitas: 3, casos: 11, pct: 25 }, { desde: '3 m EC', ventaja_visitas: 1, casos: 3, pct: 7 }],
     sin_alerta: { casos: 22, pct: 50 }, ventaja_visitas: { media: null, mediana: null },
   },
 }
@@ -73,7 +73,7 @@ describe('anticipación', () => {
     expect(screen.getByText('50,0 %')).toBeInTheDocument()
     expect(llamadas.some((l) => l.url === '/api/analitica/7/anticipacion')).toBe(true)
     expect(screen.getByText('Cuántas visitas antes se avisó cada caso')).toBeInTheDocument()
-    expect(screen.getByText(/Las partes con menos de 5 casos se omiten \(n menor que 5\)/)).toBeInTheDocument()
+    expect(screen.queryByText(/se omiten|n menor que 5/)).not.toBeInTheDocument()
     // el resto de los artefactos está en las otras pestañas
     fireEvent.click(screen.getByRole('tab', { name: 'Qué cuesta avisar antes' }))
     expect(await screen.findByText('El precio de avisar antes')).toBeInTheDocument()

@@ -99,7 +99,7 @@ def test_primera_alerta_reparte_los_casos_y_no_expone_ninos(resultados):
         assert 'sujeto' not in texto and '"N-' not in texto, 'solo agregados (D7)'
 
 
-def test_las_celdas_pequenas_se_omiten():
+def test_las_celdas_de_1_a_4_ninos_dan_su_cifra():
     rng = np.random.default_rng(1)
 
     def pred(momento):
@@ -110,6 +110,9 @@ def test_las_celdas_pequenas_se_omiten():
                 'desenlace': SimpleNamespace(nombre='x', momento=momento, etapa='12 m EC', variable=None)}
     sal = AA.artefactos({'x_12m_desde_3': pred('3 m EC'), 'x_12m_desde_6': pred('6 m EC')},
                         {'3 m EC': 1, '6 m EC': 2, '12 m EC': 4})['x_12m']
-    assert sal['anticipacion']['avisados_antes']['pct'] is None and sal['primera_alerta']['casos'] is None
-    assert all(d['casos'] is None for d in sal['primera_alerta']['distribucion'])
-    assert all(v['auc'] is None and v['casos'] is None for v in sal['metricas_por_visita']['visitas'])
+    av = sal['anticipacion']['avisados_antes']
+    assert av['casos'] == 3 and av['pct'] is not None and sal['primera_alerta']['casos'] == 3
+    assert all(isinstance(d['casos'], int) for d in sal['primera_alerta']['distribucion'])
+    assert sal['primera_alerta']['sin_alerta']['casos'] is not None
+    assert sal['primera_alerta']['ventaja_visitas']['media'] is None, 'la media de la ventaja pide 20 casos (D52)'
+    assert all(v['casos'] == 3 and v['n'] == 60 and v['auc'] is not None for v in sal['metricas_por_visita']['visitas'])

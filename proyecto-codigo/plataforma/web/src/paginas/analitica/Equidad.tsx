@@ -11,11 +11,9 @@ import { PanelPestana, Pestanas, usePestanaEnUrl } from '../../components/ui/Pes
 import { descripcionDe } from '../../lib/descripciones'
 import { cn } from '../../lib/cn'
 import { dec2, frase, num } from '../../lib/formato'
-import { jerga, N_MENOR_QUE_5 } from '../../lib/lenguaje'
+import { jerga, SIN_INTERVALO } from '../../lib/lenguaje'
 import { Guia, ic, PorDesenlace, useNombreDesenlace, useTecnico } from './comun'
 import { useContextoAnalitica } from './contexto'
-
-const pequeno = (f: FilaSubgrupo) => f.n < 5
 
 /** Diferencia frente al total desde la que se marca un grupo (plan v3.7, 6.3.7). */
 const MARCA = -0.05
@@ -41,7 +39,7 @@ export default function Equidad() {
     <div className="flex flex-col lg:min-h-0 lg:flex-1">
       <Guia>
         <p>Compara cómo funciona el modelo en cada grupo (por sexo, edad gestacional o sede). Si un grupo queda mucho peor que el total, el modelo puede estar fallando con esos niños.</p>
-        <p>Una diferencia menor que −0,05 frente al total se marca para revisarla. Los grupos con menos de 5 niños no se muestran, para proteger su privacidad.</p>
+        <p>Una diferencia menor que −0,05 frente al total se marca para revisarla. Cada grupo dice cuántos niños tiene, también si son pocos; su AUC pide 20 niños o más, y su intervalo, además, 5 niños con el desenlace y 5 sin él.</p>
       </Guia>
       <PorDesenlace consulta={consulta}>
         {(d) => {
@@ -78,8 +76,9 @@ export default function Equidad() {
                   <div className="grid gap-3 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] xl:items-start">
                     <Grafica titulo={`${dGrupo.titulo}: ${nombreGrupo(por).toLowerCase()}`} descripcion={dGrupo.descripcion}>
                       <Bosque etiqueta="Qué tan bien ordena el modelo en cada grupo" referencia={total} nombreValor={jerga(tecnico, 'Ordena', 'AUC')}
-                        puntos={filas.map((f) => ({ etiqueta: `${g(f)} · ${pequeno(f) ? N_MENOR_QUE_5 : `${num(f.n)} niños`}`, valor: f.auc, bajo: f.ic_bajo, alto: f.ic_alto, pequena: pequeno(f), nota: 'Pocos niños para calcularlo' }))} />
+                        puntos={filas.map((f) => ({ etiqueta: `${g(f)} · ${num(f.n)} niños`, valor: f.auc, bajo: f.ic_bajo, alto: f.ic_alto, nota: 'Pide 20 niños o más para calcularlo' }))} />
                       {total != null && <p className="mt-1 text-xs text-salvia">La línea punteada es el total del modelo ({dec2(total)}).</p>}
+                      {filas.some((f) => f.auc != null && f.ic_bajo == null) && <p className="mt-1 text-xs text-salvia">{SIN_INTERVALO}</p>}
                     </Grafica>
                     <TablaDatos titulo={dDif.titulo} descripcion={`${dDif.descripcion} Menos de −0,05 se marca.`}
                       exportar={{ nombre: 'equidad-diferencia', filas: filas.map((f) => ({ subgrupo_por: nombreGrupo(por), grupo: f.grupo, ninos: f.n, casos: f.casos, auc: f.auc, diferencia_con_el_total: dif(f) != null ? Math.round((dif(f) as number) * 10000) / 10000 : null })) }}>
@@ -87,15 +86,15 @@ export default function Equidad() {
                         <thead><tr><th>Grupo</th><th>Niños</th><th>Casos</th><th>{jerga(tecnico, 'Ordena', 'AUC (IC)')}</th><th>Diferencia</th></tr></thead>
                         <tbody>
                           {filas.map((f) => {
-                            const x = dif(f), malo = x != null && x < MARCA && !pequeno(f)
+                            const x = dif(f), malo = x != null && x < MARCA
                             return (
                               <tr key={f.grupo}>
                                 <td>{g(f)}</td>
-                                <td>{pequeno(f) ? N_MENOR_QUE_5 : num(f.n)}</td>
-                                <td>{pequeno(f) || f.casos == null || f.casos < 5 ? N_MENOR_QUE_5 : num(f.casos)}</td>
-                                <td>{pequeno(f) ? N_MENOR_QUE_5 : ic(f)}</td>
+                                <td>{num(f.n)}</td>
+                                <td>{f.casos == null ? '—' : num(f.casos)}</td>
+                                <td>{f.auc == null ? 'Pide 20 niños' : ic(f)}</td>
                                 <td className={cn(malo && 'font-bold text-coral-hondo')}>
-                                  {pequeno(f) ? N_MENOR_QUE_5 : x != null ? `${x >= 0 ? '+' : '−'}${dec2(Math.abs(x))}` : '—'}
+                                  {x != null ? `${x >= 0 ? '+' : '−'}${dec2(Math.abs(x))}` : '—'}
                                   {malo && <span className="ml-1 text-xs">▼ revisar</span>}
                                 </td>
                               </tr>
@@ -110,7 +109,7 @@ export default function Equidad() {
                   <Grafica llenar titulo={`${dMapa.titulo}: ${nombreGrupo(por).toLowerCase()} y desenlace`} descripcion={dMapa.descripcion}
                     exportar={{ nombre: 'equidad-mapa', filas: nombresFila.flatMap((n) => columnas.map(([clave, datos]) => {
                       const f = datos.subgrupos?.[por]?.find((x) => x.grupo === n)
-                      return { grupo: n, desenlace: nombreDes(clave).nombre, ninos: f?.n ?? null, auc: f && !pequeno(f) ? f.auc : null }
+                      return { grupo: n, desenlace: nombreDes(clave).nombre, ninos: f?.n ?? null, auc: f ? f.auc : null }
                     })) }}>
                     {/* un desenlace por fila y un grupo por columna: los nombres largos de los desenlaces tienen ancho y los grupos caben en el encabezado */}
                     <div className={MAPA_FIJO}>
@@ -120,7 +119,7 @@ export default function Equidad() {
                           etiqueta: nombreDes(clave).nombre + (nombreDes(clave).enPrueba ? ' (En prueba)' : ''),
                           celdas: nombresFila.map((n) => {
                             const f = datos.subgrupos?.[por]?.find((x) => x.grupo === n)
-                            return { valor: f?.auc ?? null, pequena: !f || pequeno(f), texto: f?.auc != null ? dec2(f.auc) : '—' }
+                            return { valor: f?.auc ?? null, texto: f?.auc != null ? dec2(f.auc) : '—' }
                           }),
                         }))} />
                     </div>
