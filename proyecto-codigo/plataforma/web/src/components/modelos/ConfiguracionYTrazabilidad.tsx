@@ -1,12 +1,12 @@
-// «Configuración» (con qué datos y cómo se entrenó) y «Trazabilidad» (qué entrenamiento es, de cuándo y en qué paquete está):
-// lo que hace falta para reproducir o auditar el modelo. Solo se muestra lo que el entrenamiento guardó o el sistema sabe;
-// lo que no se registró (p. ej. la versión del diccionario con que se entrenó) no se inventa.
+// «Configuración» (con qué datos y cómo se entrenó) y «Trazabilidad» (qué entrenamiento es, de cuándo, con qué Diccionario y en
+// qué paquete está): lo que hace falta para reproducir o auditar el modelo. Solo se muestra lo que el entrenamiento guardó o el
+// sistema sabe: un entrenamiento anterior que no registró sus cohortes o la versión del Diccionario no las inventa.
 import { Link } from 'react-router'
-import type { AnaliticaMeta } from '../../api/tipos'
+import type { AnaliticaMeta, CohorteDeEntrenamiento } from '../../api/tipos'
 import { paqueteQueContiene } from '../../api/modelos'
 import { puede, useSesion } from '../../auth/sesion'
 import { usePaqueteActivo } from '../../lib/consultas'
-import { fecha, numero } from '../../lib/formato'
+import { fecha, num, numero } from '../../lib/formato'
 import { datosAl } from '../../lib/lenguaje'
 import { Panel } from '../ui'
 
@@ -25,16 +25,27 @@ function Datos({ filas }: { filas: [string, string | null | undefined][] }) {
 
 const FUENTES: Record<string, string> = { simulado: 'Datos simulados', kmc: 'Base de la Fundación' }
 
+/** «nacidos de 2007 a 2021» (o «nacidos en 2021»); nada si el entrenamiento no supo los años. */
+const nacidos = (c: CohorteDeEntrenamiento) => (c.nacidos_desde == null || c.nacidos_hasta == null ? null
+  : c.nacidos_desde === c.nacidos_hasta ? `nacidos en ${c.nacidos_desde}` : `nacidos de ${c.nacidos_desde} a ${c.nacidos_hasta}`)
+const frase = (t: string) => t.charAt(0).toUpperCase() + t.slice(1)
+const DIVISION = 'Temporal por fecha de nacimiento: se entrena con los nacidos antes y se prueba con los'
+
 /** Con qué datos y cómo se entrenó; los hiperparámetros van en su propia tarjeta (`HiperparametrosModelo`). Administración ve el
  *  enlace a los hiperparámetros del entrenamiento. */
 export function ConfiguracionModelo({ meta }: { meta: AnaliticaMeta | undefined }) {
   const { usuario } = useSesion()
+  const { entrenamiento, prueba } = meta?.cohortes ?? {}
   return (
     <Panel titulo="Configuración"
       accion={puede(usuario, ['admin']) ? <Link to="/admin/entrenamientos" className="text-sm font-semibold text-teal hover:underline">Ver hiperparámetros ›</Link> : undefined}>
       <Datos filas={[
         ['Datos de entrenamiento', meta?.corte ? `${datosAl(meta.corte)}${meta.fuente ? `, ${(FUENTES[meta.fuente] ?? meta.fuente).toLowerCase()}` : ''}` : null],
-        ['División de datos', 'Temporal por fecha de nacimiento: se entrena con los nacidos antes y se prueba con los más recientes.'],
+        ['Cohorte de entrenamiento', entrenamiento
+          ? [frase(nacidos(entrenamiento) ?? ''), `${num(entrenamiento.ninos)} niños`].filter(Boolean).join(' · ') : null],
+        ['División de datos', prueba
+          ? `${DIVISION} ${num(prueba.ninos)} más recientes${nacidos(prueba) ? ` (${nacidos(prueba)})` : ''}, que el modelo no vio.`
+          : `${DIVISION} más recientes.`],
         ['Algoritmo', 'Gradient boosting (LightGBM)'],
       ]} />
     </Panel>
@@ -69,6 +80,7 @@ export function TrazabilidadModelo({ meta }: { meta: AnaliticaMeta | undefined }
         ['Fecha', meta?.creada ? fecha(meta.creada) : null],
         ['Versión registrada', meta?.version_registro != null ? `${meta.registro ? `${meta.registro} ` : ''}versión ${meta.version_registro}` : null],
         ['Versión del modelo', meta?.version_modelo != null ? String(meta.version_modelo) : null],
+        ['Diccionario', meta?.diccionario != null ? `versión ${meta.diccionario}` : null],
         ['Paquete', delPaquete ?? (paquete.isSuccess && meta ? 'No está en el paquete activo' : null)],
       ]} />
     </Panel>

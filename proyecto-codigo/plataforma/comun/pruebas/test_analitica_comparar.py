@@ -88,3 +88,15 @@ def test_comparar_valores_acota_las_filas():
     grande = (rng.random(CM.MAX_FILAS * 2) < 0.2).astype(float)
     r = CM.comparar_valores(grande, grande, escala=100, replicas=20)
     assert r['n_a'] == CM.MAX_FILAS * 2 and abs(r['a'] - 20) < 1.5
+
+
+def test_el_porcentaje_de_un_grupo_grande_sale_de_todos_sus_ninos():
+    """La cifra que se muestra junto a «x de n con dato» es la de todos los niños del grupo; la submuestra de
+    ``MAX_FILAS`` es solo para el intervalo. Con una submuestra, 3.662 de 20.734 salía 17,6 % y no 17,7 %."""
+    a = np.zeros(20_734)
+    a[:3_662] = 1
+    b = np.zeros(3_455)
+    b[:598] = 1
+    r = CM.comparar_valores(a, b, escala=100)
+    assert r['a'] == round(100 * 3_662 / 20_734, 3) and r['b'] == round(100 * 598 / 3_455, 3)
+    assert r['diferencia'] == round(r['b'] - r['a'], 3) and r['n_a'] == 20_734

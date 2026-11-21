@@ -159,12 +159,12 @@ describe('navegación', () => {
     expect(within(menu).getByRole('link', { name: 'Mis modelos' })).toHaveAttribute('href', '/mis-modelos')
   })
 
-  it('el experto ve lo clínico y lo técnico menos Calidad de datos', async () => {
+  it('el experto ve lo clínico y lo técnico, con Calidad de datos', async () => {
     api('experto')
     montar('/ninos')
     const menu = await menuDe()
     expect(seccion(menu, 'Clínica')).toEqual(['Vista clínica', 'Niños', 'Comparar grupos', 'Revisión de riesgos', 'Calcular un niño'])
-    expect(seccion(menu, 'Técnica')).toEqual(['Modelos', 'Diccionario', 'Resumen'])
+    expect(seccion(menu, 'Técnica')).toEqual(['Modelos', 'Calidad de datos', 'Diccionario', 'Resumen'])
   })
 
   it('quien solo consulta ve vista clínica, comparar, modelos y el resumen; no niños uno por uno ni lo que cambia o calcula', async () => {
@@ -218,8 +218,8 @@ describe('navegación', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Explorar' })).toBeInTheDocument()
   })
 
-  it('Calidad de datos sigue siendo solo de administración, también por la dirección', async () => {
-    api('experto')
+  it('quien solo consulta no entra a Calidad de datos, tampoco por la dirección', async () => {
+    api('visualizador')
     montar('/admin/calidad-datos')
     expect(await screen.findByRole('heading', { name: 'Sin permiso' })).toBeInTheDocument()
   })

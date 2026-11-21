@@ -377,3 +377,33 @@ def test_purga_que_falla_en_mlflow_no_tumba_el_ciclo(motor):
         assert not any((e.parametros or {}).get('borrado') for e in s.scalars(select(Ejecucion)))
         s.execute(delete(Usuario).where(Usuario.id == uid))
         s.commit()
+
+
+def test_el_entrenamiento_recibe_la_version_del_diccionario_con_que_se_hace(motor, tmp_path):
+    """La versión vigente del Diccionario viaja al entrenamiento (``MAIA_DICCIONARIO_VERSION``): queda en su
+    trazabilidad, para saber con qué definiciones de desenlaces y variables se entrenó."""
+    from maia_comun import diccionarios as DIC
+    from maia_comun.modelos_db import VersionDiccionario
+    with Session(motor) as s:
+        assert DIC.sembrar(s)
+        s.commit()
+        version = DIC.vigente(s).version
+        EJ.encolar(s, 'entrenamiento', 'simulado', 'manual', {'modelos': ['clinico']})
+        s.commit()
+    try:
+        lanzador = Lanzador({'entrenar': (0, '')})
+        Programador(motor=motor, lanzar=lanzador, cfg=CFG, diccionario=tmp_path / 'diccionario.xlsx').ciclo()
+        assert lanzador.llamadas and all(env['MAIA_DICCIONARIO_VERSION'] == str(version) for _, env in lanzador.llamadas)
+    finally:
+        with Session(motor) as s:
+            s.execute(delete(VersionDiccionario))
+            s.commit()
+
+
+def test_sin_diccionario_en_la_base_el_entrenamiento_no_inventa_una_version(motor, tmp_path):
+    with Session(motor) as s:
+        EJ.encolar(s, 'entrenamiento', 'simulado', 'manual', {'modelos': ['clinico']})
+        s.commit()
+    lanzador = Lanzador({'entrenar': (0, '')})
+    Programador(motor=motor, lanzar=lanzador, cfg=CFG, diccionario=tmp_path / 'diccionario.xlsx').ciclo()
+    assert lanzador.llamadas and all('MAIA_DICCIONARIO_VERSION' not in env for _, env in lanzador.llamadas)

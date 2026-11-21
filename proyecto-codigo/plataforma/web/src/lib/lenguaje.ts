@@ -1,7 +1,7 @@
 // Glosario clínico: cómo se dicen en las pantallas del equipo clínico los términos técnicos del modelo. El término
 // técnico no desaparece: queda al pasar el mouse (title) y en Administración, donde sí hace falta. Es el único lugar
 // que hay que tocar cuando los médicos de la Fundación ajusten las palabras.
-import { CAPAS, dec2, fecha, frase, indicador, numero, RIESGO_ALTO } from './formato'
+import { CAPAS, dec2, fecha, frase, indicador, numero, RIESGO_ALTO, unidad } from './formato'
 
 // ------------------------------------------------------------------ riesgo (posición = percentil dentro del desenlace)
 
@@ -164,7 +164,9 @@ export function peso(texto: string): string {
     return `${indicador(z[1])} a ${z[2].replaceAll('_', ' ')}: ${Number.isFinite(numero) ? frenteOms(numero).toLowerCase() : valor}`
   }
   const limpio = nombreDato(nombre)
-  return valor ? `${limpio}: ${valor}` : limpio
+  // «4.165 GRAMOS» → «4.165 g»: solo cuando el valor es un número con su unidad (un texto no es una unidad)
+  const legible = valor.replace(/^(-?[\d.,]+) (\S+)$/, (_, n: string, u: string) => `${n} ${unidad(u)}`)
+  return legible ? `${limpio}: ${legible}` : limpio
 }
 const INDICADOR_Z = new Set(['peso', 'talla', 'perimetro_cefalico', 'peso_para_talla'])
 

@@ -18,7 +18,7 @@ import { Termino } from '../components/Termino'
 import { ErrorConReintento } from '../components/ErrorConReintento'
 import { cn } from '../lib/cn'
 import { desenlaceDeUrlAntigua } from '../lib/familias'
-import { aproximado, dec, edad, fecha, indicador, RIESGO_ALTO } from '../lib/formato'
+import { aproximado, dec, edad, fecha, indicador, medida, RIESGO_ALTO, unidad } from '../lib/formato'
 import { alerta, ayudaAlerta, ayudaZ, datosAl, frenteOms, motivo } from '../lib/lenguaje'
 
 export default function Nino() {
@@ -53,7 +53,8 @@ function Ficha({ n, historia, trayectoria, perfil }: {
   const conDesenlaces = historia.isPending || historia.error != null || desenlaces.length > 0
   const secciones = [
     ...(conDesenlaces ? [{ clave: 'desenlaces', texto: 'Desenlaces', contenido: (
-      <Desenlaces sujeto={n.sujeto} historia={historia} desenlaces={desenlaces} modeloClinico={n.modelo_clinico} />
+      <Desenlaces sujeto={n.sujeto} historia={historia} desenlaces={desenlaces} modeloClinico={n.modelo_clinico}
+        visitas={n.visitas} talla={n.crecimiento.talla} />
     ) }] : []),
     ...(conCrecimiento ? [{ clave: 'crecimiento', texto: 'Crecimiento', contenido: <CrecimientoOms crecimiento={n.crecimiento} grilla="sm:grid-cols-3" /> }] : []),
     ...(conPerfil ? [{ clave: 'perfil', texto: 'Frente a los demás niños', contenido: (
@@ -76,7 +77,7 @@ function Ficha({ n, historia, trayectoria, perfil }: {
     <div className="flex flex-col lg:h-full">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
         <div>
-          <h1>Niño {n.sujeto}</h1>
+          <h1>{/^f/i.test(n.sexo ?? '') ? 'Niña' : 'Niño'} {n.sujeto}</h1>
           <p className="mt-1 text-salvia">{subtitulo(n)}</p>
         </div>
         <div className="no-imprimir flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -100,12 +101,16 @@ function Ficha({ n, historia, trayectoria, perfil }: {
   )
 }
 
-/** Cómo nació y dónde se atiende, en frases que no quedan sueltas cuando falta un dato. El grupo del niño es su sede. */
+/** Cómo nació, dónde se atiende y cuál fue su última visita con datos, en frases que no quedan sueltas cuando falta un dato.
+ * El grupo del niño es su sede. */
 function subtitulo(n: LineaTemporal) {
   const nacio = n.eg_semanas != null ? `Nació a las ${dec(n.eg_semanas)} semanas de gestación` : null
   const anio = n.anio_nacimiento ? (nacio ? `en ${n.anio_nacimiento}` : `Nació en ${n.anio_nacimiento}`) : null
-  const nacimiento = [nacio, anio].filter((x) => x != null).join(', ')
-  return `${[nacimiento || null, n.grupo ? `Sede ${n.grupo}` : null, datosAl(n.corte)].filter((f) => f != null).join('. ')}.`
+  const peso = n.peso_nacer ? `con ${[medida(n.peso_nacer.valor), unidad(n.peso_nacer.unidad)].filter(Boolean).join(' ')}` : null
+  const nacimiento = [nacio, anio, nacio || anio ? peso : null].filter((x) => x != null).join(', ')
+  const ultima = n.visitas.findLast((v) => v.fecha != null || v.riesgos.length > 0 || v.mediciones.some((m) => m.valor != null))
+  const visita = ultima ? `Última visita: ${ultima.nombre.replace(' (edad corregida)', '')}${ultima.fecha ? ` (${fecha(ultima.fecha)})` : ''}` : null
+  return `${[nacimiento || null, n.grupo ? `Sede ${n.grupo}` : null, visita, datosAl(n.corte)].filter((f) => f != null).join('. ')}.`
 }
 
 /** Las visitas del niño y lo que se midió en la elegida. Con pocas mediciones la tarjeta mide lo que su contenido; con muchas se
@@ -205,7 +210,7 @@ function DetalleVisita({ visita }: { visita: Visita }) {
                   <tr key={m.variable} className={a ? 'bg-coral-tinte/60' : undefined}>
                     <td>{m.etiqueta}</td>
                     <td className={cn('text-right whitespace-nowrap', a && 'font-bold text-coral-hondo')}>
-                      {m.valor ?? '—'}{m.unidad && m.valor != null ? ` ${m.unidad}` : ''}
+                      {m.valor ?? '—'}{m.unidad && m.valor != null ? ` ${unidad(m.unidad)}` : ''}
                     </td>
                     <td className="text-sm">
                       {a ? (

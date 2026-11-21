@@ -1,9 +1,9 @@
-// «Riesgo estimado»: por cada momento en que se calcula, una línea con cuántos niños del grupo tienen riesgo calculado
-// (solo los que siguen en seguimiento a esa visita: es el denominador) y cuántos están en alerta. «En prueba» sale una
+// «Riesgo estimado de …»: por cada visita en que se calcula, una línea con cuántos de los niños del grupo con riesgo
+// calculado (solo los que siguen en seguimiento a esa visita: es el denominador) están en alerta. «En prueba» sale una
 // sola vez, en el título, y dice qué cortes no lo están. Un desenlace sin modelo en el paquete activo no tiene filas: se
 // dice en vez de dejar el panel vacío.
 import type { RiesgoCorte } from '../../api/tipos'
-import { frase, num, pct } from '../../lib/formato'
+import { num, pct } from '../../lib/formato'
 import { definicionAlerta, sinRiesgoEstimado } from '../../lib/lenguaje'
 import { Insignia, Panel } from '../ui'
 
@@ -30,12 +30,16 @@ export function marcaEnPrueba(filas: RiesgoCorte[]): string | null {
   return enUso.length ? `En prueba, salvo ${enUso.join(' y ')}` : 'En prueba'
 }
 
-export function RiesgoPorCorte({ filas, conModelo, alertaPercentil, className }: {
-  filas: RiesgoCorte[]; conModelo: boolean; alertaPercentil: number; className?: string
+export function RiesgoPorCorte({ filas, conModelo, alertaPercentil, desenlace, className }: {
+  filas: RiesgoCorte[]; conModelo: boolean; alertaPercentil: number
+  /** El desenlace que se estima («Talla baja a los 12 meses»): va en el título. */
+  desenlace?: string
+  className?: string
 }) {
   const marca = marcaEnPrueba(filas)
+  const titulo = desenlace ? `Riesgo estimado de ${desenlace.charAt(0).toLowerCase()}${desenlace.slice(1)}` : 'Riesgo estimado'
   return (
-    <Panel className={className} titulo="Riesgo estimado" accion={marca && <Insignia tono="ocre">{marca}</Insignia>}
+    <Panel className={className} titulo={titulo} accion={marca && <Insignia tono="ocre">{marca}</Insignia>}
       descripcion={filas.length ? `Solo tienen riesgo calculado los niños del grupo que siguen en seguimiento. ${definicionAlerta(alertaPercentil)}` : undefined}>
       {filas.length === 0 ? (
         <p className="text-sm">{sinRiesgoEstimado(conModelo, 'del grupo')}</p>
@@ -44,9 +48,8 @@ export function RiesgoPorCorte({ filas, conModelo, alertaPercentil, className }:
         <ul className="-my-1 divide-y divide-linea/70 text-sm 2xl:my-0 2xl:grid 2xl:auto-cols-fr 2xl:grid-flow-col 2xl:divide-x 2xl:divide-y-0">
           {filas.map((f) => (
             <li key={f.clave} className="py-1 tabular-nums 2xl:px-4 2xl:py-0 2xl:first:pl-0 2xl:last:pr-0">
-              <span className="font-semibold 2xl:block">{frase(aMomento(f.momento))}<span className="2xl:hidden">:</span></span>{' '}
-              <span className="2xl:block">{num(f.calculados)} con riesgo calculado<span className="2xl:hidden"> ·</span></span>{' '}
-              <strong className="text-teal 2xl:block 2xl:text-base">{num(f.en_alerta)} en alerta ({pct(f.pct_en_alerta)})</strong>
+              <span className="font-semibold 2xl:block">Calculado {aMomento(f.momento)}<span className="2xl:hidden">:</span></span>{' '}
+              <strong className="text-teal 2xl:block 2xl:text-base">{num(f.en_alerta)} de {num(f.calculados)} niños en alerta ({pct(f.pct_en_alerta)})</strong>
             </li>
           ))}
         </ul>

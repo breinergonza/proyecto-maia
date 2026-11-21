@@ -374,9 +374,10 @@ export interface paths {
          *     consulta), cuántas se revisaron este mes, las visitas y mediciones que tienen alertas (para filtrar la cola) y la
          *     completitud de la talla por visita.
          *
-         *     Completitud: de los niños con alguna medida de crecimiento en la visita (peso, talla o perímetro), el porcentaje que
-         *     tiene talla. No se compara con todos los niños del corte porque quien aún no llegó a la visita no tiene un dato
-         *     faltante. ``a_12_meses`` marca la visita cuya ventana de edad incluye los 12 meses (365 días).
+         *     Completitud: de los niños elegibles (todos los del corte, como en Comparar grupos), el porcentaje que tiene talla en
+         *     cada visita. Quien aún no llega a la visita, no asistió o no tiene una medida válida cuenta como «sin dato». Si los
+         *     datos de origen de la corrida ya no están, no se sabe cuántos eran elegibles y no hay completitud.
+         *     ``a_12_meses`` marca la visita cuya ventana de edad incluye los 12 meses (365 días).
          */
         get: operations["resumen_datos_api_revision_datos_resumen_get"];
         put?: never;

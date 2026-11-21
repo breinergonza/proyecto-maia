@@ -1,5 +1,5 @@
-// Calidad de datos (Administración): la cola de mediciones por revisar, sus cifras, su completitud por visita y las dos
-// medidas de cómo acierta la revisión.
+// Calidad de datos (administración y expertos clínicos): la cola de mediciones por revisar, sus cifras, su completitud por
+// visita y las dos medidas de cómo acierta la revisión.
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { pedir } from './cliente'
 import type { AciertosRevision, ConcentracionAlertas, DatoRevision, Pagina, Respuesta } from './tipos'
@@ -25,7 +25,8 @@ export interface ResumenCalidad {
   completitud: {
     indicador: string
     nombre: string
-    etapas: { etapa: string; etapa_nombre: string | null; con_dato: number; con_visita: number; pct: number; a_12_meses: boolean }[]
+    /** `elegibles`: todos los niños del programa, hayan llegado o no a esa visita (el denominador del porcentaje). */
+    etapas: { etapa: string; etapa_nombre: string | null; con_dato: number; elegibles: number; pct: number; a_12_meses: boolean }[]
   }
 }
 
@@ -45,7 +46,7 @@ export const useColaDatos = (f: FiltrosCola) => useQuery({
   placeholderData: keepPreviousData,
 })
 
-/** Guarda la respuesta del administrador a una medición («¿es un error de registro?») y refresca la cola y sus cifras. */
+/** Guarda la respuesta de quien revisa una medición (confirmarla o marcarla para corregir) y refresca la cola y sus cifras. */
 export function useResponderDato(id: number) {
   const cliente = useQueryClient()
   return useMutation({

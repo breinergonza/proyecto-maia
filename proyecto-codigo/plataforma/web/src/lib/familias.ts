@@ -123,14 +123,19 @@ export const sinFamilia = (nombre: string) => `El paquete de modelos activo no c
  *  en prueba se dice que aún no se sabe, para no prometer una frecuencia que nadie ha verificado. */
 export function fraseCalibrada(riesgo: number, desenlace: string, enUso: boolean): string {
   const n = porcentaje(riesgo)
+  // en los extremos el porcentaje se lee «menos de 1 %» o «más de 99 %»: la frase no dice «un riesgo de 100 %, unos 100»
   if (!enUso) {
     return n < 1
       ? `Modelo en prueba: aún no se ha comprobado si, de cada 100 niños con un riesgo menor de 1 %, menos de 1 tiene ${desenlace}.`
-      : `Modelo en prueba: aún no se ha comprobado si, de cada 100 niños con un riesgo de ${n} %, unos ${n} tienen ${desenlace}.`
+      : n > 99
+        ? `Modelo en prueba: aún no se ha comprobado si, de cada 100 niños con un riesgo mayor de 99 %, casi todos tienen ${desenlace}.`
+        : `Modelo en prueba: aún no se ha comprobado si, de cada 100 niños con un riesgo de ${n} %, unos ${n} tienen ${desenlace}.`
   }
   return n < 1
     ? `De cada 100 niños con un riesgo menor de 1 %, menos de 1 tuvo ${desenlace}.`
-    : `De cada 100 niños con un riesgo de ${n} %, unos ${n} tuvieron ${desenlace}.`
+    : n > 99
+      ? `De cada 100 niños con un riesgo mayor de 99 %, casi todos tuvieron ${desenlace}.`
+      : `De cada 100 niños con un riesgo de ${n} %, unos ${n} tuvieron ${desenlace}.`
 }
 
 // ------------------------------------------------------------------ todos los desenlaces del niño (pestaña «Desenlaces»)

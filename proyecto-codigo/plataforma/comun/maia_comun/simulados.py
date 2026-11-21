@@ -191,7 +191,7 @@ CONFIG_CLINICA_DEMO = AC.ConfigClinica(
 EN_PRUEBA_DEMO = tuple(
     AC.Desenlace(f'talla_baja_12m_desde_{momento.split()[0]}',
                  f'talla baja para la edad a los 12 meses (riesgo calculado a {momento})', momento, 'z_bajo',
-                 concepto='talla', etapa='12 m EC', comparar=REGLA_SIMPLE)
+                 concepto='talla', etapa='12 m EC', comparar=('z_talla',))   # la talla que ya tiene, sin modelo
     for momento in ('40 sem', '3 m EC', '6 m EC'))
 
 

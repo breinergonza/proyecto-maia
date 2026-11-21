@@ -150,9 +150,10 @@ def comparar_valores(a: np.ndarray, b: np.ndarray, *, escala: float = 1.0, semil
            'diferencia': None, 'ic_bajo': None, 'ic_alto': None, 'clara': None}
     if len(a) < MIN_DISTRIBUCION or len(b) < MIN_DISTRIBUCION:
         return sal
+    # la cifra de cada lado sale de todos sus niños (es la que va junto a «x de n»); la submuestra es solo para el intervalo
+    sal['a'], sal['b'] = _r(escala * float(a.mean()), 3), _r(escala * float(b.mean()), 3)
     a, b = _acotar(a, rng), _acotar(b, rng)
     ra, rb = escala * _medias_bootstrap(a, rng, replicas), escala * _medias_bootstrap(b, rng, replicas)
-    sal['a'], sal['b'] = _r(escala * float(a.mean()), 3), _r(escala * float(b.mean()), 3)
     sal['ic_a'] = [_r(float(np.percentile(ra, 2.5)), 3), _r(float(np.percentile(ra, 97.5)), 3)]
     sal['ic_b'] = [_r(float(np.percentile(rb, 2.5)), 3), _r(float(np.percentile(rb, 97.5)), 3)]
     sal['diferencia'] = _r(sal['b'] - sal['a'], 3)

@@ -111,8 +111,12 @@ def _desenlace(fila: object, dic: D.Diccionario, medidas: dict[str, CR.Medida],
     if solo_desde and solo_desde not in set(dic.quiebres.quiebre):
         return f'el quiebre "{solo_desde}" no está en la hoja "Quiebres"'
     comparar = D.partes(fila.comparar)
-    if fuera := [c for c in comparar if c not in variables.index and c not in DEL_NINO]:
-        return f'"Comparar con" nombra {", ".join(fuera)}, que no está en la hoja "Variables"'
+    # "z_talla": the WHO z-score of a growth measure in use, at the visit the risk is computed at
+    z_de = {f'z_{indicador}': f'z_{m.nombre}' for indicador, m in medidas.items()}
+    if fuera := [c for c in comparar if c not in variables.index and c not in DEL_NINO and c not in z_de]:
+        return (f'"Comparar con" nombra {", ".join(fuera)}, que no está en la hoja "Variables" ni es el puntaje z '
+                f'de una medida en uso de la hoja "Crecimiento" (z_talla, z_peso...)')
+    comparar = tuple(z_de.get(c, c) for c in comparar)
     variable = _texto(fila.variable) if regla in CON_VARIABLE else None
     if regla in CON_VARIABLE and variable is None:
         return f'falta la "Variable": "{como}" la necesita'

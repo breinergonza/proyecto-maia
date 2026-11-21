@@ -129,6 +129,24 @@ describe('modelos: configuración y trazabilidad', () => {
     expect(within(traza).queryByText(/Diccionario/)).not.toBeInTheDocument()   // el entrenamiento no lo registra: no se inventa
   })
 
+  it('un entrenamiento que guardó sus cohortes y su Diccionario dice con quiénes se entrenó, con quiénes se probó y con qué versión', async () => {
+    const completa = { ...meta, diccionario: 14, cohortes: {
+      entrenamiento: { ninos: 3400, nacidos_desde: 2007, nacidos_hasta: 2021 }, prueba: { ninos: 600, nacidos_desde: 2020, nacidos_hasta: 2021 } } }
+    api('experto', (url) => {
+      const m = /^\/api\/analitica\/7\/(rendimiento|resumen)\?desenlace=(.+)$/.exec(url)
+      if (!m) return undefined
+      return { cuerpo: { estado: 'ok', entrenamiento: 7, submodulo: m[1], meta: completa,
+        desenlaces: { [m[2]]: m[1] === 'rendimiento' ? rendimiento(0.74, 0.68) : { auc: 0.74, semaforos } } } }
+    })
+    montar(`/analitica?entrenamiento=7&desenlace=${T3}&ver=entrenamiento`)
+    const config = (await screen.findByRole('heading', { name: 'Configuración' })).closest('section')!
+    expect(within(config).getByText('Cohorte de entrenamiento').nextElementSibling).toHaveTextContent('Nacidos de 2007 a 2021 · 3.400 niños')
+    expect(within(config).getByText('División de datos').nextElementSibling).toHaveTextContent(
+      'Temporal por fecha de nacimiento: se entrena con los nacidos antes y se prueba con los 600 más recientes (nacidos de 2020 a 2021), que el modelo no vio.')
+    const traza = screen.getByRole('heading', { name: 'Trazabilidad' }).closest('section')!
+    expect(within(traza).getByText('Diccionario').nextElementSibling).toHaveTextContent('versión 14')
+  })
+
   it('un entrenamiento que no guardó sus hiperparámetros no los muestra', async () => {
     api('experto')
     montar(`/analitica?entrenamiento=6&desenlace=${T3}&ver=entrenamiento`)
@@ -194,6 +212,34 @@ describe('modelos: comparación técnica', () => {
     expect(fila('Modelo de referencia')).toHaveTextContent('0,68')
     expect(fila('Modelo completo')).toHaveTextContent('0,74')
     expect(fila('Modelo completo')).toHaveTextContent('+0,06')
+  })
+
+  // un entrenamiento nuevo guarda con qué datos se calcula la regla y la diferencia con su intervalo
+  const conRegla = (diferencia: { valor: number; ic_bajo: number | null; ic_alto: number | null }): Extra => (url) => {
+    const m = /^\/api\/analitica\/7\/rendimiento\?desenlace=(.+)$/.exec(url)
+    if (!m) return undefined
+    const r = rendimiento(0.74, 0.68)
+    return { cuerpo: { estado: 'ok', entrenamiento: 7, submodulo: 'rendimiento', meta, desenlaces: { [m[1]]: {
+      ...r, referencia: { ...r.referencia, entradas: ['talla, puntaje z a 3 meses (edad corregida)'], diferencia } } } } }
+  }
+
+  it('dice con qué datos se calcula la regla de referencia y da la diferencia con su intervalo', async () => {
+    api('experto', conRegla({ valor: 0.06, ic_bajo: 0.02, ic_alto: 0.1 }))
+    montar(`/analitica?entrenamiento=7&desenlace=${T3}&ver=evaluacion`)
+    const panel = (await screen.findByRole('heading', { name: 'Comparación técnica' })).closest('section')!
+    const fila = (t: string) => within(panel).getByText(t).closest('tr')!
+    expect(fila('Modelo de referencia')).toHaveTextContent('(solo talla, puntaje z a 3 meses (edad corregida))')
+    expect(fila('Modelo de referencia')).not.toHaveTextContent('edad gestacional')
+    expect(fila('Modelo completo')).toHaveTextContent('+0,06(0,02 a 0,1)')
+    expect(within(panel).getByText(/El intervalo de la diferencia no incluye el 0: la ventaja del modelo completo no es casualidad\./)).toBeInTheDocument()
+  })
+
+  it('si el intervalo de la diferencia incluye el 0, dice que la ventaja puede ser casualidad', async () => {
+    api('experto', conRegla({ valor: 0.02, ic_bajo: -0.03, ic_alto: 0.07 }))
+    montar(`/analitica?entrenamiento=7&desenlace=${T3}&ver=evaluacion`)
+    const panel = (await screen.findByRole('heading', { name: 'Comparación técnica' })).closest('section')!
+    expect(within(panel).getByText('Modelo completo').closest('tr')).toHaveTextContent('(−0,03 a 0,07)')
+    expect(within(panel).getByText(/El intervalo de la diferencia incluye el 0: la ventaja puede ser casualidad\./)).toBeInTheDocument()
   })
 
   it('un entrenamiento sin regla de referencia no muestra el panel', async () => {

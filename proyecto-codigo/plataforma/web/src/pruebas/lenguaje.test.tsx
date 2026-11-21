@@ -50,6 +50,10 @@ describe('glosario clínico', () => {
     expect(peso('quiebre_cambio_de_sistema_2022 = 0')).toBe('Nació antes del cambio de sistema 2022')
     expect(peso('z_peso_40_sem = -2,4')).toBe('Peso para la edad a 40 sem: bajo para la edad')
     expect(peso('Sexo = Femenino')).toBe('Sexo: Femenino')
+    // la unidad como la trae la base («GRAMOS», «CMS») se dice como se escribe en clínica; un texto no es una unidad
+    expect(peso('3mEC Peso (v310) = 4.165 GRAMOS')).toBe('3mEC Peso: 4.165 g')
+    expect(peso('Talla vis 40 sem (v250) = 45,5 CMS')).toBe('Talla vis 40 sem: 45,5 cm')
+    expect(peso('Lactancia (lact) = Leche materna exclusiva')).toBe('Lactancia: Leche materna exclusiva')
   })
 
   it('los trimestres de las alarmas, seguidos y con los que no tuvieron alarma', () => {

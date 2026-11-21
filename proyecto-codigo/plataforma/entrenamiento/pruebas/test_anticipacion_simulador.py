@@ -134,3 +134,40 @@ def test_las_celdas_de_1_a_4_ninos_dan_su_cifra():
     assert sal['primera_alerta']['sin_alerta']['casos'] is not None
     assert sal['primera_alerta']['ventaja_visitas']['media'] is None, 'la media de la ventaja pide 20 casos (D52)'
     assert all(v['casos'] == 3 and v['n'] == 60 and v['auc'] is not None for v in sal['metricas_por_visita']['visitas'])
+
+
+def test_la_talla_baja_se_mide_contra_la_talla_que_el_nino_ya_tiene(resultados):
+    """La regla de referencia de la talla baja es «solo el puntaje z de talla» de la visita del cálculo; el rendimiento
+    dice con qué dato se calcula la regla y cuánto le gana el modelo completo, con su intervalo."""
+    res, _ = resultados
+    for visita, etiqueta in (('40', '40 semanas'), ('3', '3 meses')):
+        ref = res[f'talla_baja_12m_desde_{visita}']['rendimiento']['referencia']
+        assert len(ref['entradas']) == 1 and ref['entradas'][0].startswith('talla, puntaje z') and etiqueta in ref['entradas'][0]
+        assert set(ref['diferencia']) == {'valor', 'ic_bajo', 'ic_alto'} and ref['diferencia']['valor'] is not None
+    # el desarrollo psicomotor sigue comparándose con la edad gestacional y el peso al nacer
+    assert len(res['desarrollo_12m']['rendimiento']['referencia']['entradas']) == 2
+
+
+def test_la_validacion_deja_con_quienes_se_entreno_y_con_quienes_se_probo():
+    """Para «Cómo se entrenó»: cuántos niños y nacidos entre qué años tuvo el entrenamiento y cuántos la prueba (los más
+    recientes, que el modelo no vio)."""
+    from maia_entrenamiento import entrenar as E
+    sev = simulados.simular(2500, 3)
+    cfg = replace(D.config_clinica('simulado', anticipacion=False), rondas=40, min_casos=20, hilos=2)
+    retenido: dict = {}
+    E.validar_clinico(sev, cfg, [], retenido)
+    c = retenido['cohortes']
+    assert set(c) == {'entrenamiento', 'prueba'}
+    assert 0 < c['prueba']['ninos'] < c['entrenamiento']['ninos'] and c['entrenamiento']['ninos'] + c['prueba']['ninos'] <= 2500
+    for parte in c.values():
+        assert parte['nacidos_desde'] <= parte['nacidos_hasta']
+
+
+def test_la_version_del_diccionario_llega_del_programador_o_no_se_inventa(monkeypatch):
+    from maia_entrenamiento import entrenar as E
+    monkeypatch.setenv('MAIA_DICCIONARIO_VERSION', '14')
+    assert E.version_del_diccionario() == 14
+    monkeypatch.setenv('MAIA_DICCIONARIO_VERSION', 'no es un número')
+    assert E.version_del_diccionario() is None
+    monkeypatch.delenv('MAIA_DICCIONARIO_VERSION')
+    assert E.version_del_diccionario() is None

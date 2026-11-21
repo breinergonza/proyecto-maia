@@ -423,6 +423,16 @@ def test_desenlace_de_crecimiento_sin_lo_que_necesita_queda_sin_modelo(clinico):
     assert 'antes de' in modelo.falta(sev, tarde)
 
 
+def test_la_regla_simple_puede_ser_el_puntaje_z_de_la_visita_del_calculo(clinico):
+    """"z_talla" in ``comparar`` is the length z-score at the visit the risk is computed at: for short stature the
+    honest rival is "how short the child already is", not gestational age and birth weight."""
+    sev = clinico[0]
+    cfg = replace(CFG, desenlaces=(replace(TALLA_12M, comparar=('z_talla',)),))
+    modelo = AC.ModeloClinico(cfg).ajustar(sev)
+    assert modelo.modelos['talla_12m'].columnas_base == ['z_talla_40_sem']
+    assert modelo.modelos['talla_12m'].base is not None
+
+
 def test_experimento_valida_sin_tocar_el_modelo_en_uso(clinico, proyecto, tmp_path, monkeypatch, capsys):
     sev = clinico[0]
     carpeta = SV.guardar(sev, tmp_path / 'sev')
@@ -497,6 +507,14 @@ def test_un_desenlace_del_diccionario_llega_al_modelo_como_lo_escribieron_los_ex
     assert medidas['peso'] == CR.Medida('peso', 'peso', factor=0.001, restringido=True)   # grams to WHO's kg
     assert (medidas['talla'].factor, medidas['talla'].z_bajo, medidas['talla'].caida) == (1.0, -3.0, 1.5)
     assert (en_uso.sexo, en_uso.codigos_sexo, en_uso.etapas_crecimiento) == ('sexo', (('1', 1), ('2', 2)), ('a', 'b'))
+
+
+def test_comparar_con_acepta_el_puntaje_z_de_una_medida_en_uso():
+    cfg = CF.leer(_diccionario([_fila('con_z', comparar='eg_semanas;z_talla'),
+                                _fila('sin_medida', comparar='z_perimetro_cefalico')]))
+    assert {d.clave: d.comparar for d in cfg.desenlaces} == {'con_z': ('eg_semanas', 'z_talla')}
+    # a measure that is not in use in "Crecimiento" has no z-score to compare with
+    assert 'z_perimetro_cefalico' in dict(cfg.descartados)['sin_medida']
 
 
 @pytest.mark.parametrize('fila, motivo', [

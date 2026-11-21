@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event'
 import { useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CorteDeFamilia, PuntoPorCorte, RiesgoPorCorte } from '../api/ninos'
+import { fraseCalibrada } from '../lib/familias'
 import { montar, simularApi, usuario } from './util'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -108,7 +109,7 @@ describe('lo condicional de la ficha no deja rótulos vacíos', () => {
     api()
     montar('/ninos/s1')
     await screen.findByRole('list', { name: 'Desenlaces del niño' })
-    expect(screen.getByText(/Nació a las 30 semanas de gestación, en 2026\. Sede 1\. Datos al/)).toBeInTheDocument()
+    expect(screen.getByText(/Nació a las 30 semanas de gestación, en 2026\. Sede 1\. Última visita: 3 meses \(1 de mar de 2026\)\. Datos al/)).toBeInTheDocument()
     expect(screen.queryByText(/Grupo 1/)).not.toBeInTheDocument()
   })
 })
@@ -296,5 +297,103 @@ describe('la ficha abre en una pestaña con contenido', () => {
     const lista = await pestanas()
     await waitFor(() => expect(lista.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Visitas']))
     expect(lista.getByRole('tab', { name: 'Visitas' })).toHaveAttribute('aria-selected', 'true')
+  })
+})
+
+// ------------------------------------------------------------------ encabezado, talla visita por visita y frases (mockup de la ficha)
+
+const visitaVacia = (etapa: string, nombre: string, orden: number) => ({
+  etapa, nombre, orden, fecha: null, edad_corregida: null, z: {}, alertas_dato: [], riesgos: [],
+  mediciones: [{ variable: `talla_${orden}`, etiqueta: `Talla a ${nombre}`, valor: null, unidad: 'CMS', fecha: null, tema: 'crecimiento' }],
+})
+const visitaCon = (etapa: string, nombre: string, orden: number, fecha: string, edad: number) => ({
+  etapa, nombre, orden, fecha, edad_corregida: edad, z: {}, alertas_dato: [], riesgos: [],
+  mediciones: [{ variable: `talla_${orden}`, etiqueta: `Talla a ${nombre}`, valor: '58', unidad: 'CMS', fecha, tema: 'crecimiento' }],
+})
+const talla = (etapa: string, edad: number, zeta: number, improbable = false) => ({
+  etapa, indicador: 'talla', fecha: null, edad_corregida: edad, valor: 58, unidad: 'CMS', z: zeta, bajo_2de: zeta < -2, caida_1de: false, improbable,
+})
+// fue a 40 semanas y a 3 meses; 6 y 12 meses aún no llegan
+const conTalla = (extra: Record<string, unknown> = {}) => linea({
+  visitas: [visitaCon('40 sem', '40 semanas', 3, '2026-01-05', 0), visitaCon('3 m EC', '3 meses', 4, '2026-03-12', 90),
+    visitaVacia('6 m EC', '6 meses', 5), visitaVacia('12 m EC', '12 meses', 7)],
+  crecimiento: { talla: [talla('40 sem', 0, -1.2), talla('3 m EC', 90, -1.8)] },
+  ...extra,
+})
+
+describe('encabezado de la ficha', () => {
+  it('dice si es niña, con qué peso nació y cuál fue su última visita con datos', async () => {
+    api(historia(), conTalla({ sexo: 'femenino', peso_nacer: { valor: '1240', unidad: 'GRAMOS' } }))
+    montar('/ninos/s1')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Niña s1' })).toBeInTheDocument()
+    expect(screen.getByText(/^Nació a las 30 semanas de gestación, en 2026, con 1\.240 g\. Sede 1\. Última visita: 3 meses \(12 de mar de 2026\)\. Datos al/)).toBeInTheDocument()
+  })
+
+  it('sin sexo ni peso al nacer en la base no los inventa', async () => {
+    api(historia(), conTalla())
+    montar('/ninos/s1')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Niño s1' })).toBeInTheDocument()
+    expect(screen.getByText(/^Nació a las 30 semanas de gestación, en 2026\. Sede 1\./)).toBeInTheDocument()
+  })
+})
+
+describe('talla del niño visita por visita, bajo el riesgo de talla baja', () => {
+  const figura = 'Talla para la edad de este niño en cada visita'
+
+  it('trae cada visita con su valor frente a la OMS, el umbral de talla baja y las visitas que aún no llegan', async () => {
+    api(historia(), conTalla())
+    montar('/ninos/s1?ver=desenlaces&desenlace=talla_baja_12m')
+    const region = await screen.findByRole('region', { name: 'Talla baja a los 12 meses' })
+    expect(within(region).getByRole('heading', { name: 'Talla para la edad, visita por visita' })).toBeInTheDocument()
+    expect(within(region).getByRole('figure', { name: `${figura}: 40 semanas, −1,2; 3 meses, −1,8; 6 meses, aún sin medir; 12 meses, aún sin medir` })).toBeInTheDocument()
+    expect(within(region).getByText(/Por debajo de −2 es talla baja/)).toBeInTheDocument()
+    expect(within(region).getByText('Última visita con datos: 3 meses.')).toBeInTheDocument()
+  })
+
+  it('una visita pasada sin talla dice «sin dato»; una medida improbable no se grafica', async () => {
+    api(historia(), conTalla({
+      visitas: [visitaCon('40 sem', '40 semanas', 3, '2026-01-05', 0), visitaVacia('3 m EC', '3 meses', 4), visitaCon('6 m EC', '6 meses', 5, '2026-06-10', 180),
+        visitaVacia('12 m EC', '12 meses', 7)],
+      crecimiento: { talla: [talla('40 sem', 0, -1.2), talla('6 m EC', 180, -9.5, true)] },
+    }))
+    montar('/ninos/s1?ver=desenlaces&desenlace=talla_baja_12m')
+    const region = await screen.findByRole('region', { name: 'Talla baja a los 12 meses' })
+    expect(within(region).getByRole('figure', { name: `${figura}: 40 semanas, −1,2; 3 meses, sin dato; 6 meses, sin dato; 12 meses, aún sin medir` })).toBeInTheDocument()
+  })
+
+  it('el desenlace de desarrollo no trae la gráfica de talla, ni un niño sin tallas', async () => {
+    api(historia(), conTalla())
+    montar('/ninos/s1?ver=desenlaces&desenlace=desarrollo_12m')
+    const region = await screen.findByRole('region', { name: 'Desarrollo psicomotor bajo a los 12 meses' })
+    expect(within(region).queryByRole('heading', { name: 'Talla para la edad, visita por visita' })).not.toBeInTheDocument()
+  })
+
+  it('un niño sin ninguna talla válida no deja la gráfica vacía', async () => {
+    api(historia(), conTalla({ crecimiento: {} }))
+    montar('/ninos/s1?ver=desenlaces&desenlace=talla_baja_12m')
+    const region = await screen.findByRole('region', { name: 'Talla baja a los 12 meses' })
+    expect(within(region).queryByRole('heading', { name: 'Talla para la edad, visita por visita' })).not.toBeInTheDocument()
+  })
+})
+
+describe('la frase «de cada 100 niños»', () => {
+  it('con el riesgo saturado no dice «un riesgo de 100 %, unos 100»', () => {
+    expect(fraseCalibrada(0.999, 'talla baja a los 12 meses', true))
+      .toBe('De cada 100 niños con un riesgo mayor de 99 %, casi todos tuvieron talla baja a los 12 meses.')
+    expect(fraseCalibrada(0.999, 'talla baja a los 12 meses', false))
+      .toBe('Modelo en prueba: aún no se ha comprobado si, de cada 100 niños con un riesgo mayor de 99 %, casi todos tienen talla baja a los 12 meses.')
+    // lo demás sigue igual
+    expect(fraseCalibrada(0.35, 'talla baja a los 12 meses', true)).toBe('De cada 100 niños con un riesgo de 35 %, unos 35 tuvieron talla baja a los 12 meses.')
+  })
+})
+
+describe('las visitas dicen las unidades como se escriben en clínica', () => {
+  it('«CMS» sale como «cm»', async () => {
+    api(historia(), conTalla())
+    montar('/ninos/s1?ver=visitas')
+    await userEvent.click(await screen.findByRole('button', { name: /^3 meses/ }))   // abre la visita de 3 meses
+    const fila = (await screen.findByText('Talla a 3 meses')).closest('tr')!
+    expect(fila).toHaveTextContent('58 cm')
+    expect(fila).not.toHaveTextContent('CMS')
   })
 })

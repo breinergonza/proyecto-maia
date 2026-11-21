@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DesenlaceComparado, GruposClinicoOk, RespuestaGruposClinico } from '../api/comparar'
 import type { Usuario } from '../api/tipos'
 import { Veredicto } from '../components/comparar/comun'
+import { filasDeLaComparacion } from '../components/comparar/comun'
 import { montar, simularApi, usuario } from './util'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -203,6 +204,37 @@ describe('comparar grupos', () => {
     expect(within(tabla).getByRole('columnheader', { name: 'Grupo A: niños con dato' })).toBeInTheDocument()
     expect(within(within(tabla).getByRole('row', { name: /40 sem/ })).getByText('472')).toBeInTheDocument()
     await userEvent.click(within(panel).getByRole('button', { name: 'Ver como tabla' }))   // deja la gráfica para las demás pruebas
+  })
+
+  it('«¿Crecen distinto?» dice cuánta talla falta en la última visita de cada grupo y lleva a «¿Faltan datos distintos?»', async () => {
+    await compararConTodos()
+    const nota = screen.getByText(/falta la talla/).closest('p')!
+    expect(nota).toHaveTextContent('A los 12 meses falta la talla del 20,3 % del grupo A (101 de 498) y del 28,5 % del grupo B (89 de 312).')
+    await userEvent.click(screen.getByRole('button', { name: 'Ver los datos que faltan' }))
+    expect(screen.getByRole('tab', { name: '¿Faltan datos distintos?' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByTestId('ubicacion').textContent).toContain('pregunta=faltan')
+  })
+
+  it('«Exportar» lleva las cifras de la comparación: cada grupo, lo observado con su diferencia y la talla por visita', async () => {
+    const filas = filasDeLaComparacion(ok)
+    const de = (seccion: string) => filas.filter((f) => f['Sección'] === seccion).map((f) => `${f.Dato}: ${f.Valor}`)
+    expect(de('Grupos')).toEqual(['Grupo A: niños elegibles: 498', 'Grupo B: niños elegibles: 312', 'Niños elegibles en total: 5000'])
+    expect(de('Observado a los 12 meses: Talla baja a los 12 meses')).toEqual([
+      'Grupo A: % con el desenlace: 13,1', 'Grupo A: casos: 52', 'Grupo A: niños con dato: 397', 'Grupo A: niños sin dato: 101',
+      'Grupo B: % con el desenlace: 18,4', 'Grupo B: casos: 41', 'Grupo B: niños con dato: 223', 'Grupo B: niños sin dato: 89',
+      'Diferencia de B frente a A (puntos): 5,3', 'Intervalo del 95 % de la diferencia: -0,8 a 11,4'])
+    // con menos de 20 niños con dato en un lado no hay porcentaje ni diferencia que exportar
+    expect(de('Observado a los 12 meses: Desarrollo psicomotor bajo a los 12 meses')).toEqual([
+      'Grupo A: % con el desenlace: 10', 'Grupo A: casos: 20', 'Grupo A: niños con dato: 200', 'Grupo A: niños sin dato: 298',
+      'Grupo B: casos: 1', 'Grupo B: niños con dato: 3', 'Grupo B: niños sin dato: 309'])
+    const talla = de('Talla para la edad por visita (puntaje z)')
+    expect(talla).toContain('40 sem: Grupo A: mediana: -2,2')
+    expect(talla).toContain('40 sem: Grupo A: niños con dato: 472')
+    expect(talla).toContain('40 sem: Grupo B: % sin dato: 4,5')
+    expect(talla.some((x) => x.startsWith('6 m EC: Grupo B'))).toBe(false)   // ningún niño de B con dato en esa visita
+    // el botón aparece cuando hay comparación
+    await compararConTodos()
+    expect(screen.getByRole('button', { name: 'Exportar' })).toHaveAttribute('title', 'Descargar las cifras de esta comparación (CSV)')
   })
 
   it('«¿Les pasa algo distinto?»: lo observado de los dos desenlaces y, en el mismo lugar, el riesgo estimado rotulado aparte', async () => {

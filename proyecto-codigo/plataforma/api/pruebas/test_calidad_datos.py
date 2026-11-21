@@ -1,5 +1,5 @@
-"""Calidad de datos (Administración): la cola de datos por revisar y sus dos medidas, solo para el perfil admin.
-Se siembra una corrida pequeña a mano (sin entrenar nada) contra Postgres real."""
+"""Calidad de datos: la cola de datos por revisar y sus dos medidas, para administración y expertos clínicos (quien
+solo consulta no entra). Se siembra una corrida pequeña a mano (sin entrenar nada) contra Postgres real."""
 from __future__ import annotations
 
 from datetime import date
@@ -11,6 +11,7 @@ pytestmark = pytest.mark.integracion
 
 ADMIN = ('admin@maia.prueba', 'clave-admin-de-prueba')
 EXPERTO = ('experto@maia.prueba', 'clave-experto-de-prueba')
+CONSULTA = ('consulta@maia.prueba', 'clave-consulta-de-prueba')
 TOTAL_ALERTAS = 120
 
 
@@ -63,6 +64,14 @@ def experto(cliente, admin):
 
 
 @pytest.fixture(scope='module')
+def consulta(cliente, admin):
+    r = cliente.post('/api/usuarios', headers=admin,
+                     json={'email': CONSULTA[0], 'nombre': 'Consulta', 'rol': 'visualizador', 'clave': CONSULTA[1]})
+    assert r.status_code == 201, r.text
+    return _login(cliente, *CONSULTA)
+
+
+@pytest.fixture(scope='module')
 def corrida(cliente, admin):
     """120 alertas: 'peso' (60: 40 de la sede A, 20 de la B), 'talla' (57: 30 y 27) y 'cefalico' (3, de la A)."""
     from maia_comun import db
@@ -89,13 +98,13 @@ def corrida(cliente, admin):
         return c.id
 
 
-def test_solo_administracion(cliente, admin, experto, corrida):
-    for ruta in ('/api/revision/datos', '/api/revision/datos/aciertos', '/api/revision/datos/concentracion'):
-        assert cliente.get(ruta, headers=experto).status_code == 403, ruta
-        assert cliente.get(ruta, headers=admin, params={'corrida_id': corrida}).status_code == 200, ruta
-    assert cliente.post('/api/revision/datos/1', headers=experto, json={'es_error': 'si'}).status_code == 403
-    # la revisión de riesgos sigue siendo de los expertos
-    assert cliente.get('/api/revision/riesgos', headers=experto, params={'corrida_id': corrida}).status_code == 200
+def test_la_ven_expertos_y_administracion_pero_no_quien_solo_consulta(cliente, admin, experto, consulta, corrida):
+    for ruta in ('/api/revision/datos', '/api/revision/datos/resumen', '/api/revision/datos/aciertos',
+                 '/api/revision/datos/concentracion'):
+        assert cliente.get(ruta, headers=consulta, params={'corrida_id': corrida}).status_code == 403, ruta
+        for quien in (experto, admin):
+            assert cliente.get(ruta, headers=quien, params={'corrida_id': corrida}).status_code == 200, ruta
+    assert cliente.post('/api/revision/datos/1', headers=consulta, json={'es_error': 'si'}).status_code == 403
 
 
 def test_aciertos_sin_respuestas(cliente, admin, corrida):
@@ -148,14 +157,15 @@ def test_concentracion_sin_sede_real_solo_por_variable(cliente, admin, corrida):
 
 @pytest.fixture(scope='module')
 def corrida_visitas(cliente, admin):
-    """Una corrida con dos visitas (40 semanas y 12 meses): quién tiene alguna medida de crecimiento en cada una y de
-    ellos quién tiene talla, y diez alertas repartidas entre las dos visitas, dos de ellas ya respondidas."""
+    """Una corrida de 20 niños con dos visitas (40 semanas y 12 meses): quién tiene talla en cada una, y diez alertas
+    repartidas entre las dos visitas, dos de ellas ya respondidas."""
     from maia_comun import db
-    from maia_comun.modelos_db import AlertaDato, Corrida, Corte, Crecimiento, Etapa
+    from maia_comun.modelos_db import AlertaDato, Corrida, Corte, Crecimiento, Etapa, Sujeto
     with db.sesion() as s:
         corte = Corte(fuente='simulado', fecha_corte=date(2020, 2, 1), filas={})
         s.add(corte)
         s.flush()
+        s.add_all([Sujeto(corte_id=corte.id, sujeto=f'v{i}') for i in range(20)])   # 20 niños elegibles
         s.add_all([Etapa(corte_id=corte.id, etapa='e40', orden=3, edad_min=-21, edad_max=35, base='corregida', nombre='40 sem'),
                    Etapa(corte_id=corte.id, etapa='e12', orden=6, edad_min=315, edad_max=450, base='corregida', nombre='12 m')])
         c = Corrida(corte_id=corte.id, fuente='simulado', tipo='revision', estado='ok')
@@ -173,8 +183,7 @@ def corrida_visitas(cliente, admin):
         return c.id
 
 
-def test_resumen_cifras_y_completitud_por_visita(cliente, admin, experto, corrida_visitas):
-    assert cliente.get('/api/revision/datos/resumen', headers=experto, params={'corrida_id': corrida_visitas}).status_code == 403
+def test_resumen_cifras_y_completitud_por_visita(cliente, admin, corrida_visitas):
     ids = [d['id'] for d in cliente.get('/api/revision/datos', headers=admin, params={'corrida_id': corrida_visitas}).json()['items']]
     for alerta in ids[:2]:
         assert cliente.post(f'/api/revision/datos/{alerta}', headers=admin, json={'es_error': 'si'}).status_code == 204
@@ -184,10 +193,27 @@ def test_resumen_cifras_y_completitud_por_visita(cliente, admin, experto, corrid
     assert [(v['variable'], v['etiqueta'], v['alertas']) for v in r['variables']] == [('peso', 'Peso', 6), ('talla', 'Talla', 4)]
     comp = r['completitud']
     assert comp['indicador'] == 'talla'
-    # con talla de los niños que tienen alguna medida de crecimiento en la visita; la talla vacía no cuenta
+    # con talla entre los 20 niños elegibles (no solo entre quienes fueron a la visita); la talla vacía no cuenta
     assert comp['etapas'] == [
-        {'etapa': 'e40', 'etapa_nombre': '40 sem', 'con_dato': 8, 'con_visita': 10, 'pct': 80.0, 'a_12_meses': False},
-        {'etapa': 'e12', 'etapa_nombre': '12 m', 'con_dato': 2, 'con_visita': 5, 'pct': 40.0, 'a_12_meses': True}]
+        {'etapa': 'e40', 'etapa_nombre': '40 sem', 'con_dato': 8, 'elegibles': 20, 'pct': 40.0, 'a_12_meses': False},
+        {'etapa': 'e12', 'etapa_nombre': '12 m', 'con_dato': 2, 'elegibles': 20, 'pct': 10.0, 'a_12_meses': True}]
+
+
+def test_completitud_sin_ninos_elegibles_no_da_cifras(cliente, admin):
+    """Una corrida cuyos datos de origen ya no están (sin corte) no sabe cuántos niños eran elegibles: no hay completitud
+    que mostrar, en vez de dividir por cero."""
+    from maia_comun import db
+    from maia_comun.modelos_db import Corrida, Crecimiento
+    with db.sesion() as s:
+        c = Corrida(corte_id=None, fuente='simulado', tipo='revision', estado='ok')
+        s.add(c)
+        s.flush()
+        s.add(Crecimiento(corrida_id=c.id, sujeto='x1', etapa='e40', indicador='talla', valor=50.0, z=0.0))
+        s.commit()
+        corrida_sin_corte = c.id
+    r = cliente.get('/api/revision/datos/resumen', headers=admin, params={'corrida_id': corrida_sin_corte})
+    assert r.status_code == 200, r.text
+    assert r.json()['completitud']['etapas'] == []
 
 
 def test_cola_se_filtra_por_visita_y_conserva_su_contrato(cliente, admin, corrida_visitas):
@@ -224,3 +250,13 @@ def test_cada_dato_dice_quien_lo_reviso_y_cuando(cliente, admin, corrida_visitas
     despues = revisiones()
     assert [(x['propia'], x['es_error']) for x in despues] == [(True, 'no_se'), (False, 'no')]
     assert despues[0]['cuando'] >= antes[0]['cuando']
+
+
+def test_un_experto_responde_y_queda_con_su_nombre(cliente, admin, experto, corrida_visitas):
+    todas = cliente.get('/api/revision/datos', headers=experto, params={'corrida_id': corrida_visitas, 'estado': 'todos'}).json()
+    alerta = todas['items'][-2]
+    assert alerta['revisiones'] == []
+    assert cliente.post(f"/api/revision/datos/{alerta['id']}", headers=experto, json={'es_error': 'no'}).status_code == 204
+    items = cliente.get('/api/revision/datos', headers=admin, params={'corrida_id': corrida_visitas, 'estado': 'todos'}).json()['items']
+    revisiones = next(d for d in items if d['id'] == alerta['id'])['revisiones']
+    assert [(x['usuario'], x['propia'], x['es_error']) for x in revisiones] == [('Experta', False, 'no')]

@@ -86,6 +86,8 @@ def predicciones(modelo, p) -> dict[str, dict]:
         sal[clave] = {
             'r': m.riesgo(Xo), 'y': y[ok].to_numpy().astype(bool),
             'r_base': m.riesgo(Xo, base=True) if m.base is not None else None,   # la regla de referencia
+            # con qué datos se calcula esa regla, dichos como los dice el modelo («talla, puntaje z a 3 m EC»)
+            'base_entradas': [modelo.etiquetas.get(c, c) for c in m.columnas_base] if m.base is not None else None,
             'grupos': {k: g.reindex(Xo.index).to_numpy() for k, g in grupos_base.items()},
             'trimestre': trimestres.reindex(Xo.index).to_numpy(),
             'variables': Xo, 'importancias': dict(zip(m.columnas, m.modelo.feature_importance('gain'))),
@@ -221,7 +223,7 @@ def calcular(modelo, p) -> tuple[dict[str, dict[str, dict]], list[dict]]:
             d['r'], d['y'], grupos={k: pd.Series(v) for k, v in d['grupos'].items()},
             trimestre=pd.Series(d['trimestre']) if hay_trimestres else None,
             variables=d['variables'], embudo=d['embudo'], importancias=d['importancias'], avisos=avisos,
-            r_base=d.get('r_base'))
+            r_base=d.get('r_base'), base_entradas=d.get('base_entradas'))
         if 'calibracion' in resultados[clave]:      # histograma por desenlace y muestra frente a universo
             resultados[clave].update(AD.artefactos_extra(d['y'], d['r'], d['variables'].index, d.get('universo')))
         des = d['desenlace']

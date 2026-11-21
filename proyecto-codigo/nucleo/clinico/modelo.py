@@ -154,6 +154,15 @@ def _nombre(c: str) -> str:
     return MA._nombre(c)
 
 
+def _columna_de_comparar(entrada: str, momento: str, X: pd.DataFrame) -> str:
+    """A ``comparar`` entry as a column of the model matrix. ``z_talla`` is not a variable: it is the z-score of that
+    growth measure at the visit the risk is computed at (``z_talla_3_m_EC``)."""
+    columna = _nombre(entrada)
+    if columna not in X and entrada.startswith('z_'):
+        return _nombre(f'{entrada}_{momento}')
+    return columna
+
+
 @dataclass
 class Preparado:
     """A SEVARTI set read once: cleaned long table, sex, growth z-scores."""
@@ -457,7 +466,7 @@ class ModeloClinico:
             modelo = self._entrenar(X.loc[tr_idx, columnas], ytr, rng)
             puntajes = modelo.predict(X.loc[ca_idx, columnas])
             cal = isotonica(puntajes, yca.to_numpy())
-            base_cols = [c for c in (_nombre(b) for b in des.comparar) if c in X]
+            base_cols = [c for c in (_columna_de_comparar(b, des.momento, X) for b in des.comparar) if c in X]
             base = self._entrenar(X.loc[tr_idx, base_cols], ytr, rng) if base_cols else None
             cal_base = isotonica(base.predict(X.loc[ca_idx, base_cols]), yca.to_numpy()) if base else None
             anios = nac.reindex(ca_idx).dt.year.dropna()

@@ -1,5 +1,5 @@
-"""Revisión: la cola de datos por revisar (¿es un error?, solo administración: Calidad de datos) y la revisión ciega
-de riesgos (¿le preocupa?, expertos).
+"""Revisión: la cola de datos por revisar (Calidad de datos: ¿el valor es correcto o hay que corregirlo?) y la revisión
+ciega de riesgos (¿le preocupa?). Las dos son de administración y de los expertos clínicos; quien solo consulta no entra.
 
 La revisión de riesgos es ciega: mezcla niños de riesgo alto (posición 90 o más) con el resto, en un orden fijo por
 corrida, y no muestra ni el riesgo ni la posición. ``/revision/resumen`` mide después qué tanto acierta cada capa y si
@@ -15,6 +15,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from clinico import crecimiento as CR
+from maia_api import poblacion as P
 from maia_api.consultas import (
     corrida_de,
     esquema,
@@ -25,7 +26,7 @@ from maia_api.consultas import (
     unidades_crecimiento,
     valor_legible,
 )
-from maia_api.dependencias import ADMIN, EXPERTO, auditar, sesion
+from maia_api.dependencias import EXPERTO, auditar, sesion
 from maia_api.esquemas import RevisionDatoEntrada, RevisionRiesgoEntrada
 from maia_api.rutas.ninos import unidad_crecimiento
 from maia_comun.modelos_db import PERCENTIL_ALTO, AlertaDato, RevisionDato, RevisionRiesgo, Riesgo, Usuario
@@ -38,7 +39,7 @@ MUESTRA_POR_GRUPO = 20
 @ruta.get('/datos')
 def datos(estado: str = Query('pendiente', pattern='^(pendiente|revisado|todos)$'), capa: str | None = None,
           variable: str | None = None, etapa: str | None = None, pagina: int = Query(1, ge=1),
-          tamano: int = Query(25, ge=1, le=200), corrida_id: int | None = None, s: Session = Depends(sesion), u: Usuario = Depends(ADMIN)) -> dict:
+          tamano: int = Query(25, ge=1, le=200), corrida_id: int | None = None, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> dict:
     c = corrida_de(s, corrida_id)
     mapa = etapas(s, c.corte_id)
     filtros = ['a.corrida_id = :c']
@@ -102,14 +103,15 @@ DIAS_12_MESES = 365
 
 
 @ruta.get('/datos/resumen')
-def resumen_datos(corrida_id: int | None = None, s: Session = Depends(sesion), u: Usuario = Depends(ADMIN)) -> dict:
+def resumen_datos(corrida_id: int | None = None, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> dict:
     """Lo que la pantalla de Calidad de datos pone sobre la cola: cuántas mediciones faltan por revisar (para quien
     consulta), cuántas se revisaron este mes, las visitas y mediciones que tienen alertas (para filtrar la cola) y la
     completitud de la talla por visita.
 
-    Completitud: de los niños con alguna medida de crecimiento en la visita (peso, talla o perímetro), el porcentaje que
-    tiene talla. No se compara con todos los niños del corte porque quien aún no llegó a la visita no tiene un dato
-    faltante. ``a_12_meses`` marca la visita cuya ventana de edad incluye los 12 meses (365 días)."""
+    Completitud: de los niños elegibles (todos los del corte, como en Comparar grupos), el porcentaje que tiene talla en
+    cada visita. Quien aún no llega a la visita, no asistió o no tiene una medida válida cuenta como «sin dato». Si los
+    datos de origen de la corrida ya no están, no se sabe cuántos eran elegibles y no hay completitud.
+    ``a_12_meses`` marca la visita cuya ventana de edad incluye los 12 meses (365 días)."""
     c = corrida_de(s, corrida_id)
     mapa = etapas(s, c.corte_id)
     p = {'c': c.id, 'u': u.id}
@@ -127,23 +129,23 @@ def resumen_datos(corrida_id: int | None = None, s: Session = Depends(sesion), u
         'SELECT variable, max(etiqueta) AS etiqueta, count(*) AS alertas FROM resultados.alertas_dato '
         'WHERE corrida_id = :c GROUP BY variable ORDER BY count(*) DESC, variable'), p)]
     visitas = sorted(s.execute(text("""
-        SELECT etapa, count(DISTINCT sujeto) AS con_visita,
-               count(DISTINCT sujeto) FILTER (WHERE indicador = :i) AS con_dato
-        FROM resultados.crecimiento WHERE corrida_id = :c AND etapa IS NOT NULL AND valor IS NOT NULL
+        SELECT etapa, count(DISTINCT sujeto) AS con_dato
+        FROM resultados.crecimiento WHERE corrida_id = :c AND etapa IS NOT NULL AND valor IS NOT NULL AND indicador = :i
         GROUP BY etapa"""), {**p, 'i': INDICADOR_COMPLETITUD[0]}).all(),
                      key=lambda f: (mapa.get(f.etapa, {}).get('orden', 99), f.etapa))
     ventanas = {f.etapa: (f.edad_min, f.edad_max) for f in s.execute(
         text('SELECT etapa, edad_min, edad_max FROM sevarti.etapas WHERE corte_id = :k'), {'k': c.corte_id})}         if c.corte_id is not None else {}
     doce = next((f.etapa for f in visitas if None not in ventanas.get(f.etapa, (None, None))
                  and ventanas[f.etapa][0] <= DIAS_12_MESES <= ventanas[f.etapa][1]), None)
+    elegibles = int(P.n_base(s, c.corte_id)) if c.corte_id is not None else 0
     return {'corrida_id': c.id, 'por_revisar': por_revisar, 'revisadas': revisadas, 'revisadas_mes': revisadas_mes,
             'etapas': [{'etapa': e, 'etapa_nombre': nombre_etapa(mapa, e), 'alertas': n}
                        for e, n in sorted(por_etapa.items(), key=lambda x: (mapa.get(x[0], {}).get('orden', 99), x[0]))],
             'variables': variables,
             'completitud': {'indicador': INDICADOR_COMPLETITUD[0], 'nombre': INDICADOR_COMPLETITUD[1],
                             'etapas': [{'etapa': f.etapa, 'etapa_nombre': nombre_etapa(mapa, f.etapa), 'con_dato': f.con_dato,
-                                        'con_visita': f.con_visita, 'pct': round(100 * f.con_dato / f.con_visita, 1),
-                                        'a_12_meses': f.etapa == doce} for f in visitas]}}
+                                        'elegibles': elegibles, 'pct': round(100 * f.con_dato / elegibles, 1),
+                                        'a_12_meses': f.etapa == doce} for f in visitas if elegibles]}}
 
 
 PUNTOS_ACIERTOS = (50, 100, 200, 300, 400, 500)
@@ -160,7 +162,7 @@ def _cortes_aciertos(maximo: int) -> list[int]:
 
 
 @ruta.get('/datos/aciertos')
-def aciertos(corrida_id: int | None = None, s: Session = Depends(sesion), _: Usuario = Depends(ADMIN)) -> dict:
+def aciertos(corrida_id: int | None = None, s: Session = Depends(sesion), _: Usuario = Depends(EXPERTO)) -> dict:
     """Qué tanto acierta la cola: de las k primeras alertas (por prioridad) que ya tienen respuesta, qué porcentaje se
     marcó «error». Una alerta cuenta como error si alguna respuesta dijo «sí». Las respuestas «no sé» cuentan como
     respondidas pero no como error."""
@@ -182,7 +184,7 @@ def aciertos(corrida_id: int | None = None, s: Session = Depends(sesion), _: Usu
 
 
 @ruta.get('/datos/concentracion')
-def concentracion(corrida_id: int | None = None, s: Session = Depends(sesion), _: Usuario = Depends(ADMIN)) -> dict:
+def concentracion(corrida_id: int | None = None, s: Session = Depends(sesion), _: Usuario = Depends(EXPERTO)) -> dict:
     """Dónde se acumulan las alertas: por variable y, si el corte trae más de un grupo o sede, por grupo y variable.
     Cada variable y cada celda sale con su cifra, aunque tenga una sola alerta (D63)."""
     c = corrida_de(s, corrida_id)
@@ -266,7 +268,7 @@ def _series(s: Session, corte_id: int, items: list[dict], esq: dict, mapa: dict)
 
 @ruta.post('/datos/{alerta_id}', status_code=status.HTTP_204_NO_CONTENT)
 def responder_dato(alerta_id: int, datos: RevisionDatoEntrada, s: Session = Depends(sesion),
-                   u: Usuario = Depends(ADMIN)) -> None:
+                   u: Usuario = Depends(EXPERTO)) -> None:
     if s.get(AlertaDato, alerta_id) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, 'No existe ese dato en la cola.')
     q = pg_insert(RevisionDato).values(alerta_id=alerta_id, usuario_id=u.id, es_error=datos.es_error,

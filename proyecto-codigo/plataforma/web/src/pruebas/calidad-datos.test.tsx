@@ -18,8 +18,8 @@ const resumen = {
   completitud: {
     indicador: 'talla', nombre: 'Talla para la edad',
     etapas: [
-      { etapa: 'e40', etapa_nombre: '40 sem', con_dato: 94, con_visita: 100, pct: 94, a_12_meses: false },
-      { etapa: 'e12', etapa_nombre: '12 m', con_dato: 71, con_visita: 100, pct: 71, a_12_meses: true },
+      { etapa: 'e40', etapa_nombre: '40 sem', con_dato: 94, elegibles: 100, pct: 94, a_12_meses: false },
+      { etapa: 'e12', etapa_nombre: '12 m', con_dato: 71, elegibles: 100, pct: 71, a_12_meses: true },
     ],
   },
 }
@@ -34,9 +34,10 @@ const cola = (items: object[]) => ({ total: items.length, pagina: 1, tamano: 12,
 const concentracion = { corrida_id: 1, hay_sede: false, celdas: [], por_variable: [
   { variable: 'peso', etiqueta: 'Peso', alertas: 12 }, { variable: 'pc', etiqueta: 'Perímetro cefálico', alertas: 1 }] }
 
-function api(items: object[] = [dato()], extra?: (url: string, init?: RequestInit) => { estado?: number; cuerpo?: unknown } | undefined) {
+function api(items: object[] = [dato()], extra?: (url: string, init?: RequestInit) => { estado?: number; cuerpo?: unknown } | undefined,
+  rol: 'admin' | 'experto' | 'visualizador' = 'admin') {
   return simularApi((url, init) => {
-    if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('admin') } }
+    if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario(rol) } }
     const e = extra?.(url, init)
     if (e) return e
     if (url === '/api/revision/datos/resumen') return { cuerpo: resumen }
@@ -52,7 +53,7 @@ function api(items: object[] = [dato()], extra?: (url: string, init?: RequestIni
 }
 
 describe('calidad de datos: cifras y encabezado', () => {
-  it('dice que son datos a revisar y no riesgos clínicos, y muestra las dos cifras del servidor', async () => {
+  it('dice que son datos a revisar y no riesgos clínicos, y muestra las tres cifras del servidor', async () => {
     api()
     montar('/admin/calidad-datos')
     expect(await screen.findByRole('heading', { level: 1, name: 'Calidad de datos' })).toBeInTheDocument()
@@ -61,36 +62,56 @@ describe('calidad de datos: cifras y encabezado', () => {
     expect(screen.getByText('38')).toBeInTheDocument()
     expect(screen.getByText('revisadas este mes')).toBeInTheDocument()
     expect(screen.getByText('112')).toBeInTheDocument()
-    // la completitud a los 12 meses ya está en su barra: no se repite en una cifra aparte
-    expect(screen.queryByText(/Completitud a los 12 meses/)).not.toBeInTheDocument()
-    expect(screen.getAllByText('71,0 %').length).toBe(1)
+    // la tercera cifra: de los niños elegibles, cuántos tienen talla a los 12 meses (la misma de su barra)
+    const completitud = screen.getByText('completitud a los 12 meses').closest('p')!
+    expect(completitud).toHaveTextContent('71,0 %')
+  })
+
+  it('sin una visita de 12 meses no inventa la tercera cifra', async () => {
+    api([dato()], (url) => (url === '/api/revision/datos/resumen'
+      ? { cuerpo: { ...resumen, completitud: { ...resumen.completitud, etapas: [resumen.completitud.etapas[0]] } } } : undefined))
+    montar('/admin/calidad-datos')
+    expect(await screen.findByText('mediciones por revisar')).toBeInTheDocument()
+    expect(screen.queryByText('completitud a los 12 meses')).not.toBeInTheDocument()
+  })
+
+  it('el experto clínico también entra y ve la cola', async () => {
+    api([dato()], undefined, 'experto')
+    montar('/admin/calidad-datos')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Calidad de datos' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'S-02210' })).toBeInTheDocument()
   })
 })
 
 describe('calidad de datos: la cola', () => {
-  it('muestra niño, medición con su visita, valor, por qué es dudosa con quién lo detectó, y la revisión con su estado y acción', async () => {
+  it('cada fila dice niño, visita, medición, valor, por qué es dudosa, quién la detectó, su estado y la acción', async () => {
     api()
     montar('/admin/calidad-datos')
     const tabla = (await screen.findByRole('table')).closest('table')!
-    // cinco columnas: la cola cabe junto al menú sin desplazarse de lado (la acción no queda fuera de la vista)
     expect(within(tabla).getAllByRole('columnheader').map((c) => c.textContent)).toEqual(
-      ['Niño', 'Medición', 'Valor registrado', 'Por qué es dudosa', '¿Es un error de registro?'])
+      ['Niño', 'Visita', 'Medición', 'Valor registrado', 'Por qué es dudosa', 'Detectado por', 'Estado', 'Acción'])
     const fila = within(tabla).getByRole('link', { name: 'S-02210' }).closest('tr')!
-    expect(fila).toHaveTextContent('6 m')
-    expect(fila).toHaveTextContent('Talla')
-    expect(fila).toHaveTextContent('58 cm')
-    expect(within(fila).getByText(/Esperado entre 62 y 70 cm/)).toBeInTheDocument()
-    expect(within(fila).getByText('Por revisar')).toBeInTheDocument()
-    expect(within(fila).getByRole('button', { name: 'Es un error' })).toHaveTextContent('Sí')
-    expect(within(fila).getByRole('button', { name: 'No es un error' })).toHaveTextContent('No')
+    const celdas = within(fila).getAllByRole('cell').map((c) => c.textContent)
+    expect(celdas.slice(0, 7)).toEqual(['S-02210', '6 m', 'Talla', '58 cm', 'Esperado entre 62 y 70 cm.', 'Valor fuera de lo esperado', 'Por revisar'])
+    // confirmar deja el valor como está; corregir lo marca como error de registro (no cambia el valor)
+    expect(within(fila).getByRole('button', { name: 'Confirmar' })).toHaveAttribute('title', 'Confirmar: el valor registrado es correcto')
+    expect(within(fila).getByRole('button', { name: 'Corregir' })).toHaveAttribute('title', 'Corregir: es un error de registro (se marca; el valor no cambia)')
     expect(within(fila).getByRole('button', { name: 'No sé' })).toBeInTheDocument()
-    // lo que sobra para decidir se abre aparte: quién lo detectó, lo más probable y cuándo se midió
-    expect(screen.queryByText(/Detectado por:/)).not.toBeInTheDocument()
+    // lo que sobra para decidir se abre aparte: lo más probable, cuándo se midió y las otras visitas
+    expect(screen.queryByText(/Medido el/)).not.toBeInTheDocument()
     await userEvent.click(within(fila).getByRole('button', { name: /Ver detalle/ }))
-    expect(await screen.findByText(/Detectado por:/)).toHaveTextContent('Detectado por: Valor fuera de lo esperado')
-    expect(screen.getByText(/Medido el/)).toBeInTheDocument()
+    expect(await screen.findByText(/Medido el/)).toBeInTheDocument()
     // en el teléfono cada fila se vuelve una tarjeta
     expect(tabla.parentElement).toHaveClass('tabla-apilada')
+  })
+
+  it('las unidades de la base se dicen como se escriben en clínica', async () => {
+    api([dato({ unidad: 'GRAMOS', valor: '9800', rango_bajo: 2997, rango_alto: 3752 })])
+    montar('/admin/calidad-datos')
+    const fila = (await screen.findByRole('link', { name: 'S-02210' })).closest('tr')!
+    expect(fila).toHaveTextContent('9.800 g')
+    expect(fila).toHaveTextContent('Esperado entre 2.997 y 3.752 g.')
+    expect(fila).not.toHaveTextContent('GRAMOS')
   })
 
   it('los filtros Visita, Medición, Detectado por y Estado piden a la API lo elegido y vuelven a la primera página', async () => {
@@ -107,7 +128,7 @@ describe('calidad de datos: la cola', () => {
       && l.url.includes('variable=talla_6') && l.url.includes('capa=2') && l.url.includes('estado=todos') && l.url.includes('pagina=1'))).toBe(true))
   })
 
-  it('guarda la respuesta con su comentario y la fila lo dice', async () => {
+  it('«Corregir» guarda que es un error, con su comentario, y la fila lo dice', async () => {
     const enviados: unknown[] = []
     api([dato()], (url, init) => {
       if (url === '/api/revision/datos/7') { enviados.push(JSON.parse(String(init?.body))); return { estado: 204 } }
@@ -116,9 +137,22 @@ describe('calidad de datos: la cola', () => {
     montar('/admin/calidad-datos')
     await userEvent.click(await screen.findByRole('button', { name: /Ver detalle/ }))
     await userEvent.type(screen.getByLabelText('Comentario'), 'La báscula estaba dañada')
-    await userEvent.click(screen.getByRole('button', { name: 'Es un error' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Corregir' }))
     await waitFor(() => expect(enviados).toEqual([{ es_error: 'si', comentario: 'La báscula estaba dañada' }]))
     expect(await screen.findByText('Respuesta guardada.')).toBeInTheDocument()
+    expect(await screen.findByText('Por corregir')).toBeInTheDocument()
+  })
+
+  it('«Confirmar» guarda que el valor es correcto y la fila queda «Confirmado»', async () => {
+    const enviados: unknown[] = []
+    api([dato()], (url, init) => {
+      if (url === '/api/revision/datos/7') { enviados.push(JSON.parse(String(init?.body))); return { estado: 204 } }
+      return undefined
+    })
+    montar('/admin/calidad-datos')
+    await userEvent.click(await screen.findByRole('button', { name: 'Confirmar' }))
+    await waitFor(() => expect(enviados).toEqual([{ es_error: 'no', comentario: null }]))
+    expect(await screen.findByText('Confirmado')).toBeInTheDocument()
   })
 
   it('una medición ya respondida dice cómo y deja cambiar la respuesta; el dato en su contexto se abre aparte', async () => {
@@ -131,8 +165,8 @@ describe('calidad de datos: la cola', () => {
     })])
     montar('/admin/calidad-datos')
     const fila = (await screen.findByRole('link', { name: 'S-02210' })).closest('tr')!
-    expect(within(fila).getByText('Revisada: no es un error')).toBeInTheDocument()
-    expect(within(fila).getByRole('button', { name: 'No es un error', pressed: true })).toBeInTheDocument()
+    expect(within(fila).getByText('Confirmado')).toBeInTheDocument()
+    expect(within(fila).getByRole('button', { name: 'Confirmar', pressed: true })).toBeInTheDocument()
     expect(within(fila).getByText('La fecha no corresponde a esta visita.')).toBeInTheDocument()
     expect(screen.queryByRole('figure', { name: /Talla de este niño en cada visita/ })).not.toBeInTheDocument()
     await userEvent.click(within(fila).getByRole('button', { name: /Ver detalle/ }))
@@ -149,12 +183,12 @@ describe('calidad de datos: la cola', () => {
     })])
     montar('/admin/calidad-datos')
     const fila = (await screen.findByRole('link', { name: 'S-02210' })).closest('tr')!
-    expect(within(fila).getByText(/^Última revisión: Segunda Revisora, no es un error, 19 de nov/)).toBeInTheDocument()
+    expect(within(fila).getByText(/^Última revisión: Segunda Revisora, confirmado, 19 de nov/)).toBeInTheDocument()
     expect(within(fila).getByText(/y 1 respuesta más/)).toBeInTheDocument()
     await userEvent.click(within(fila).getByRole('button', { name: /Ver detalle/ }))
     const equipo = await screen.findByRole('list', { name: 'Respuestas del equipo' })
     expect(within(equipo).getAllByRole('listitem').map((li) => li.textContent?.split(' · ')[0])).toEqual([
-      'Segunda Revisora: no es un error', 'Tú: es un error'])
+      'Segunda Revisora: confirmado', 'Tú: por corregir'])
   })
 
   it('una medición que nadie revisó no dice quién la revisó', async () => {
@@ -184,9 +218,9 @@ describe('calidad de datos: filas compactas y completitud', () => {
     api()
     montar('/admin/calidad-datos')
     const figura = await screen.findByRole('figure', { name: /Porcentaje de niños con talla medida por visita/ })
-    // 71 de 100: niños con alguna medida en esa visita, no todos los niños del programa
+    // 71 de 100: de todos los niños elegibles, como en Comparar grupos
     expect(within(figura).getByText('(71 de 100)')).toBeInTheDocument()
-    expect(screen.getByText(/entre los niños con alguna medida de crecimiento en esa visita/)).toBeInTheDocument()
+    expect(screen.getByText(/% de niños con talla medida entre los niños elegibles\./)).toBeInTheDocument()
   })
 })
 

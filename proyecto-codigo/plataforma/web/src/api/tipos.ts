@@ -224,6 +224,10 @@ export interface LineaTemporal {
   sujeto: string
   grupo: string | null
   eg_semanas: number | null
+  /** El sexo en palabras («femenino», «Masculino»…), si la base lo trae. */
+  sexo?: string | null
+  /** El peso al nacer con la unidad en que se registró, si la base lo trae. */
+  peso_nacer?: { valor: string; unidad: string | null } | null
   perfil?: PerfilProvisional
   anio_nacimiento: number | null
   corte: string | null
@@ -453,7 +457,12 @@ export interface AnaliticaMeta {
   desenlaces: AnaliticaDesenlace[]; submodulos: AnaliticaSubmodulo[]
   /** Los hiperparámetros con que se entrenó; vacío si el entrenamiento no los guardó. */
   hiperparametros?: { nombre: string; etiqueta: string; valor: number }[]
+  /** Con quiénes se entrenó y con quiénes se probó (los más recientes); nulo si el entrenamiento no lo guardó. */
+  cohortes?: { entrenamiento: CohorteDeEntrenamiento; prueba: CohorteDeEntrenamiento } | null
+  /** La versión del Diccionario con que se entrenó; nula si no se registró. */
+  diccionario?: number | null
 }
+export interface CohorteDeEntrenamiento { ninos: number; nacidos_desde: number | null; nacidos_hasta: number | null }
 export interface AnaliticaEntrenamientos { entrenamientos: AnaliticaMeta[] }
 export interface AnaliticaContexto {
   estado: 'ok' | 'sin_artefactos'; entrenamiento: number | null
@@ -477,8 +486,13 @@ export interface DatosRendimiento {
   confusion_por_top: { top_pct: number; tp: number | null; fp: number | null; fn: number | null; tn: number | null }[]
   lift: { tasa_general: number | null; deciles: { decil: number; niños: number; tasa: number | null; lift: number | null }[]; acumulado: { top_pct: number; lift: number | null }[] }
   top_k: { k: number; casos: number | null; acertadas_pct: number | null; detectados_pct: number | null }[]
-  /** La regla de referencia (edad gestacional y pesos basales); los entrenamientos anteriores no la traen. */
-  referencia?: { auc_desenlace: AucIc; casos_top10_pct: number | null }
+  /** La regla de referencia (un modelo reducido con los datos de «Comparar con» del Diccionario); los entrenamientos
+   *  anteriores no la traen. ``entradas``: con qué datos se calcula; ``diferencia``: AUC del modelo completo menos el de la
+   *  regla, con su intervalo del 95 % (los dos se miden con los mismos niños). Los entrenamientos de antes no traen estos dos. */
+  referencia?: {
+    auc_desenlace: AucIc; casos_top10_pct: number | null; entradas?: string[]
+    diferencia?: { valor: number | null; ic_bajo: number | null; ic_alto: number | null }
+  }
 }
 export interface DatosCalibracion {
   estado?: 'insuficiente'; n: number; brier: number | null; ece?: number | null; riesgo_medio: number | null; observado: number | null

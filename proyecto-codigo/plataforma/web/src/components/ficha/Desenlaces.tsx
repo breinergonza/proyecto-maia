@@ -6,7 +6,7 @@ import type { UseQueryResult } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp, Minus } from 'lucide-react'
 import { useSearchParams } from 'react-router'
 import type { RiesgoPorCorte } from '../../api/ninos'
-import type { HistoriaRiesgo, RiesgoNino } from '../../api/tipos'
+import type { HistoriaRiesgo, PuntoCrecimiento, RiesgoNino, Visita } from '../../api/tipos'
 import { cn } from '../../lib/cn'
 import {
   type CambioDeRiesgo, cambioCorto, desenlaceDeUrlAntigua, estadoDe, familiaDe, type FamiliaDelNino, familiasConRiesgo, familiasDelNino,
@@ -19,6 +19,10 @@ import { familiasSinExcluidas, TarjetaRiesgo, TrayectoriaRiesgo } from '../ficha
 import { Cargando } from '../ui'
 import { usePestanaEnUrl } from '../ui/Pestanas'
 import { DetalleDe12Meses } from './RiesgoA12Meses'
+import { TallaDelNino } from './TallaDelNino'
+
+/** El desenlace que se lee junto a la talla del niño visita por visita. */
+const FAMILIA_DE_TALLA = 'talla_baja_12m'
 
 /** La tarjeta de riesgo de la última visita de un desenlace, con el nombre de esa visita. */
 export type TarjetaConVisita = RiesgoNino & { visita: string }
@@ -73,11 +77,14 @@ export function desenlacesDelNino({ historia, trayectoria, riesgos }: {
 /** Si algún desenlace tiene riesgo calculado: de eso depende que la ficha abra en «Desenlaces» o en otra pestaña con contenido. */
 export const hayRiesgo = (desenlaces: readonly DesenlaceDelNino[]) => desenlaces.some((d) => d.resumen.riesgo != null)
 
-export function Desenlaces({ sujeto, historia, desenlaces, modeloClinico }: {
+export function Desenlaces({ sujeto, historia, desenlaces, modeloClinico, visitas = [], talla }: {
   sujeto: string
   historia: UseQueryResult<RiesgoPorCorte>
   desenlaces: readonly DesenlaceDelNino[]
   modeloClinico: string | null
+  /** Las visitas del niño y sus tallas: van bajo el riesgo de talla baja. */
+  visitas?: Visita[]
+  talla?: PuntoCrecimiento[]
 }) {
   const [params] = useSearchParams()
   const claves = desenlaces.map((d) => d.resumen.clave)
@@ -119,6 +126,7 @@ export function Desenlaces({ sujeto, historia, desenlaces, modeloClinico }: {
               <section key={d.resumen.clave} aria-label={d.resumen.nombre}
                 className={cn('print:break-inside-avoid', d.resumen.clave !== elegido && 'hidden print:block')}>
                 <Contenido d={d} historia={historia.data} sujeto={sujeto} modeloClinico={modeloClinico} />
+                {d.resumen.clave === FAMILIA_DE_TALLA && <div className="mt-4"><TallaDelNino visitas={visitas} puntos={talla} /></div>}
               </section>
             ))}
           </div>

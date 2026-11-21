@@ -81,9 +81,9 @@ describe('calidad de datos', () => {
   const resumen = { datos_revisar: 120, alertas_por_1000: 12.5, alarmas_grupo: 3, alertas_por_capa: { '1': 50, '2': 90 } }
   const calidad = { corrida_id: 1, por_revisar: 120, revisadas: 6, revisadas_mes: 4, etapas: [], variables: [], completitud: { indicador: 'talla', nombre: 'Talla para la edad', etapas: [] } }
 
-  it('el experto no ve el enlace ni entra a la página; el administrador sí', async () => {
+  it('quien solo consulta no ve el enlace ni entra a la página; el experto y el administrador sí', async () => {
     simularApi((url) => {
-      if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('experto') } }
+      if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('visualizador') } }
       if (url === '/api/tablero/resumen') return { estado: 404, cuerpo: { detail: 'x' } }
     })
     const { unmount } = montar('/admin/calidad-datos')
@@ -116,7 +116,7 @@ describe('calidad de datos', () => {
       expect(await screen.findByRole('heading', { name: t })).toBeInTheDocument()
     }
     expect(screen.getByText('Cuántos datos raros encontró cada revisión.')).toBeInTheDocument()
-    expect(screen.getByText('Cuántas alertas confirmó el equipo al revisar las primeras.')).toBeInTheDocument()
+    expect(screen.getByText('Cuántas alertas marcó el equipo para corregir al revisar las primeras.')).toBeInTheDocument()
     expect(screen.getByText('Sede y dato con más alertas.')).toBeInTheDocument()
     expect(await screen.findByText('datos por revisar')).toBeInTheDocument()
     expect(await screen.findByText('66,7 %')).toBeInTheDocument()
@@ -139,7 +139,7 @@ describe('calidad de datos', () => {
     expect(await screen.findByRole('heading', { name: 'Calidad de datos' })).toBeInTheDocument()
   })
 
-  it('guarda la respuesta del administrador', async () => {
+  it('guarda la respuesta de quien revisa', async () => {
     const dato = {
       id: 7, prioridad: 1, sujeto: 's1', variable: 'peso_40', etiqueta: 'Peso a 40 sem', unidad: 'g', etapa: 's40',
       etapa_nombre: '40 semanas', fecha: '2026-01-01', valor: '9999', esperado: 2800, rango_bajo: 2000, rango_alto: 3500,
@@ -170,7 +170,7 @@ describe('calidad de datos', () => {
       .toBeInTheDocument()
     expect(screen.queryByText(/Valor muy distinto/)).not.toBeInTheDocument()
     await userEvent.type(screen.getByLabelText('Comentario'), 'La báscula estaba dañada')
-    await userEvent.click(screen.getByRole('button', { name: 'Es un error' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Corregir' }))
     await waitFor(() => expect(enviados).toEqual([{ es_error: 'si', comentario: 'La báscula estaba dañada' }]))
     expect(await screen.findByText('Respuesta guardada.')).toBeInTheDocument()
   })

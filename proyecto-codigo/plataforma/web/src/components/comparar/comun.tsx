@@ -1,8 +1,9 @@
 // Piezas comunes de las preguntas de Comparar grupos: los dos lados con su color fijo, la ficha de lo que muestra cada
 // gráfica (variable, unidad, momento, población y observaciones válidas), el veredicto de la diferencia, las barras de lo
 // observado y la celda «porcentaje y conteo» de las tablas.
-import type { DesenlaceComparado, DiferenciaObservada, ObservadoLado } from '../../api/comparar'
-import { num } from '../../lib/formato'
+import type { DesenlaceComparado, DiferenciaObservada, GruposClinicoOk, ObservadoLado } from '../../api/comparar'
+import type { FilaCsv } from '../../lib/exportar'
+import { num, numero } from '../../lib/formato'
 import { cn } from '../../lib/cn'
 import { SIN_CIFRA } from '../../lib/lenguaje'
 import { SERIES_COLOR, type Serie } from '../graficos'
@@ -10,6 +11,49 @@ import { SERIES_COLOR, type Serie } from '../graficos'
 export const SERIE_A: Serie = { clave: 'a', nombre: 'Grupo A', color: 0 }
 export const SERIE_B: Serie = { clave: 'b', nombre: 'Grupo B', color: 1 }
 export const SERIES_AB = [SERIE_A, SERIE_B]
+
+export const COLUMNAS_COMPARACION = ['Sección', 'Dato', 'Valor']
+
+/** Las cifras de la comparación como filas de un CSV (sección, dato, valor): los dos grupos, lo observado a los 12 meses de
+ *  cada desenlace con la diferencia de B frente a A y su intervalo, y la talla por visita con los niños con dato y el
+ *  porcentaje sin dato de cada lado. Lo que la pantalla no muestra (un porcentaje con menos de 20 niños) tampoco sale. */
+export function filasDeLaComparacion(r: GruposClinicoOk): FilaCsv[] {
+  const filas: FilaCsv[] = []
+  const agregar = (seccion: string, dato: string, valor: string | number | null | undefined) => {
+    if (valor != null) filas.push({ Sección: seccion, Dato: dato, Valor: valor })
+  }
+  const lados = [{ serie: SERIE_A, lado: 'a' }, { serie: SERIE_B, lado: 'b' }] as const
+  for (const { serie, lado } of lados) agregar('Grupos', `${serie.nombre}: niños elegibles`, r[lado].n)
+  agregar('Grupos', 'Niños elegibles en total', r.a.n_total)
+
+  for (const d of r.desenlaces) {
+    const seccion = `Observado a los 12 meses: ${d.nombre}`
+    for (const { serie, lado } of lados) {
+      const o = d[lado]
+      if (!o) continue
+      if (o.pct != null) agregar(seccion, `${serie.nombre}: % con el desenlace`, numero(o.pct))
+      agregar(seccion, `${serie.nombre}: casos`, o.casos)
+      agregar(seccion, `${serie.nombre}: niños con dato`, o.con_dato)
+      agregar(seccion, `${serie.nombre}: niños sin dato`, o.sin_dato)
+    }
+    if (d.dif.valor != null) agregar(seccion, 'Diferencia de B frente a A (puntos)', numero(d.dif.valor))
+    if (d.dif.ic_bajo != null && d.dif.ic_alto != null) {
+      agregar(seccion, 'Intervalo del 95 % de la diferencia', `${numero(d.dif.ic_bajo)} a ${numero(d.dif.ic_alto)}`)
+    }
+  }
+
+  const talla = `${r.trayectoria.nombre} por visita (puntaje z)`
+  for (const e of r.trayectoria.etapas) {
+    for (const { serie, lado } of lados) {
+      const c = e[lado]
+      if (!c) continue
+      agregar(talla, `${e.etapa}: ${serie.nombre}: mediana`, numero(c.mediana))
+      agregar(talla, `${e.etapa}: ${serie.nombre}: niños con dato`, c.n)
+      agregar(talla, `${e.etapa}: ${serie.nombre}: % sin dato`, numero(c.pct_sin_dato))
+    }
+  }
+  return filas
+}
 
 const nf1 = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 1, minimumFractionDigits: 1 })
 /** 13,1 % */
