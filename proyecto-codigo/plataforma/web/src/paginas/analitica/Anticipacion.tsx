@@ -6,9 +6,11 @@
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { useSubmodulo } from '../../api/analitica'
+import { ErrorApi } from '../../api/cliente'
 import { useRiesgoPorVisita } from '../../api/anticipacion'
 import type { DatosAnticipacion, NinoRiesgoVisita } from '../../api/tipos'
 import { puede, useSesion } from '../../auth/sesion'
+import { ErrorConReintento } from '../../components/ErrorConReintento'
 import { BarrasApiladas, LineasSeries, MiniSerie, Muestra, type PuntoSerie } from '../../components/graficos'
 import { Grafica, TablaDatos } from '../../components/grafica'
 import { Aviso, Cargando, Cifra, Selector, Tabla, Vacio } from '../../components/ui'
@@ -196,8 +198,11 @@ function NinosDeEjemplo({ desenlace, entrenamiento }: { desenlace: string; entre
   const q = useRiesgoPorVisita({ desenlace, n: 3 })
   if (q.isPending) return <Grafica titulo={d.titulo} descripcion={d.descripcion}><Cargando /></Grafica>
   if (q.isError) {
+    // 404 o 409: no hay corrida o paquete activo, no es una falla; lo demás (red, servidor) se puede reintentar
+    const sinCorrida = q.error instanceof ErrorApi && (q.error.estado === 404 || q.error.estado === 409)
     return <Grafica titulo={d.titulo} descripcion={d.descripcion}>
-      <Aviso tono="teal">Todavía no hay una corrida con un modelo activo para mostrar niños de ejemplo.</Aviso>
+      {sinCorrida ? <Aviso tono="teal">Todavía no hay una corrida con un modelo activo para mostrar niños de ejemplo.</Aviso>
+        : <ErrorConReintento error={q.error} que="los niños de ejemplo" reintentando={q.isFetching} reintentar={() => void q.refetch()} />}
     </Grafica>
   }
   const ninos = q.data.ninos.filter((n): n is NinoRiesgoVisita & { puntos: NonNullable<NinoRiesgoVisita['puntos']> } => !!n.puntos?.length)

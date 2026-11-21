@@ -77,9 +77,13 @@ const interpretabilidad = {
     celdas: [{ i: 0, j: 0, n: 100, riesgo_medio: 0.5 }, { i: 0, j: 1, n: 90, riesgo_medio: 0.2 }, { i: 1, j: 0, n: 90, riesgo_medio: 0.2 }, { i: 1, j: 1, n: 200, riesgo_medio: 0.05 }] }] },
 }
 
-function api(rol: Usuario['rol'] = 'experto') {
+/** ``caida``: la petición que empieza así falla como falla el navegador sin conexión. ``sinCorrida``: los niños de ejemplo
+ *  responden 409, como cuando no hay un paquete activo. */
+function api(rol: Usuario['rol'] = 'experto', { caida, sinCorrida = false }: { caida?: string; sinCorrida?: boolean } = {}) {
   return simularApi((url) => {
     if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario(rol) } }
+    if (caida && url.startsWith(caida)) throw new TypeError('Failed to fetch')
+    if (sinCorrida && url.startsWith('/api/analitica/riesgo-por-visita')) return { estado: 409, cuerpo: { detail: 'No hay un paquete activo.' } }
     if (url.startsWith('/api/analitica/contexto')) return { cuerpo: contexto }
     if (url === '/api/analitica/entrenamientos') return { cuerpo: { entrenamientos: [meta] } }
     if (url === '/api/modelos/activo') return { cuerpo: { version: '2026-11-19-5dcbdc', fuente: 'simulado', activo: true, metricas: {}, modelos: { clinico: { version_modelo: 'abc123' } } } }
@@ -277,5 +281,33 @@ describe('Modelos 1: el marco de Analítica es compacto', () => {
     const origen = within(region).getByText(/Datos simulados/)
     expect(estado.closest('[data-linea-contexto]')).not.toBeNull()
     expect(estado.closest('[data-linea-contexto]')).toBe(origen.closest('[data-linea-contexto]'))
+  })
+})
+
+describe('Modelos sin red (prueba de resiliencia del asesor)', () => {
+  it('los niños de ejemplo de Anticipación se pueden reintentar', async () => {
+    const llamadas = api('experto', { caida: '/api/analitica/riesgo-por-visita' })
+    montar(ruta('anticipacion', 'tabla'))
+    const pedidas = () => llamadas.filter((l) => l.url.startsWith('/api/analitica/riesgo-por-visita')).length
+    await userEvent.click(await screen.findByRole('button', { name: 'Reintentar' }))
+    await waitFor(() => expect(pedidas()).toBe(2))
+    expect(screen.queryByText(/Todavía no hay una corrida/)).not.toBeInTheDocument()
+  })
+
+  it('sin corrida activa, Anticipación lo dice sin ofrecer reintentar', async () => {
+    api('experto', { sinCorrida: true })
+    montar(ruta('anticipacion', 'tabla'))
+    expect(await screen.findByText(/Todavía no hay una corrida con un modelo activo/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reintentar' })).not.toBeInTheDocument()
+  })
+
+  it('un análisis que se calcula al pedirlo (Trayectorias) se puede reintentar', async () => {
+    const llamadas = api('experto', { caida: '/api/analitica/7/trayectorias' })
+    montar(ruta('trayectorias'))
+    const pedidas = () => llamadas.filter((l) => l.url.startsWith('/api/analitica/7/trayectorias')).length
+    const boton = await screen.findByRole('button', { name: 'Reintentar' })
+    const antes = pedidas()
+    await userEvent.click(boton)
+    await waitFor(() => expect(pedidas()).toBe(antes + 1))
   })
 })

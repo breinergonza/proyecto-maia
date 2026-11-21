@@ -1,5 +1,6 @@
 // Explorar: las cifras del grupo, el filtro en la dirección, el aviso con menos de 20 niños y el enlace del menú.
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { EntradaFiltro, Usuario } from '../api/tipos'
@@ -42,8 +43,10 @@ function Ubicacion() {
   return <output data-testid="ubicacion">{decodeURIComponent(useLocation().search)}</output>
 }
 
-function api(rol: Usuario['rol'], respuesta: unknown = resumen, guardadas: unknown[] = []) {
+/** ``sinRed``: el resumen falla como falla el navegador sin conexión. */
+function api(rol: Usuario['rol'], respuesta: unknown = resumen, guardadas: unknown[] = [], sinRed = false) {
   return simularApi((url, init) => {
+    if (sinRed && url === '/api/exploracion/resumen') throw new TypeError('Failed to fetch')
     if (url === '/api/muestras' && init?.method === 'POST') {
       return { estado: 201, cuerpo: { id: 7, titulo: 'Varones', n_ninos: 240, definicion: JSON.parse(String(init.body)).muestra } }
     }
@@ -327,5 +330,17 @@ describe('explorar: el riesgo agrupado por desenlace', () => {
     expect(filtros).toContain('lg:overflow-y-auto')
     const resultados = (await screen.findByRole('heading', { name: 'Riesgo del grupo elegido' })).closest('section')!.parentElement!.parentElement!
     expect(resultados.className).toContain('lg:overflow-y-auto')
+  })
+})
+
+describe('Explorar sin red (prueba de resiliencia del asesor)', () => {
+  it('dice qué pasó y reintentar pide el mismo grupo', async () => {
+    const llamadas = api('experto', resumen, [], true)
+    montar('/explorar')
+    await userEvent.click(await screen.findByRole('button', { name: 'Reintentar' }))
+    const pedidas = () => llamadas.filter((l) => l.url === '/api/exploracion/resumen').map((l) => String(l.init?.body))
+    await waitFor(() => expect(pedidas().length).toBeGreaterThan(1))
+    expect(pedidas().at(-1)).toBe(pedidas()[0])
+    expect(screen.getAllByText(/No se pudo conectar con el servidor/).length).toBeGreaterThan(0)
   })
 })

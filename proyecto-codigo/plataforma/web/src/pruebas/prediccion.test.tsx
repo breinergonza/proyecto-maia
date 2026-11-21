@@ -1,5 +1,5 @@
 // Predicción: las tres pestañas, el CSV solo para administración y la reserva de cifras con pocos niños.
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -41,8 +41,10 @@ const facetas = {
     { valor: 'M', etiqueta: 'Masculino', n: 300, texto: '300' }, { valor: 'F', etiqueta: 'Femenino', n: 300, texto: '300' }] } },
 }
 
-function api(rol: Usuario['rol'], trabajo: unknown = trabajoOk) {
+/** ``caida``: la petición que empieza así falla como falla el navegador sin conexión. */
+function api(rol: Usuario['rol'], trabajo: unknown = trabajoOk, caida?: string) {
   return simularApi((url, init) => {
+    if (caida && url.startsWith(caida) && (caida !== '/api/prediccion/trabajos' || init?.method === 'POST')) throw new TypeError('Failed to fetch')
     if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario(rol) } }
     if (url === '/api/prediccion/modelos') {
       return { cuerpo: { corte_vigente: '2026-06-30', activo: 'p1', modelos: [{ version: 'p1', origen: 'oficial', dueno: null, activo: true,
@@ -267,5 +269,27 @@ describe('predicción en pestañas', () => {
     // lo escrito sobrevive al cambiar de pestaña
     await userEvent.click(within(lista).getByRole('tab', { name: 'Niño de ejemplo' }))
     expect(screen.getByLabelText(/Peso al nacer/)).toHaveValue(1100)
+  })
+})
+
+describe('Calcular un niño sin red (prueba de resiliencia del asesor)', () => {
+  it('la lista de niños de ejemplo (un niño nuevo) se puede reintentar', async () => {
+    const llamadas = api('experto', trabajoOk, '/api/prediccion/ejemplos')
+    montar('/prediccion?vista=grupo&modo=nino')
+    const pedidas = () => llamadas.filter((l) => l.url.startsWith('/api/prediccion/ejemplos')).length
+    await userEvent.click(await screen.findByRole('button', { name: 'Reintentar' }))
+    await waitFor(() => expect(pedidas()).toBeGreaterThan(1))
+  })
+
+  it('el cálculo de un grupo que no llegó se reintenta con lo mismo', async () => {
+    const llamadas = api('experto', trabajoOk, '/api/prediccion/trabajos')
+    montar('/prediccion?vista=grupo')
+    await userEvent.click(await screen.findByRole('tab', { name: 'Todo el universo' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Calcular el riesgo' }))
+    expect(await screen.findByText(/No se pudo conectar con el servidor/)).toBeInTheDocument()
+    const lanzados = () => llamadas.filter((l) => l.url === '/api/prediccion/trabajos' && l.init?.method === 'POST').map((l) => String(l.init?.body))
+    await userEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
+    await waitFor(() => expect(lanzados().length).toBe(2))
+    expect(lanzados()[1]).toBe(lanzados()[0])
   })
 })

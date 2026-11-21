@@ -21,6 +21,7 @@ import { Grafica, TablaDatos } from '../components/grafica'
 import { Termino } from '../components/Termino'
 import { PanelFacetas } from '../components/PanelFacetas'
 import { LeyendaSeries, LineasSeries, type FilaSeries, type Serie } from '../components/graficos'
+import { ErrorConReintento } from '../components/ErrorConReintento'
 import { Aviso, Boton, Campo, Cargando, Cifra, Encabezado, Entrada, Insignia, Paginador, Panel, Selector, Tabla, Vacio } from '../components/ui'
 import { cn } from '../lib/cn'
 import { descripcionDe } from '../lib/descripciones'
@@ -125,6 +126,7 @@ function Calculo({ modelo, universo, grupo, listo }: {
   const [excluir, setExcluir] = useState(false)
   const [trabajoId, setTrabajoId] = useState<number | null>(null)
   const lanzar = useLanzarPrediccion()
+  const lanzarCon = (c: Parameters<typeof lanzar.mutate>[0]) => lanzar.mutate(c, { onSuccess: (x) => setTrabajoId(x.id) })
   const trabajo = useTrabajoPrediccion(trabajoId)
   const cuerpo: CuerpoPrediccionMuestra = {
     modelo: modelo || null, ...grupo, excluir_entrenamiento: excluir, visita: visita || null,
@@ -137,7 +139,7 @@ function Calculo({ modelo, universo, grupo, listo }: {
         <p className="mb-2 text-sm text-salvia">
           {universo ? 'Todos los niños del corte vigente, con la visita que elija.' : 'Los niños que cumplen el grupo que armó a la izquierda.'}
         </p>
-        <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-end" onSubmit={(e) => { e.preventDefault(); lanzar.mutate(cuerpo, { onSuccess: (x) => setTrabajoId(x.id) }) }}>
+        <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-end" onSubmit={(e) => { e.preventDefault(); lanzarCon(cuerpo) }}>
           <Campo etiqueta="Visita" id="visita-prediccion">
             <Selector id="visita-prediccion" value={visita} onChange={(e) => setVisita(e.target.value)}>
               <option value="">La última a la que fue cada niño</option>
@@ -152,8 +154,14 @@ function Calculo({ modelo, universo, grupo, listo }: {
           {!listo && <p className="text-xs text-salvia sm:col-span-2 lg:col-span-3">Marque al menos una opción o elija un filtro guardado para armar la muestra.</p>}
         </form>
       </Panel>
-      {lanzar.isError && <Aviso>{lanzar.error.message}</Aviso>}
-      {trabajo.isError && <Aviso>{trabajo.error.message}</Aviso>}
+      {/* reintentar envía la misma muestra que no llegó (prueba de resiliencia del asesor) */}
+      {lanzar.isError && (
+        <ErrorConReintento error={lanzar.error} verbo="iniciar" que="el cálculo del grupo" reintentando={lanzar.isPending}
+          reintentar={() => { if (lanzar.variables) lanzarCon(lanzar.variables) }} />
+      )}
+      {trabajo.isError && (
+        <ErrorConReintento error={trabajo.error} que="el avance del cálculo" reintentando={trabajo.isFetching} reintentar={() => void trabajo.refetch()} />
+      )}
       {t && EN_CURSO.includes(t.estado) && <Avance t={t} />}
       {t?.estado === 'error' && <Aviso>{t.mensaje ?? 'El cálculo falló. Intente de nuevo.'}</Aviso>}
       {t?.estado === 'ok' && t.resultado && <Resultado t={t} r={t.resultado} admin={admin} />}
@@ -398,7 +406,9 @@ function NinoNuevo({ modelo }: { modelo: string }) {
   }
 
   if (biblioteca.isPending) return <Cargando />
-  if (biblioteca.isError) return <Aviso>{biblioteca.error.message}</Aviso>
+  if (biblioteca.isError) {
+    return <ErrorConReintento error={biblioteca.error} que="los niños de ejemplo" reintentando={biblioteca.isFetching} reintentar={() => void biblioteca.refetch()} />
+  }
   const b = biblioteca.data
   const elegir = (v: string | null, p: string | null) => {
     setVisita(v)
@@ -443,11 +453,16 @@ function NinoNuevo({ modelo }: { modelo: string }) {
       clave: 'ejemplo', texto: 'Niño de ejemplo',
       contenido: !visita || !perfil ? (
         <Vacio titulo="Elija una visita y un perfil">Con las dos cosas aparece el niño de ejemplo para editar.</Vacio>
-      ) : ejemplo.isPending ? <Cargando /> : ejemplo.isError ? <Aviso>{ejemplo.error.message}</Aviso> : e?.insuficiente ? (
+      ) : ejemplo.isPending ? <Cargando /> : ejemplo.isError ? (
+        <ErrorConReintento error={ejemplo.error} que="el niño de ejemplo" reintentando={ejemplo.isFetching} reintentar={() => void ejemplo.refetch()} />
+      ) : e?.insuficiente ? (
         <Aviso tono="teal"><strong>Muy pocos niños.</strong> Con menos de {e.minimo} niños en ese grupo no se da un ejemplo típico.</Aviso>
       ) : e ? (
         <div className="flex flex-col gap-3 lg:h-full">
-          {predecir.isError && <Aviso>{predecir.error.message}</Aviso>}
+          {predecir.isError && (
+            <ErrorConReintento error={predecir.error} verbo="calcular" que="el riesgo de este niño" reintentando={predecir.isPending}
+              reintentar={() => { if (predecir.variables) predecir.mutate(predecir.variables, { onSuccess: () => setSeccion('resultado') }) }} />
+          )}
           <EditorEjemplo campos={e.campos} visitas={e.visitas} cambios={cambios} todos={todos} verTodos={() => setTodos(!todos)}
             cambiar={(v, valor) => setCambios((c) => ({ ...c, [v]: valor }))}
             etiqueta={`${e.perfil_etiqueta} · ${e.visita_nombre} · ${num(e.n)} niños`}

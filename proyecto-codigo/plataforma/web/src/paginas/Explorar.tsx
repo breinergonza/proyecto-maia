@@ -11,6 +11,7 @@ import { RiesgoGrupo } from '../components/explorar/RiesgoGrupo'
 import { Grafica } from '../components/grafica'
 import { cuerpoDeFacetas, cuerpoDeFiltros, GrupoActivo } from '../components/GrupoActivo'
 import { PanelFacetas } from '../components/PanelFacetas'
+import { ErrorConReintento } from '../components/ErrorConReintento'
 import { Aviso, Boton, Cargando, Encabezado, Vacio } from '../components/ui'
 import { PanelPestana, Pestanas, usePestanaEnUrl } from '../components/ui/Pestanas'
 import { descripcionDe } from '../lib/descripciones'
@@ -44,7 +45,7 @@ export default function Explorar() {
         </aside>
         <div className="flex min-w-0 flex-col gap-4 lg:col-span-8 lg:min-h-0 lg:overflow-y-auto xl:col-span-9">
           {resumen.isPending ? <Cargando />
-            : resumen.error ? <Error error={resumen.error} />
+            : resumen.error ? <Error error={resumen.error} reintentar={() => void resumen.refetch()} reintentando={resumen.isFetching} />
               : r?.insuficiente && r.vacio ? (
                 <Vacio titulo="Ningún niño cumple estos filtros">
                   Son 0 niños de este corte. Quite algún filtro o cambie el tiempo para ver un grupo.
@@ -61,11 +62,11 @@ export default function Explorar() {
   )
 }
 
-function Error({ error }: { error: Error }) {
+function Error({ error, reintentar, reintentando }: { error: Error; reintentar: () => void; reintentando: boolean }) {
   if (error instanceof ErrorApi && error.estado === 404) {
     return <Vacio titulo="Todavía no hay resultados">Cuando se procesen los datos podrá explorar grupos de niños.</Vacio>
   }
-  return <Aviso>{error.message}</Aviso>
+  return <ErrorConReintento error={error} que="el resumen de este grupo" reintentar={reintentar} reintentando={reintentando} />
 }
 
 const GRAFICAS = [

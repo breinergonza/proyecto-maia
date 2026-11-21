@@ -778,6 +778,12 @@ No. Quiere decir que, frente a los demás niños del corte, conviene mirarlo pri
 El riesgo de cada desenlace se calcula en la visita en que se mide ese desenlace y solo mientras la siguiente visita
 no ha pasado. Si el niño ya pasó ese momento, o aún no llega a él, no tiene riesgo vigente en este corte.
 
+**¿Qué pasa si se cae la conexión mientras uso una página?**
+La parte que no cargó dice «No se pudo cargar …» (o «No se pudo calcular …» si usted pidió un cálculo), explica qué
+pasó y ofrece **Reintentar**. Lo que eligió (filtros, grupo, desenlace, modelo, los datos del niño) sigue igual, y
+reintentar pide exactamente lo mismo. Si Anticipación dice que todavía no hay una corrida, no es una falla de conexión:
+falta ejecutar una corrida con un paquete activo.
+
 **¿Por qué el tablero dice «Todavía no hay resultados»?**
 No se ha ejecutado ninguna corrida con un paquete activo. La administración debe activar un paquete en **Modelos** y
 ejecutar una corrida en **Corridas**.
