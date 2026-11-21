@@ -36,10 +36,11 @@ const resultado = {
     bajo_2de: false, caida_1de: false, improbable: true }],
 }
 
-function api(rol: Usuario['rol'], enviados: unknown[] = [], extra?: { formulario?: unknown; inferencia?: { estado: number; cuerpo: unknown }; activo?: unknown }) {
+function api(rol: Usuario['rol'], enviados: unknown[] = [], extra?: { formulario?: unknown; inferencia?: { estado: number; cuerpo: unknown }; activo?: unknown; ejemplo?: unknown }) {
   simularApi((url, init) => {
     if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario(rol) } }
     if (url === '/api/modelos/activo') return { cuerpo: extra?.activo === undefined ? { version: 'p1', fuente: 'simulado', activo: true, metricas: {}, modelos: {} } : extra.activo }
+    if (url === '/api/inferencia/ejemplo') return { cuerpo: extra?.ejemplo }
     if (url === '/api/inferencia/formulario') return { cuerpo: extra?.formulario ?? formulario }
     if (url === '/api/inferencia') {
       enviados.push(JSON.parse(String(init?.body)))
@@ -66,6 +67,7 @@ describe('calcular el riesgo de un niño', () => {
     // sin la fecha de la visita no se calcula, y se dice por qué
     await userEvent.click(screen.getByRole('button', { name: 'Estimar riesgo' }))
     expect(await screen.findByText('Escriba la fecha de la visita «3 meses (edad corregida)».')).toBeInTheDocument()
+    expect(screen.getByLabelText('Revise los datos del cálculo')).toHaveFocus()
     expect(enviados).toEqual([])
 
     await userEvent.type(screen.getByLabelText('Fecha de la visita'), '2026-05-10')
@@ -105,6 +107,26 @@ describe('calcular el riesgo de un niño', () => {
     expect(boton).toHaveAttribute('form', 'formulario-calculo')
     expect(document.getElementById('formulario-calculo')).not.toBeNull()
     expect(screen.getByRole('tab', { name: 'Riesgo estimado' })).toBeInTheDocument()
+  })
+
+  it('carga la fecha y la gestación del ejemplo y lo calcula desde el botón', async () => {
+    const enviados = api('experto', [], {
+      ejemplo: {
+        sujetos: [{ sujeto: 'ejemplo-1', fecha_nacimiento: '2026-01-10', eg_semanas: 32 }],
+        mediciones: [{ sujeto: 'ejemplo-1', variable: 'peso_nacer', valor: 1600, fecha: '2026-01-10' }],
+      },
+    })
+    montar('/prediccion')
+    await userEvent.click(await screen.findByRole('button', { name: 'Cargar un niño de ejemplo' }))
+    await waitFor(() => expect(screen.getByLabelText('Fecha de nacimiento')).toHaveValue('2026-01-10'))
+    expect(screen.getByLabelText('Semanas de gestación al nacer')).toHaveValue('32')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Estimar riesgo' }))
+    await waitFor(() => expect(enviados).toHaveLength(1))
+    expect(enviados[0]).toMatchObject({
+      sujetos: [{ fecha_nacimiento: '2026-01-10', eg_semanas: 32 }],
+      mediciones: [{ variable: 'peso_nacer', valor: 1600 }],
+    })
   })
 
   it('los datos generales van plegados y la administración tiene el modo avanzado', async () => {

@@ -203,7 +203,7 @@ function ComparaEntrenamientos() {
                     {ver === 'roc' && (
                       <Grafica titulo={dRoc.titulo} descripcion={dRoc.descripcion}
                         exportar={{ nombre: 'comparar-roc', filas: [...datoA.roc.puntos.map(([x, y]) => ({ entrenamiento: 'A', falsas_alarmas: x, casos_detectados: y })), ...datoB.roc.puntos.map(([x, y]) => ({ entrenamiento: 'B', falsas_alarmas: x, casos_detectados: y }))] }}>
-                        <CurvaXY etiqueta="Aciertos frente a falsas alarmas en A y en B" ejeX="Falsas alarmas" ejeY="Casos detectados" diagonal alto={altoRoc}
+                        <CurvaXY etiqueta="Casos detectados frente a falsas alertas en A y en B" ejeX="Proporción de falsas alertas" ejeY="Proporción de casos detectados" diagonal alto={altoRoc}
                           formatoX={(v) => `${Math.round(v * 100)} %`} formatoY={(v) => `${Math.round(v * 100)} %`}
                           series={[
                             { clave: 'a', nombre: `A (entrenamiento ${a})`, color: 0, puntos: datoA.roc.puntos, sinPuntos: true },

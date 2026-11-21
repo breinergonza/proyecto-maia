@@ -78,7 +78,7 @@ describe('diccionario de variables', () => {
     expect(screen.getByText(/apnea a las 40 semanas/)).toBeInTheDocument()
     expect(llamadas.some((l) => l.url === '/api/diccionario/versiones' && l.init?.method === 'POST')).toBe(false)
     await userEvent.type(screen.getByLabelText('Nota (opcional)'), 'Agrego D')
-    await userEvent.click(screen.getByRole('button', { name: 'Confirmar y usar esta versión' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Publicar como versión vigente' }))
     await waitFor(() => expect(llamadas.some((l) => l.url === '/api/diccionario/versiones' && l.init?.method === 'POST')).toBe(true))
     const post = llamadas.find((l) => l.url === '/api/diccionario/versiones' && l.init?.method === 'POST')!
     const fd = post.init!.body as FormData
@@ -129,7 +129,7 @@ describe('diccionario de variables', () => {
     await userEvent.upload(await screen.findByLabelText('Archivo de Excel (.xlsx)'), new File(['x'], 'mio.xlsx'))
     await userEvent.click(screen.getByRole('button', { name: 'Revisar cambios' }))
     expect(await screen.findByText(/hoja "Variables", fila 4/)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Confirmar y usar esta versión' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Publicar como versión vigente' })).not.toBeInTheDocument()
   })
 
   it('la consulta no ve el diccionario', async () => {

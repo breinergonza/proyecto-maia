@@ -93,7 +93,7 @@ describe('editar el diccionario con formularios', () => {
     })
     expect(llamadas.some((l) => l.url === '/api/diccionario/editar')).toBe(false)   // revisar no guarda
     await userEvent.type(within(revision).getByLabelText('Nota (opcional)'), 'Corrijo A')
-    await userEvent.click(within(revision).getByRole('button', { name: 'Guardar versión nueva' }))
+    await userEvent.click(within(revision).getByRole('button', { name: 'Publicar como versión vigente' }))
     expect(await screen.findByText('La versión 3 quedó en uso.')).toBeInTheDocument()
     expect(cuerpo(llamadas, '/api/diccionario/editar').nota).toBe('Corrijo A')
     await waitFor(() => expect(within(editor).queryByText(/sin guardar/)).not.toBeInTheDocument())
@@ -114,7 +114,7 @@ describe('editar el diccionario con formularios', () => {
     await userEvent.click(within(editor).getByRole('button', { name: 'Revisar y guardar' }))
     let revision = await screen.findByRole('dialog', { name: 'Revisar los cambios' })
     expect(await within(revision).findByText(/Variables · var_simulada_a: falta Rol/)).toBeInTheDocument()
-    expect(within(revision).queryByRole('button', { name: 'Guardar versión nueva' })).not.toBeInTheDocument()
+    expect(within(revision).queryByRole('button', { name: 'Publicar como versión vigente' })).not.toBeInTheDocument()
     await userEvent.click(within(revision).getByRole('button', { name: 'Seguir editando' }))
     conflicto = true
     await userEvent.click(within(editor).getByRole('button', { name: 'Revisar y guardar' }))

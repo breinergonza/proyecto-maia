@@ -1,7 +1,7 @@
 // Entrenamientos propios: entrenar un modelo propio, ver la cola con la posición y el tiempo estimado, y el banco compartido.
 // Los modelos personales no cambian el tablero ni envían correos; solo administración aprueba los oficiales.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { pedir } from '../api/cliente'
 import type { ColaEntrenamientos, CuotasConfig, ItemBanco, MuestraGuardada } from '../api/tipos'
 import { useSesion, puede } from '../auth/sesion'
@@ -25,6 +25,15 @@ export default function MisModelos() {
   const cliente = useQueryClient()
   const cola = useQuery({ queryKey: ['mis-modelos', 'cola'], queryFn: () => pedir<ColaEntrenamientos>('/entrenamientos/cola'), refetchInterval: 15000 })
   const banco = useQuery({ queryKey: ['mis-modelos', 'banco'], queryFn: () => pedir<ItemBanco[]>('/entrenamientos/banco') })
+  const trabajosPropios = useRef<number[]>([])
+  useEffect(() => {
+    if (!cola.data) return
+    const vigentes = cola.data.items.filter((item) => item.propia).map((item) => item.id)
+    if (trabajosPropios.current.some((id) => !vigentes.includes(id))) {
+      void cliente.invalidateQueries({ queryKey: ['mis-modelos', 'banco'] })
+    }
+    trabajosPropios.current = vigentes
+  }, [cola.data, cliente])
   const muestras = useQuery({ queryKey: ['muestras'], queryFn: () => pedir<(MuestraGuardada & { propietario_id?: string | null })[]>('/muestras') })
   const cuotas = useQuery({ queryKey: ['mis-modelos', 'cuotas'], queryFn: () => pedir<CuotasConfig>('/entrenamientos/cuotas'), enabled: admin })
   const [ver, setVer] = useState('todos')               // todos | mios | oficial | personal
@@ -212,8 +221,8 @@ export default function MisModelos() {
   return (
     <div className="flex flex-col xl:h-full">
       <Encabezado titulo="Entrenamientos propios">
-        Entrene un modelo propio con los hiperparámetros vigentes. Queda como «Personal»: no cambia el tablero ni envía
-        correos. Solo administración aprueba un modelo como oficial.
+        Entrene con los parámetros vigentes. {admin ? 'El modelo se comparte en el catálogo como «Oficial» y queda pendiente de aprobación.'
+          : 'El modelo queda como «Personal» para sus estimaciones.'} El modelo activo del tablero se cambia desde Administración.
       </Encabezado>
       <Pestanas prefijo="mis-modelos" etiqueta="Secciones de Entrenamientos propios" pestanas={pestanas} activa={activa} elegir={elegir} />
       <PanelesPestana prefijo="mis-modelos" activa={activa} className="mt-3 flex min-h-0 flex-col gap-3 xl:flex-1" paneles={[

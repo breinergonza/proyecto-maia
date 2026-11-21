@@ -94,8 +94,12 @@ _CONOCIDOS: tuple[tuple[str, str], ...] = (
      'No se encontró el servidor de la base de la entidad. Revise el nombre en Administración › Configuración.'),
     (r'(?i)connection refused|connection timed out|timeout expired|could not connect to server',
      'No se pudo conectar con la base de datos: revise el servidor, el puerto y que la red lo permita.'),
+    (r'(?i)no hay cortes.*simulado',
+     'Todavía no hay datos guardados de esta fuente. En Entrenar ahora, seleccione Datos simulados y marque '
+     '«Generar una cohorte simulada nueva».'),
     (r'(?i)no hay cortes',
-     'Todavía no hay datos guardados de esta fuente. Marque «Traer datos nuevos» o ejecute primero una corrida.'),
+     'Todavía no hay datos guardados de esta fuente. En Entrenar ahora, marque '
+     '«Extraer datos nuevos de la base de la entidad» o ejecute primero una actualización de datos.'),
     (r'No hay modelos con alias produccion',
      'Todavía no hay modelos aprobados: entrene y apruebe una versión de cada modelo en Administración › '
      'Entrenamientos antes de la corrida.'),

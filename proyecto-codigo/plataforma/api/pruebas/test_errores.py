@@ -54,7 +54,10 @@ def test_falta_un_campo():
     assert r.status_code == 422 and r.json()['detail'] == 'Falta el correo.'
 
 
-def test_un_error_inesperado_no_muestra_la_traza():
+def test_un_error_inesperado_no_muestra_la_traza(caplog):
     r = _cliente().get('/falla')
     assert r.status_code == 500
     assert 'error inesperado' in r.json()['detail'] and 'psycopg' not in r.text
+    referencia = r.json()['referencia']
+    assert referencia in r.json()['detail']
+    assert referencia in caplog.text

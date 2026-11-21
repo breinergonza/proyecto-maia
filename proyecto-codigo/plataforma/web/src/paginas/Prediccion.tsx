@@ -182,6 +182,15 @@ function Avance({ t }: { t: TrabajoPrediccion }) {
 
 function Resultado({ t, r, admin }: { t: TrabajoPrediccion; r: ResultadoTrabajoPrediccion; admin: boolean }) {
   if (r.insuficiente) {
+    if (r.excluidos > 0) {
+      return (
+        <Aviso tono="teal">
+          <strong>{r.n_filtro === 0 ? 'No quedaron niños después de la exclusión.' : 'El grupo tiene datos insuficientes.'}</strong>
+          {' '}Antes de excluir: {num(r.n_filtro + r.excluidos)}. Excluidos por participar en el entrenamiento: {num(r.excluidos)}.
+          {' '}Después de excluir: {num(r.n_filtro)}. {r.n_filtro > 0 && r.mensaje} Elija un grupo más grande.
+        </Aviso>
+      )
+    }
     return (
       <Aviso tono="teal">
         <strong>Muy pocos niños.</strong> {r.mensaje} Elija un grupo más grande.

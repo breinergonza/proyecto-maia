@@ -26,7 +26,7 @@ export const DESCRIPCIONES: Record<string, Descripcion> = {
   entrenamientos_modelo: { titulo: "Entrenamientos del modelo", descripcion: "Entrenamientos registrados con sus métricas de validación y su versión." },
   resumen_revision: { titulo: "Resumen de la revisión", descripcion: "Un semáforo por área: verde es confiable, ocre pide mirar." },
   resumen_muestra: { titulo: "Resumen de la muestra", descripcion: "Con qué niños se entrenó el modelo." },
-  roc: { titulo: "Aciertos frente a falsas alarmas", descripcion: "Cuanto más arriba va la línea, mejor separa a los niños." },
+  roc: { titulo: "Casos detectados frente a falsas alertas", descripcion: "Cuanto más arriba va la línea, mejor separa a los niños." },
   casos_detectados: { titulo: "Casos detectados", descripcion: "Cuántos casos se detectan y cuántas alertas aciertan." },
   a_cuantos_se_alerta: { titulo: "A cuántos se alerta", descripcion: "Mueve el porcentaje y mira cómo cambian los números." },
   aciertos_errores: { titulo: "Aciertos y errores", descripcion: "Cuántos niños se acertaron y cuántos fueron falsa alarma." },

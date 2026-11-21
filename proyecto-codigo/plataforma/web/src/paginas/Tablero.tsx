@@ -78,7 +78,7 @@ export default function Tablero() {
   return (
     <div className="flex flex-col gap-3 lg:h-full">
       <div className="flex shrink-0 flex-wrap items-baseline gap-x-4 gap-y-0.5">
-        <h1>Resumen</h1>
+        <h1>Resumen de riesgos y calidad de datos</h1>
         <p className="text-sm text-salvia">
           {datosAl(r.corte)}, actualizados el {fecha(r.corrida.terminada)}.
           {puede(usuario, ['admin']) && r.paquete && <> Paquete {r.paquete}.</>}

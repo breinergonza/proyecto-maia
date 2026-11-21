@@ -142,7 +142,7 @@ describe('Modelos 1: Rendimiento en pestañas', () => {
     api()
     montar(ruta('rendimiento'), <Ubicacion />)
     expect(await pestana('Curvas de rendimiento')).toHaveAttribute('aria-selected', 'true')
-    expect(await screen.findByText('Aciertos frente a falsas alarmas')).toBeInTheDocument()
+    expect(await screen.findByText('Casos detectados frente a falsas alertas')).toBeInTheDocument()
     expect(screen.getByText('Alertas acertadas frente a casos detectados')).toBeInTheDocument()
     expect(screen.queryByRole('slider')).not.toBeInTheDocument()
 

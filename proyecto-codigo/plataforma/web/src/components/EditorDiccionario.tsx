@@ -422,7 +422,7 @@ function Revision({ edicion, hojas, alCerrar, alGuardar }: {
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Boton variante="secundario" onClick={alCerrar} disabled={guardar.isPending}>Seguir editando</Boton>
           {revisar.data && !desactualizado && (
-            <Boton onClick={() => guardar.mutate()} disabled={guardar.isPending}>{guardar.isPending ? 'Guardando…' : 'Guardar versión nueva'}</Boton>
+            <Boton onClick={() => guardar.mutate()} disabled={guardar.isPending}>{guardar.isPending ? 'Guardando…' : 'Publicar como versión vigente'}</Boton>
           )}
         </div>
       }>
