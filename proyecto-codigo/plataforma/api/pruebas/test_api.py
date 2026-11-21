@@ -255,8 +255,12 @@ def test_corrida_y_tablero(cliente, admin, corrida, smtp):
     envio = corrida['resumen']['notificaciones']
     assert envio['correos'] >= 1 and envio['errores'] == 0 and not envio['sin_servidor'], envio
     assert len(buzon.mensajes) >= 1
+    # «Avisos enviados»: un solo registro para la notificación de la corrida, con su correo y sus niños
     h = cliente.get('/api/notificaciones/historial', headers=admin).json()
     assert h['total'] >= 1 and h['items'][0]['estado'] == 'enviado' and h['items'][0]['notificacion'] == 'Corrida demo'
+    assert sum(i['notificacion'] == 'Corrida demo' for i in h['items']) == 1
+    assert h['items'][0]['corrida_id'] == corrida['id'] and 1 <= h['items'][0]['ninos'] <= envio['ninos']
+    assert h['items'][0]['destinatarios'] == [{'correo': 'clinica@maia.prueba', 'estado': 'enviado', 'error': None}]
 
 
 def test_ninos_y_linea_temporal(cliente, admin, corrida):

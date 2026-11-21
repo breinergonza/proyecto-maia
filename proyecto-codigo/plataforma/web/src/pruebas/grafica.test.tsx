@@ -18,6 +18,16 @@ describe('Panel.descripcion', () => {
   })
 })
 
+describe('Panel denso', () => {
+  it('deja menos relleno arriba y abajo, para las pantallas que deben verse enteras sin bajar', () => {
+    render(<><Panel denso titulo="Apretado"><p>contenido denso</p></Panel><Panel titulo="Normal"><p>contenido normal</p></Panel></>)
+    expect(screen.getByText('contenido denso').parentElement).toHaveClass('py-3')
+    expect(screen.getByText('contenido denso').parentElement).not.toHaveClass('sm:p-5')
+    // el panel de siempre no cambia
+    expect(screen.getByText('contenido normal').parentElement).toHaveClass('sm:p-5')
+  })
+})
+
 describe('Grafica', () => {
   it('muestra la descripción y los botones PNG y CSV con filas', () => {
     render(<Grafica titulo="G" descripcion="Una frase." exportar={{ nombre: 'g', filas: [{ a: 1 }] }}><svg /></Grafica>)

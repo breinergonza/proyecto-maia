@@ -135,6 +135,76 @@ describe('calcular el riesgo de un niño', () => {
   })
 })
 
+describe('el formulario cabe en la ventana: las casillas se reparten a lo ancho y nada ocupa una línea de más', () => {
+  const conRango = {
+    ...formulario,
+    generales: [campo('talla_madre', 'Talla de la madre', { unidad: 'cm', minimo: 120, maximo: 200 }), ...formulario.generales],
+  }
+  const cuadriculaDe = (casilla: HTMLElement) => casilla.closest('[data-cuadricula]') as HTMLElement
+
+  it('el rango habitual va dentro de la casilla y se le sigue diciendo a quien usa lector de pantalla', async () => {
+    api('experto', [], { formulario: conRango })
+    montar('/prediccion')
+    const talla = await screen.findByLabelText('Talla de la madre (cm)')
+    expect(talla).toHaveAttribute('placeholder', '120 a 200')
+    expect(talla).toHaveAccessibleDescription('Habitual: 120 a 200 cm.')
+    // la frase completa no se pinta: ocupaba una línea bajo cada casilla
+    expect(document.getElementById(talla.getAttribute('aria-describedby')!)).toHaveClass('sr-only')
+    const semanas = screen.getByLabelText('Semanas de gestación al nacer')
+    expect(semanas).toHaveAttribute('placeholder', '20 a 45')
+    expect(semanas).toHaveAccessibleDescription('Entre 20 y 45.')
+  })
+
+  it('la fecha de nacimiento, las semanas de gestación y los datos principales del niño comparten una cuadrícula', async () => {
+    api('experto', [], { formulario: conRango })
+    montar('/prediccion')
+    const cuadricula = cuadriculaDe(await screen.findByLabelText('Fecha de nacimiento'))
+    expect(cuadricula).not.toBeNull()
+    expect(within(cuadricula).getByLabelText('Semanas de gestación al nacer')).toBeInTheDocument()
+    expect(within(cuadricula).getByLabelText('Talla de la madre (cm)')).toBeInTheDocument()
+    // tantas columnas como quepan en el ancho de la ventana, no cuatro fijas
+    expect(cuadricula.className).toMatch(/grid-cols-\[repeat\(auto-fill,minmax\(/)
+    // en escritorio las casillas son un poco más bajas (en un teléfono conservan el alto para el dedo)
+    for (const casilla of within(cuadricula).getAllByRole('textbox')) expect(casilla).toHaveClass('lg:h-9')
+    expect(within(cuadricula).getByLabelText('Fecha de nacimiento')).toHaveClass('lg:h-9')
+  })
+
+  it('la fecha de la visita es una casilla más de la visita, y la edad esperada se sigue diciendo', async () => {
+    api('experto')
+    montar('/prediccion')
+    await userEvent.click(await screen.findByRole('tab', { name: /^3 meses/ }))
+    const fecha = screen.getByLabelText('Fecha de la visita')
+    expect(within(cuadriculaDe(fecha)).getByLabelText('Peso a 3 m EC (g)')).toBeInTheDocument()
+    expect(screen.getByText('Se espera entre 45 d y 4,4 m de edad corregida.')).toBeInTheDocument()
+    expect(fecha).toHaveAccessibleDescription('Se espera entre 45 d y 4,4 m de edad corregida.')
+  })
+
+  it('la guía del formulario va junto al título «Datos del niño», no en un renglón propio', async () => {
+    api('experto')
+    montar('/prediccion')
+    const titulo = await screen.findByRole('heading', { level: 2, name: 'Datos del niño' })
+    expect(within(titulo.closest('header')!).getByText(/Lo que deje vacío se toma como dato faltante\. No se guarda nada\./)).toBeInTheDocument()
+  })
+
+  it('el título «Visitas» comparte renglón con las pestañas de las visitas', async () => {
+    api('experto')
+    montar('/prediccion')
+    const titulo = await screen.findByRole('heading', { level: 2, name: 'Visitas' })
+    expect(within(titulo.parentElement!).getByRole('tablist', { name: 'Visitas' })).toBeInTheDocument()
+  })
+
+  it('una visita del nacimiento no pide fecha y lo dice, junto a sus casillas', async () => {
+    api('experto')
+    montar('/prediccion')
+    await screen.findByLabelText('Peso al nacer (g)')
+    // todos los paneles de visita están montados: se mira el de la pestaña elegida
+    const panel = document.getElementById('visita-panel')!
+    expect(within(panel).getByText('Se toman con la fecha de nacimiento.')).toBeInTheDocument()
+    expect(within(panel).queryByLabelText('Fecha de la visita')).not.toBeInTheDocument()
+    expect(cuadriculaDe(within(panel).getByLabelText('Peso al nacer (g)'))).not.toBeNull()
+  })
+})
+
 describe('cuando no se puede calcular, cada rol sabe a quién acudir', () => {
   const sinModelo = { estado: 409, cuerpo: { detail: 'No hay un paquete de modelos activo.' } }
   const falla = { estado: 422, cuerpo: { detail: 'No se pudo calcular el riesgo con estos datos. Revise los valores que escribió e intente de nuevo.' } }

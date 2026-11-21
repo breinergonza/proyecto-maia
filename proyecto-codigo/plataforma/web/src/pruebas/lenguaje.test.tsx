@@ -141,8 +141,9 @@ const sinProblema = { ...fila, sujeto: 's2', percentil_max: 40, n_bajo_2de: 0, n
 const sinDato = { ...fila, sujeto: 's3', percentil_max: 20, n_bajo_2de: 0, n_caida_1de: 0, n_crecimiento: 0, ultima_visita: null,
   ultima_fecha: null, ultima_edad_corregida: null }
 const notificaciones = [{ id: 1, nombre: 'readmisión a los 3 meses', percentil_minimo: 95, destinatarios: ['a@maia.prueba'], alertas: ['readm'], activo: true }]
-const aviso = { id: 1, destinatario: 'a@maia.prueba', estado: 'enviado', error: null, enviado_en: '2026-07-01T10:00:00Z', sujeto: 's1',
-  desenlace: 'readmisión a los 3 meses', percentil: 93, corrida_id: 3, notificacion: null }
+const aviso = { notificacion_id: 1, notificacion: 'readmisión a los 3 meses', corrida_id: 3, enviado_en: '2026-07-01T10:00:00Z', ninos: 1,
+  riesgo: { muy_alto: 0, alto: 1, otros: 0 }, alertas: [{ desenlace: 'readmisión a los 3 meses', ninos: 1 }],
+  destinatarios: [{ correo: 'a@maia.prueba', estado: 'enviado', error: null }], estado: 'enviado' }
 const datoRevision = { ...alertaDato, sujeto: 's1', unidad: 'g', etapa_nombre: '3 meses', fecha: '2026-03-01', fuerza: 9, es_error: null, comentario: null, serie: [], revisiones: [] }
 
 function api(rol: 'admin' | 'experto' = 'experto') {
@@ -191,7 +192,7 @@ describe('pantallas del equipo clínico sin términos técnicos', () => {
   it('notificaciones (administración)', async () => {
     api('admin')
     montar('/notificaciones/alertas')
-    expect(await screen.findByText('Alto')).toBeInTheDocument()   // el aviso de posición 93, dicho como en el resto de la web
+    expect(await screen.findByText('1 alto')).toBeInTheDocument()   // el nivel del aviso, dicho como en el resto de la web
     expect(screen.getByText('1 correo')).toBeInTheDocument()
     expect(screen.getByText(/Con 95 se avisa del 5 % de niños con más riesgo\./)).toBeInTheDocument()
     expect(document.querySelector('main')?.textContent).not.toMatch(PROHIBIDO)

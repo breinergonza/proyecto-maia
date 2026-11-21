@@ -368,17 +368,20 @@ export interface ResultadoInferencia {
   crecimiento: (PuntoCrecimiento & { sujeto: string })[]
 }
 
-export interface Notificacion {
-  id: number
-  destinatario: string
-  estado: 'enviado' | 'error'
-  error: string | null
-  enviado_en: string
-  sujeto: string
-  desenlace: string
-  percentil: number
-  corrida_id: number
+/** Un registro de «Avisos enviados»: una notificación en una actualización de resultados, con todos sus destinatarios.
+ *  ``enviado_en`` es el último envío del registro. ``riesgo`` cuenta niños por el nivel de su riesgo más alto en el aviso.
+ *  ``estado``: ``enviado`` si llegó a todos los correos, ``parcial`` si alguno falló y ``error`` si fallaron todos. */
+export interface AvisoEnviado {
+  /** Nulos si la notificación se eliminó después: el registro se conserva. */
+  notificacion_id: number | null
   notificacion: string | null
+  corrida_id: number
+  enviado_en: string
+  ninos: number
+  riesgo: { muy_alto: number; alto: number; otros: number }
+  alertas: { desenlace: string; ninos: number }[]
+  destinatarios: { correo: string; estado: 'enviado' | 'error'; error: string | null }[]
+  estado: 'enviado' | 'parcial' | 'error'
 }
 
 /** Perfil provisional al nacer (D12): categorías, nunca valores numéricos. */
