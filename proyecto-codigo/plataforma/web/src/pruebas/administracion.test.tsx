@@ -28,7 +28,7 @@ describe('administración de las ejecuciones', () => {
     })
     montar('/admin/configuracion')
     expect(await screen.findByRole('heading', { name: 'Sin permiso' })).toBeInTheDocument()
-    for (const n of ['Configuración', 'Programación', 'Entrenamientos']) expect(screen.queryAllByRole('link', { name: n })).toHaveLength(0)
+    for (const n of ['Configuración', 'Programar ejecuciones automáticas', 'Entrenar y aprobar modelos']) expect(screen.queryAllByRole('link', { name: n })).toHaveLength(0)
   })
 
   it('configuración: la clave guardada no se muestra y solo se envía si se escribe', async () => {
@@ -111,7 +111,7 @@ describe('administración de las ejecuciones', () => {
         : url === `/api/usuarios/${otra.id}` && init?.method === 'PATCH' ? { cuerpo: { ...otra, rol: 'visualizador' } }
           : undefined))
     montar('/admin/usuarios')
-    const perfil = await screen.findByLabelText('Perfil de Ana Pérez')
+    const perfil = await screen.findByLabelText('Rol de acceso de Ana Pérez')
     await userEvent.selectOptions(perfil, 'Consulta')
     const d = await screen.findByRole('alertdialog')
     expect(d).toHaveTextContent('Ana Pérez')
@@ -147,7 +147,7 @@ describe('administración de las ejecuciones', () => {
     montar('/admin/corridas')
     expect(await screen.findByText('Extracción y cálculo')).toBeInTheDocument()
     expect(screen.queryByText(/equipo local/)).not.toBeInTheDocument()
-    expect(within(screen.getByRole('main')).getByRole('link', { name: 'Programación' })).toHaveAttribute('href', '/admin/programacion')
+    expect(within(screen.getByRole('main')).getByRole('link', { name: 'Programar ejecuciones automáticas' })).toHaveAttribute('href', '/admin/programacion')
   })
 
   it('corridas: si todas son del mismo tipo se dice una vez y no en una columna que repite lo mismo', async () => {
@@ -198,7 +198,7 @@ describe('administración de las ejecuciones', () => {
     expect(within(clinico).getByText('auc__muerte')).toBeInTheDocument()
     await userEvent.click(within(clinico).getByLabelText('Aprobar v5'))
     await userEvent.click(screen.getByLabelText('Aprobar v2'))
-    await userEvent.click(screen.getByRole('button', { name: 'Aprobar y activar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Aprobar y poner el modelo en uso' }))
     await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Activar en la solución' }))
     expect(await screen.findByText(/Aprobación en cola \(ejecución n\.º 9\)/)).toBeInTheDocument()
     const post = llamadas.find((l) => l.url === '/api/entrenamientos/aprobar')!

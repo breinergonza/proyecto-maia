@@ -52,18 +52,18 @@ function Ficha({ n, historia, trayectoria, perfil }: {
   // mientras se piden o si fallan, la pestaña dice qué pasa; con una API anterior (sin las familias) y sin otros riesgos, no hay
   const conDesenlaces = historia.isPending || historia.error != null || desenlaces.length > 0
   const secciones = [
-    ...(conDesenlaces ? [{ clave: 'desenlaces', texto: 'Desenlaces', contenido: (
+    ...(conDesenlaces ? [{ clave: 'desenlaces', texto: 'Resultados clínicos y riesgo estimado', contenido: (
       <Desenlaces sujeto={n.sujeto} historia={historia} desenlaces={desenlaces} modeloClinico={n.modelo_clinico}
         visitas={n.visitas} talla={n.crecimiento.talla} />
     ) }] : []),
-    ...(conCrecimiento ? [{ clave: 'crecimiento', texto: 'Crecimiento', contenido: <CrecimientoOms crecimiento={n.crecimiento} grilla="sm:grid-cols-3" /> }] : []),
-    ...(conPerfil ? [{ clave: 'perfil', texto: 'Frente a los demás niños', contenido: (
+    ...(conCrecimiento ? [{ clave: 'crecimiento', texto: 'Evolución del crecimiento', contenido: <CrecimientoOms crecimiento={n.crecimiento} grilla="sm:grid-cols-3" /> }] : []),
+    ...(conPerfil ? [{ clave: 'perfil', texto: 'Comparación con otros niños', contenido: (
       <div className="space-y-4">
         <PerfilDelNino perfil={n.perfil} />
         <PerfilCohorte sujeto={n.sujeto} grilla="sm:grid-cols-2" />
       </div>
     ) }] : []),
-    { clave: 'visitas', texto: 'Visitas', contenido: <PanelVisitas n={n} visita={visita} elegir={setElegida} /> },
+    { clave: 'visitas', texto: 'Historial de visitas', contenido: <PanelVisitas n={n} visita={visita} elegir={setElegida} /> },
   ]
   // abre en la primera pestaña con algo que mostrar: «Desenlaces» solo si hay riesgo (o se está pidiendo); si no, queda al final
   // (sigue ahí para ver por qué no hay riesgo). Las direcciones de antes (`?ver=riesgo-…`, `?ver=otros`) también abren «Desenlaces».
@@ -77,7 +77,7 @@ function Ficha({ n, historia, trayectoria, perfil }: {
     <div className="flex flex-col lg:h-full">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
         <div>
-          <h1>{/^f/i.test(n.sexo ?? '') ? 'Niña' : 'Niño'} {n.sujeto}</h1>
+          <h1>Ficha clínica · {/^f/i.test(n.sexo ?? '') ? 'Niña' : 'Niño'} {n.sujeto}</h1>
           <p className="mt-1 text-salvia">{subtitulo(n)}</p>
         </div>
         <div className="no-imprimir flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -117,7 +117,7 @@ function subtitulo(n: LineaTemporal) {
  * desplaza por dentro, con el encabezado de la lista fijo. */
 function PanelVisitas({ n, visita, elegir }: { n: LineaTemporal; visita: Visita | undefined; elegir: (etapa: string) => void }) {
   return (
-    <Panel llenar titulo="Visitas" className="lg:max-h-full print:max-h-none">
+    <Panel llenar titulo="Historial de visitas" className="lg:max-h-full print:max-h-none">
       {n.visitas.length === 0 ? <Vacio titulo="Este niño no tiene visitas registradas" /> : (
         <>
           <Recorrido visitas={n.visitas} elegida={visita?.etapa ?? null} elegir={elegir} />

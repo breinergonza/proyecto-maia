@@ -1,5 +1,5 @@
 // Rendimiento (plan v3.7, 6.3.2), en tres pestañas: «Curvas» (aciertos frente a falsas alarmas y alertas acertadas frente a
-// casos detectados), «Línea de alerta» (a cuántos niños alertar con un control deslizante calculado en el navegador, los
+// casos detectados), «Umbral de alerta» (a cuántos niños alertar con un control deslizante calculado en el navegador, los
 // aciertos y errores en 2×2 y qué pasa según dónde se ponga la línea) y «Por desenlace» (qué tan bien ordena cada uno, en una
 // lista que se desplaza dentro de su tarjeta). La revisión de los primeros (lift) y a cuántos revisar viven en Calibración.
 import { useState, type ReactNode } from 'react'
@@ -59,8 +59,8 @@ export default function Rendimiento() {
   const dAe = descripcionDe('aciertos_errores'), dOrd = descripcionDe('ordena_por_desenlace')
   const porDesenlace = resumen.data?.estado === 'ok' ? Object.entries(resumen.data.desenlaces ?? {}) : []
   const pestanas: Pestana<Ver>[] = [
-    { clave: 'curvas', texto: 'Curvas' },
-    { clave: 'linea', texto: 'Línea de alerta' },
+    { clave: 'curvas', texto: 'Curvas de rendimiento' },
+    { clave: 'linea', texto: 'Umbral de alerta' },
     { clave: 'desenlaces', texto: porDesenlace.length ? 'Por desenlace' : 'Orden del modelo' },
   ]
   return (
@@ -82,7 +82,7 @@ export default function Rendimiento() {
                 <div className="grid gap-4 xl:grid-cols-2 [&>*]:min-w-0">
                   <Grafica titulo={dRoc.titulo} descripcion={dRoc.descripcion}
                     exportar={{ nombre: 'rendimiento-roc', filas: d.roc.puntos.map(([x, y]) => ({ falsas_alarmas: x, casos_detectados: y })), muestra }}>
-                    <CurvaXY etiqueta="Aciertos frente a falsas alarmas" ejeX="Falsas alarmas" ejeY="Casos detectados" diagonal alto={280}
+                    <CurvaXY etiqueta="Aciertos frente a falsas alarmas" ejeX="Proporción de falsas alertas" ejeY="Proporción de casos detectados" diagonal alto={280}
                       formatoX={(v) => `${Math.round(v * 100)} %`} formatoY={(v) => `${Math.round(v * 100)} %`}
                       series={[{ clave: 'roc', nombre: `Modelo · ${ic(d.auc_desenlace)}`, color: 0, puntos: d.roc.puntos, sinPuntos: true }]} />
                   </Grafica>

@@ -39,7 +39,7 @@ export default function AdminModelos() {
   // queda siempre a la vista a su lado
   return (
     <div className="flex flex-col xl:h-full">
-      <Encabezado titulo="Modelos">
+      <Encabezado titulo="Modelos disponibles">
         Los modelos se usan como un paquete firmado. Se arma solo al aprobar versiones en{' '}
         <Link className="text-teal underline" to="/admin/entrenamientos">Entrenamientos</Link>; aquí también se puede subir
         uno armado fuera de la plataforma (maia exportar). Al subirlo se verifican la firma, cada archivo y la versión de
@@ -48,17 +48,17 @@ export default function AdminModelos() {
       </Encabezado>
 
       <div className="grid grid-cols-1 items-start gap-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_22rem] xl:grid-rows-[minmax(0,1fr)]">
-      <Panel titulo="Subir un paquete" className="xl:order-2">
+      <Panel titulo="Importar un modelo" className="xl:order-2">
         <form className="flex flex-col gap-3" onSubmit={(e) => {
           e.preventDefault()
           const f = archivo.current?.files?.[0]
           if (f) subir.mutate(f)
         }}>
-          <label htmlFor="paquete" className="sr-only">Archivo del paquete</label>
+          <label htmlFor="paquete" className="sr-only">Archivo del modelo</label>
           <input ref={archivo} id="paquete" type="file" accept=".tar.gz,.tgz,application/gzip"
             onChange={(e) => setNombre(e.target.files?.[0]?.name ?? null)}
             className="text-sm file:mr-3 file:h-10 file:rounded-control file:border file:border-linea file:bg-papel file:px-4 file:font-semibold file:text-tinta" />
-          <Boton type="submit" disabled={!nombre || subir.isPending}>{subir.isPending ? 'Verificando…' : 'Subir paquete'}</Boton>
+          <Boton type="submit" disabled={!nombre || subir.isPending}>{subir.isPending ? 'Verificando…' : 'Importar modelo'}</Boton>
         </form>
         {subir.error && <div className="mt-3"><Aviso>{subir.error.message}</Aviso></div>}
         {subir.data && <div className="mt-3"><Aviso tono="teal">Paquete {subir.data.version} verificado y guardado. Actívelo para usarlo.</Aviso></div>}

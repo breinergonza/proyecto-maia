@@ -32,7 +32,7 @@ const COLUMNAS: Columna[] = [
   },
   // el nivel de riesgo va justo después del niño: en el teléfono es lo que se ve sin desplazarse de lado
   {
-    id: 'percentil_max', titulo: 'Nivel de riesgo', primero: 'desc',
+    id: 'percentil_max', titulo: 'Nivel de riesgo estimado', primero: 'desc',
     celda: (n) => (n.percentil_max == null ? '—' : esAlto(n.percentil_max)
       ? <span title={ayudaPosicion(n.percentil_max)}><Insignia tono="coral">{nivelCorto(n.percentil_max)}</Insignia></span>
       : <span title={ayudaPosicion(n.percentil_max)} className="whitespace-nowrap">{nivelCorto(n.percentil_max)}</span>),
@@ -157,19 +157,19 @@ export default function Ninos() {
 
   return (
     <div className="flex flex-col lg:h-full">
-      <Encabezado titulo="Niños">
+      <Encabezado titulo="Listado de niños">
         {definicionAlto(RIESGO_ALTO, RIESGO_MUY_ALTO)}. Los códigos están seudonimizados.
       </Encabezado>
 
       <div className="mb-4 grid grid-cols-1 shrink-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_16rem_14rem_auto]">
-        <label className="sr-only" htmlFor="buscar">Buscar por código</label>
-        <Entrada id="buscar" placeholder="Buscar por código" value={texto} onChange={(e) => setTexto(e.target.value)} />
-        <label className="sr-only" htmlFor="desenlace">Desenlace</label>
+        <label className="sr-only" htmlFor="buscar">Buscar por código del niño</label>
+        <Entrada id="buscar" placeholder="Buscar por código del niño" value={texto} onChange={(e) => setTexto(e.target.value)} />
+        <label className="sr-only" htmlFor="desenlace">Resultado clínico evaluado</label>
         <Selector id="desenlace" value={desenlace} onChange={(e) => cambiar({ desenlace: e.target.value })}>
           <option value="">Todos los desenlaces</option>
           {desenlaces.data?.riesgos_por_desenlace.map((d) => <option key={d.clave} value={d.clave}>{d.desenlace}</option>)}
         </Selector>
-        <label className="sr-only" htmlFor="percentil">Nivel de riesgo</label>
+        <label className="sr-only" htmlFor="percentil">Nivel de riesgo estimado</label>
         <Selector id="percentil" value={percentil} onChange={(e) => cambiar({ percentil_min: e.target.value })}>
           <option value="">Cualquier riesgo</option>
           <option value={RIESGO_ALTO}>Riesgo alto (el {100 - RIESGO_ALTO} % con más riesgo)</option>
@@ -286,7 +286,7 @@ function MenuColumnas({ columnas, reordenar }: { columnas: string[]; reordenar: 
   return (
     <div ref={caja} className="relative">
       <Boton variante="secundario" className="w-full xl:w-auto" aria-expanded={abierto} onClick={() => setAbierto((a) => !a)}>
-        <Columns3 size={17} aria-hidden /> Columnas
+        <Columns3 size={17} aria-hidden /> Elegir columnas
       </Boton>
       {abierto && (
         <div className="absolute right-0 z-20 mt-2 w-72 animate-aparecer rounded-panel border border-linea bg-papel p-3 shadow-elevada">

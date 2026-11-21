@@ -11,13 +11,13 @@ describe('ingreso y permisos', () => {
   it('sin sesión lleva al ingreso', async () => {
     simularApi(sinSesion)
     montar('/ninos')
-    expect(await screen.findByRole('heading', { name: 'Ingresar' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Iniciar sesión en MAIA' })).toBeInTheDocument()
   })
 
   it('valida el formulario antes de llamar a la API', async () => {
     const llamadas = simularApi(sinSesion)
     montar('/ingresar')
-    await userEvent.click(await screen.findByRole('button', { name: 'Ingresar al sistema' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Iniciar sesión' }))
     expect(await screen.findByText('Escriba su correo.')).toBeInTheDocument()
     expect(llamadas.some((l) => l.url === '/api/auth/login')).toBe(false)
   })
@@ -36,11 +36,11 @@ describe('ingreso y permisos', () => {
     montar('/ingresar')
     await userEvent.type(await screen.findByLabelText('Correo electrónico'), 'consulta@maia.prueba')
     await userEvent.type(screen.getByLabelText('Contraseña'), 'mala')
-    await userEvent.click(screen.getByRole('button', { name: 'Ingresar al sistema' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
     expect(await screen.findByText('Correo o contraseña incorrectos.')).toBeInTheDocument()
     await userEvent.clear(screen.getByLabelText('Contraseña'))
     await userEvent.type(screen.getByLabelText('Contraseña'), 'buena-clave')
-    await userEvent.click(screen.getByRole('button', { name: 'Ingresar al sistema' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
     expect(await screen.findByText('Todavía no hay resultados')).toBeInTheDocument()
   })
 
@@ -53,8 +53,8 @@ describe('ingreso y permisos', () => {
     expect(await screen.findByRole('heading', { name: 'Sin permiso' })).toBeInTheDocument()
     expect(screen.queryAllByRole('link', { name: 'Usuarios' })).toHaveLength(0)
     expect(screen.queryAllByRole('link', { name: 'Datos por revisar' })).toHaveLength(0)
-    expect(screen.queryAllByRole('link', { name: 'Niños' })).toHaveLength(0)
-    expect(screen.getAllByRole('link', { name: 'Vista clínica' }).length).toBeGreaterThan(0)
+    expect(screen.queryAllByRole('link', { name: 'Listado de niños' })).toHaveLength(0)
+    expect(screen.getAllByRole('link', { name: 'Seguimiento clínico' }).length).toBeGreaterThan(0)
     expect(screen.getByText(/Su perfil \(Consulta\)/)).toBeInTheDocument()
   })
 
@@ -67,7 +67,7 @@ describe('ingreso y permisos', () => {
     montar('/ninos?desenlace=readm_3m')
     await userEvent.type(await screen.findByLabelText('Correo electrónico'), 'experto@maia.prueba')
     await userEvent.type(screen.getByLabelText('Contraseña'), 'buena-clave')
-    await userEvent.click(screen.getByRole('button', { name: 'Ingresar al sistema' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
     await waitFor(() => expect(llamadas.some((l) => l.url.startsWith('/api/ninos?') && l.url.includes('desenlace=readm_3m'))).toBe(true))
   })
 })
@@ -88,7 +88,7 @@ describe('calidad de datos', () => {
     })
     const { unmount } = montar('/admin/calidad-datos')
     expect(await screen.findByRole('heading', { name: 'Sin permiso' })).toBeInTheDocument()
-    expect(screen.queryAllByRole('link', { name: 'Calidad de datos' })).toHaveLength(0)
+    expect(screen.queryAllByRole('link', { name: 'Mediciones por revisar' })).toHaveLength(0)
     expect(screen.queryAllByRole('link', { name: 'Datos por revisar' })).toHaveLength(0)
     unmount()
     simularApi((url) => {
@@ -96,7 +96,7 @@ describe('calidad de datos', () => {
       if (url === '/api/tablero/resumen') return { estado: 404, cuerpo: { detail: 'x' } }
     })
     montar('/tablero')
-    expect((await screen.findAllByRole('link', { name: 'Calidad de datos' })).length).toBeGreaterThan(0)
+    expect((await screen.findAllByRole('link', { name: 'Mediciones por revisar' })).length).toBeGreaterThan(0)
   })
 
   it('muestra las cifras y los tres paneles con su frase', async () => {
@@ -109,9 +109,9 @@ describe('calidad de datos', () => {
       if (url.startsWith('/api/revision/datos?')) return { cuerpo: { total: 0, pagina: 1, tamano: 12, items: [] } }
     })
     montar('/admin/calidad-datos')
-    expect(await screen.findByRole('heading', { name: 'Calidad de datos' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Mediciones por revisar' })).toBeInTheDocument()
     expect(await screen.findByText('mediciones por revisar')).toBeInTheDocument()
-    await userEvent.click(screen.getByText('Cómo se comportan las alertas'))   // las tres medidas de la revisión van en el detalle
+    await userEvent.click(screen.getByText('Resumen de alertas de calidad de datos'))   // las tres medidas de la revisión van en el detalle
     for (const t of ['Alertas por tipo', 'Aciertos frente a la revisión', 'Dónde se concentran']) {
       expect(await screen.findByRole('heading', { name: t })).toBeInTheDocument()
     }
@@ -136,7 +136,7 @@ describe('calidad de datos', () => {
       return { cuerpo: {} }
     })
     montar('/revision/datos')
-    expect(await screen.findByRole('heading', { name: 'Calidad de datos' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Mediciones por revisar' })).toBeInTheDocument()
   })
 
   it('guarda la respuesta de quien revisa', async () => {
@@ -202,7 +202,7 @@ describe('niños: lista', () => {
   it('el subtítulo es una línea y dice qué es «alto» y «muy alto» con los porcentajes del filtro', async () => {
     api()
     montar('/ninos')
-    const subtitulo = (await screen.findByRole('heading', { name: 'Niños' })).nextElementSibling!
+    const subtitulo = (await screen.findByRole('heading', { name: 'Listado de niños' })).nextElementSibling!
     expect(subtitulo.textContent).toMatch(/Alto: entre el 10 % más alto de los niños con que se calibró cada modelo; muy alto: el 5 %/)
     expect(subtitulo.textContent).toMatch(/seudonimizados/)
     expect(subtitulo.textContent!.length).toBeLessThan(170)

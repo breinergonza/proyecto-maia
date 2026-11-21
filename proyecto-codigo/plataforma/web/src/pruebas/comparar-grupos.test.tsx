@@ -121,11 +121,11 @@ describe('comparar grupos', () => {
   it('abre con el grupo activo como A y B sin elegir: no pide nada hasta que se elija', async () => {
     const llamadas = api()
     montar('/comparar?f=sexo|lista|F&t=fecha_nacimiento|periodo|2015|2018')
-    expect(await screen.findByRole('heading', { level: 1, name: 'Comparar grupos' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Comparar grupos de niños' })).toBeInTheDocument()
     expect(await within(ladoA()).findByText(/Sexo: Femenino/)).toBeInTheDocument()
     expect(within(ladoA()).getByText(/Período: 2015 a 2018/)).toBeInTheDocument()
     expect(within(ladoA()).getByText('498 niños elegibles')).toBeInTheDocument()   // S8: el tamaño, antes de comparar
-    expect(within(ladoB()).getByText('Sin elegir')).toBeInTheDocument()
+    expect(within(ladoB()).getByText('Grupo B sin seleccionar')).toBeInTheDocument()
     expect(screen.getByText(/Elija el grupo B/)).toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: '¿Crecen distinto?' })).toBeNull()
     expect(cuerpos(llamadas)).toHaveLength(0)
@@ -144,7 +144,7 @@ describe('comparar grupos', () => {
   it('si A y B quedan con los mismos criterios no compara: lo dice y no pide nada', async () => {
     const llamadas = await compararConTodos()
     const antes = cuerpos(llamadas).length
-    await userEvent.click(screen.getByRole('button', { name: 'Editar grupo A' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Cambiar criterios del grupo A' }))
     await userEvent.click(await within(await cajon('A')).findByRole('checkbox', { name: /Femenino/ }))   // A se queda sin filtros, como B
     expect(await screen.findByText(/Los grupos A y B tienen los mismos criterios/)).toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: '¿Crecen distinto?' })).toBeNull()
@@ -260,7 +260,7 @@ describe('comparar grupos', () => {
     expect(screen.getByText(/no es lo que pasó a los 12 meses/)).toBeVisible()
     expect(within(dt()).queryByText(/52 de 397 niños con dato/)).toBeNull()
     const riesgo = within(dt()).getByRole('table', { name: /Riesgo estimado de talla baja a los 12 meses/ })
-    expect(within(riesgo).getAllByRole('columnheader').map((c) => c.textContent)).toEqual(['Calculado a', 'Grupo A en alerta', 'Grupo B en alerta', 'Modelo'])
+    expect(within(riesgo).getAllByRole('columnheader').map((c) => c.textContent)).toEqual(['Edad al estimar el riesgo', 'Grupo A en alerta', 'Grupo B en alerta', 'Modelo'])
     const fila = within(riesgo).getByRole('row', { name: /40 sem/ })
     expect(within(fila).getByText('10,0 % (40 de 400)')).toBeInTheDocument()
     expect(within(fila).getByText('12,0 % (30 de 250)')).toBeInTheDocument()
@@ -320,11 +320,11 @@ describe('comparar grupos', () => {
   it('«Intercambiar A y B» cambia los lados: B pasa a ser el grupo activo y cada uno conserva sus criterios', async () => {
     const llamadas = api()
     montar('/comparar?f=sexo|lista|F', <Ubicacion />)
-    const intercambiar = await screen.findByRole('button', { name: 'Intercambiar A y B' })
+    const intercambiar = await screen.findByRole('button', { name: 'Intercambiar los grupos A y B' })
     expect(intercambiar).toBeDisabled()   // B todavía no está elegida
     await userEvent.click(await screen.findByRole('button', { name: 'Comparar con todos los niños' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Intercambiar A y B' })).toBeEnabled())
-    await userEvent.click(screen.getByRole('button', { name: 'Intercambiar A y B' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Intercambiar los grupos A y B' })).toBeEnabled())
+    await userEvent.click(screen.getByRole('button', { name: 'Intercambiar los grupos A y B' }))
     await waitFor(() => expect(screen.getByTestId('ubicacion').textContent).not.toContain('sexo|lista|F'))
     await waitFor(() => expect(within(ladoB()).getByText(/Sexo: Femenino/)).toBeInTheDocument())
     expect(within(ladoA()).getByText('Sin filtros: están todos los niños del programa.')).toBeInTheDocument()
@@ -348,7 +348,7 @@ describe('comparar grupos', () => {
   it('el panel de cada lado es un cajón con su nombre: Escape lo cierra y el foco vuelve a su botón', async () => {
     api()
     montar('/comparar?f=sexo|lista|F')
-    const editar = await screen.findByRole('button', { name: 'Editar grupo A' })
+    const editar = await screen.findByRole('button', { name: 'Cambiar criterios del grupo A' })
     await userEvent.click(editar)
     const a = await cajon('A')
     expect(a).toHaveAttribute('aria-modal', 'true')
@@ -363,7 +363,7 @@ describe('comparar grupos', () => {
     api()
     montar('/comparar?f=sexo|lista|F', <Ubicacion />)
     await userEvent.click(await screen.findByRole('button', { name: 'Comparar con todos los niños' }))
-    await userEvent.click(await screen.findByRole('button', { name: 'Editar grupo A' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Cambiar criterios del grupo A' }))
     const panel = await within(await cajon('A')).findByRole('checkbox', { name: /Masculino/ })
     await userEvent.click(panel)
     await waitFor(() => expect(screen.getByTestId('ubicacion').textContent).toContain('sexo|lista|F;M'))

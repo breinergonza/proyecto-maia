@@ -67,7 +67,7 @@ describe('calcular un niño: riesgo visita por visita', () => {
     await userEvent.click(screen.getByRole('tab', { name: /^40 semanas/ }))
     await userEvent.type(screen.getByLabelText('Peso a 40 sem (g)'), '2500')
     await userEvent.type(within(screen.getByRole('tabpanel', { name: /^40 semanas/ })).getByLabelText('Fecha de la visita'), '2026-02-20')
-    await userEvent.click(screen.getByRole('button', { name: 'Calcular el riesgo' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Estimar riesgo' }))
 
     expect(await screen.findByRole('heading', { level: 2, name: 'Riesgo a los 12 meses, visita por visita' })).toBeInTheDocument()
     await waitFor(() => expect(columnas()).toHaveLength(1))
@@ -83,7 +83,7 @@ describe('calcular un niño: riesgo visita por visita', () => {
     await userEvent.click(screen.getByRole('tab', { name: /^3 meses/ }))
     await userEvent.type(screen.getByLabelText('Peso a 3 m (g)'), '5000')
     await userEvent.type(within(screen.getByRole('tabpanel', { name: /^3 meses/ })).getByLabelText('Fecha de la visita'), '2026-05-10')
-    await userEvent.click(screen.getByRole('button', { name: 'Calcular el riesgo' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Estimar riesgo' }))
 
     await waitFor(() => expect(columnas()).toHaveLength(2))
     const ahora = screen.getByText('Calculado a 3 meses').closest('li')!

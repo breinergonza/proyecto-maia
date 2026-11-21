@@ -32,8 +32,8 @@ describe('Grafica', () => {
   it('muestra la descripción y los botones PNG y CSV con filas', () => {
     render(<Grafica titulo="G" descripcion="Una frase." exportar={{ nombre: 'g', filas: [{ a: 1 }] }}><svg /></Grafica>)
     expect(screen.getByText('Una frase.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Descargar PNG: G' })).toHaveTextContent('PNG')
-    expect(screen.getByRole('button', { name: 'Descargar CSV: G' })).toHaveTextContent('CSV')
+    expect(screen.getByRole('button', { name: 'Descargar PNG: G' })).toHaveTextContent('Descargar gráfica (PNG)')
+    expect(screen.getByRole('button', { name: 'Descargar CSV: G' })).toHaveTextContent('Descargar datos (CSV)')
   })
   it('sin filas no hay botón CSV; la tabla no tiene PNG', () => {
     render(<><Grafica titulo="G" descripcion="d" exportar={{ nombre: 'g' }}><svg /></Grafica>

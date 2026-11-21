@@ -58,7 +58,7 @@ export function ColaDatos({ resumen }: { resumen: ResumenCalidad | undefined }) 
           {filtros.variable && !resumen?.variables.some((v) => v.variable === filtros.variable) && <option value={filtros.variable}>{filtros.variable}</option>}
           {resumen?.variables.map((v) => <option key={v.variable} value={v.variable}>{v.etiqueta ?? v.variable} ({num(v.alertas)})</option>)}
         </Filtro>
-        <Filtro id="filtro-detectado" etiqueta="Detectado por" value={filtros.capa} onChange={(e) => cambiar({ capa: e.target.value })}>
+        <Filtro id="filtro-detectado" etiqueta="Regla o modelo que detectó la medición" value={filtros.capa} onChange={(e) => cambiar({ capa: e.target.value })}>
           <option value="">Todos</option>
           {TIPOS_ALERTA.map((c) => <option key={c} value={c}>{alerta(c)}</option>)}
         </Filtro>
@@ -84,7 +84,7 @@ export function ColaDatos({ resumen }: { resumen: ResumenCalidad | undefined }) 
                 <thead className="sticky top-0 z-10 bg-papel">
                   <tr>
                     <th>Niño</th><th>Visita</th><th>Medición</th><th>Valor registrado</th><th>Por qué es dudosa</th>
-                    <th>Detectado por</th><th>Estado</th><th>Acción</th>
+                    <th>Regla o modelo que detectó la medición</th><th>Estado</th><th>Acción</th>
                   </tr>
                 </thead>
                 <tbody>

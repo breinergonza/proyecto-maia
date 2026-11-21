@@ -33,7 +33,7 @@ export default function AdminUsuarios() {
 
   return (
     <>
-      <Encabezado titulo="Usuarios">
+      <Encabezado titulo="Usuarios y permisos">
         Administración crea usuarios y cambia todo; un experto clínico responde las revisiones y calcula niños; consulta solo
         ve el tablero y la lista de niños.
       </Encabezado>
@@ -42,17 +42,17 @@ export default function AdminUsuarios() {
           {lista.isPending ? <Cargando /> : lista.error ? <Aviso>{lista.error.message}</Aviso> : (
             <div className="rounded-panel border border-linea bg-papel p-2">
               <Tabla apilar>
-                <thead><tr><th>Usuario</th><th>Perfil</th><th data-acciones className="sticky right-0 bg-papel"><span className="sr-only">Acciones</span></th></tr></thead>
+                <thead><tr><th>Usuario</th><th>Rol de acceso</th><th data-acciones className="sticky right-0 bg-papel"><span className="sr-only">Acciones</span></th></tr></thead>
                 <tbody>{lista.data.map((u) => <Fila key={u.id} u={u} />)}</tbody>
               </Tabla>
             </div>
           )}
         </div>
-        <Panel titulo="Nuevo usuario" className="max-w-xl xl:max-w-none">
+        <Panel titulo="Crear cuenta de usuario" className="max-w-xl xl:max-w-none">
           <form className="space-y-3" noValidate onSubmit={f.handleSubmit((d) => crear.mutate(d))}>
             <Campo id="n-nombre" etiqueta="Nombre" error={e.nombre?.message}><Entrada id="n-nombre" aria-invalid={!!e.nombre} {...f.register('nombre')} /></Campo>
-            <Campo id="n-email" etiqueta="Correo" error={e.email?.message}><Entrada id="n-email" type="email" aria-invalid={!!e.email} {...f.register('email')} /></Campo>
-            <Campo id="n-rol" etiqueta="Perfil"><Selector id="n-rol" {...f.register('rol')}>{Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Selector></Campo>
+            <Campo id="n-email" etiqueta="Correo electrónico" error={e.email?.message}><Entrada id="n-email" type="email" aria-invalid={!!e.email} {...f.register('email')} /></Campo>
+            <Campo id="n-rol" etiqueta="Rol de acceso"><Selector id="n-rol" {...f.register('rol')}>{Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Selector></Campo>
             <Campo id="n-clave" etiqueta="Contraseña inicial" error={e.clave?.message} ayuda="Compártala por un canal seguro.">
               <Entrada id="n-clave" type="password" autoComplete="new-password" aria-invalid={!!e.clave} {...f.register('clave')} />
             </Campo>
@@ -100,7 +100,7 @@ function Fila({ u }: { u: Usuario }) {
           <p className="text-xs text-salvia">Último ingreso: {u.ultimo_ingreso ? fechaHora(u.ultimo_ingreso) : 'nunca'}</p>
         </td>
         <td>
-          <label className="sr-only" htmlFor={`rol-${u.id}`}>Perfil de {u.nombre}</label>
+          <label className="sr-only" htmlFor={`rol-${u.id}`}>Rol de acceso de {u.nombre}</label>
           <Selector id={`rol-${u.id}`} className="h-8 w-40 text-sm" value={u.rol} disabled={soyYo || cambiar.isPending}
             onChange={(e) => void pedirCambio(e.target.value as Rol)}>
             {Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}

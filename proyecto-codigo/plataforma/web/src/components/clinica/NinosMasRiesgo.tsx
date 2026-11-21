@@ -1,4 +1,4 @@
-// «Niños del grupo con más riesgo»: los niños del grupo con el riesgo más alto en este desenlace, cada uno con su ficha,
+// «Niños con mayor riesgo estimado»: los niños del grupo con el riesgo más alto en este desenlace, cada uno con su ficha,
 // en una fila de una línea con su riesgo estimado en porcentaje y la visita con que se calculó. La API los manda ordenados
 // por su lugar frente a los demás niños de esa visita (el percentil), que es lo que los ordena cuando el porcentaje se
 // satura («más de 99,9 %»): ese lugar queda al pasar el cursor, con el denominador de «Riesgo estimado». Con todos los
@@ -41,7 +41,7 @@ export function NinosMasRiesgo({ ninos, riesgos, medida, alertaPercentil, esPobl
   // la visita de cálculo más reciente con niños en alerta: a esos lleva el enlace
   const reciente = esPoblacion ? [...riesgos].reverse().find((f) => f.en_alerta > 0) : undefined
   return (
-    <Panel llenar className={className} titulo="Niños del grupo con más riesgo"
+    <Panel llenar className={className} titulo="Niños con mayor riesgo estimado"
       descripcion="Riesgo estimado con lo medido hasta la visita indicada. Van primero los que más se alejan de los demás niños de su visita.">
       {ninos.length === 0 ? (
         <p className="text-sm">Ningún niño del grupo está en alerta con los cálculos de ahora.</p>

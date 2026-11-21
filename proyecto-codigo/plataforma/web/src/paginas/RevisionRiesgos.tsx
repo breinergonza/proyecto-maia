@@ -49,8 +49,8 @@ const OPCIONES: { valor: Respuesta; texto: string }[] = [
 ]
 
 const VISTAS = [
-  { clave: 'revisar', texto: 'Revisar niños' },
-  { clave: 'resultados', texto: 'Resultados' },
+  { clave: 'revisar', texto: 'Revisar casos' },
+  { clave: 'resultados', texto: 'Resumen de revisiones clínicas' },
 ] as const
 
 export default function RevisionRiesgos() {
@@ -91,7 +91,7 @@ export default function RevisionRiesgos() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 lg:h-full lg:max-w-none">
-      <Encabezado titulo="Revisión de riesgos"
+      <Encabezado titulo="Revisión clínica de casos"
         accion={total > 0 && (
           <div className="w-full sm:w-56">
             <div className="flex justify-between text-xs text-salvia"><span>Respondidos</span><span>{respondidas} de {total}</span></div>
@@ -101,8 +101,7 @@ export default function RevisionRiesgos() {
             </div>
           </div>
         )}>
-        Diga si el niño le preocupa, con su criterio clínico. No se muestra el riesgo calculado, a propósito, para que su
-        opinión sea independiente.
+        Registre su criterio clínico sobre el caso. El riesgo estimado se mantiene oculto durante la revisión.
       </Encabezado>
       {admin ? (
         <>
@@ -188,7 +187,7 @@ function Resultados() {
   const q = useQuery({ queryKey: ['revision', 'resumen'], queryFn: () => pedir<ResumenRevision>('/revision/resumen') })
   const vacio = !q.data || (!q.data.datos_por_capa.length && !q.data.riesgos_por_grupo.length)
   return (
-    <Panel llenar titulo="Lo que va de la revisión" className="lg:max-h-full"
+    <Panel llenar titulo="Avance de la revisión clínica" className="lg:max-h-full"
       accion={<span className="text-xs text-salvia">todos los expertos</span>}>
       {q.isPending ? <Cargando /> : vacio ? (
         <p className="text-sm text-salvia">Todavía no hay respuestas. Aquí verá qué parte de lo marcado era un error y si el riesgo alto preocupa más.</p>

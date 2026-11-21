@@ -50,7 +50,7 @@ export default function Tablero() {
     if (resumen.error instanceof ErrorApi && resumen.error.estado === 404) {
       return (
         <>
-          <Encabezado titulo="Resumen" />
+          <Encabezado titulo="Resumen de riesgos y calidad de datos" />
           <Vacio titulo="Todavía no hay resultados">
             {puede(usuario, ['admin'])
               ? <>Active un paquete de modelos y ejecute una corrida en <Link className="text-teal underline" to="/admin/corridas">Corridas</Link>.</>
@@ -61,7 +61,7 @@ export default function Tablero() {
     }
     return (
       <>
-        <Encabezado titulo="Resumen" />
+        <Encabezado titulo="Resumen de riesgos y calidad de datos" />
         <ErrorConReintento error={resumen.error} que="el resumen del programa" reintentando={resumen.isFetching} reintentar={() => void resumen.refetch()} />
       </>
     )
@@ -111,7 +111,7 @@ export default function Tablero() {
               // encabezado fijo: sube 1rem (el relleno del panel) para que no se vea pasar el contenido por encima
               <table className="w-full border-collapse text-sm [&_td]:border-b [&_td]:border-linea/70 [&_td]:px-2.5 [&_td]:py-1 [&_td]:leading-snug [&_th]:sticky [&_th]:-top-4 [&_th]:z-10 [&_th]:border-b [&_th]:border-linea [&_th]:bg-papel [&_th]:px-2.5 [&_th]:pb-2 [&_th]:pt-4 [&_th]:text-xs [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-salvia [&_th]:whitespace-nowrap [&_tbody_tr:last-child_td]:border-b-0">
                 <thead>
-                  <tr><th className="text-left">Desenlace</th><th className="text-right">Niños</th><th className="text-right">Alto</th><th className="text-right" title="Riesgo promedio de los niños en ese desenlace">Promedio</th></tr>
+                  <tr><th className="text-left">Resultado clínico evaluado</th><th className="text-right">Niños</th><th className="text-right">Niños con riesgo alto</th><th className="text-right" title="Riesgo promedio de los niños en ese desenlace">Riesgo estimado promedio</th></tr>
                 </thead>
                 <tbody>
                   {r.riesgos_por_desenlace.map((d) => (

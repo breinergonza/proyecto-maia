@@ -21,9 +21,9 @@ const colorPsi = (v: number | null) =>
   v == null ? undefined : v >= 0.25 ? 'var(--color-coral-tinte)' : v >= 0.1 ? 'var(--color-ocre-tinte)' : 'var(--color-teal-tinte)'
 
 const PESTANAS = [
-  { clave: 'trimestre', texto: 'Por trimestre' },
+  { clave: 'trimestre', texto: 'Rendimiento por trimestre' },
   { clave: 'datos', texto: 'Datos por trimestre' },
-  { clave: 'poblacion', texto: 'Cambio de la población' },
+  { clave: 'poblacion', texto: 'Cambios en la población evaluada' },
 ] as const
 const CLAVES = PESTANAS.map((p) => p.clave)
 /** El contenido de una pestaña ocupa el alto que queda: las tarjetas con lista (`llenar`) se encogen y la desplazan por dentro. */

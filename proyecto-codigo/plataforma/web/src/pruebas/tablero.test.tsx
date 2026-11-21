@@ -62,7 +62,7 @@ describe('tablero', () => {
   it('el contador de alarmas es el total y dice cuántas se listan', async () => {
     api('experto')
     montar('/tablero')
-    const panel = (await screen.findByRole('heading', { name: 'Alarmas de grupo' })).closest('section')!
+    const panel = (await screen.findByRole('heading', { name: 'Alertas por grupo de niños' })).closest('section')!
     expect(await within(panel).findByText('789 · se muestran las 100 más recientes')).toBeInTheDocument()
     expect(within(panel).getAllByRole('listitem')).toHaveLength(100)
   })
@@ -177,7 +177,7 @@ describe('tablero: claridad y enlaces de revisión', () => {
       return { cuerpo: [] }
     })
     montar('/tablero')
-    const panel = (await screen.findByRole('heading', { name: 'Riesgo por desenlace' })).closest('section')!
+    const panel = (await screen.findByRole('heading', { name: 'Riesgo estimado por resultado clínico' })).closest('section')!
     // la visita ya se dice en su línea: no se repite entre paréntesis en el nombre
     expect(within(panel).getByText('desarrollo psicomotor bajo a los 12 meses')).toBeInTheDocument()
     expect(within(panel).getByText('Visita: 3 meses EC')).toBeInTheDocument()

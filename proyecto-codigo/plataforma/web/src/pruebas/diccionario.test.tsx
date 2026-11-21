@@ -14,7 +14,7 @@ const version = (v: number, estado: VersionDiccionario['estado'], origen: Versio
   creado_en: '2026-10-30T10:00:00Z', ...extra,
 })
 const variable = (nombre: string, etiqueta: string) => ({
-  variable: nombre, etiqueta, estado: 'Por clasificar', tema: null, etapa: '3 m EC', visita: '3 meses (edad corregida)', nota: null,
+  variable: nombre, etiqueta, estado: 'Variables pendientes de clasificar', tema: null, etapa: '3 m EC', visita: '3 meses (edad corregida)', nota: null,
 })
 const versiones = [version(2, 'vigente', 'subido', { creado_por: 'Experta', nota: 'Dos nuevas' }), version(1, 'archivado', 'semilla')]
 const pendientes: PorClasificar = {
@@ -44,9 +44,9 @@ describe('diccionario de variables', () => {
     montar('/diccionario?ver=clasificar')
     expect(await screen.findByText('Variable simulada A')).toBeInTheDocument()
     expect(screen.getByText(/visita sugerida: 3 meses \(edad corregida\)/)).toBeInTheDocument()
-    const enlace = screen.getAllByRole('link', { name: /Diccionario/ })[0]
+    const enlace = screen.getAllByRole('link', { name: /Guía de variables y unidades/ })[0]
     expect(within(enlace).getByText('3')).toBeInTheDocument()
-    expect(screen.getAllByRole('link', { name: 'Calcular un niño' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('link', { name: 'Estimar riesgo' }).length).toBeGreaterThan(0)
     // sin palabras técnicas para el equipo clínico
     expect(document.body.textContent).not.toMatch(/sha|corte|corrida/i)
     await userEvent.click(screen.getByRole('button', { name: 'Marcar var_simulada_a como Lista' }))
@@ -136,6 +136,6 @@ describe('diccionario de variables', () => {
     simularApi(como('visualizador'))
     montar('/diccionario')
     expect(await screen.findByRole('heading', { name: 'Sin permiso' })).toBeInTheDocument()
-    expect(screen.queryAllByRole('link', { name: /Diccionario/ })).toHaveLength(0)
+    expect(screen.queryAllByRole('link', { name: /Guía de variables y unidades/ })).toHaveLength(0)
   })
 })

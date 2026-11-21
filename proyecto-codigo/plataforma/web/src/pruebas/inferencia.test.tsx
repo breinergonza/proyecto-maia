@@ -64,12 +64,12 @@ describe('calcular el riesgo de un niño', () => {
     await userEvent.selectOptions(screen.getByLabelText('Oxígeno a los 3 meses'), '9')
 
     // sin la fecha de la visita no se calcula, y se dice por qué
-    await userEvent.click(screen.getByRole('button', { name: 'Calcular el riesgo' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Estimar riesgo' }))
     expect(await screen.findByText('Escriba la fecha de la visita «3 meses (edad corregida)».')).toBeInTheDocument()
     expect(enviados).toEqual([])
 
     await userEvent.type(screen.getByLabelText('Fecha de la visita'), '2026-05-10')
-    await userEvent.click(screen.getByRole('button', { name: 'Calcular el riesgo' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Estimar riesgo' }))
     await waitFor(() => expect(enviados).toHaveLength(1))
     expect(enviados[0]).toEqual({
       sujetos: [{ sujeto: 'calculo', fecha_nacimiento: '2026-01-10', eg_semanas: 30.5 }],
@@ -91,27 +91,27 @@ describe('calcular el riesgo de un niño', () => {
     // una medida que solo tiene datos improbables no desaparece: se nombra para revisarla
     expect(screen.getByText('1 medida improbable (revisar) no se grafica')).toBeInTheDocument()
     expect(document.querySelector('main')?.textContent).not.toMatch(/posici[oó]n|puntaje z|capa \d|[−-]2 DE|\(peso_nacer\)/i)
-    expect(screen.queryByRole('button', { name: 'Modo avanzado (JSON)' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Ingresar datos en formato JSON' })).not.toBeInTheDocument()
   })
 
   it('la página se llama «Calcular un niño» (como el menú y la pestaña del navegador) y «Calcular el riesgo» queda a la vista junto al título', async () => {
     api('experto')
     montar('/prediccion')
-    expect(await screen.findByRole('heading', { level: 1, name: 'Calcular un niño' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Estimar riesgo individual' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: /Predicción: un niño/ })).not.toBeInTheDocument()
     // el botón está fuera del formulario, que es largo, y lo envía por su id
-    const boton = await screen.findByRole('button', { name: 'Calcular el riesgo' })
+    const boton = await screen.findByRole('button', { name: 'Estimar riesgo' })
     expect(boton.closest('form')).toBeNull()
     expect(boton).toHaveAttribute('form', 'formulario-calculo')
     expect(document.getElementById('formulario-calculo')).not.toBeNull()
-    expect(screen.getByRole('tab', { name: 'Resultado' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Riesgo estimado' })).toBeInTheDocument()
   })
 
   it('los datos generales van plegados y la administración tiene el modo avanzado', async () => {
     api('admin')
     montar('/prediccion')
     expect(await screen.findByText('Más datos del niño y la familia (1)')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Modo avanzado (JSON)' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Ingresar datos en formato JSON' }))
     expect(screen.getByLabelText('Petición en JSON')).toBeInTheDocument()
   })
 
@@ -126,7 +126,7 @@ describe('calcular el riesgo de un niño', () => {
     await userEvent.click(screen.getByRole('tab', { name: /^3 meses/ }))
     await userEvent.type(screen.getByLabelText('Peso a 3 m EC (g)'), '5000')
     await userEvent.type(screen.getByLabelText('Fecha de la visita'), '2026-05-10')
-    await userEvent.click(screen.getByRole('button', { name: 'Calcular el riesgo' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Estimar riesgo' }))
     await waitFor(() => expect(enviados).toHaveLength(1))
     expect(enviados[0]).toEqual({
       sujetos: [{ sujeto: 'calculo', fecha_nacimiento: '2026-01-10', eg_semanas: 30 }],
@@ -215,7 +215,7 @@ describe('cuando no se puede calcular, cada rol sabe a quién acudir', () => {
     await userEvent.type(await screen.findByLabelText('Fecha de nacimiento'), '2026-01-10')
     await userEvent.type(screen.getByLabelText('Semanas de gestación al nacer'), '30')
     await userEvent.type(screen.getByLabelText('Peso al nacer (g)'), '900')
-    await userEvent.click(screen.getByRole('button', { name: 'Calcular el riesgo' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Estimar riesgo' }))
     return screen.findByRole('alert')
   }
 

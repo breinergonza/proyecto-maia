@@ -1,4 +1,4 @@
-// Configuración inicial (administración): lo que la solución necesita para correr sola, la conexión de solo lectura a
+// Configuración del sistema y del entrenamiento (administración): lo que la solución necesita para correr sola, la conexión de solo lectura a
 // la base de la entidad (la clave entra cifrada y nunca vuelve) y los hiperparámetros de los próximos entrenamientos.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, Circle } from 'lucide-react'
@@ -18,10 +18,10 @@ type Datos = Omit<ConexionEntrada, 'clave' | 'borrar_clave'>
 // Cada formulario vive entero en su pestaña, con su botón de guardar. Los paneles quedan montados: lo escrito en uno
 // sigue ahí al cambiar de pestaña.
 const PESTANAS = [
-  { clave: 'estado', texto: 'Estado' },
+  { clave: 'estado', texto: 'Estado del sistema' },
   { clave: 'base', texto: 'Base de datos' },
-  { clave: 'anomalias', texto: 'Hiperparámetros · Anomalías' },
-  { clave: 'clinico', texto: 'Hiperparámetros · Alertas clínicas' },
+  { clave: 'anomalias', texto: 'Parámetros de entrenamiento para detectar mediciones atípicas' },
+  { clave: 'clinico', texto: 'Parámetros de entrenamiento para estimar riesgo clínico' },
 ] as const
 const CLAVES = PESTANAS.map((p) => p.clave)
 
@@ -30,7 +30,7 @@ export default function AdminConfiguracion() {
   const [activa, elegir] = usePestanaEnUrl('ver', CLAVES)
   return (
     <>
-      <Encabezado titulo="Configuración inicial">
+      <Encabezado titulo="Configuración del sistema y del entrenamiento">
         Lo que la solución necesita para extraer los datos, entrenar los modelos en los horarios que se programen y
         usarlos. Los horarios y la cola están en Programación; lo entrenado, en Entrenamientos.
       </Encabezado>

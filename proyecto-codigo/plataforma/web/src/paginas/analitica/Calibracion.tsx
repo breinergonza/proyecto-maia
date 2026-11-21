@@ -1,5 +1,5 @@
-// Calibración y decisión (plan v3.7, 6.3.4), en cuatro pestañas por pregunta: «Es creíble el riesgo» (si el porcentaje de riesgo
-// es el que ocurre en realidad), «Cómo se reparte» (el riesgo de los niños con y sin el desenlace y en general), «A cuántos
+// Calibración y decisión (plan v3.7, 6.3.4), en cuatro pestañas por pregunta: «Riesgo estimado frente al observado» (si el porcentaje de riesgo
+// es el que ocurre en realidad), «Distribución del riesgo estimado» (el riesgo de los niños con y sin el desenlace y en general), «A cuántos
 // revisar» (los casos que se capturan al revisar primero a los de más riesgo y cuántos niños cabe revisar según la capacidad
 // del equipo) y «Beneficio y costo» (el beneficio de alertar y el costo de equivocarse con un porcentaje sugerido).
 import { useState } from 'react'
@@ -57,9 +57,9 @@ export default function Calibracion() {
             .map((f) => ({ p: f.percentil, costo: peso * casos * (1 - (f.casos_detectados_pct as number) / 100) + (n - casos) * (1 - (f.sin_falsa_alarma_pct as number) / 100), f }))
           const mejor = costos.length ? costos.reduce((a, b) => (b.costo < a.costo ? b : a)) : null
           const pestanas: Pestana<Ver>[] = [
-            { clave: 'creible', texto: 'Es creíble el riesgo' },
-            { clave: 'reparto', texto: 'Cómo se reparte' },
-            ...(rd ? [{ clave: 'revisar', texto: 'A cuántos revisar' } satisfies Pestana<Ver>] : []),
+            { clave: 'creible', texto: 'Riesgo estimado frente al observado' },
+            { clave: 'reparto', texto: 'Distribución del riesgo estimado' },
+            ...(rd ? [{ clave: 'revisar', texto: 'Niños por revisar según el umbral' } satisfies Pestana<Ver>] : []),
             ...(dec || rd ? [{ clave: 'beneficio', texto: 'Beneficio y costo' } satisfies Pestana<Ver>] : []),
           ]
           return (
@@ -73,14 +73,14 @@ export default function Calibracion() {
                       <Cifra valor={fracPct(d.riesgo_medio)} texto="Riesgo medio que da el modelo" />
                       <Cifra valor={fracPct(d.observado)} texto="Niños que tuvieron el desenlace" />
                       <Cifra valor={d.razon_riesgo_observado != null ? dec2(d.razon_riesgo_observado) : '—'}
-                        texto={<><Termino id="razon_riesgo">Riesgo dicho entre riesgo real</Termino> (1 es lo ideal)</>} />
+                        texto={<><Termino id="razon_riesgo">Razón entre riesgo estimado y proporción observada</Termino> (1 es lo ideal)</>} />
                       <Cifra valor={dec3(d.brier)} texto={<Termino id="brier">Error del porcentaje de riesgo</Termino>} />
                       {d.ece != null && <p className="text-sm text-salvia sm:col-span-2 lg:col-span-4"><Termino id="ece">Error medio entre el riesgo dicho y el real</Termino>: {dec3(d.ece)}</p>}
                     </div>
                   </Panel>
                   <Grafica titulo={dCal.titulo} descripcion={dCal.descripcion}
                     exportar={{ nombre: 'calibracion', filas: d.bins.map((b) => ({ grupo_de_10: b.bin, ninos: b.n, riesgo_medio: b.riesgo_medio, observado: b.observado })), muestra }}>
-                    <CurvaXY etiqueta="Riesgo dicho frente a riesgo real" ejeX="Riesgo que da el modelo" ejeY="Lo que ocurre en realidad" diagonal
+                    <CurvaXY etiqueta="Riesgo estimado frente al observado" ejeX="Riesgo estimado" ejeY="Proporción observada" diagonal
                       dominioX={[0, tope]} dominioY={[0, tope]}
                       formatoX={(v) => `${Math.round(v * 100)} %`} formatoY={(v) => `${Math.round(v * 100)} %`}
                       series={[{ clave: 'obs', nombre: 'Grupos de niños', color: 0, puntos: puntos.map((p) => [p.riesgo_medio as number, p.observado]) }]} />
@@ -88,7 +88,7 @@ export default function Calibracion() {
                   <TablaDatos titulo="Por grupos de niños" descripcion="Diez grupos del mismo tamaño, del menor al mayor riesgo."
                     exportar={{ nombre: 'calibracion-grupos', filas: d.bins.map((b) => ({ grupo: b.bin, ninos: b.n, riesgo_medio: b.riesgo_medio, observado: b.observado })), muestra }}>
                     <Tabla densa className="[&_td]:whitespace-nowrap">
-                      <thead><tr><th>Grupo</th><th>Niños</th><th>Riesgo dicho</th><th>Real</th></tr></thead>
+                      <thead><tr><th>Grupo</th><th>Niños</th><th>Riesgo estimado</th><th>Proporción observada</th></tr></thead>
                       <tbody>{d.bins.map((b) => <tr key={b.bin}><td>{b.bin}</td><td>{num(b.n)}</td><td>{fracPct(b.riesgo_medio)}</td><td>{fracPct(b.observado)}</td></tr>)}</tbody>
                     </Tabla>
                   </TablaDatos>
@@ -111,7 +111,7 @@ export default function Calibracion() {
                   )}
                   <Grafica titulo={dHist.titulo} descripcion={dHist.descripcion}
                     exportar={{ nombre: 'calibracion-histograma', filas: d.histograma.map((h) => ({ desde: h.desde, hasta: h.hasta, ninos: h.n })), muestra }}>
-                    <Histograma etiqueta="Cómo se reparte el riesgo" tramos={d.histograma} alto={300} formatoX={(v) => `${Math.round(v * 100)} %`} />
+                    <Histograma etiqueta="Distribución del riesgo estimado" tramos={d.histograma} alto={300} formatoX={(v) => `${Math.round(v * 100)} %`} />
                     {d.histograma.some((h) => h.n == null) && <p className="mt-1 text-xs text-salvia">Algunos tramos no traen su cifra: el entrenamiento los guardó antes de que se dijeran todos los conteos.</p>}
                   </Grafica>
                 </div>

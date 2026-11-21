@@ -59,7 +59,7 @@ function BotonCsv({ titulo, exportar }: { titulo: string; exportar: Exportar }) 
   return (
     <Boton variante="secundario" chico aria-label={`Descargar CSV: ${titulo}`}
       onClick={() => descargar(new Blob([aCsv(filas, exportar.columnas)], { type: 'text/csv;charset=utf-8' }), nombreArchivo(exportar.nombre, 'csv'))}>
-      CSV
+      Descargar datos (CSV)
     </Boton>
   )
 }
@@ -88,7 +88,7 @@ function Botones({ titulo, descripcion, exportar, png, contenedor, tabla, altern
           Ver como tabla
         </Boton>
       )}
-      {png && !tabla && <Boton variante="secundario" chico aria-label={`Descargar PNG: ${titulo}`} onClick={bajarPng}>PNG</Boton>}
+      {png && !tabla && <Boton variante="secundario" chico aria-label={`Descargar PNG: ${titulo}`} onClick={bajarPng}>Descargar gráfica (PNG)</Boton>}
       <BotonCsv titulo={titulo} exportar={exportar} />
     </span>
   )

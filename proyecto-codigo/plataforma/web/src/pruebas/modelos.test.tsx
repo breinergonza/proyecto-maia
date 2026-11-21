@@ -53,7 +53,7 @@ const calibracion = {
   bins: [{ bin: 1, n: 400, riesgo_medio: 0.05, observado: 0.04 }, { bin: 2, n: 400, riesgo_medio: 0.15, observado: 0.17 }, { bin: 3, n: 404, riesgo_medio: 0.4, observado: 0.35 }],
   histograma: [],
 }
-const semaforos = [{ id: 'auc', nombre: 'Rendimiento', estado: 'verde', valor: 0.74, detalle: 'Ordena bien.', umbral: 'AUC ≥ 0,7' }]
+const semaforos = [{ id: 'auc', nombre: 'Detección y falsas alertas', estado: 'verde', valor: 0.74, detalle: 'Ordena bien.', umbral: 'AUC ≥ 0,7' }]
 
 type Extra = (url: string, init?: RequestInit) => { estado?: number; cuerpo?: unknown } | undefined
 
@@ -88,14 +88,14 @@ describe('modelos: los selectores de arriba', () => {
   it('Desenlace agrupa por familia, Calculado a lista sus visitas y el estado es el del desenlace elegido', async () => {
     api()
     montar(`/analitica?entrenamiento=7&desenlace=${T3}`, <Ubicacion />)
-    expect(await screen.findByRole('heading', { level: 1, name: 'Modelos' })).toBeInTheDocument()
-    const desenlace = await screen.findByLabelText('Desenlace')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Ficha del modelo' })).toBeInTheDocument()
+    const desenlace = await screen.findByLabelText('Resultado clínico evaluado')
     await waitFor(() => expect(desenlace).toHaveValue('talla_baja_12m'))
     expect(within(desenlace).getAllByRole('option').map((o) => o.textContent)).toEqual([
       'Talla baja a los 12 meses', 'Desarrollo psicomotor bajo a los 12 meses'])
-    const corte = screen.getByLabelText('Calculado a')
+    const corte = screen.getByLabelText('Edad al estimar el riesgo')
     expect(corte).toHaveValue(T3)
-    expect(within(corte).getAllByRole('option').map((o) => o.textContent)).toEqual(['3 m EC', '40 sem'])
+    expect(within(corte).getAllByRole('option').map((o) => o.textContent)).toEqual(['3 meses de edad corregida', '40 sem'])
     expect(screen.getByLabelText('Entrenamiento')).toHaveValue('7')
     expect(screen.getByText('En prueba', { selector: 'b' })).toBeInTheDocument()
     expect(screen.getByText(/no está validado/)).toBeInTheDocument()
@@ -103,10 +103,10 @@ describe('modelos: los selectores de arriba', () => {
     fireEvent.change(corte, { target: { value: T40 } })
     await waitFor(() => expect(screen.getByTestId('ubicacion').textContent).toContain(`desenlace=${T40}`))
     // otro desenlace: el que ya está en uso va primero y su estado cambia
-    fireEvent.change(screen.getByLabelText('Desenlace'), { target: { value: 'desarrollo_12m' } })
+    fireEvent.change(screen.getByLabelText('Resultado clínico evaluado'), { target: { value: 'desarrollo_12m' } })
     await waitFor(() => expect(screen.getByTestId('ubicacion').textContent).toContain(`desenlace=${D}`))
     expect(await screen.findByText('En uso', { selector: 'b' })).toBeInTheDocument()
-    expect(within(screen.getByLabelText('Calculado a')).getAllByRole('option').map((o) => o.textContent)).toEqual(['12 m EC', '3 m EC'])
+    expect(within(screen.getByLabelText('Edad al estimar el riesgo')).getAllByRole('option').map((o) => o.textContent)).toEqual(['12 meses de edad corregida', '3 meses de edad corregida'])
   })
 })
 
@@ -126,7 +126,7 @@ describe('modelos: configuración y trazabilidad', () => {
     expect(within(traza).getByText('N.º 7')).toBeInTheDocument()
     expect(within(traza).getByText(/versión 3/)).toBeInTheDocument()
     expect(await within(traza).findByText('2026-11-19-5dcbdc')).toBeInTheDocument()
-    expect(within(traza).queryByText(/Diccionario/)).not.toBeInTheDocument()   // el entrenamiento no lo registra: no se inventa
+    expect(within(traza).queryByText(/Guía de variables y unidades/)).not.toBeInTheDocument()   // el entrenamiento no lo registra: no se inventa
   })
 
   it('un entrenamiento que guardó sus cohortes y su Diccionario dice con quiénes se entrenó, con quiénes se probó y con qué versión', async () => {
@@ -286,12 +286,12 @@ describe('modelos: falla de red', () => {
     const aviso = await screen.findByRole('alert', undefined, { timeout: 20_000 })
     expect(aviso).toHaveTextContent('No se pudo cargar este análisis')
     expect(aviso).toHaveTextContent('El servidor no responde por ahora.')
-    expect(screen.getByLabelText('Calculado a')).toHaveValue(T40)
+    expect(screen.getByLabelText('Edad al estimar el riesgo')).toHaveValue(T40)
     expect(screen.getByTestId('ubicacion').textContent).toContain(`desenlace=${T40}`)
     caida = false
     await userEvent.click(within(aviso).getByRole('button', { name: 'Reintentar' }))
     expect(await screen.findByText(/1\.204 niños, 16,0 % con el desenlace/)).toBeInTheDocument()
-    expect(screen.getByLabelText('Calculado a')).toHaveValue(T40)
+    expect(screen.getByLabelText('Edad al estimar el riesgo')).toHaveValue(T40)
   })
 })
 
@@ -299,8 +299,8 @@ describe('modelos: los demás submódulos siguen funcionando', () => {
   it('Rendimiento abre con el mismo contexto y los selectores nuevos', async () => {
     api()
     montar(`/analitica/rendimiento?entrenamiento=7&desenlace=${T3}&ver=linea`)
-    expect(await screen.findByRole('heading', { level: 1, name: 'Rendimiento' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Detección y falsas alertas' })).toBeInTheDocument()
     expect(await screen.findByRole('slider')).toHaveValue('10')
-    expect(screen.getByLabelText('Calculado a')).toHaveValue(T3)
+    expect(screen.getByLabelText('Edad al estimar el riesgo')).toHaveValue(T3)
   })
 })

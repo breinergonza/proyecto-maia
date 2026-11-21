@@ -120,3 +120,23 @@ export const ESTADOS_EJECUCION: Record<string, string> = {
 export const TIPOS_EJECUCION: Record<string, string> = { corrida: 'Corrida', entrenamiento: 'Entrenamiento', aprobacion: 'Aprobación de modelos' }
 export const FUENTES: Record<string, string> = { kmc: 'Base de la Fundación', simulado: 'Datos simulados' }
 export const MODELOS: Record<string, string> = { anomalias: 'Anomalías (revisión de datos)', clinico: 'Alertas clínicas' }
+
+const ETIQUETAS_HEREDADAS: Readonly<Record<string, string>> = {
+  'Hasta que mes trabajo en el embarazo': '¿Hasta qué mes del embarazo trabajó la madre?',
+  'Numero de personas que viven en el hogar con este ingreso': 'Número de personas que viven en el hogar con este ingreso',
+  'Educacion del padre': 'Nivel educativo del padre',
+  'Educacion de la madre': 'Nivel educativo de la madre',
+  'Edad materna (años)': 'Edad de la madre',
+  'Peso de la madre (Kg)': 'Peso de la madre',
+  'Numero de controles hechos por ARO': 'Número de controles por ARO',
+}
+
+/** Presenta las etiquetas heredadas y añade la unidad cuando aún no figura en la etiqueta. */
+export function etiquetaCampo(etiqueta: string, unidad?: string | null): string {
+  const texto = Object.hasOwn(ETIQUETAS_HEREDADAS, etiqueta) ? ETIQUETAS_HEREDADAS[etiqueta] : etiqueta
+  const normalizar = (valor: string) => valor.toLowerCase().replace(/[.\s]/g, '')
+  const unidadEnEtiqueta = /\(([^()]+)\)\s*$/.exec(texto)?.[1]
+  return unidad && (!unidadEnEtiqueta || normalizar(unidadEnEtiqueta) !== normalizar(unidad))
+    ? `${texto} (${unidad})`
+    : texto
+}

@@ -79,7 +79,7 @@ describe('ficha del niño: riesgo a los 12 meses', () => {
     const aviso = await screen.findAllByText('No se pudo calcular el riesgo en las visitas anteriores de este niño.')
     expect(aviso.length).toBeGreaterThan(0)
     // el resto de la ficha sigue a la vista
-    expect(await screen.findByRole('heading', { name: 'Niño s1' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Ficha clínica · Niño s1' })).toBeInTheDocument()
     falla = false
     await userEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
     expect(await screen.findByText('Calculado a 3 meses')).toBeInTheDocument()
@@ -100,7 +100,7 @@ describe('ficha del niño: riesgo a los 12 meses', () => {
     montar('/ninos/s1')
     const lista = await screen.findByRole('tablist', { name: 'Qué ver de este niño' })
     expect(lista).toHaveClass('no-imprimir')
-    await waitFor(() => expect(within(lista).getAllByRole('tab').map((t) => t.textContent)).toEqual(['Desenlaces', 'Crecimiento', 'Visitas']))
+    await waitFor(() => expect(within(lista).getAllByRole('tab').map((t) => t.textContent)).toEqual(['Resultados clínicos y riesgo estimado', 'Evolución del crecimiento', 'Historial de visitas']))
     // los desenlaces vienen antes que el crecimiento
     const crecimiento = screen.getByRole('heading', { name: 'Crecimiento frente a la OMS' })
     const desenlaces = await screen.findByRole('list', { name: 'Desenlaces del niño' })

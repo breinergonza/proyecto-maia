@@ -31,7 +31,7 @@ export default function Explorar() {
 
   return (
     <div className="flex flex-col gap-4 lg:h-full">
-      <Encabezado titulo="Explorar">
+      <Encabezado titulo="Explorar grupos de niños">
         {r && !r.insuficiente ? <>{datosAl(r.corte)}. </> : null}
         Elija un grupo de niños y vea su riesgo, su crecimiento y quiénes son, frente a todos.
       </Encabezado>

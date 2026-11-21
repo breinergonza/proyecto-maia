@@ -62,7 +62,7 @@ function RiesgoEstimado({ d }: { d: DesenlaceComparado }) {
   return (
     <Tabla densa apilar>
       <caption className="sr-only">Riesgo estimado de {d.nombre.toLowerCase()} por corte</caption>
-      <thead><tr><th>Calculado a</th><th>Grupo A en alerta</th><th>Grupo B en alerta</th><th>Modelo</th></tr></thead>
+      <thead><tr><th>Edad al estimar el riesgo</th><th>Grupo A en alerta</th><th>Grupo B en alerta</th><th>Modelo</th></tr></thead>
       <tbody>
         {d.riesgo.map((f) => (
           <tr key={f.clave}>

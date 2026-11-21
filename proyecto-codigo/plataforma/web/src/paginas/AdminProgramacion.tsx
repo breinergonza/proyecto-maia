@@ -42,12 +42,12 @@ export default function AdminProgramacion() {
   const [activa, elegir] = usePestanaEnUrl('ver', CLAVES)
   const pestanas = [
     { clave: 'horarios', texto: 'Horarios y ejecuciones' },
-    { clave: 'programar', texto: editando ? 'Editar programación' : 'Nueva programación' },
+    { clave: 'programar', texto: editando ? 'Editar programación' : 'Crear programación' },
   ] as const
   // en escritorio la página ocupa la pantalla sin desplazarse: las dos listas se desplazan por dentro si no caben
   return (
     <div className="flex flex-col xl:h-full">
-      <Encabezado titulo="Programación">
+      <Encabezado titulo="Programar ejecuciones automáticas">
         Cada ejecución extrae la base de la entidad con los filtros indicados, revisa los datos y calcula los riesgos con
         los modelos aprobados en <Link className="text-teal underline" to="/admin/entrenamientos">Entrenamientos</Link>.
         Las programadas además entrenan los dos modelos (con los hiperparámetros de Configuración) y los dejan en MLflow
@@ -94,10 +94,10 @@ function ListaProgramaciones({ editar }: { editar: (p: Programacion) => void }) 
     if (ok) borrar.mutate(p.id)
   }
   return (
-    <Panel llenar titulo="Horarios" className="xl:min-h-60">
+    <Panel llenar titulo="Horarios programados" className="xl:min-h-60">
       {dialogo}
       {lista.isPending ? <Cargando /> : lista.error ? <Aviso>{lista.error.message}</Aviso> : lista.data.length === 0 ? (
-        <Vacio titulo="Sin horarios">Cree uno en «Nueva programación»: la corrida semestral es el punto de partida.</Vacio>
+        <Vacio titulo="Sin horarios">Cree uno en «Crear programación»: la corrida semestral es el punto de partida.</Vacio>
       ) : (
         <Tabla apilar className={ENCABEZADO_FIJO}>
           <thead><tr><th>Nombre</th><th>Cuándo</th><th>Próxima</th><th>Última</th><th></th></tr></thead>
@@ -154,7 +154,7 @@ function FormProgramacion({ p, listo }: { p: Programacion | null; listo: () => v
     setD({ ...d, parametros: { ...par, [k]: e.target.value === '' ? null : Number(e.target.value) } })
   const kmc = d.fuente === 'kmc'
   return (
-    <Panel titulo={p ? `Editar «${p.nombre}»` : 'Nueva programación'} accion={p && <Boton chico variante="fantasma" onClick={listo}>Cancelar</Boton>}>
+    <Panel titulo={p ? `Editar «${p.nombre}»` : 'Crear programación'} accion={p && <Boton chico variante="fantasma" onClick={listo}>Cancelar</Boton>}>
       <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); guardar.mutate() }}>
         {/* tres columnas en escritorio: qué y cuándo, cómo se lee el horario, y los filtros y opciones */}
         <div className="grid grid-cols-1 gap-x-6 gap-y-3 xl:grid-cols-3">
@@ -230,7 +230,7 @@ function ListaEjecuciones() {
     onSuccess: () => void cliente.invalidateQueries({ queryKey: ['administracion', 'ejecuciones'] }),
   })
   return (
-    <Panel llenar titulo="Ejecuciones" className="xl:min-h-60" accion={
+    <Panel llenar titulo="Historial de ejecuciones automáticas" className="xl:min-h-60" accion={
       <div className="flex items-center gap-2">
         <label htmlFor="e-fuente" className="sr-only">Datos de la corrida</label>
         <Selector id="e-fuente" className="h-9 w-auto text-sm sm:h-8" value={fuente} onChange={(e) => setFuente(e.target.value as 'kmc' | 'simulado')}>

@@ -87,15 +87,15 @@ describe('vista clínica', () => {
   it('la dirección «/» abre la vista clínica con el desenlace de talla baja elegido y su definición', async () => {
     api('experto')
     montar('/')
-    expect(await screen.findByRole('heading', { level: 1, name: 'Vista clínica' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Seguimiento clínico' })).toBeInTheDocument()
     const pestana = await screen.findByRole('tab', { name: 'Talla baja a los 12 meses' })
     expect(pestana).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('tab', { name: 'Desarrollo psicomotor bajo a los 12 meses' })).toHaveAttribute('aria-selected', 'false')
     expect(screen.getByText(familias[0].definicion)).toBeInTheDocument()
     // la pestaña controla todo el contenido del desenlace, no solo la definición
     const panel = screen.getByRole('tabpanel', { name: 'Talla baja a los 12 meses' })
-    expect(within(panel).getByRole('heading', { name: 'Qué les pasó a los 12 meses' })).toBeInTheDocument()
-    expect(within(panel).getByRole('heading', { name: 'Niños del grupo con más riesgo' })).toBeInTheDocument()
+    expect(within(panel).getByRole('heading', { name: 'Resultados observados a los 12 meses' })).toBeInTheDocument()
+    expect(within(panel).getByRole('heading', { name: 'Niños con mayor riesgo estimado' })).toBeInTheDocument()
   })
 
   it('el aviso «Apoyo a la decisión» sale una sola vez en la pantalla (el pie)', async () => {
@@ -108,7 +108,7 @@ describe('vista clínica', () => {
   it('«Qué les pasó a los 12 meses»: porcentaje observado con su numerador, denominador y sin dato; la población, como referencia', async () => {
     api('experto')
     montar('/')
-    const panel = (await screen.findByRole('heading', { name: 'Qué les pasó a los 12 meses' })).closest('section')!
+    const panel = (await screen.findByRole('heading', { name: 'Resultados observados a los 12 meses' })).closest('section')!
     expect(within(panel).getByText('18,4 %')).toBeInTheDocument()
     expect(within(panel).getByText(/41 de 223 niños con dato a los 12 meses/)).toBeInTheDocument()
     expect(within(panel).getByText(/89 sin dato/)).toBeInTheDocument()
@@ -120,7 +120,7 @@ describe('vista clínica', () => {
   it('si el grupo son todos los niños no repite la población como referencia (ni en la cifra ni en la gráfica)', async () => {
     api('experto', () => ({ ...resumen, grupo: { n: 5000, n_total: 5000 }, observado: { grupo: resumen.observado.poblacion, poblacion: resumen.observado.poblacion } }))
     montar('/')
-    const panel = (await screen.findByRole('heading', { name: 'Qué les pasó a los 12 meses' })).closest('section')!
+    const panel = (await screen.findByRole('heading', { name: 'Resultados observados a los 12 meses' })).closest('section')!
     expect(within(panel).getByText('11,2 %')).toBeInTheDocument()
     // una línea corta dice que la referencia es el mismo grupo, en vez de repetir la cifra
     expect(within(panel).getByText('Referencia: el grupo es toda la población.')).toBeInTheDocument()
@@ -136,7 +136,7 @@ describe('vista clínica', () => {
   it('sin niños con dato a los 12 meses no hay cifra observada del grupo y se explica', async () => {
     api('experto', () => ({ ...resumen, observado: { grupo: null, poblacion: resumen.observado.poblacion } }))
     montar('/')
-    const panel = (await screen.findByRole('heading', { name: 'Qué les pasó a los 12 meses' })).closest('section')!
+    const panel = (await screen.findByRole('heading', { name: 'Resultados observados a los 12 meses' })).closest('section')!
     expect(within(panel).getByText('Ningún niño del grupo elegido tiene dato a los 12 meses.')).toBeInTheDocument()
     expect(within(panel).getByText(/Toda la población \(referencia\)/)).toBeInTheDocument()
   })
@@ -240,10 +240,10 @@ describe('vista clínica', () => {
   it('los niños con más riesgo enlazan a su ficha y dicen su riesgo estimado en porcentaje, con la visita del cálculo', async () => {
     api('experto')
     montar('/')
-    const panel = (await screen.findByRole('heading', { name: 'Niños del grupo con más riesgo' })).closest('section')!
+    const panel = (await screen.findByRole('heading', { name: 'Niños con mayor riesgo estimado' })).closest('section')!
     expect(within(panel).getByRole('link', { name: 'S-01633' })).toHaveAttribute('href', '/ninos/S-01633')
     expect(within(panel).getByRole('link', { name: 'S-02210' })).toHaveAttribute('href', '/ninos/S-02210')
-    expect(within(panel).getAllByRole('columnheader').map((c) => c.textContent)).toEqual(['Niño', 'Edad gestacional', 'Riesgo estimado', 'Última talla (z)'])
+    expect(within(panel).getAllByRole('columnheader').map((c) => c.textContent)).toEqual(['Niño', 'Edad gestacional', 'Riesgo estimado', 'Último puntaje Z de talla para la edad'])
     const primero = within(panel).getByRole('row', { name: /S-01633/ })
     expect(within(primero).getAllByRole('cell')[2]).toHaveTextContent('61,0 % · 3 m EC')
     expect(within(primero).getByText('sin dato')).toBeInTheDocument()
@@ -262,7 +262,7 @@ describe('vista clínica', () => {
       { sujeto: 'S-5', semanas: 35, momento: '6 m EC', riesgo: 1, percentil: 96, ultima_z: -2.9 },
     ] }))
     montar('/')
-    const panel = (await screen.findByRole('heading', { name: 'Niños del grupo con más riesgo' })).closest('section')!
+    const panel = (await screen.findByRole('heading', { name: 'Niños con mayor riesgo estimado' })).closest('section')!
     const celda = (s: string) => within(within(panel).getByRole('row', { name: new RegExp(s) })).getAllByRole('cell')[2]
     expect(celda('S-1')).toHaveTextContent('más de 99,9 % · 3 m EC')
     expect(celda('S-1')).toHaveAttribute('title', '1.º entre los 268 niños del grupo con riesgo calculado a los 3 meses.')
@@ -277,7 +277,7 @@ describe('vista clínica', () => {
   it('con todos los niños, «Ver los niños en alerta» lleva a la lista de Niños con ese desenlace y ese umbral', async () => {
     api('experto', () => ({ ...resumen, grupo: { n: 5000, n_total: 5000 } }))
     montar('/')
-    const panel = (await screen.findByRole('heading', { name: 'Niños del grupo con más riesgo' })).closest('section')!
+    const panel = (await screen.findByRole('heading', { name: 'Niños con mayor riesgo estimado' })).closest('section')!
     // los 61 en alerta de la visita de cálculo más reciente (3 meses)
     expect(within(panel).getByRole('link', { name: 'Ver los 61 niños en alerta a los 3 meses' }))
       .toHaveAttribute('href', '/ninos?desenlace=talla_baja_12m_desde_3m&percentil_min=90')
@@ -286,15 +286,15 @@ describe('vista clínica', () => {
   it('con un grupo filtrado no enlaza a la lista de Niños, que no filtra por grupo', async () => {
     api('experto')
     montar('/')
-    const panel = (await screen.findByRole('heading', { name: 'Niños del grupo con más riesgo' })).closest('section')!
+    const panel = (await screen.findByRole('heading', { name: 'Niños con mayor riesgo estimado' })).closest('section')!
     expect(within(panel).queryByRole('link', { name: /Ver los .* niños en alerta/ })).toBeNull()
   })
 
   it('para quien no ve niños individuales (ninos nulo) la tabla no aparece', async () => {
     api('visualizador', () => ({ ...resumen, ninos: null }))
     montar('/')
-    await screen.findByRole('heading', { name: 'Qué les pasó a los 12 meses' })
-    expect(screen.queryByRole('heading', { name: 'Niños del grupo con más riesgo' })).toBeNull()
+    await screen.findByRole('heading', { name: 'Resultados observados a los 12 meses' })
+    expect(screen.queryByRole('heading', { name: 'Niños con mayor riesgo estimado' })).toBeNull()
   })
 
   it('cambiar de desenlace lo pide a la API y queda en la dirección, junto con el grupo', async () => {
@@ -322,7 +322,7 @@ describe('vista clínica', () => {
     api('experto', () => ({ insuficiente: true, minimo: 20, ninos: null }))
     montar('/')
     expect(await screen.findByText(/Con menos de 20 niños no se muestran cifras/)).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Qué les pasó a los 12 meses' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Resultados observados a los 12 meses' })).toBeNull()
   })
 
   it('una falla de red dice qué pasó, ofrece reintentar y conserva el grupo de la dirección', async () => {
@@ -343,7 +343,7 @@ describe('vista clínica', () => {
     expect(screen.getByTestId('ubicacion')).toHaveTextContent('f=sexo|lista|F')
     falla = false
     await userEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
-    expect(await screen.findByRole('heading', { name: 'Qué les pasó a los 12 meses' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Resultados observados a los 12 meses' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Reintentar' })).toBeNull()
     const enviados = cuerpos(llamadas)
     expect(enviados.length).toBeGreaterThanOrEqual(2)
@@ -354,7 +354,7 @@ describe('vista clínica', () => {
   it('enlaza a Comparar grupos y a Explorar más variables conservando el grupo', async () => {
     api('experto')
     montar('/?f=sexo|lista|F')
-    await screen.findByRole('heading', { name: 'Qué les pasó a los 12 meses' })
+    await screen.findByRole('heading', { name: 'Resultados observados a los 12 meses' })
     expect(screen.getByRole('link', { name: 'Comparar con otro grupo' })).toHaveAttribute('href', '/comparar?f=sexo%7Clista%7CF')
     expect(screen.getByRole('link', { name: 'Explorar más variables' })).toHaveAttribute('href', '/explorar?f=sexo%7Clista%7CF')
   })
@@ -382,7 +382,7 @@ describe('vista clínica: exportar', () => {
   it('el botón «Exportar» está junto a los enlaces de la página', async () => {
     api('experto')
     montar('/')
-    await screen.findByRole('heading', { name: 'Qué les pasó a los 12 meses' })
+    await screen.findByRole('heading', { name: 'Resultados observados a los 12 meses' })
     expect(screen.getByRole('button', { name: 'Exportar' })).toHaveAttribute('title', 'Descargar las cifras de esta vista (CSV)')
   })
 })
