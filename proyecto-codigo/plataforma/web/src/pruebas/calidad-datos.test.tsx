@@ -94,9 +94,9 @@ describe('calidad de datos: la cola', () => {
     const celdas = within(fila).getAllByRole('cell').map((c) => c.textContent)
     expect(celdas.slice(0, 7)).toEqual(['S-02210', '6 m', 'Talla', '58 cm', 'Esperado entre 62 y 70 cm.', 'Valor fuera de lo esperado', 'Por revisar'])
     // confirmar deja el valor como está; corregir lo marca como error de registro (no cambia el valor)
-    expect(within(fila).getByRole('button', { name: 'Confirmar' })).toHaveAttribute('title', 'Confirmar: el valor registrado es correcto')
+    expect(within(fila).getByRole('button', { name: 'Confirmar valor correcto' })).toHaveAttribute('title', 'El valor registrado es correcto')
     expect(within(fila).getByRole('button', { name: 'Corregir' })).toHaveAttribute('title', 'Corregir: es un error de registro (se marca; el valor no cambia)')
-    expect(within(fila).getByRole('button', { name: 'No sé' })).toBeInTheDocument()
+    expect(within(fila).getByRole('button', { name: 'No puedo determinarlo' })).toBeInTheDocument()
     // lo que sobra para decidir se abre aparte: lo más probable, cuándo se midió y las otras visitas
     expect(screen.queryByText(/Medido el/)).not.toBeInTheDocument()
     await userEvent.click(within(fila).getByRole('button', { name: /Ver detalle/ }))
@@ -150,7 +150,7 @@ describe('calidad de datos: la cola', () => {
       return undefined
     })
     montar('/admin/calidad-datos')
-    await userEvent.click(await screen.findByRole('button', { name: 'Confirmar' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Confirmar valor correcto' }))
     await waitFor(() => expect(enviados).toEqual([{ es_error: 'no', comentario: null }]))
     expect(await screen.findByText('Confirmado')).toBeInTheDocument()
   })
@@ -166,7 +166,7 @@ describe('calidad de datos: la cola', () => {
     montar('/admin/calidad-datos')
     const fila = (await screen.findByRole('link', { name: 'S-02210' })).closest('tr')!
     expect(within(fila).getByText('Confirmado')).toBeInTheDocument()
-    expect(within(fila).getByRole('button', { name: 'Confirmar', pressed: true })).toBeInTheDocument()
+    expect(within(fila).getByRole('button', { name: 'Confirmar valor correcto', pressed: true })).toBeInTheDocument()
     expect(within(fila).getByText('La fecha no corresponde a esta visita.')).toBeInTheDocument()
     expect(screen.queryByRole('figure', { name: /Talla de este niño en cada visita/ })).not.toBeInTheDocument()
     await userEvent.click(within(fila).getByRole('button', { name: /Ver detalle/ }))

@@ -2,8 +2,8 @@
 // paquete (GET /inferencia/formulario): primero los datos del niño y luego cada visita, con los campos que más pesan a
 // la vista y el resto plegado. Arma la misma petición que antes se pegaba como JSON, que queda como modo avanzado
 // (solo administración). Los resultados se dicen con el glosario clínico.
-import { useMutation, useQuery } from '@tanstack/react-query'
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useIsMutating, useMutation, useQuery } from '@tanstack/react-query'
+import { useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { ErrorApi, pedir } from '../api/cliente'
 import type { ResultadoConHistoria } from '../api/inferencia'
@@ -144,6 +144,7 @@ const claveVisita = (etapa: string) => etapa.replace(/[^\w-]+/g, '-')
 
 /** El formulario es un solo `form`: su botón «Estimar riesgo» vive junto al título para estar a la vista en cualquier pestaña. */
 const ID_FORMULARIO = 'formulario-calculo'
+const CLAVE_EJEMPLO = ['inferencia', 'ejemplo', 'formulario']
 
 type Seccion = { clave: string; texto: ReactNode; contenido: ReactNode }
 
@@ -152,6 +153,7 @@ export default function Inferencia() {
   const activo = usePaqueteActivo()
   const [avanzado, setAvanzado] = useState(false)
   const [pestana, setPestana] = useState('datos')
+  const cargandoEjemplo = useIsMutating({ mutationKey: CLAVE_EJEMPLO, exact: true }) > 0
   const calcular = useMutation({ mutationFn: (p: unknown) => pedir<ResultadoConHistoria>('/inferencia', { cuerpo: p }) })
   const formulario = useQuery({
     queryKey: ['inferencia', 'formulario'], queryFn: () => pedir<FormularioCalculo>('/inferencia/formulario'), select: quitarEdadGestacional,
@@ -194,8 +196,8 @@ export default function Inferencia() {
               </Boton>
             )}
             {!avanzado && (
-              <Boton type="submit" form={ID_FORMULARIO} disabled={!formulario.data || calcular.isPending}>
-                {calcular.isPending ? 'Calculando…' : 'Estimar riesgo'}
+              <Boton type="submit" form={ID_FORMULARIO} disabled={!formulario.data || cargandoEjemplo || calcular.isPending}>
+                {calcular.isPending ? 'Calculando…' : cargandoEjemplo ? 'Cargando ejemplo…' : 'Estimar riesgo'}
               </Boton>
             )}
           </div>
@@ -229,6 +231,7 @@ function Formulario({ formulario, calcular, verDatos }: {
   const [conError, setConError] = useState<string[]>([])
   const [visita, setVisita] = useState(claveVisita(formulario.visitas[0]?.etapa ?? ''))
   const ejemplo = useMutation({
+    mutationKey: CLAVE_EJEMPLO,
     mutationFn: () => pedir<PeticionInferencia & { nota: string }>('/inferencia/ejemplo'),
     onSuccess: (p) => {
       const e = desdeEjemplo(formulario, p)
@@ -242,9 +245,15 @@ function Formulario({ formulario, calcular, verDatos }: {
     },
   })
 
+  const avisos = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    if (errores.length > 0) avisos.current?.focus()
+  }, [errores])
+
   const cambiar = (variable: string, v: string) => setValores((x) => ({ ...x, [variable]: v }))
   const enviar = (ev: FormEvent) => {
     ev.preventDefault()
+    if (ejemplo.isPending) return
     const r = armarPeticion(formulario, nino, valores, fechas)
     setErrores(r.errores)
     setConError(r.visitasConError.map(claveVisita))
@@ -280,7 +289,9 @@ function Formulario({ formulario, calcular, verDatos }: {
   return (
     <form id={ID_FORMULARIO} onSubmit={enviar} noValidate className="space-y-2.5">
       {errores.length > 0 && (
-        <Aviso>{errores.length === 1 ? errores[0] : <ul className="list-disc space-y-0.5 pl-4">{errores.map((e) => <li key={e}>{e}</li>)}</ul>}</Aviso>
+        <div ref={avisos} tabIndex={-1} aria-label="Revise los datos del cálculo">
+          <Aviso>{errores.length === 1 ? errores[0] : <ul className="list-disc space-y-0.5 pl-4">{errores.map((e) => <li key={e}>{e}</li>)}</ul>}</Aviso>
+        </div>
       )}
       {/* la guía va junto al título: en un renglón propio le quitaba una fila al formulario */}
       <Panel denso
@@ -296,10 +307,10 @@ function Formulario({ formulario, calcular, verDatos }: {
         <Campos campos={formulario.generales} valores={valores} cambiar={cambiar} masTexto="Más datos del niño y la familia"
           antes={<>
             <CampoSimple id="c-nacimiento" etiqueta="Fecha de nacimiento">
-              <Entrada id="c-nacimiento" type="date" className={CASILLA} value={nino.nacimiento} onChange={(e) => setNino({ ...nino, nacimiento: e.target.value })} />
+              <Entrada id="c-nacimiento" type="date" aria-required="true" className={CASILLA} value={nino.nacimiento} onChange={(e) => setNino({ ...nino, nacimiento: e.target.value })} />
             </CampoSimple>
             <CampoSimple id="c-eg" etiqueta="Semanas de gestación al nacer" ayuda="Entre 20 y 45.">
-              <Entrada id="c-eg" inputMode="decimal" placeholder="20 a 45" className={CASILLA} value={nino.eg}
+              <Entrada id="c-eg" aria-required="true" inputMode="decimal" placeholder="20 a 45" className={CASILLA} value={nino.eg}
                 onChange={(e) => setNino({ ...nino, eg: e.target.value })} {...conAyuda('c-eg', 'Entre 20 y 45.')} />
             </CampoSimple>
           </>} />
@@ -433,6 +444,7 @@ function ModoAvanzado({ calcular, pendiente }: { calcular: (p: unknown) => void;
   const [texto, setTexto] = useState('')
   const [error, setError] = useState<string | null>(null)
   const ejemplo = useMutation({
+    mutationKey: CLAVE_EJEMPLO,
     mutationFn: () => pedir<PeticionInferencia & { nota: string }>('/inferencia/ejemplo'),
     onSuccess: ({ nota: _nota, ...p }) => setTexto(JSON.stringify(p, null, 2)),
   })

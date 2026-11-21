@@ -20,9 +20,9 @@ import { SerieDato } from './SerieDato'
 /** Lo que cada respuesta significa, dicho en el botón, en su ayuda y en el estado de la fila. La base guarda la respuesta a
  *  «¿es un error de registro?»: confirmar es «no» y corregir es «sí». */
 const ACCION: Record<Respuesta, { boton: string; ayuda: string; estado: string }> = {
-  no: { boton: 'Confirmar', ayuda: 'Confirmar: el valor registrado es correcto', estado: 'Confirmado' },
+  no: { boton: 'Confirmar valor correcto', ayuda: 'El valor registrado es correcto', estado: 'Confirmado' },
   si: { boton: 'Corregir', ayuda: 'Corregir: es un error de registro (se marca; el valor no cambia)', estado: 'Por corregir' },
-  no_se: { boton: 'No sé', ayuda: 'No sé si el valor es correcto', estado: 'Sin saber' },
+  no_se: { boton: 'No puedo determinarlo', ayuda: 'No se puede determinar si el valor es correcto', estado: 'Sin saber' },
 }
 const RESPUESTAS: Respuesta[] = ['no', 'si', 'no_se']
 const TIPOS_ALERTA = ['1', '2', '3'] as const

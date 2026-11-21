@@ -376,7 +376,7 @@ function Subir({ alGuardar }: { alGuardar: (v: VersionDiccionario) => void }) {
   return (
     <Panel llenar titulo="Importar desde Excel" className="xl:max-h-full">
       <p className="mb-3 text-sm text-salvia">Para cambios grandes: exporte el vigente, edítelo en Excel y súbalo aquí. Antes de
-        confirmar verá qué cambia.</p>
+        publicar verá qué cambia. Al publicar, esta versión pasa a ser la vigente para todo el equipo.</p>
       <form className="flex flex-col gap-3" onSubmit={(e) => {
         e.preventDefault()
         if (archivo) comparar.mutate(archivo)
@@ -403,7 +403,7 @@ function Subir({ alGuardar }: { alGuardar: (v: VersionDiccionario) => void }) {
           {guardar.error && <Aviso><span className="whitespace-pre-line">{guardar.error.message}</span></Aviso>}
           <div className="flex flex-col gap-2 sm:flex-row">
             <Boton onClick={() => guardar.mutate(archivo)} disabled={guardar.isPending}>
-              {guardar.isPending ? 'Guardando…' : 'Confirmar y usar esta versión'}
+              {guardar.isPending ? 'Guardando…' : 'Publicar como versión vigente'}
             </Boton>
             <Boton variante="secundario" onClick={reiniciar} disabled={guardar.isPending}>Cancelar</Boton>
           </div>

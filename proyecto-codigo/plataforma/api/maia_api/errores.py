@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+from uuid import uuid4
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -93,10 +94,12 @@ async def _validacion(_: Request, exc: RequestValidationError) -> JSONResponse:
 
 
 async def _inesperado(request: Request, exc: Exception) -> JSONResponse:
-    log.exception('Error inesperado en %s %s', request.method, request.url.path, exc_info=exc)
+    referencia = uuid4().hex
+    log.exception('Error inesperado en %s %s. Referencia: %s', request.method, request.url.path, referencia, exc_info=exc)
     return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        content={'detail': 'Ocurrió un error inesperado en el servidor. Intente de nuevo; si se repite, '
-                                           'avise a la administración.'})
+                        content={'detail': 'Ocurrió un error inesperado en el servidor. Si se repite, comparta esta '
+                                           f'referencia con administración: {referencia}.',
+                                 'referencia': referencia})
 
 
 def registrar(app: FastAPI) -> None:

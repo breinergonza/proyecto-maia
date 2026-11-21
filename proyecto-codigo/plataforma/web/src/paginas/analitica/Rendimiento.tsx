@@ -82,7 +82,7 @@ export default function Rendimiento() {
                 <div className="grid gap-4 xl:grid-cols-2 [&>*]:min-w-0">
                   <Grafica titulo={dRoc.titulo} descripcion={dRoc.descripcion}
                     exportar={{ nombre: 'rendimiento-roc', filas: d.roc.puntos.map(([x, y]) => ({ falsas_alarmas: x, casos_detectados: y })), muestra }}>
-                    <CurvaXY etiqueta="Aciertos frente a falsas alarmas" ejeX="Proporción de falsas alertas" ejeY="Proporción de casos detectados" diagonal alto={280}
+                    <CurvaXY etiqueta="Casos detectados frente a falsas alertas" ejeX="Proporción de falsas alertas" ejeY="Proporción de casos detectados" diagonal alto={280}
                       formatoX={(v) => `${Math.round(v * 100)} %`} formatoY={(v) => `${Math.round(v * 100)} %`}
                       series={[{ clave: 'roc', nombre: `Modelo · ${ic(d.auc_desenlace)}`, color: 0, puntos: d.roc.puntos, sinPuntos: true }]} />
                   </Grafica>
