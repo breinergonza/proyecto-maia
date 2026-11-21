@@ -6,13 +6,14 @@ import { useSubmodulo } from '../../api/analitica'
 import type { DatosEquidad, DatosRendimiento, FilaSubgrupo } from '../../api/tipos'
 import { Bosque, MapaCalor } from '../../components/graficos/equidad'
 import { Grafica, TablaDatos } from '../../components/grafica'
+import { Termino } from '../../components/Termino'
 import { Tabla } from '../../components/ui'
 import { PanelPestana, Pestanas, usePestanaEnUrl } from '../../components/ui/Pestanas'
 import { descripcionDe } from '../../lib/descripciones'
 import { cn } from '../../lib/cn'
 import { dec2, frase, num } from '../../lib/formato'
-import { jerga, SIN_INTERVALO } from '../../lib/lenguaje'
-import { Guia, ic, PorDesenlace, useNombreDesenlace, useTecnico } from './comun'
+import { SIN_INTERVALO } from '../../lib/lenguaje'
+import { Guia, ic, PorDesenlace, useNombreDesenlace } from './comun'
 import { useContextoAnalitica } from './contexto'
 
 /** Diferencia frente al total desde la que se marca un grupo (plan v3.7, 6.3.7). */
@@ -31,7 +32,6 @@ export default function Equidad() {
   const todos = useSubmodulo<DatosEquidad>(entrenamiento, 'equidad')   // todos los desenlaces, para el mapa
   const total = useSubmodulo<DatosRendimiento>(entrenamiento, 'rendimiento', desenlace).data?.desenlaces?.[desenlace ?? '']?.auc_desenlace?.auc ?? null
   const nombreDes = useNombreDesenlace()
-  const { tecnico } = useTecnico()
   const [elegido, setElegido] = useState<string | null>(null)
   const [ver, elegir] = usePestanaEnUrl('ver', CLAVES)
   const dMapa = descripcionDe('equidad_mapa'), dGrupo = descripcionDe('equidad_grupo'), dDif = descripcionDe('equidad_diferencia')
@@ -75,7 +75,7 @@ export default function Equidad() {
                 {ver === 'grupo' && (
                   <div className="grid gap-3 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] xl:items-start [&>*]:min-w-0">
                     <Grafica titulo={`${dGrupo.titulo}: ${nombreGrupo(por).toLowerCase()}`} descripcion={dGrupo.descripcion}>
-                      <Bosque etiqueta="Qué tan bien ordena el modelo en cada grupo" referencia={total} nombreValor={jerga(tecnico, 'Ordena', 'AUC')}
+                      <Bosque etiqueta="Qué tan bien ordena el modelo en cada grupo" referencia={total} nombreValor="Ordena"
                         puntos={filas.map((f) => ({ etiqueta: `${g(f)} · ${num(f.n)} niños`, valor: f.auc, bajo: f.ic_bajo, alto: f.ic_alto, nota: 'Pide 20 niños o más para calcularlo' }))} />
                       {total != null && <p className="mt-1 text-xs text-salvia">La línea punteada es el total del modelo ({dec2(total)}).</p>}
                       {filas.some((f) => f.auc != null && f.ic_bajo == null) && <p className="mt-1 text-xs text-salvia">{SIN_INTERVALO}</p>}
@@ -83,7 +83,7 @@ export default function Equidad() {
                     <TablaDatos titulo={dDif.titulo} descripcion={`${dDif.descripcion} Menos de −0,05 se marca.`}
                       exportar={{ nombre: 'equidad-diferencia', filas: filas.map((f) => ({ subgrupo_por: nombreGrupo(por), grupo: f.grupo, ninos: f.n, casos: f.casos, auc: f.auc, diferencia_con_el_total: dif(f) != null ? Math.round((dif(f) as number) * 10000) / 10000 : null })) }}>
                       <Tabla densa>
-                        <thead><tr><th>Grupo</th><th>Niños</th><th>Casos</th><th>{jerga(tecnico, 'Ordena', 'AUC (IC)')}</th><th>Diferencia</th></tr></thead>
+                        <thead><tr><th>Grupo</th><th>Niños</th><th>Casos</th><th><Termino id="auc">Ordena</Termino></th><th>Diferencia</th></tr></thead>
                         <tbody>
                           {filas.map((f) => {
                             const x = dif(f), malo = x != null && x < MARCA

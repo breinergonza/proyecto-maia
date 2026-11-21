@@ -104,24 +104,25 @@ const ruta = (sub: string, ver?: string) => `/analitica/${sub}?entrenamiento=7&d
 const pestana = (nombre: string) => screen.findByRole('tab', { name: nombre })
 
 describe('Modelos 1: Resumen en pestañas', () => {
-  it('abre en «Cómo se entrenó» y cada pestaña muestra su parte', async () => {
+  it('abre en «Cómo le fue» y lo técnico del entrenamiento queda en la última pestaña', async () => {
     api()
     montar(ruta('resumen'), <Ubicacion />)
-    expect(await pestana('Cómo se entrenó')).toHaveAttribute('aria-selected', 'true')
-    expect(await screen.findByRole('heading', { name: 'Configuración' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Trazabilidad' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Evaluación en prueba' })).not.toBeInTheDocument()
-
-    await userEvent.click(screen.getByRole('tab', { name: 'Cómo le fue' }))
+    expect((await screen.findAllByRole('tab')).map((t) => t.textContent)).toEqual(['Cómo le fue', 'Aciertos y calibración', 'Cómo se entrenó'])
+    expect(await pestana('Cómo le fue')).toHaveAttribute('aria-selected', 'true')
     expect(await screen.findByRole('heading', { name: 'Evaluación en prueba' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Comparación técnica' })).toBeInTheDocument()
     expect(screen.getByText('Rendimiento', { selector: 'span.font-semibold' })).toBeInTheDocument()   // la revisión rápida, junto a la evaluación
     expect(screen.queryByRole('heading', { name: 'Configuración' })).not.toBeInTheDocument()
-    expect(screen.getByTestId('ubicacion').textContent).toContain('ver=evaluacion')
 
     await userEvent.click(screen.getByRole('tab', { name: 'Aciertos y calibración' }))
     expect(await screen.findByRole('table', { name: 'Aciertos y errores de la alerta' })).toBeInTheDocument()
     expect(screen.getByRole('figure', { name: /Riesgo estimado frente a riesgo observado/ })).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Cómo se entrenó' }))
+    expect(await screen.findByRole('heading', { name: 'Configuración' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Trazabilidad' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Evaluación en prueba' })).not.toBeInTheDocument()
+    expect(screen.getByTestId('ubicacion').textContent).toContain('ver=entrenamiento')
   })
 
   it('la pestaña de la dirección se abre directamente', async () => {
@@ -262,10 +263,10 @@ describe('Modelos 1: el marco de Analítica es compacto', () => {
     expect(within(region).getByLabelText('Entrenamiento')).toBeInTheDocument()
     expect(await within(region).findByText('Estado:')).toBeInTheDocument()
     expect(within(region).getByText(/Datos simulados/)).toBeInTheDocument()
-    // el título, la pregunta, la guía y el modo técnico siguen en el encabezado
+    // el título, la pregunta y la guía siguen en el encabezado; no hay modo técnico: una sola palabra (S22)
     expect(screen.getByRole('heading', { level: 1, name: 'Rendimiento' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Guía de lectura' })).toBeInTheDocument()
-    expect(screen.getByRole('switch', { name: 'Modo técnico' })).toBeInTheDocument()
+    expect(screen.queryByRole('switch', { name: 'Modo técnico' })).not.toBeInTheDocument()
   })
 
   it('el estado y el origen de los datos van en la misma línea, bajo los selectores', async () => {

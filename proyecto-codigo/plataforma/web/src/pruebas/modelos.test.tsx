@@ -113,7 +113,7 @@ describe('modelos: los selectores de arriba', () => {
 describe('modelos: configuración y trazabilidad', () => {
   it('muestra con qué datos y cómo se entrenó y qué entrenamiento, versión y paquete es', async () => {
     api('experto')
-    montar(`/analitica?entrenamiento=7&desenlace=${T3}`)
+    montar(`/analitica?entrenamiento=7&desenlace=${T3}&ver=entrenamiento`)
     const config = (await screen.findByRole('heading', { name: 'Configuración' })).closest('section')!
     expect(within(config).getByText((texto) => texto.includes(datosAl('2026-06-30')))).toBeInTheDocument()
     expect(within(config).getByText(/Temporal por fecha de nacimiento/)).toBeInTheDocument()
@@ -131,7 +131,7 @@ describe('modelos: configuración y trazabilidad', () => {
 
   it('un entrenamiento que no guardó sus hiperparámetros no los muestra', async () => {
     api('experto')
-    montar(`/analitica?entrenamiento=6&desenlace=${T3}`)
+    montar(`/analitica?entrenamiento=6&desenlace=${T3}&ver=entrenamiento`)
     const config = (await screen.findByRole('heading', { name: 'Configuración' })).closest('section')!
     await within(config).findByText('Gradient boosting (LightGBM)')
     expect(screen.queryByRole('heading', { name: 'Hiperparámetros' })).not.toBeInTheDocument()
@@ -140,7 +140,7 @@ describe('modelos: configuración y trazabilidad', () => {
   it('el administrador ve el enlace a los hiperparámetros; un entrenamiento que no está en el paquete activo lo dice', async () => {
     api('admin', (url) => (url === '/api/modelos/activo'
       ? { cuerpo: { version: 'otro', fuente: 'simulado', activo: true, metricas: {}, modelos: { clinico: { version_modelo: 'zzz' } } } } : undefined))
-    montar(`/analitica?entrenamiento=7&desenlace=${T3}`)
+    montar(`/analitica?entrenamiento=7&desenlace=${T3}&ver=entrenamiento`)
     expect(await screen.findByRole('link', { name: /Ver hiperparámetros/ })).toHaveAttribute('href', '/admin/entrenamientos')
     expect(await screen.findByText('No está en el paquete activo')).toBeInTheDocument()
   })
@@ -216,7 +216,7 @@ describe('modelos: sin jerga ni repeticiones', () => {
 
   it('la fecha del entrenamiento se dice una vez, y las opciones del selector no llevan la hora', async () => {
     api()
-    montar(`/analitica?entrenamiento=7&desenlace=${T3}`)
+    montar(`/analitica?entrenamiento=7&desenlace=${T3}&ver=entrenamiento`)
     const traza = (await screen.findByRole('heading', { name: 'Trazabilidad' })).closest('section')!
     expect(within(traza).getByText('Fecha').nextElementSibling).toHaveTextContent(new RegExp(`^${fecha('2026-07-01T10:00:00Z')}$`))
     expect(within(screen.getByLabelText('Entrenamiento')).getAllByRole('option').map((o) => o.textContent)).toEqual([

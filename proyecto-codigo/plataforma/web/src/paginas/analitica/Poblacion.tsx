@@ -11,8 +11,8 @@ import { PanelPestana, Pestanas, usePestanaEnUrl } from '../../components/ui/Pes
 import { descripcionDe } from '../../lib/descripciones'
 import { dec2, frase, num, pct } from '../../lib/formato'
 import { cn } from '../../lib/cn'
-import { nombreVariable, variable } from '../../lib/lenguaje'
-import { Guia, omitida, PorDesenlace, pctN, useNombreDesenlace, useTecnico } from './comun'
+import { nombreVariable } from '../../lib/lenguaje'
+import { Guia, omitida, PorDesenlace, pctN, useNombreDesenlace } from './comun'
 import { useContextoAnalitica } from './contexto'
 
 /** Porcentaje de niños sin un dato desde el que se pinta en coral, y casos por debajo de los que se avisa. */
@@ -33,7 +33,6 @@ const PANEL = 'mt-3 flex flex-col gap-3 lg:min-h-0 lg:flex-1 lg:-mx-1 lg:overflo
 const textoEtapa = (e: Record<string, string | number | null>) => String(e.etapa ?? e.nombre ?? e.paso ?? e.filtro ?? e.descripcion ?? '—')
 
 export default function Poblacion() {
-  const { tecnico } = useTecnico()
   const { entrenamiento, desenlace } = useContextoAnalitica()
   const consulta = useSubmodulo<DatosPoblacion>(entrenamiento, 'poblacion', desenlace)
   const todos = useSubmodulo<DatosPoblacion>(entrenamiento, 'poblacion')   // todos los desenlaces, para «casos por desenlace»
@@ -158,7 +157,7 @@ export default function Poblacion() {
                         const alto = (n.nulos_pct ?? 0) > LIMITE_FALTANTES
                         return (
                           <li key={n.variable} className="grid grid-cols-[minmax(8rem,15rem)_1fr_4rem] items-center gap-2 text-sm">
-                            <span className="leading-tight">{variable(tecnico, n.variable)}</span>
+                            <span className="leading-tight">{nombreVariable(n.variable)}</span>
                             <span className="relative h-3 rounded-full bg-fondo">
                               <span className={cn('block h-3 rounded-full', alto ? 'bg-coral-hondo' : 'bg-teal-medio')} style={{ width: `${n.nulos_pct ?? 0}%` }} />
                               <span className="absolute -inset-y-1 w-0.5 bg-tinta" style={{ left: `${LIMITE_FALTANTES}%` }} aria-hidden />

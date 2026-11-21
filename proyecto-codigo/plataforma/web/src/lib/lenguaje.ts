@@ -227,24 +227,6 @@ export const datosAl = (corte: string | null | undefined) => `Datos al ${fecha(c
 
 // ------------------------------------------------------------------ analítica de los modelos (entradas nuevas)
 
-/** Término técnico → cómo se dice en la pantalla clínica. El modo técnico muestra la jerga. */
-export const GLOSARIO_ANALITICA: Record<string, string> = {
-  AUC: 'Qué tan bien ordena a los niños',
-  ROC: 'Aciertos frente a falsas alarmas',
-  PR: 'Alertas acertadas frente a casos detectados',
-  sensibilidad: 'Casos detectados',
-  VPP: 'Alertas acertadas',
-  especificidad: 'Niños sin falsa alarma',
-  umbral: 'A cuántos niños se alerta',
-  calibración: 'Si el porcentaje de riesgo es el real',
-  Brier: 'Error del porcentaje de riesgo',
-  PSI: 'Cambio frente al entrenamiento',
-  lift: 'Qué tanto ayuda revisar a los primeros',
-}
-
-/** Jerga o palabra clínica según el modo técnico. */
-export const jerga = (tecnico: boolean, clinico: string, tecnicoTexto: string) => (tecnico ? tecnicoTexto : clinico)
-
 /** Lo que dice una celda sin cifra. Ningún conteo se oculta por ser de pocos niños (1 a 4 se dicen con su número): sin
  *  cifra es lo que no se pudo calcular (un desvío o un intervalo pide 20 niños; el intervalo de un AUC, 5 de cada
  *  clase) o lo que un entrenamiento anterior no guardó. */
@@ -259,8 +241,7 @@ export const SEMAFORO: Record<string, string> = { verde: 'Confiable', ambar: 'Mi
 // ------------------------------------------------------------------ nombres de variables del modelo
 // Los artefactos de analítica traen el código de cada variable; la pantalla muestra su nombre clínico. Mientras no
 // haya un servicio con las etiquetas del Diccionario para todas las variables del modelo, se traducen los códigos
-// conocidos y el resto se vuelve legible (guiones bajos a espacios, «z_» como «frente a la OMS»). El modo técnico
-// sigue mostrando el código.
+// conocidos y el resto se vuelve legible (guiones bajos a espacios, «z_» como «frente a la OMS»).
 const NOMBRES_VARIABLE: Record<string, string> = {
   ingreso_hogar: 'Ingreso del hogar', personas_hogar: 'Personas en el hogar', edad_madre: 'Edad de la madre',
   controles_prenatales: 'Controles prenatales', eg_semanas: 'Edad gestacional', sexo: 'Sexo', dias_uci: 'Días en UCI',
@@ -278,5 +259,3 @@ export function nombreVariable(codigo: string): string {
   const texto = base.charAt(0).toUpperCase() + base.slice(1)
   return oms ? `${texto} frente a la OMS` : texto
 }
-/** El nombre de la variable y, en modo técnico, su código entre paréntesis. */
-export const variable = (tecnico: boolean, codigo: string) => (tecnico ? `${nombreVariable(codigo)} (${codigo})` : nombreVariable(codigo))

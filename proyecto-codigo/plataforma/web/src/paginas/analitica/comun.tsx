@@ -1,6 +1,7 @@
-// Piezas comunes de los submódulos de analítica: modo técnico, guía de lectura, estados vacíos y formatos.
+// Piezas comunes de los submódulos de analítica: guía de lectura, estados vacíos y formatos. No hay modo técnico: cada
+// palabra clínica explica su nombre estadístico (S22).
 import type { UseQueryResult } from '@tanstack/react-query'
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
 import type { RespuestaAnalitica } from '../../api/tipos'
@@ -13,41 +14,8 @@ import { dec2, pct } from '../../lib/formato'
 import { SIN_CIFRA } from '../../lib/lenguaje'
 import { useContextoAnalitica } from './contexto'
 
-// ------------------------------------------------------------------ modo técnico (preferencia del navegador)
-const CLAVE_TECNICO = 'maia.analitica.tecnico'
-function leerTecnico(): boolean {
-  try { return localStorage.getItem(CLAVE_TECNICO) === '1' } catch { return false }
-}
-
-const Tecnico = createContext<{ tecnico: boolean; fijar: (v: boolean) => void }>({ tecnico: false, fijar: () => {} })
-export const useTecnico = () => useContext(Tecnico)
-
-export function ProveedorTecnico({ children }: { children: ReactNode }) {
-  const [tecnico, setTecnico] = useState(leerTecnico)
-  const fijar = useCallback((v: boolean) => {
-    setTecnico(v)
-    try { localStorage.setItem(CLAVE_TECNICO, v ? '1' : '0') } catch { /* sin almacenamiento: vale solo para esta vista */ }
-  }, [])
-  const valor = useMemo(() => ({ tecnico, fijar }), [tecnico, fijar])
-  return <Tecnico.Provider value={valor}>{children}</Tecnico.Provider>
-}
-
 /** El lugar del encabezado donde cada submódulo pone su «Guía de lectura» (lo fija `AnaliticaLayout`). */
 export const RanuraGuia = createContext<HTMLElement | null>(null)
-
-/** Interruptor del modo técnico: muestra la jerga y las cifras completas. */
-export function InterruptorTecnico() {
-  const { tecnico, fijar } = useTecnico()
-  return (
-    <label className="flex items-center gap-2 text-sm font-semibold text-salvia">
-      <button type="button" role="switch" aria-checked={tecnico} aria-label="Modo técnico" onClick={() => fijar(!tecnico)}
-        className={cn('relative h-6 w-11 shrink-0 rounded-full border transition-colors', tecnico ? 'border-teal bg-teal' : 'border-linea bg-fondo')}>
-        <span className={cn('absolute top-0.5 size-4.5 rounded-full bg-papel shadow-suave transition-all', tecnico ? 'left-5.5' : 'left-0.5')} />
-      </button>
-      Modo técnico
-    </label>
-  )
-}
 
 /** «Guía de lectura» de un submódulo: un botón en el encabezado que despliega una explicación breve. */
 export function Guia({ children }: { children: ReactNode }) {

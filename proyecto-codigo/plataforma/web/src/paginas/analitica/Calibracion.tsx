@@ -11,9 +11,9 @@ import { Grafica, TablaDatos } from '../../components/grafica'
 import { Cifra, Panel, Tabla } from '../../components/ui'
 import type { Pestana } from '../../components/ui/Pestanas'
 import { descripcionDe } from '../../lib/descripciones'
-import { dec2, num } from '../../lib/formato'
-import { jerga } from '../../lib/lenguaje'
-import { ConPestanas, fracPct, Guia, IrA, muestraDe, omitida, PorDesenlace, pctN, useTecnico } from './comun'
+import { Termino } from '../../components/Termino'
+import { dec2, dec3, num } from '../../lib/formato'
+import { ConPestanas, fracPct, Guia, IrA, muestraDe, omitida, PorDesenlace, pctN } from './comun'
 import { useContextoAnalitica } from './contexto'
 
 type Ver = 'creible' | 'reparto' | 'revisar' | 'beneficio'
@@ -24,7 +24,6 @@ export default function Calibracion() {
   const rend = useSubmodulo<DatosRendimiento>(entrenamiento, 'rendimiento', desenlace)
   const rdCrudo = rend.data?.estado === 'ok' && desenlace ? rend.data.desenlaces?.[desenlace] : undefined
   const rd = rdCrudo && !rdCrudo.estado ? rdCrudo : undefined
-  const { tecnico } = useTecnico()
   // lo que la persona elige vive aquí y no en cada pestaña: al cambiar de pestaña y volver se conserva
   const [capacidadElegida, setCapacidad] = useState<number | null>(null)
   const [peso, setPeso] = useState(10)   // plan: por defecto, no detectar un caso pesa como 10 falsas alarmas
@@ -74,9 +73,9 @@ export default function Calibracion() {
                       <Cifra valor={fracPct(d.riesgo_medio)} texto="Riesgo medio que da el modelo" />
                       <Cifra valor={fracPct(d.observado)} texto="Niños que tuvieron el desenlace" />
                       <Cifra valor={d.razon_riesgo_observado != null ? dec2(d.razon_riesgo_observado) : '—'}
-                        texto={jerga(tecnico, 'Riesgo dicho entre riesgo real (1 es lo ideal)', 'Razón riesgo medio / observado')} />
-                      <Cifra valor={d.brier == null ? '—' : tecnico ? String(d.brier) : dec2(d.brier)} texto={jerga(tecnico, 'Error del porcentaje de riesgo', 'Puntaje de Brier')} />
-                      {d.ece != null && <p className="text-sm text-salvia sm:col-span-2 lg:col-span-4">{jerga(tecnico, 'Error medio entre el riesgo dicho y el real', 'ECE (error de calibración esperado)')}: {tecnico ? d.ece : dec2(d.ece)}</p>}
+                        texto={<><Termino id="razon_riesgo">Riesgo dicho entre riesgo real</Termino> (1 es lo ideal)</>} />
+                      <Cifra valor={dec3(d.brier)} texto={<Termino id="brier">Error del porcentaje de riesgo</Termino>} />
+                      {d.ece != null && <p className="text-sm text-salvia sm:col-span-2 lg:col-span-4"><Termino id="ece">Error medio entre el riesgo dicho y el real</Termino>: {dec3(d.ece)}</p>}
                     </div>
                   </Panel>
                   <Grafica titulo={dCal.titulo} descripcion={dCal.descripcion}
@@ -160,7 +159,7 @@ export default function Calibracion() {
                         const pts = [...dec.puntos].sort((a, b) => x(a) - x(b))
                         return (
                           <CurvaXY etiqueta="Beneficio de alertar con el modelo, a todos o a ninguno" dominioX={porPct ? [0, 1] : [0, 0.5]} dominioY={[-0.1, 'auto']}
-                            ejeX={porPct ? 'Niños alertados (los de más riesgo)' : jerga(tecnico, 'Riesgo desde el que se alerta', 'Umbral de riesgo')} ejeY="Beneficio"
+                            ejeX={porPct ? 'Niños alertados (los de más riesgo)' : 'Riesgo desde el que se alerta'} ejeY="Beneficio"
                             formatoX={(v) => `${Math.round(v * 100)} %`} formatoY={(v) => dec2(v)}
                             series={[
                               { clave: 'modelo', nombre: 'Con el modelo', color: 0, puntos: pts.map((p) => [x(p), p.modelo]), sinPuntos: true },

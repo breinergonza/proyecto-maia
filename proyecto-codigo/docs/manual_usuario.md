@@ -253,8 +253,10 @@ submódulos, como fichas arriba (en el teléfono se deslizan): **Resumen**, **Re
   Además, la aplicación recuerda el último **desenlace** y la última **visita** que eligió: al volver a entrar a
   Analítica en la misma pestaña del navegador no tiene que elegirlos de nuevo. Si abre un enlace con otros valores, mandan
   los del enlace.
-* **Guía de lectura:** cada submódulo explica en pocas líneas cómo leerlo. Su interruptor **Modo técnico** agrega los
-  términos y cifras de detalle (se recuerda en el navegador).
+* **Guía de lectura:** cada submódulo explica en pocas líneas cómo leerlo.
+* **Una sola palabra:** las pantallas usan la palabra clínica («Casos detectados», «Alertas acertadas»). La palabra
+  subrayada explica qué mide y da su nombre estadístico («En estadística: sensibilidad»); no hay un modo técnico aparte.
+* **Modelos:** abre en **Cómo le fue**; **Cómo se entrenó** (configuración, trazabilidad e hiperparámetros) va al final.
 * **En prueba:** un desenlace marcado así se ve, pero aún no es oficial ni genera correos.
 * **Sin analítica / «Este análisis estará disponible pronto»:** si el entrenamiento es anterior y no guardó los
   resultados de analítica, aparece **Sin analítica** y la opción de reentrenar (no se recalcula en silencio). Una ficha con
@@ -690,18 +692,27 @@ anotado en otra unidad», «la fecha no corresponde a esta visita», «cambió d
 Estas son las definiciones que aparecen al pasar el mouse por un término subrayado (ver
 [Términos con «¿qué significa?»](#términos-con-qué-significa)):
 
-* **AUC:** qué tan bien separa el modelo a los niños con y sin el problema. 1 es perfecto; 0,5 equivale a lanzar una
-  moneda.
-* **Curva ROC:** compara los aciertos con las falsas alarmas; mientras más se aleja de la diagonal, mejor.
-* **PSI:** cuánto cambió el grupo de niños actual frente al de entrenamiento; si es alto, conviene revisar el modelo.
+* **Qué tan bien ordena (AUC):** qué tan bien separa el modelo a los niños con y sin el problema. 1 es perfecto; 0,5
+  es lanzar una moneda.
+* **Curva ROC:** los casos detectados frente a las falsas alarmas; cuanto más se aleja de la diagonal, mejor ordena.
+* **Curva de precisión y exhaustividad:** las alertas acertadas frente a los casos detectados.
+* **Cambio frente al entrenamiento (PSI):** cuánto cambiaron los niños actuales frente a los del entrenamiento; si es
+  alto, conviene revisar el modelo.
 * **Percentil:** lugar del niño entre todos, de 0 a 100. Un percentil 95 significa que solo 5 de cada 100 niños tienen
   más riesgo.
 * **Calibración:** qué tanto coincide el riesgo que dice el modelo con lo que ocurre de verdad. Con 20 % de riesgo,
   debería pasar en 2 de cada 10.
-* **Sensibilidad:** de los niños que sí tendrán el problema, qué parte detecta el modelo.
-* **Especificidad:** de los niños que no tendrán el problema, qué parte descarta bien el modelo.
-* **Brier:** error promedio de las probabilidades, de 0 a 1; más cerca de 0 es más confiable.
-* **Precisión promedio (PR-AUC):** qué tan bien acierta el modelo cuando marca a un niño en riesgo, sobre todo si el
+* **Casos detectados (sensibilidad):** de los niños que tuvieron el problema, cuántos recibieron alerta.
+* **Alertas acertadas (valor predictivo positivo, VPP):** de los niños con alerta, cuántos tuvieron el problema.
+* **Niños sin falsa alarma (especificidad):** de los niños que no tuvieron el problema, cuántos quedaron sin alerta.
+* **Alertar al (umbral, percentil de riesgo):** qué parte de los niños, los de más riesgo, recibe alerta. Al 10 %: 1
+  de cada 10.
+* **Error del porcentaje de riesgo (puntaje de Brier):** error promedio del porcentaje de riesgo, de 0 a 1; cuanto más
+  cerca de 0, más confiable. Se muestra con tres decimales.
+* **Riesgo dicho entre riesgo real (razón esperado / observado):** el riesgo promedio que dijo el modelo dividido por el
+  que ocurrió; 1 es lo ideal.
+* **Error medio entre el riesgo dicho y el real (ECE):** distancia promedio entre ambos, por tramos; cerca de 0 es mejor.
+* **Alertas acertadas en promedio (PR-AUC):** qué tan bien acierta el modelo cuando marca a un niño, sobre todo si el
   problema es poco frecuente.
 * **Falsas por 1.000:** niños marcados en riesgo que no tenían el problema, por cada 1.000 revisados.
 * **Mediana:** valor del medio: la mitad de los niños tiene menos riesgo y la otra mitad, más.

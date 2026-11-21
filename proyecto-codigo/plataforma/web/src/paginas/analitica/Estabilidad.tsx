@@ -5,12 +5,13 @@ import { useSubmodulo } from '../../api/analitica'
 import type { DatosEstabilidad } from '../../api/tipos'
 import { SerieTrimestral } from '../../components/graficos'
 import { Grafica, TablaDatos } from '../../components/grafica'
+import { Termino } from '../../components/Termino'
 import { Aviso, Tabla } from '../../components/ui'
 import { PanelPestana, Pestanas, usePestanaEnUrl } from '../../components/ui/Pestanas'
 import { descripcionDe } from '../../lib/descripciones'
 import { dec2, num } from '../../lib/formato'
-import { jerga, nombreVariable, variable } from '../../lib/lenguaje'
-import { Guia, ic, PorDesenlace, useTecnico } from './comun'
+import { nombreVariable } from '../../lib/lenguaje'
+import { Guia, ic, PorDesenlace } from './comun'
 import { useContextoAnalitica } from './contexto'
 
 /** Mínimo aceptable de «qué tan bien ordena» por trimestre (plan: 0,80 por defecto). */
@@ -33,7 +34,6 @@ const ENCABEZADO_FIJO = 'xl:overflow-visible [&_th]:sticky [&_th]:top-0 [&_th]:z
 export default function Estabilidad() {
   const { entrenamiento, desenlace } = useContextoAnalitica()
   const consulta = useSubmodulo<DatosEstabilidad>(entrenamiento, 'estabilidad', desenlace)
-  const { tecnico } = useTecnico()
   const [ver, elegir] = usePestanaEnUrl('ver', CLAVES)
   const dTri = descripcionDe('estab_trimestre'), dPsi = descripcionDe('psi'), dAl = descripcionDe('alertas_1000')
   return (
@@ -70,7 +70,7 @@ export default function Estabilidad() {
                       <Grafica titulo={dTri.titulo} descripcion={dTri.descripcion}
                         exportar={{ nombre: 'estabilidad-trimestre', filas: tri.map((t) => ({ trimestre: t.trimestre, ninos: t.n, casos: t.casos, auc: t.auc, ic_bajo: t.ic_bajo, ic_alto: t.ic_alto })) }}>
                         <SerieTrimestral etiqueta="Qué tan bien ordena el modelo en cada trimestre" alto={280} dominioY={[0.4, 1]} formatoY={(v) => dec2(v)}
-                          nombre={jerga(tecnico, 'Qué tan bien ordena', 'AUC')} minimo={MINIMO_AUC} textoMinimo={`Mínimo ${dec2(MINIMO_AUC)}`}
+                          nombre="Qué tan bien ordena" minimo={MINIMO_AUC} textoMinimo={`Mínimo ${dec2(MINIMO_AUC)}`}
                           puntos={tri.map((t) => ({ trimestre: t.trimestre, valor: t.auc, bajo: t.ic_bajo, alto: t.ic_alto }))} />
                         <p className="mt-1 text-xs text-salvia">La banda es la incertidumbre; «…» marca trimestres sin niños. Las cifras de cada trimestre están en «Datos por trimestre».</p>
                       </Grafica>
@@ -90,7 +90,7 @@ export default function Estabilidad() {
                   <TablaDatos llenar className="xl:max-w-4xl" titulo="Datos de cada trimestre"
                     descripcion="Niños, casos y qué tan bien ordena el modelo en cada trimestre; con menos de 20 niños no hay AUC.">
                     <Tabla densa className={ENCABEZADO_FIJO}>
-                      <thead><tr><th>Trimestre</th><th>Niños</th><th>Casos</th><th>{jerga(tecnico, 'Qué tan bien ordena', 'AUC (IC)')}</th></tr></thead>
+                      <thead><tr><th>Trimestre</th><th>Niños</th><th>Casos</th><th><Termino id="auc">Qué tan bien ordena</Termino></th></tr></thead>
                       <tbody>{tri.map((t) => <tr key={t.trimestre}><td>{t.trimestre}</td><td>{num(t.n)}</td><td>{t.casos == null ? '—' : num(t.casos)}</td><td>{t.auc == null ? 'Pide 20 niños' : ic(t)}</td></tr>)}</tbody>
                     </Tabla>
                   </TablaDatos>
@@ -98,25 +98,26 @@ export default function Estabilidad() {
                 {ver === 'poblacion' && (
                   <TablaDatos llenar titulo={dPsi.titulo} descripcion={dPsi.descripcion}
                     exportar={{ nombre: 'estabilidad-psi', filas: Object.entries(psi).map(([v, fila]) => ({ dato: nombreVariable(v), ...fila })) }}>
-                    <p className="mb-3 flex flex-wrap gap-2 text-xs">
-                      <span className="rounded-md bg-teal-tinte px-2 py-0.5 text-teal">Estable: menos de 0,10</span>
-                      <span className="rounded-md bg-ocre-tinte px-2 py-0.5 text-ocre-hondo">Vigilar: 0,10 a 0,25</span>
-                      <span className="rounded-md bg-coral-tinte px-2 py-0.5 font-semibold text-coral-hondo">Reentrenar: más de 0,25</span>
-                      {tecnico && <span className="text-salvia">(PSI)</span>}
-                      <span className="text-salvia">Ordenado de más a menos cambio.</span>
-                    </p>
-                    {Object.keys(psi).length === 0 ? <p className="text-salvia">Se necesitan al menos dos trimestres con 20 niños o más para comparar.</p> : (
+                    {Object.keys(psi).length === 0 ? <p className="text-salvia">Se necesitan al menos dos trimestres con 20 niños o más para comparar.</p> : (<>
+                      {/* la leyenda solo acompaña a la tabla: sin filas no hay colores que explicar */}
+                      <p className="mb-3 flex flex-wrap gap-2 text-xs">
+                        <span className="text-salvia"><Termino id="psi">Cambio frente al entrenamiento</Termino>:</span>
+                        <span className="rounded-md bg-teal-tinte px-2 py-0.5 text-teal">Estable: menos de 0,10</span>
+                        <span className="rounded-md bg-ocre-tinte px-2 py-0.5 text-ocre-hondo">Vigilar: 0,10 a 0,25</span>
+                        <span className="rounded-md bg-coral-tinte px-2 py-0.5 font-semibold text-coral-hondo">Reentrenar: más de 0,25</span>
+                        <span className="text-salvia">Ordenado de más a menos cambio.</span>
+                      </p>
                       <Tabla densa className={ENCABEZADO_FIJO}>
                         <thead><tr><th>Dato</th>{trimestres.map((t) => <th key={t}>{t}</th>)}</tr></thead>
                         <tbody>
                           {ordenadas.map(([v, fila]) => (
-                            <tr key={v}><td>{variable(tecnico, v)}</td>{trimestres.map((t) => (
-                              <td key={t} style={{ background: colorPsi(fila[t] ?? null) }}>{fila[t] == null ? '—' : tecnico ? fila[t] : dec2(fila[t])}</td>
+                            <tr key={v}><td>{nombreVariable(v)}</td>{trimestres.map((t) => (
+                              <td key={t} style={{ background: colorPsi(fila[t] ?? null) }}>{fila[t] == null ? '—' : dec2(fila[t])}</td>
                             ))}</tr>
                           ))}
                         </tbody>
                       </Tabla>
-                    )}
+                    </>)}
                   </TablaDatos>
                 )}
               </PanelPestana>

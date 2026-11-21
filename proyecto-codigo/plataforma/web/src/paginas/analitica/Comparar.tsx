@@ -13,13 +13,15 @@ import { puede, useSesion } from '../../auth/sesion'
 import { CurvaXY } from '../../components/graficos/xy'
 import { useConfirmar } from '../../components/Confirmar'
 import { Grafica, TablaDatos } from '../../components/grafica'
+import { Termino } from '../../components/Termino'
 import { Aviso, Boton, Selector, Tabla } from '../../components/ui'
 import { PanelPestana, Pestanas, usePestanaEnUrl } from '../../components/ui/Pestanas'
 import { descripcionDe } from '../../lib/descripciones'
 import { dec2, fecha, num, pct } from '../../lib/formato'
-import { jerga, SIN_CIFRA } from '../../lib/lenguaje'
+import type { IdTermino } from '../../lib/glosario'
+import { SIN_CIFRA } from '../../lib/lenguaje'
 import { difTexto } from './ComparaGrupos'
-import { Guia, Resultado, useTecnico } from './comun'
+import { Guia, Resultado } from './comun'
 import { useContextoAnalitica } from './contexto'
 
 const PESTANAS = [
@@ -33,7 +35,7 @@ const PANEL = 'flex flex-col gap-3 lg:min-h-0 lg:flex-1 lg:-mx-1 lg:overflow-y-a
 /** Encabezado de columna fijo mientras la tabla se desplaza dentro de su tarjeta. */
 const ENCABEZADO_FIJO = 'xl:overflow-visible [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-papel [&_th]:whitespace-normal!'
 
-interface Medida { id: string; texto: string; valor: (d: DatosRendimiento) => number | null; formato: (v: number) => string; unidad: 'pp' | 'abs' }
+interface Medida { id: string; texto: string; termino?: IdTermino; valor: (d: DatosRendimiento) => number | null; formato: (v: number) => string; unidad: 'pp' | 'abs' }
 
 const fila = (d: DatosRendimiento, top: number) => d.metricas_por_top.find((t) => t.top_pct === top)
 
@@ -58,7 +60,6 @@ function useAltoSegunVentana(fraccion: number, min: number, max: number) {
 function ComparaEntrenamientos() {
   const { desenlace, entrenamiento } = useContextoAnalitica()
   const { usuario } = useSesion()
-  const { tecnico } = useTecnico()
   const lista = useEntrenamientosAnalitica()
   const todos = lista.data?.entrenamientos ?? []
   const [elegidoA, setA] = useState<number | null>(null)
@@ -96,11 +97,11 @@ function ComparaEntrenamientos() {
     : clinicoB == null ? 'Este entrenamiento no tiene una versión registrada.' : anomalias == null ? 'No hay una versión de anomalías para aprobar con B.' : ''
 
   const medidas: Medida[] = [
-    { id: 'auc', texto: jerga(tecnico, 'Qué tan bien ordena a los niños', 'AUC'), valor: (d) => d.auc_desenlace.auc, formato: dec2, unidad: 'abs' },
-    { id: 'pr', texto: jerga(tecnico, 'Alertas acertadas en promedio', 'Precisión promedio (PR-AUC)'), valor: (d) => d.pr_auc ?? null, formato: dec2, unidad: 'abs' },
+    { id: 'auc', texto: 'Qué tan bien ordena a los niños', termino: 'auc', valor: (d) => d.auc_desenlace.auc, formato: dec2, unidad: 'abs' },
+    { id: 'pr', texto: 'Alertas acertadas en promedio', termino: 'pr_auc', valor: (d) => d.pr_auc ?? null, formato: dec2, unidad: 'abs' },
     ...[10, 20].flatMap((t): Medida[] => [
-      { id: `det${t}`, texto: `${jerga(tecnico, 'Casos detectados', 'Sensibilidad')} si se alerta al ${t} %`, valor: (d) => fila(d, t)?.casos_detectados_pct ?? null, formato: pct, unidad: 'pp' },
-      { id: `ac${t}`, texto: `${jerga(tecnico, 'Alertas acertadas', 'VPP')} si se alerta al ${t} %`, valor: (d) => fila(d, t)?.alertas_acertadas_pct ?? null, formato: pct, unidad: 'pp' },
+      { id: `det${t}`, texto: `Casos detectados si se alerta al ${t} %`, termino: 'sensibilidad', valor: (d) => fila(d, t)?.casos_detectados_pct ?? null, formato: pct, unidad: 'pp' },
+      { id: `ac${t}`, texto: `Alertas acertadas si se alerta al ${t} %`, termino: 'vpp', valor: (d) => fila(d, t)?.alertas_acertadas_pct ?? null, formato: pct, unidad: 'pp' },
     ]),
     { id: 'mil', texto: 'Alertas por 1.000 niños si se alerta al 10 %', valor: (d) => fila(d, 10)?.alertas_por_1000 ?? null, formato: num, unidad: 'abs' },
   ]
@@ -187,7 +188,7 @@ function ComparaEntrenamientos() {
                           <tbody>
                             {medidas.map((m) => (
                               <tr key={m.id}>
-                                <td className="lg:whitespace-nowrap">{m.texto}</td>
+                                <td className="lg:whitespace-nowrap">{m.termino ? <Termino id={m.termino}>{m.texto}</Termino> : m.texto}</td>
                                 <td>{m.valor(datoA) != null ? m.formato(m.valor(datoA) as number) : SIN_CIFRA}</td>
                                 <td>{m.valor(datoB) != null ? m.formato(m.valor(datoB) as number) : SIN_CIFRA}</td>
                                 <td>{diferencia(m, datoA, datoB)}</td>

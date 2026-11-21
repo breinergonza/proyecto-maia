@@ -10,10 +10,10 @@ import { CurvaXY } from '../../components/graficos/xy'
 import { Aviso, Selector, Tabla, Vacio } from '../../components/ui'
 import { descripcionDe } from '../../lib/descripciones'
 import { dec2, num, pct } from '../../lib/formato'
-import { SIN_CIFRA, variable } from '../../lib/lenguaje'
+import { nombreVariable, SIN_CIFRA } from '../../lib/lenguaje'
 import type { Pestana } from '../../components/ui/Pestanas'
 import { cn } from '../../lib/cn'
-import { ConPestanas, Guia, muestraDe, PorDesenlace, useTecnico } from './comun'
+import { ConPestanas, Guia, muestraDe, PorDesenlace } from './comun'
 import { useContextoAnalitica } from './contexto'
 
 type Ver = 'pesan' | 'cambia' | 'combinacion'
@@ -88,7 +88,6 @@ function avisoClaro(a: string) {
 }
 
 export default function Interpretabilidad() {
-  const { tecnico } = useTecnico()
   const { entrenamiento, desenlace } = useContextoAnalitica()
   const consulta = useSubmodulo<DatosInterpretabilidad>(entrenamiento, 'interpretabilidad', desenlace)
   const dPesan = descripcionDe('variables_pesan'), dMot = descripcionDe('motivos_frecuentes')
@@ -102,7 +101,7 @@ export default function Interpretabilidad() {
         {(datos) => {
           const sg = datos.shap_global
           const filas = sg ? sg.variables.map((i) => ({ variable: i.variable, etiqueta: i.etiqueta, pct: i.importancia_pct }))
-            : datos.importancia.map((i) => ({ variable: i.variable, etiqueta: variable(tecnico, i.variable), pct: i.importancia_pct }))
+            : datos.importancia.map((i) => ({ variable: i.variable, etiqueta: nombreVariable(i.variable), pct: i.importancia_pct }))
           const max = Math.max(1, ...filas.map((i) => i.pct))
           const muestra = muestraDe(sg?.n)
           const completo = !!(sg || datos.pdp || datos.motivos_frecuentes || datos.interaccion)

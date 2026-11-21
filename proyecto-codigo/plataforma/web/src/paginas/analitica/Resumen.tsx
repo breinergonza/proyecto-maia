@@ -1,7 +1,7 @@
 // Modelos (S9): la puerta de entrada de lo técnico. De un entrenamiento, un desenlace y la visita desde la que se calcula, en tres
-// pestañas: «Cómo se entrenó» (Configuración, Trazabilidad e hiperparámetros), «Cómo le fue» (Evaluación en prueba con niños que
-// no vio, Comparación técnica con una regla simple y el semáforo de cada área con el enlace a su detalle) y «Aciertos y
-// calibración» (la matriz de la alerta y la calibración de esa evaluación). Todo sale de los artefactos que dejó el
+// pestañas: «Cómo le fue» (Evaluación en prueba con niños que no vio, Comparación técnica con una regla simple y el semáforo de
+// cada área con el enlace a su detalle), «Aciertos y calibración» (la matriz de la alerta y la calibración de esa evaluación) y,
+// al final, «Cómo se entrenó» (Configuración, Trazabilidad e hiperparámetros: lo solo técnico, S22). Todo sale de los artefactos que dejó el
 // entrenamiento: no se calcula nada aquí.
 import { useSubmodulo } from '../../api/analitica'
 import type { DatosCalibracion, DatosRendimiento, DatosResumen } from '../../api/tipos'
@@ -38,10 +38,11 @@ export default function Resumen() {
   const sinAnalitica = [rend.data, resumen.data].find((d) => d && d.estado !== 'ok')
   const cargando = entrenamiento != null && consultas.some((c) => c.isPending && c.fetchStatus !== 'idle')
   const conReferencia = evaluacion?.referencia?.auc_desenlace.auc != null && evaluacion.auc_desenlace.auc != null
+  // primero lo que le importa a quien decide (cómo le fue) y al final lo solo técnico (cómo se entrenó, S22)
   const pestanas: Pestana<Ver>[] = [
-    { clave: 'entrenamiento', texto: 'Cómo se entrenó' },
     { clave: 'evaluacion', texto: 'Cómo le fue' },
     ...(evaluacion ? [{ clave: 'graficas', texto: 'Aciertos y calibración' } satisfies Pestana<Ver>] : []),
+    { clave: 'entrenamiento', texto: 'Cómo se entrenó' },
   ]
   return (
     <div className="flex flex-col gap-3 lg:min-h-0 lg:flex-1">

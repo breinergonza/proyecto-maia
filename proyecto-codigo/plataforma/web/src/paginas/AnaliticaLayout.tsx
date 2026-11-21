@@ -9,7 +9,7 @@ import { SelectoresModelo } from '../components/modelos/SelectoresModelo'
 import { Cargando } from '../components/ui'
 import { cn } from '../lib/cn'
 import { datosAl } from '../lib/lenguaje'
-import { InterruptorTecnico, ProveedorTecnico, RanuraGuia } from './analitica/comun'
+import { RanuraGuia } from './analitica/comun'
 import { useContextoAnalitica } from './analitica/contexto'
 import { SUBMODULOS } from './analitica/submodulos'
 
@@ -36,8 +36,7 @@ export default function AnaliticaLayout() {
   const [ranura, setRanura] = useState<HTMLElement | null>(null)
 
   return (
-    <ProveedorTecnico>
-      <RanuraGuia.Provider value={ranura}>
+    <RanuraGuia.Provider value={ranura}>
       {/* en escritorio la página ocupa justo la ventana: el título, el contexto y la pregunta en pocas líneas dejan el alto a los datos */}
       <div className="flex flex-col lg:h-full">
       <header className="mb-3 flex animate-aparecer flex-wrap items-center justify-between gap-x-4 gap-y-1">
@@ -46,10 +45,7 @@ export default function AnaliticaLayout() {
           <h1>{actual?.titulo ?? 'Analítica de los modelos'}</h1>
         </div>
         <p className="min-w-0 max-w-[110ch] basis-72 text-sm text-salvia lg:flex-1">{actual?.pregunta ?? 'Cómo se comporta el modelo: qué tan bien ordena, si su riesgo es fiable y si funciona igual para todos.'}</p>
-        <div className="flex flex-wrap items-center gap-4">
-          <div ref={setRanura} />
-          <InterruptorTecnico />
-        </div>
+        <div ref={setRanura} />
       </header>
 
       <section aria-label="Contexto de análisis" className="mb-3 rounded-panel border border-linea/80 bg-papel p-3 shadow-suave">
@@ -88,7 +84,6 @@ export default function AnaliticaLayout() {
 
       <div className="flex flex-col lg:min-h-0 lg:flex-1"><Outlet /></div>
       </div>
-      </RanuraGuia.Provider>
-    </ProveedorTecnico>
+    </RanuraGuia.Provider>
   )
 }

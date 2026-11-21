@@ -17,6 +17,8 @@ export const parametro = (v: string | number | null | undefined) =>
   v == null ? '—' : typeof v === 'number' ? numero(v) : /^-?\d+(\.\d+)?(e-?\d+)?$/i.test(v.trim()) ? numero(Number(v)) : v
 export const dec = (v: number | null | undefined) => (v == null ? '—' : nf01.format(v))
 export const dec2 = (v: number | null | undefined) => (v == null ? '—' : nf2.format(v))
+/** Errores pequeños (Brier, ECE): con dos decimales 0,073 y 0,078 se leerían iguales. */
+export const dec3 = (v: number | null | undefined) => (v == null ? '—' : nf3.format(v))
 /** Un valor estimado (p. ej. el rango esperado de un peso) con los decimales que importan para su tamaño:
  * 2.185 g, 47,3 cm, 1,23. */
 export const aproximado = (v: number | null | undefined) => {

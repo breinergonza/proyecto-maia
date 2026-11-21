@@ -149,14 +149,15 @@ describe('analítica: a cuántos niños se alerta', () => {
     expect(screen.queryByText(/sin cifra|n menor que 5/)).not.toBeInTheDocument()
   })
 
-  it('el modo técnico (interruptor del encabezado) muestra la jerga y se recuerda', async () => {
+  it('una sola palabra: sin interruptor técnico, «Casos detectados» explica que en estadística es la sensibilidad', async () => {
     api('experto')
     montar('/analitica/rendimiento?entrenamiento=7&desenlace=des_a&ver=linea')
     await screen.findByRole('slider')
+    expect(screen.queryByRole('switch', { name: 'Modo técnico' })).not.toBeInTheDocument()
+    const termino = screen.getByRole('button', { name: /^Casos detectados/ })
+    fireEvent.focus(termino)
+    expect(document.getElementById(termino.getAttribute('aria-describedby') ?? '')).toHaveTextContent(/En estadística: sensibilidad/)
     expect(screen.queryByText('Sensibilidad')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('switch', { name: 'Modo técnico' }))
-    expect(screen.getAllByText('Sensibilidad').length).toBeGreaterThan(0)
-    expect(localStorage.getItem('maia.analitica.tecnico')).toBe('1')
   })
 })
 
