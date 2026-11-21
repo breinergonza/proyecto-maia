@@ -76,7 +76,7 @@ nuevo**. Al ingresar, la aplicación lo devuelve a la misma pantalla en que esta
 ## Cómo está organizada la pantalla
 
 * **Menú lateral** (en el teléfono se abre con el botón de las tres rayas, arriba a la derecha) con tres secciones:
-  * **Seguimiento:** **Tablero**, **Explorar**, **Niños** y **Analítica**.
+  * **Seguimiento:** **Tablero**, **Explorar**, **Niños** (solo Experto clínico y Administración) y **Analítica**.
   * **Revisión clínica:** **Revisión de riesgos**, **Predicción**, **Mis modelos** y **Diccionario**.
   * **Administración:** **Calidad de datos**, **Configuración**, **Modelos y corridas** y **Usuarios**.
 * **Grupos que se abren y se cierran.** **Analítica**, **Configuración** y **Modelos y corridas** son grupos: el nombre
@@ -147,8 +147,7 @@ Si aparece «Todavía no hay resultados», la administración aún no ha hecho l
   cuántas hay en total y, si son más de 100, que se muestran las 100 más recientes.
 * **Riesgo por desenlace.** Una fila por desenlace, con el momento en que se calcula («se calcula a los …»):
   **Niños** (cuántos tienen el riesgo calculado), **Alto** (cuántos tienen riesgo alto; para Experto clínico y Administración, al pulsar el número se abre
-  la lista filtrada) y **Medio** (riesgo promedio). El enlace **Ver riesgo alto** abre la lista de niños con riesgo
-  alto.
+  la lista filtrada) y **Promedio** (riesgo promedio).
   Si el panel dice que ningún niño tiene riesgo calculado, no es un error: el riesgo solo se calcula en la visita en
   que se mide cada desenlace, cuando la siguiente visita aún no ha pasado.
 * **Crecimiento frente a la OMS.** Una fila por visita y una columna por medida (**Peso para la edad**, **Talla para

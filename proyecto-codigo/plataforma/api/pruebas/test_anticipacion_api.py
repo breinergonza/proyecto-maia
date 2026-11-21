@@ -92,3 +92,13 @@ def test_la_familia_llega_con_los_tres_artefactos_a_cualquier_perfil(cliente, en
     assert len(f['metricas_por_visita']['visitas']) == 3 and f['primera_alerta']['familia'] == 'readm_6m'
     solo = cliente.get(f'/api/analitica/{entrenamiento}/anticipacion', headers=h, params={'desenlace': 'readm_6m'}).json()
     assert set(solo['desenlaces']) == {'readm_6m'}
+
+
+def test_los_ninos_de_ejemplo_son_solo_de_experto_y_administracion(cliente, entrenamiento):
+    """D65: el riesgo por visita lista niños uno por uno; quien solo consulta recibe 403 y la administración pasa el
+    permiso (sin corrida en esta prueba puede responder 409)."""
+    cliente.post('/api/usuarios', headers=_login(cliente, *ADMIN),
+                 json={'email': VISOR[0], 'nombre': 'visor', 'rol': 'visualizador', 'clave': VISOR[1]})   # puede existir ya
+    params = {'desenlace': 'readm_6m'}
+    assert cliente.get('/api/analitica/riesgo-por-visita', headers=_login(cliente, *VISOR), params=params).status_code == 403
+    assert cliente.get('/api/analitica/riesgo-por-visita', headers=_login(cliente, *ADMIN), params=params).status_code not in (401, 403)
