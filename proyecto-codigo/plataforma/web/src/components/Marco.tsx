@@ -42,7 +42,7 @@ const SECCIONES: { titulo: string; enlaces: Enlace[] }[] = [
     titulo: 'Clínica',
     enlaces: [
       { a: '/', texto: 'Vista clínica', icono: LayoutDashboard },
-      { a: '/ninos', texto: 'Niños', icono: Baby },
+      { a: '/ninos', texto: 'Niños', icono: Baby, roles: ROLES_CLINICOS },   // niños uno por uno: D65
       { a: '/comparar', texto: 'Comparar grupos', icono: GitCompare, roles: ROLES_CONSULTA },
       { a: '/revision/riesgos', texto: 'Revisión de riesgos', icono: HeartPulse, roles: ROLES_CLINICOS },
       { a: '/prediccion', texto: 'Calcular un niño', icono: LineChart, roles: ROLES_CLINICOS },

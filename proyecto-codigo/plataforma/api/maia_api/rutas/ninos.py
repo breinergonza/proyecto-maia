@@ -1,5 +1,7 @@
 """Niños: lista filtrable con su riesgo más alto, y la línea temporal de un niño (visitas, mediciones, puntajes z
-de la OMS, alertas de dato y riesgos). Los códigos son los seudonimizados de la base; nunca hay nombres."""
+de la OMS, alertas de dato y riesgos). Los códigos son los seudonimizados de la base; nunca hay nombres.
+
+Cada ruta es de experto y administración: quien solo consulta ve agregados, nunca un niño (D5, D65)."""
 from __future__ import annotations
 
 import json
@@ -31,7 +33,7 @@ from maia_api.consultas import (
     unidades_crecimiento,
     valor_legible,
 )
-from maia_api.dependencias import CUALQUIERA, sesion
+from maia_api.dependencias import EXPERTO, sesion
 from maia_comun import clinica as CL
 from maia_comun import puntuacion as PU
 from maia_comun.modelos_db import PERCENTIL_ALTO, Usuario
@@ -61,7 +63,7 @@ def listar(buscar: str | None = None, desenlace: str | None = None,
            orden: Literal['sujeto', 'eg_semanas', 'desenlace_max', 'percentil_max', 'n_alertas', 'crecimiento',
                           'ultimo_control'] | None = None,
            dir: Literal['asc', 'desc'] = 'desc',
-           s: Session = Depends(sesion), _: Usuario = Depends(CUALQUIERA)) -> dict:
+           s: Session = Depends(sesion), _: Usuario = Depends(EXPERTO)) -> dict:
     c = corrida_de(s, corrida_id)
     if c.corte_id is None:
         raise HTTPException(status.HTTP_409_CONFLICT, 'Los datos de esa corrida ya no están cargados.')
@@ -145,7 +147,7 @@ def _texto_motivos(m) -> list[str]:
 
 @ruta.get('/{sujeto}/linea-temporal')
 def linea_temporal(sujeto: str, corrida_id: int | None = None, s: Session = Depends(sesion),
-                   _: Usuario = Depends(CUALQUIERA)) -> dict:
+                   _: Usuario = Depends(EXPERTO)) -> dict:
     c = corrida_de(s, corrida_id)
     if not sujeto_existe(s, c.corte_id, sujeto):
         raise HTTPException(status.HTTP_404_NOT_FOUND, f'No hay un niño {sujeto} en el corte de la corrida.')
@@ -329,7 +331,7 @@ def riesgo_por_corte(sev: Sevarti, modelos: PU.Modelos, manifest: dict, base: Pa
 
 @ruta.get('/{sujeto}/historia-riesgo')
 def historia_riesgo(sujeto: str, corrida_id: int | None = None, s: Session = Depends(sesion),
-                    _: Usuario = Depends(CUALQUIERA), motivos: bool = False) -> dict:
+                    _: Usuario = Depends(EXPERTO), motivos: bool = False) -> dict:
     """El riesgo de cada desenlace en cada visita del niño, calculado ahora con el paquete activo: cada punto usa solo lo
     medido hasta su visita. La corrida guarda solo la última visita, así que esto no sale de ``resultados.riesgos``.
     Con ``motivos`` cada punto trae también lo que más pesó en su riesgo (es lo caro: por eso es opcional). Trae además
@@ -396,7 +398,7 @@ def _variables_perfil(esq: dict) -> list[str]:
 
 @ruta.get('/{sujeto}/perfil')
 def perfil(sujeto: str, corrida_id: int | None = None, s: Session = Depends(sesion),
-           _: Usuario = Depends(CUALQUIERA)) -> dict:
+           _: Usuario = Depends(EXPERTO)) -> dict:
     """Dónde queda el niño frente a los demás niños del corte en su edad gestacional y sus medidas al nacer. De la
     cohorte solo salen agregados (cuantiles y cuántos niños), nunca valores de otro niño."""
     c = corrida_de(s, corrida_id)

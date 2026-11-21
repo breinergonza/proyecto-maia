@@ -30,8 +30,8 @@ la base de la Fundación).
 
 | Perfil (como aparece en pantalla) | Qué puede hacer |
 |---|---|
-| **Consulta** | Ver el **Tablero**, la lista de **Niños** y la historia de cada niño |
-| **Experto clínico** | Todo lo de Consulta, más **Revisión de riesgos**, **Predicción**, **Mis modelos** y **Diccionario** |
+| **Consulta** | Ver cifras de grupo: **Vista clínica**, **Comparar grupos**, **Explorar**, **Modelos** y el **Resumen**. No ve niños uno por uno |
+| **Experto clínico** | Todo lo de Consulta, más la lista de **Niños** y la historia de cada niño, **Revisión de riesgos**, **Predicción**, **Mis modelos** y **Diccionario** |
 | **Administración** | Todo lo anterior, más **Calidad de datos**, **Configuración**, **Modelos y corridas** y **Usuarios** |
 
 Si una opción del menú no aparece, su perfil no la incluye. Pida el cambio a la administración.
@@ -115,7 +115,9 @@ corrientes; se cierra con Esc o al salir de la palabra. Las explicaciones están
 
 ## Perfil Consulta
 
-Estas pantallas las ven todos los perfiles.
+Estas pantallas las ven todos los perfiles, salvo **Niños**, la historia de un niño y su perfil, que son de
+Experto clínico y Administración: el perfil Consulta ve cifras de grupo, nunca un niño uno por uno. En el Tablero ve
+las mismas cifras, sin el enlace a la lista de niños.
 
 ### Tablero
 
@@ -132,7 +134,7 @@ Si aparece «Todavía no hay resultados», la administración aún no ha hecho l
 | **datos leídos** | Total de mediciones revisadas por el modelo de anomalías |
 | **datos por revisar · N por mil** | Datos que el modelo encontró raros y cuántos son por cada mil datos leídos. Para la administración es un enlace a **Calidad de datos** |
 | **datos ya respondidos** | Datos por revisar que ya tienen respuesta de la administración |
-| **niños con algún riesgo alto** | Niños distintos con al menos un desenlace en riesgo alto (posición 90 o más: entre el 10 % de niños con más riesgo para ese desenlace). Un niño con riesgo alto en tres desenlaces cuenta una vez; al pasar el mouse se ve el total de riesgos altos. Lleva a la lista de **Niños** ya filtrada, que muestra la misma cifra |
+| **niños con algún riesgo alto** | Niños distintos con al menos un desenlace en riesgo alto (posición 90 o más: entre el 10 % de niños con más riesgo para ese desenlace). Un niño con riesgo alto en tres desenlaces cuenta una vez; al pasar el mouse se ve el total de riesgos altos. Para Experto clínico y Administración lleva a la lista de **Niños** ya filtrada, que muestra la misma cifra |
 | **alarmas de grupo** | Cambios bruscos en todo un grupo de niños de un trimestre a otro (ver abajo) |
 
 **Paneles:**
@@ -144,7 +146,7 @@ Si aparece «Todavía no hay resultados», la administración aún no ha hecho l
   siempre vienen de un cambio en la forma de medir y no de los niños. Las más recientes van primero. Arriba dice
   cuántas hay en total y, si son más de 100, que se muestran las 100 más recientes.
 * **Riesgo por desenlace.** Una fila por desenlace, con el momento en que se calcula («se calcula a los …»):
-  **Niños** (cuántos tienen el riesgo calculado), **Alto** (cuántos tienen riesgo alto; al pulsar el número se abre
+  **Niños** (cuántos tienen el riesgo calculado), **Alto** (cuántos tienen riesgo alto; para Experto clínico y Administración, al pulsar el número se abre
   la lista filtrada) y **Medio** (riesgo promedio). El enlace **Ver riesgo alto** abre la lista de niños con riesgo
   alto.
   Si el panel dice que ningún niño tiene riesgo calculado, no es un error: el riesgo solo se calcula en la visita en
@@ -154,7 +156,7 @@ Si aparece «Todavía no hay resultados», la administración aún no ha hecho l
   color ocre si es 10 % o más) y, con la flecha ↓, el porcentaje que **cayó desde el control anterior**. «EC» quiere
   decir edad corregida. Al pasar el cursor sobre una celda se ve también cuántos datos hay y el puntaje z mediano.
 
-### Niños
+### Niños (Experto y Administración)
 
 La lista de todos los niños con datos. Por defecto los primeros son los de riesgo más alto.
 
@@ -181,7 +183,7 @@ Al pulsar el nombre de una columna, la lista se ordena por ella; un segundo clic
 | **Datos por revisar** | Cuántos datos raros tiene el niño |
 | **Crecimiento** | «Bajo para la edad ×N»: cuántas medidas quedaron bajas para la edad. «Cayó ×N»: cuántas veces cayó desde el control anterior |
 
-### La historia de un niño (línea temporal)
+### La historia de un niño (línea temporal, Experto y Administración)
 
 Se abre al pulsar el código de un niño en **Niños**, en **Datos por revisar** o en un correo de aviso. **Todos los
 niños** vuelve a la lista.
@@ -279,7 +281,7 @@ teléfono). Sus botones permiten llevarse el dato: **PNG** de la gráfica (con t
   punto o barra al siguiente; **Inicio** y **Fin** saltan al primero y al último. Cada valor se anuncia en voz alta para
   los lectores de pantalla.
 
-### Perfil del niño y primera alerta
+### Perfil del niño y primera alerta (Experto y Administración)
 
 En la ficha de un niño, la tarjeta **Perfil del niño** muestra fichas con su categoría por edad gestacional
 (prematuro extremo, muy prematuro, moderado a tardío, a término), su clasificación de Lubchenco (peso adecuado, pequeño
@@ -752,8 +754,8 @@ Es a propósito (revisión ciega): así se puede saber si el modelo coincide con
 **¿Mis respuestas las ven los demás expertos?**
 No. Cada experto ve solo las suyas. La administración ve el resumen agregado de todos.
 
-**¿Por qué no veo Revisión de riesgos o Predicción?**
-Su perfil es Consulta. Si necesita esas opciones, pídale a la administración el perfil de Experto clínico.
+**¿Por qué no veo Niños, Revisión de riesgos o Predicción?**
+Su perfil es Consulta: ve cifras de grupo, no niños uno por uno. Si necesita esas opciones, pídale a la administración el perfil de Experto clínico.
 
 **¿Por qué no veo Calidad de datos?**
 Es una opción de Administración y solo la ve el perfil de administración.

@@ -143,6 +143,30 @@ describe('tablero: claridad y enlaces de revisión', () => {
     expect(screen.getByText('datos por revisar · 12,5 por mil').closest('div, a')).toHaveAttribute('title', expect.stringContaining('16.000 datos'))
   })
 
+  it('quien solo consulta ve las cifras de riesgo alto sin enlace a la lista de niños; el experto sí lo tiene', async () => {
+    const conDesenlace = (rol: Usuario['rol']) => simularApi((url) => {
+      if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario(rol) } }
+      if (url === '/api/tablero/resumen') {
+        return { cuerpo: { ...resumen, riesgos_por_desenlace: [{ clave: 'readm_3m', desenlace: 'readmisión',
+          momento: '40 sem', momento_nombre: '40 semanas', ninos: 95, altos: 10, riesgo_medio: 0.087 }] } }
+      }
+      return { cuerpo: [] }
+    })
+    conDesenlace('visualizador')
+    const { unmount } = montar('/tablero')
+    await screen.findByText('niños con algún riesgo alto')
+    expect(cifra('niños con algún riesgo alto')).toBe('40')
+    expect(screen.getByText('niños con algún riesgo alto').closest('a')).toBeNull()
+    expect(within(screen.getByRole('table')).getByText('10').closest('a')).toBeNull()
+    expect(document.querySelector('a[href^="/ninos"]')).toBeNull()
+    unmount()
+    conDesenlace('experto')
+    montar('/tablero')
+    await screen.findByText('niños con algún riesgo alto')
+    expect(screen.getByText('niños con algún riesgo alto').closest('a')).toHaveAttribute('href', '/ninos?percentil_min=90')
+    expect(within(screen.getByRole('table')).getByText('10').closest('a')).toHaveAttribute('href', '/ninos?desenlace=readm_3m&percentil_min=90')
+  })
+
   it('«Riesgo por desenlace»: un nombre por desenlace con su visita aparte, y dice qué es «alto»', async () => {
     simularApi((url) => {
       if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('experto') } }

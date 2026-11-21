@@ -44,7 +44,7 @@ describe('ingreso y permisos', () => {
     expect(await screen.findByText('Todavía no hay resultados')).toBeInTheDocument()
   })
 
-  it('el perfil de consulta no ve la administración ni la revisión', async () => {
+  it('el perfil de consulta no ve la administración, la revisión ni los niños uno por uno', async () => {
     simularApi((url) => {
       if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('visualizador') } }
       if (url === '/api/tablero/resumen') return { estado: 404, cuerpo: { detail: 'x' } }
@@ -53,7 +53,8 @@ describe('ingreso y permisos', () => {
     expect(await screen.findByRole('heading', { name: 'Sin permiso' })).toBeInTheDocument()
     expect(screen.queryAllByRole('link', { name: 'Usuarios' })).toHaveLength(0)
     expect(screen.queryAllByRole('link', { name: 'Datos por revisar' })).toHaveLength(0)
-    expect(screen.getAllByRole('link', { name: 'Niños' }).length).toBeGreaterThan(0)
+    expect(screen.queryAllByRole('link', { name: 'Niños' })).toHaveLength(0)
+    expect(screen.getAllByRole('link', { name: 'Vista clínica' }).length).toBeGreaterThan(0)
     expect(screen.getByText(/Su perfil \(Consulta\)/)).toBeInTheDocument()
   })
 

@@ -167,12 +167,21 @@ describe('navegación', () => {
     expect(seccion(menu, 'Técnica')).toEqual(['Modelos', 'Diccionario', 'Resumen'])
   })
 
-  it('quien solo consulta ve vista clínica, niños, comparar, modelos y el resumen; no lo que cambia o calcula', async () => {
+  it('quien solo consulta ve vista clínica, comparar, modelos y el resumen; no niños uno por uno ni lo que cambia o calcula', async () => {
     api('visualizador')
-    montar('/ninos')
+    montar('/')
     const menu = await menuDe()
-    expect(seccion(menu, 'Clínica')).toEqual(['Vista clínica', 'Niños', 'Comparar grupos'])
+    expect(seccion(menu, 'Clínica')).toEqual(['Vista clínica', 'Comparar grupos'])
     expect(seccion(menu, 'Técnica')).toEqual(['Modelos', 'Resumen'])
+  })
+
+  it('quien solo consulta tampoco abre la lista de niños ni la ficha de uno por la dirección', async () => {
+    for (const ruta of ['/ninos', '/ninos/K001']) {
+      api('visualizador')
+      const { unmount } = montar(ruta)
+      expect(await screen.findByRole('heading', { name: 'Sin permiso' })).toBeInTheDocument()
+      unmount()
+    }
   })
 
   it('«/» abre la vista clínica y el tablero de antes queda en «/tablero» como «Resumen»', async () => {

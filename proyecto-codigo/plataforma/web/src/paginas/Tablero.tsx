@@ -8,6 +8,7 @@ import { Link } from 'react-router'
 import { ErrorApi, pedir } from '../api/cliente'
 import type { AlarmaGrupo, AlarmasTrimestre, CrecimientoEtapa, ResumenTablero } from '../api/tipos'
 import { puede, useSesion } from '../auth/sesion'
+import { ROLES_CLINICOS } from '../components/Marco'
 import { BarrasApiladas, LeyendaSeries, LineasSeries, type ColorSerie, type FilaSeries, type Serie } from '../components/graficos'
 import { Grafica, TablaDatos } from '../components/grafica'
 import { Cargando, Encabezado, Insignia, Panel, Vacio } from '../components/ui'
@@ -65,7 +66,9 @@ export default function Tablero() {
     )
   }
   const r = resumen.data
-  const verAltos = `/ninos?percentil_min=${r.percentil_alto}`
+  // la lista de niños es de experto y administración: quien solo consulta ve la cifra, sin enlace (D65)
+  const verNinos = puede(usuario, ROLES_CLINICOS)
+  const verAltos = verNinos ? `/ninos?percentil_min=${r.percentil_alto}` : undefined
   const pendientes = Math.max(0, (r.datos_revisar ?? 0) - r.datos_revisados)
   const filasRiesgo = r.riesgos_por_desenlace.map((d) => ({
     Desenlace: sinVisita(d.desenlace), Visita: d.momento_nombre ?? '', Niños: d.ninos, 'Riesgo alto': d.altos, 'Riesgo promedio': riesgo(d.riesgo_medio),
@@ -118,9 +121,9 @@ export default function Tablero() {
                       </td>
                       <td className="text-right">{num(d.ninos)}</td>
                       <td className="text-right">
-                        <Link to={`/ninos?desenlace=${d.clave}&percentil_min=${r.percentil_alto}`} className={d.altos ? 'font-semibold text-coral-hondo underline' : ''}>
-                          {num(d.altos)}
-                        </Link>
+                        {verNinos
+                          ? <Link to={`/ninos?desenlace=${d.clave}&percentil_min=${r.percentil_alto}`} className={d.altos ? 'font-semibold text-coral-hondo underline' : ''}>{num(d.altos)}</Link>
+                          : <span className={d.altos ? 'font-semibold text-coral-hondo' : ''}>{num(d.altos)}</span>}
                       </td>
                       <td className="whitespace-nowrap text-right">{riesgo(d.riesgo_medio)}</td>
                     </tr>

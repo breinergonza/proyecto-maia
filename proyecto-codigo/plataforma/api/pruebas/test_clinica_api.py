@@ -223,6 +223,20 @@ def test_el_visualizador_no_ve_ninos_y_ve_las_mismas_cifras(cliente, tokens, cor
     assert v['grupo']['n'] == n and v == {**e, 'ninos': None}   # las mismas cifras, sin redondeo (D64)
 
 
+def test_los_ninos_uno_por_uno_son_solo_de_experto_y_administracion(cliente, tokens, corrida, sev):  # noqa: F811
+    """D5 y D65: quien solo consulta ve agregados. La lista de niños y la ficha de uno (línea temporal, historia del
+    riesgo y perfil) son de experto y administración, igual que los niños con más riesgo de la Vista clínica."""
+    sujeto = sorted(sev.sujetos.sujeto)[0]
+    for url in ('/api/ninos', f'/api/ninos/{sujeto}/linea-temporal', f'/api/ninos/{sujeto}/historia-riesgo',
+                f'/api/ninos/{sujeto}/perfil'):
+        assert cliente.get(url, params={'corrida_id': corrida}).status_code == 401, url
+        assert cliente.get(url, headers=tokens['visualizador'], params={'corrida_id': corrida}).status_code == 403, url
+        for rol in ('admin', 'experto'):
+            # pasa el permiso; la historia del riesgo responde 409 en esta prueba porque no hay paquete activo
+            r = cliente.get(url, headers=tokens[rol], params={'corrida_id': corrida})
+            assert r.status_code in ((200, 409) if url.endswith('historia-riesgo') else (200,)), (url, rol, r.status_code)
+
+
 def test_familia_o_indicador_desconocidos(cliente, tokens, corrida):  # noqa: F811
     r = _resumen(cliente, tokens, corrida_id=corrida, familia='no_existe')
     assert r.status_code == 404 and 'no_existe' in r.json()['detail']
