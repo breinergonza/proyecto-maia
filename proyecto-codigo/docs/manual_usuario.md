@@ -646,8 +646,20 @@ un enlace, nunca valores clínicos. Cada destinatario recibe un solo aviso por n
   * **Guardar.** Aparece «Guardado.».
 * **Probar el correo:** escriba un correo en **Enviar un correo de prueba a** y pulse **Enviar**. Si no llega en unos
   minutos, el equipo técnico debe revisar la configuración del servidor de correo.
-* **Avisos enviados:** **Fecha**, **Destinatario**, **Niño**, **Desenlace**, **Riesgo** y **Estado** (**Enviado** o
-  **Error**, con el motivo).
+* **Avisos enviados:** un registro por cada notificación en cada corrida, el más reciente primero (no uno por niño y
+  destinatario):
+  * **Fecha:** la del último envío del registro.
+  * **Notificación:** su nombre. Si se eliminó después, el registro se conserva y dice «Notificación eliminada».
+  * **Destinatarios:** todos los correos del aviso. El que falló dice «No se envió» y el motivo.
+  * **Niños:** cuántos niños distintos llevó el aviso. Si la notificación junta varias alertas, debajo dice cuántos
+    por cada una.
+  * **Riesgo:** cuántos de esos niños están en muy alto, en alto o por debajo de alto («2 muy alto · 1 alto»). De cada
+    niño cuenta su riesgo más alto en el aviso.
+  * **Estado:** **Enviado** si llegó a todos los correos, **Con errores** si falló alguno («Falló 1 de 2 correos») y
+    **Error** si no llegó a ninguno.
+
+  El detalle niño por niño va en el Excel adjunto de cada correo, no en esta tabla. Volver a enviar la misma
+  notificación sobre la misma corrida actualiza su registro; no crea otro.
 
 ### Resumen de la revisión (solo administración)
 
@@ -840,7 +852,8 @@ aparecen la fecha del corte y la de la corrida.
 **No me llegan los correos de aviso.**
 Revise la carpeta de correo no deseado. Si no está ahí, la administración debe confirmar en **Notificaciones** que el
 desenlace está **Activa**, que su correo está en **Destinatarios** y que la corrida no fue **En silencio**. En
-**Avisos enviados** se ve si el envío dio **Error**.
+**Avisos enviados** se ve si el aviso llegó a todos los correos (**Enviado**), falló en alguno (**Con errores**, con
+el correo y el motivo) o en todos (**Error**).
 
 **El enlace de un correo no abre la historia del niño.**
 Puede que ese niño ya no esté en el corte de la última corrida, o que su sesión haya vencido. Ingrese de nuevo y

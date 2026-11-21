@@ -2,13 +2,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { pedir } from '../api/cliente'
-import type { NotificacionConfig, Notificacion, OpcionAlertaApi, Pagina, ResultadoEnvio } from '../api/tipos'
+import type { AvisoEnviado, NotificacionConfig, OpcionAlertaApi, Pagina, ResultadoEnvio } from '../api/tipos'
 import { CampoCorreos } from '../components/CampoCorreos'
 import { useConfirmar } from '../components/Confirmar'
 import { SelectorAlertas } from '../components/SelectorAlertas'
 import { Aviso, Boton, Campo, Cargando, Encabezado, Entrada, Insignia, Paginador, Panel, Tabla, Vacio } from '../components/ui'
-import { fechaHora } from '../lib/formato'
-import { ayudaMinimo, ayudaPosicion, nivelCorto } from '../lib/lenguaje'
+import { fechaHora, num, RIESGO_ALTO } from '../lib/formato'
+import { ayudaMinimo, definicionAlto, RIESGO_MUY_ALTO } from '../lib/lenguaje'
 
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`
 
@@ -159,11 +159,31 @@ function Formulario({ inicial, opciones, alCerrar }: { inicial: NotificacionConf
   )
 }
 
+/** «3 muy alto · 2 alto»: cuántos niños del aviso hay en cada nivel, con las palabras del resto de la web. */
+function resumenRiesgo(r: AvisoEnviado['riesgo']): string {
+  const partes = [[r.muy_alto, 'muy alto'], [r.alto, 'alto'], [r.otros, 'por debajo de alto']] as const
+  return partes.filter(([n]) => n > 0).map(([n, nivel]) => `${num(n)} ${nivel}`).join(' · ') || '—'
+}
+const AYUDA_RIESGO_AVISO = `${definicionAlto(RIESGO_ALTO, RIESGO_MUY_ALTO)}. De cada niño cuenta su riesgo más alto en este aviso.`
+
+/** El estado de un registro: si llegó a todos sus correos, a algunos o a ninguno. */
+function EstadoAviso({ a }: { a: AvisoEnviado }) {
+  if (a.estado === 'enviado') return <Insignia tono="teal">Enviado</Insignia>
+  const fallaron = a.destinatarios.filter((d) => d.estado === 'error').length
+  return a.estado === 'error' ? (
+    <><Insignia tono="coral">Error</Insignia><p className="mt-0.5 text-xs text-coral-hondo">No se envió a ningún correo</p></>
+  ) : (
+    <><Insignia tono="ocre">Con errores</Insignia><p className="mt-0.5 text-xs">Falló {fallaron} de {plural(a.destinatarios.length, 'correo', 'correos')}</p></>
+  )
+}
+
+/** «Avisos enviados»: un registro por notificación y actualización de resultados, con todos sus destinatarios, cuántos niños
+ *  fueron, su nivel de riesgo y si llegó. El detalle niño por niño va en el Excel de cada correo, no en esta tabla. */
 function Historial() {
   const [pagina, setPagina] = useState(1)
   const q = useQuery({
     queryKey: ['notificaciones', 'historial', pagina],
-    queryFn: () => pedir<Pagina<Notificacion>>('/notificaciones/historial', { params: { pagina, tamano: 20 } }),
+    queryFn: () => pedir<Pagina<AvisoEnviado>>('/notificaciones/historial', { params: { pagina, tamano: 20 } }),
   })
   return (
     <Panel titulo="Avisos enviados">
@@ -172,16 +192,32 @@ function Historial() {
       ) : (
         <>
           <Tabla apilar>
-            <thead><tr><th>Fecha</th><th>Notificación</th><th>Destinatario</th><th>Niño</th><th>Desenlace</th><th>Riesgo</th><th>Estado</th></tr></thead>
-            <tbody>{q.data.items.map((n) => (
-              <tr key={n.id}>
-                <td className="whitespace-nowrap">{fechaHora(n.enviado_en)}</td>
-                <td>{n.notificacion ?? '—'}</td>
-                <td>{n.destinatario}</td>
-                <td>{n.sujeto}</td>
-                <td>{n.desenlace}</td>
-                <td title={ayudaPosicion(n.percentil)}>{nivelCorto(n.percentil)}</td>
-                <td>{n.estado === 'enviado' ? <Insignia tono="teal">Enviado</Insignia> : <Insignia tono="coral">Error</Insignia>}{n.error && <p className="text-xs text-coral-hondo">{n.error}</p>}</td>
+            <thead><tr><th>Fecha</th><th>Notificación</th><th>Destinatarios</th><th>Niños</th><th>Riesgo</th><th>Estado</th></tr></thead>
+            <tbody>{q.data.items.map((a) => (
+              <tr key={`${a.notificacion_id ?? 'eliminada'}-${a.corrida_id}`} className="align-top">
+                <td className="whitespace-nowrap">{fechaHora(a.enviado_en)}</td>
+                <td className="font-semibold">{a.notificacion ?? <span className="font-normal text-salvia">Notificación eliminada</span>}</td>
+                <td>
+                  <ul aria-label="Destinatarios" className="space-y-0.5">
+                    {a.destinatarios.map((d) => (
+                      <li key={d.correo} className={d.estado === 'error' ? 'text-coral-hondo' : undefined}>
+                        <span className="break-all">{d.correo}</span>
+                        {d.estado === 'error' && <span className="block text-xs">No se envió{d.error ? `: ${d.error}` : ''}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </td>
+                <td className="tabular-nums">
+                  <span className="font-semibold">{num(a.ninos)}</span>
+                  {/* con una sola alerta el total ya lo dice todo; con varias, cuántos niños por cada una */}
+                  {a.alertas.length > 1 && (
+                    <ul aria-label="Niños por alerta" className="mt-0.5 space-y-0.5 text-xs">
+                      {a.alertas.map((x) => <li key={x.desenlace}>{num(x.ninos)} · {x.desenlace}</li>)}
+                    </ul>
+                  )}
+                </td>
+                <td title={AYUDA_RIESGO_AVISO}>{resumenRiesgo(a.riesgo)}</td>
+                <td><EstadoAviso a={a} /></td>
               </tr>
             ))}</tbody>
           </Tabla>

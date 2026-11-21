@@ -684,7 +684,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Historial */
+        /**
+         * Historial
+         * @description «Avisos enviados»: un registro por notificación y actualización de resultados (corrida), el más reciente primero.
+         *     Cada registro trae todos sus destinatarios con su estado, cuántos niños distintos fueron, cuántos de cada nivel de
+         *     riesgo (el de su riesgo más alto en ese aviso), el desglose por alerta y un estado: ``enviado`` si llegó a todos los
+         *     correos, ``parcial`` si alguno falló y ``error`` si fallaron todos. ``total`` cuenta registros, no filas guardadas.
+         *     Una notificación eliminada conserva sus registros, sin nombre.
+         */
         get: operations["historial_api_notificaciones_historial_get"];
         put?: never;
         post?: never;

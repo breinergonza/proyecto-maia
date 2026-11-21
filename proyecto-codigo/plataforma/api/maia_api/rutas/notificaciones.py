@@ -13,7 +13,15 @@ from maia_api.esquemas import NotificacionEntrada, PruebaCorreo, ServidorEntrada
 from maia_comun import cifrado, correo, db
 from maia_comun import notificaciones as N
 from maia_comun.config import Configuracion
-from maia_comun.modelos_db import ConfigNotificacion, ConfigSmtp, NotificacionAlerta, NotificacionConfig, Usuario
+from maia_comun.modelos_db import (
+    PERCENTIL_ALTO,
+    PERCENTIL_MUY_ALTO,
+    ConfigNotificacion,
+    ConfigSmtp,
+    NotificacionAlerta,
+    NotificacionConfig,
+    Usuario,
+)
 
 ruta = APIRouter(prefix='/notificaciones', tags=['notificaciones'])
 SIN_SERVIDOR = 'Configure el servidor de correo en Notificaciones › Servidor de correo.'
@@ -167,15 +175,60 @@ def enviar_ahora(notificacion_id: int, cfg: Configuracion = Depends(configuracio
     return r
 
 
+# Las filas guardadas (una por niño y destinatario) con la corrida, el niño y el nivel de su riesgo: de aquí sale cada registro
+_FILAS_AVISOS = """
+    SELECT n.notificacion_config_id AS config_id, r.corrida_id, n.destinatario, n.estado, n.error, n.enviado_en,
+           r.sujeto, r.desenlace, r.percentil
+    FROM app.notificaciones n JOIN resultados.riesgos r ON r.id = n.riesgo_id"""
+
+
 @ruta.get('/historial')
 def historial(pagina: int = Query(1, ge=1), tamano: int = Query(50, ge=1, le=200), s: Session = Depends(sesion),
               _: Usuario = Depends(ADMIN)) -> dict:
-    total = s.execute(text('SELECT count(*) FROM app.notificaciones')).scalar_one()
-    filas = s.execute(text("""
-        SELECT n.id, n.destinatario, n.estado, n.error, n.enviado_en, r.sujeto, r.desenlace, r.percentil, r.corrida_id,
-               c.nombre AS notificacion
-        FROM app.notificaciones n JOIN resultados.riesgos r ON r.id = n.riesgo_id
-        LEFT JOIN app.notificaciones_config c ON c.id = n.notificacion_config_id
-        ORDER BY n.enviado_en DESC, n.id DESC LIMIT :lim OFFSET :off"""),
-        {'lim': tamano, 'off': (pagina - 1) * tamano})
-    return {'total': total, 'pagina': pagina, 'tamano': tamano, 'items': [dict(f._mapping) for f in filas]}
+    """«Avisos enviados»: un registro por notificación y actualización de resultados (corrida), el más reciente primero.
+    Cada registro trae todos sus destinatarios con su estado, cuántos niños distintos fueron, cuántos de cada nivel de
+    riesgo (el de su riesgo más alto en ese aviso), el desglose por alerta y un estado: ``enviado`` si llegó a todos los
+    correos, ``parcial`` si alguno falló y ``error`` si fallaron todos. ``total`` cuenta registros, no filas guardadas.
+    Una notificación eliminada conserva sus registros, sin nombre."""
+    total = s.execute(text(f'SELECT count(*) FROM (SELECT 1 FROM ({_FILAS_AVISOS}) f GROUP BY config_id, corrida_id) g')
+                      ).scalar_one()
+    grupos = s.execute(text(f"""
+        SELECT f.config_id, f.corrida_id, max(f.enviado_en) AS enviado_en, count(DISTINCT f.sujeto) AS ninos,
+               max(c.nombre) AS notificacion
+        FROM ({_FILAS_AVISOS}) f LEFT JOIN app.notificaciones_config c ON c.id = f.config_id
+        GROUP BY f.config_id, f.corrida_id
+        ORDER BY max(f.enviado_en) DESC, f.corrida_id DESC, f.config_id DESC NULLS LAST
+        LIMIT :lim OFFSET :off"""), {'lim': tamano, 'off': (pagina - 1) * tamano}).all()
+    if not grupos:
+        return {'total': total, 'pagina': pagina, 'tamano': tamano, 'items': []}
+    # el detalle de los registros de la página se agrega en la base: un aviso puede tener miles de filas
+    de_la_pagina = {'corridas': sorted({g.corrida_id for g in grupos})}
+    filtro = f'FROM ({_FILAS_AVISOS}) f WHERE f.corrida_id = ANY(:corridas)'
+    niveles = {(f.config_id, f.corrida_id): {'muy_alto': f.muy_alto, 'alto': f.alto, 'otros': f.otros}
+               for f in s.execute(text(f"""
+        SELECT config_id, corrida_id, count(*) FILTER (WHERE p >= :muy) AS muy_alto,
+               count(*) FILTER (WHERE p >= :alto AND p < :muy) AS alto, count(*) FILTER (WHERE p < :alto) AS otros
+        FROM (SELECT f.config_id, f.corrida_id, f.sujeto, max(f.percentil) AS p {filtro} GROUP BY 1, 2, 3) x
+        GROUP BY config_id, corrida_id"""), {**de_la_pagina, 'muy': PERCENTIL_MUY_ALTO, 'alto': PERCENTIL_ALTO})}
+    alertas: dict[tuple, list[dict]] = {}
+    for f in s.execute(text(f"""
+            SELECT f.config_id, f.corrida_id, f.desenlace, count(DISTINCT f.sujeto) AS ninos {filtro}
+            GROUP BY 1, 2, 3 ORDER BY count(DISTINCT f.sujeto) DESC, f.desenlace"""), de_la_pagina):
+        alertas.setdefault((f.config_id, f.corrida_id), []).append({'desenlace': f.desenlace, 'ninos': f.ninos})
+    destinatarios: dict[tuple, list[dict]] = {}
+    for f in s.execute(text(f"""
+            SELECT f.config_id, f.corrida_id, f.destinatario, bool_and(f.estado = 'enviado') AS enviado,
+                   (array_agg(f.error ORDER BY f.enviado_en DESC) FILTER (WHERE f.estado = 'error'))[1] AS error {filtro}
+            GROUP BY 1, 2, 3 ORDER BY f.destinatario"""), de_la_pagina):
+        destinatarios.setdefault((f.config_id, f.corrida_id), []).append(
+            {'correo': f.destinatario, 'estado': 'enviado' if f.enviado else 'error', 'error': None if f.enviado else f.error})
+
+    def registro(g) -> dict:
+        llave = (g.config_id, g.corrida_id)
+        correos = destinatarios.get(llave, [])
+        fallaron = sum(d['estado'] == 'error' for d in correos)
+        return {'notificacion_id': g.config_id, 'notificacion': g.notificacion, 'corrida_id': g.corrida_id,
+                'enviado_en': g.enviado_en, 'ninos': g.ninos, 'riesgo': niveles.get(llave, {'muy_alto': 0, 'alto': 0, 'otros': 0}),
+                'alertas': alertas.get(llave, []), 'destinatarios': correos,
+                'estado': 'enviado' if fallaron == 0 else 'error' if fallaron == len(correos) else 'parcial'}
+    return {'total': total, 'pagina': pagina, 'tamano': tamano, 'items': [registro(g) for g in grupos]}

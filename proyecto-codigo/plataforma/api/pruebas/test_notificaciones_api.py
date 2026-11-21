@@ -186,8 +186,10 @@ def test_enviar_ahora_por_api_y_auditoria(cliente, admin, paquetes, smtp):
     r = cliente.post(f"/api/notificaciones/alertas/{n['id']}/enviar", headers=admin)
     assert r.status_code == 200 and r.json()['correos'] == 1 and r.json()['ninos'] == 2
     assert len(buzon.mensajes) == antes + 1
-    h = cliente.get('/api/notificaciones/historial', headers=admin).json()
-    assert any(i['notificacion'] == 'Envio directo' for i in h['items'])
+    # un solo registro para ese envío: dos niños a un correo, no una fila por niño
+    mios = [i for i in _avisos(cliente, admin)['items'] if i['notificacion'] == 'Envio directo']
+    assert len(mios) == 1 and (mios[0]['ninos'], mios[0]['estado']) == (2, 'enviado')
+    assert mios[0]['destinatarios'] == [{'correo': 'x@maia.prueba', 'estado': 'enviado', 'error': None}]
     with db.fabrica()() as s:
         acciones = set(s.execute(text('SELECT accion FROM app.auditoria')).scalars())
     assert {'crear_notificacion', 'enviar_notificacion'} <= acciones
@@ -222,3 +224,89 @@ def test_solo_el_admin_reestablece_el_servidor(cliente, admin, paquetes, smtp):
     exp = _login(cliente, 'exp-rest@maia.prueba', 'clave-larga-123')
     assert cliente.delete('/api/notificaciones/servidor', headers=exp).status_code == 403
     assert cliente.get('/api/notificaciones/servidor', headers=admin).json()['configurado'] is True
+
+
+# ------------------------------------------------------------------ avisos enviados: un registro por notificación
+
+def _corrida_con_avisos(notificacion_id, riesgos, envios, cuando):
+    """Siembra una corrida terminada con ``riesgos`` [(sujeto, clave, desenlace, percentil)] y las filas que dejaría
+    avisar de todos ellos a cada correo de ``envios`` {correo: (estado, error)}. Devuelve el id de la corrida."""
+    from maia_comun.modelos_db import Corrida, Notificacion, Riesgo
+    with db.fabrica()() as s:
+        c = Corrida(tipo='demo', estado='ok', silencio=False)
+        s.add(c)
+        s.flush()
+        filas = [Riesgo(corrida_id=c.id, sujeto=sujeto, clave=clave, desenlace=desenlace, momento='6 meses', riesgo=0.5,
+                        percentil=percentil, motivos=[], silencio=False) for sujeto, clave, desenlace, percentil in riesgos]
+        s.add_all(filas)
+        s.flush()
+        s.add_all([Notificacion(riesgo_id=r.id, destinatario=correo, notificacion_config_id=notificacion_id, estado=estado,
+                                error=error, enviado_en=cuando)
+                   for r in filas for correo, (estado, error) in envios.items()])
+        s.commit()
+        return c.id
+
+
+def _avisos(cliente, admin, **params):
+    return cliente.get('/api/notificaciones/historial', headers=admin, params={'tamano': 200} | params).json()
+
+
+def test_avisos_enviados_trae_un_registro_por_notificacion_y_actualizacion(cliente, admin, paquetes):
+    """«Avisos enviados» no repite una fila por niño y por correo: cada notificación sale una vez por actualización de
+    resultados, con todos sus destinatarios, cuántos niños fueron, cuántos de cada nivel de riesgo y su estado."""
+    from datetime import UTC, datetime
+    catalogo = cliente.get('/api/notificaciones/alertas/desenlaces', headers=admin).json()
+    a, b = catalogo[0]['clave'], catalogo[1]['clave']
+    n = _crear(cliente, admin, 'Avisos agrupados', percentil_minimo=85, alertas=[a, b],
+               destinatarios=['zeta@maia.prueba', 'alfa@maia.prueba'])
+    antes = _avisos(cliente, admin)['total']
+    # primera actualización: cuatro niños (uno con las dos alertas) a los dos correos; el de «zeta» falló
+    primera = _corrida_con_avisos(
+        n['id'], [('h1', a, 'alerta uno', 98), ('h1', b, 'alerta dos', 91), ('h2', a, 'alerta uno', 96),
+                  ('h3', a, 'alerta uno', 92), ('h4', b, 'alerta dos', 86)],
+        {'alfa@maia.prueba': ('enviado', None), 'zeta@maia.prueba': ('error', 'SMTPException: buzón lleno')},
+        datetime(2026, 3, 1, 10, 0, tzinfo=UTC))
+    # segunda actualización: un niño, enviado a los dos
+    segunda = _corrida_con_avisos(n['id'], [('h9', a, 'alerta uno', 99)],
+                                  {'alfa@maia.prueba': ('enviado', None), 'zeta@maia.prueba': ('enviado', None)},
+                                  datetime(2026, 4, 1, 10, 0, tzinfo=UTC))
+    h = _avisos(cliente, admin)
+    assert h['total'] == antes + 2                                      # dos registros, no las doce filas guardadas
+    mios = [i for i in h['items'] if i['notificacion'] == 'Avisos agrupados']
+    assert [i['corrida_id'] for i in mios] == [segunda, primera]        # el más reciente primero
+    reciente, anterior = mios
+    assert anterior == {
+        'notificacion_id': n['id'], 'notificacion': 'Avisos agrupados', 'corrida_id': primera,
+        'enviado_en': anterior['enviado_en'], 'ninos': 4,
+        # el nivel de cada niño es el de su riesgo más alto: h1 (98) y h2 (96) muy alto, h3 (92) alto y h4 (86) por debajo
+        'riesgo': {'muy_alto': 2, 'alto': 1, 'otros': 1},
+        'alertas': [{'desenlace': 'alerta uno', 'ninos': 3}, {'desenlace': 'alerta dos', 'ninos': 2}],
+        'destinatarios': [{'correo': 'alfa@maia.prueba', 'estado': 'enviado', 'error': None},
+                          {'correo': 'zeta@maia.prueba', 'estado': 'error', 'error': 'SMTPException: buzón lleno'}],
+        'estado': 'parcial'}
+    assert anterior['enviado_en'].startswith('2026-03-01T10:00')
+    assert (reciente['ninos'], reciente['riesgo'], reciente['estado']) == (1, {'muy_alto': 1, 'alto': 0, 'otros': 0}, 'enviado')
+    assert [d['estado'] for d in reciente['destinatarios']] == ['enviado', 'enviado']
+
+
+def test_avisos_enviados_todos_fallaron_notificacion_eliminada_y_paginas(cliente, admin, paquetes):
+    """Si falló el envío a todos los correos el registro queda en «error». La paginación cuenta registros. Al eliminar la
+    notificación su registro se conserva, sin nombre."""
+    from datetime import UTC, datetime
+    a = cliente.get('/api/notificaciones/alertas/desenlaces', headers=admin).json()[0]['clave']
+    n = _crear(cliente, admin, 'Avisos que se borran', destinatarios=['uno@maia.prueba', 'dos@maia.prueba'])
+    fallo = {'uno@maia.prueba': ('error', 'OSError: sin red'), 'dos@maia.prueba': ('error', 'OSError: sin red')}
+    # fechas futuras: son los dos registros más recientes de la base de la prueba, en este orden
+    vieja = _corrida_con_avisos(n['id'], [('e2', a, 'alerta uno', 97)], {'uno@maia.prueba': ('enviado', None)},
+                                datetime(2029, 1, 1, tzinfo=UTC))
+    nueva = _corrida_con_avisos(n['id'], [('e1', a, 'alerta uno', 99)], fallo, datetime(2030, 1, 1, tzinfo=UTC))
+    pagina = _avisos(cliente, admin, tamano=1)
+    assert len(pagina['items']) == 1 and pagina['total'] >= 2 and pagina['tamano'] == 1
+    r = pagina['items'][0]
+    assert (r['notificacion'], r['corrida_id'], r['estado']) == ('Avisos que se borran', nueva, 'error')
+    assert {d['error'] for d in r['destinatarios']} == {'OSError: sin red'}
+    assert _avisos(cliente, admin, tamano=1, pagina=2)['items'][0]['corrida_id'] == vieja
+    assert cliente.delete(f"/api/notificaciones/alertas/{n['id']}", headers=admin).status_code == 204
+    r = _avisos(cliente, admin, tamano=1)['items'][0]
+    assert (r['notificacion_id'], r['notificacion'], r['corrida_id'], r['ninos']) == (None, None, nueva, 1)
+    assert [d['correo'] for d in r['destinatarios']] == ['dos@maia.prueba', 'uno@maia.prueba']

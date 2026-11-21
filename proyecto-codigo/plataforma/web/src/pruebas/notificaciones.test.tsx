@@ -220,3 +220,72 @@ describe('Alertas', () => {
     await waitFor(() => expect(llamadas.some((l) => l.init?.method === 'DELETE')).toBe(true))
   })
 })
+
+// «Avisos enviados»: un registro por notificación y actualización de resultados, no uno por niño y destinatario
+const registro = (extra: object = {}) => ({
+  notificacion_id: 7, notificacion: 'Neonatología', corrida_id: 3, enviado_en: '2026-11-21T20:04:00Z', ninos: 5,
+  riesgo: { muy_alto: 5, alto: 0, otros: 0 }, alertas: [{ desenlace: 'readmisión a los 3 meses', ninos: 5 }],
+  destinatarios: [{ correo: 'a@maia.prueba', estado: 'enviado', error: null }, { correo: 'b@maia.prueba', estado: 'enviado', error: null }],
+  estado: 'enviado', ...extra,
+})
+const conAvisos = (items: object[]) => (url: string) =>
+  url.startsWith('/api/notificaciones/historial') ? { cuerpo: { total: items.length, pagina: 1, tamano: 20, items } } : undefined
+/** Las celdas de la única fila de «Avisos enviados». */
+async function celdasDelAviso() {
+  const panel = (await screen.findByRole('heading', { name: 'Avisos enviados' })).closest('section')!
+  const tabla = await within(panel).findByRole('table')
+  const filas = within(tabla).getAllByRole('row').slice(1)
+  expect(filas).toHaveLength(1)   // una fila por notificación, no una por niño y destinatario
+  return { tabla, celdas: within(filas[0]).getAllByRole('cell') }
+}
+
+describe('Avisos enviados', () => {
+  it('muestra un registro por notificación con todos sus destinatarios, cuántos niños, el riesgo y el estado', async () => {
+    api(conAvisos([registro()]))
+    montar('/notificaciones/alertas')
+    const { tabla, celdas } = await celdasDelAviso()
+    expect(within(tabla).getAllByRole('columnheader').map((c) => c.textContent)).toEqual(
+      ['Fecha', 'Notificación', 'Destinatarios', 'Niños', 'Riesgo', 'Estado'])
+    expect(celdas[1]).toHaveTextContent('Neonatología')
+    expect(within(celdas[2]).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['a@maia.prueba', 'b@maia.prueba'])
+    expect(celdas[3]).toHaveTextContent(/^5$/)          // con una sola alerta no hace falta desglosar
+    expect(celdas[4]).toHaveTextContent(/^5 muy alto$/)
+    expect(celdas[5]).toHaveTextContent(/^Enviado$/)
+  })
+
+  it('si falló algún correo dice «Con errores», cuál falló y por qué', async () => {
+    api(conAvisos([registro({ estado: 'parcial', destinatarios: [
+      { correo: 'a@maia.prueba', estado: 'enviado', error: null },
+      { correo: 'b@maia.prueba', estado: 'error', error: 'SMTPException: buzón lleno' }] })]))
+    montar('/notificaciones/alertas')
+    const { celdas } = await celdasDelAviso()
+    expect(celdas[5]).toHaveTextContent('Con errores')
+    expect(celdas[5]).toHaveTextContent('Falló 1 de 2 correos')
+    const [llego, fallo] = within(celdas[2]).getAllByRole('listitem')
+    expect(llego).toHaveTextContent(/^a@maia\.prueba$/)
+    expect(fallo).toHaveTextContent('b@maia.prueba')
+    expect(fallo).toHaveTextContent('No se envió: SMTPException: buzón lleno')
+  })
+
+  it('si fallaron todos los correos dice «Error»', async () => {
+    api(conAvisos([registro({ estado: 'error', destinatarios: [
+      { correo: 'a@maia.prueba', estado: 'error', error: 'OSError: sin red' }, { correo: 'b@maia.prueba', estado: 'error', error: 'OSError: sin red' }] })]))
+    montar('/notificaciones/alertas')
+    const { celdas } = await celdasDelAviso()
+    expect(celdas[5]).toHaveTextContent('Error')
+    expect(celdas[5]).toHaveTextContent('No se envió a ningún correo')
+    expect(celdas[5]).not.toHaveTextContent('Con errores')
+  })
+
+  it('con varias alertas desglosa los niños por alerta, el riesgo dice cuántos de cada nivel y una notificación eliminada se dice', async () => {
+    api(conAvisos([registro({ notificacion_id: null, notificacion: null, ninos: 4, riesgo: { muy_alto: 2, alto: 1, otros: 1 },
+      alertas: [{ desenlace: 'readmisión a los 3 meses', ninos: 3 }, { desenlace: 'crecimiento bajo a los 6 meses', ninos: 2 }] })]))
+    montar('/notificaciones/alertas')
+    const { celdas } = await celdasDelAviso()
+    expect(celdas[1]).toHaveTextContent('Notificación eliminada')
+    expect(celdas[3]).toHaveTextContent(/^4/)
+    expect(within(celdas[3]).getAllByRole('listitem').map((li) => li.textContent)).toEqual(
+      ['3 · readmisión a los 3 meses', '2 · crecimiento bajo a los 6 meses'])
+    expect(celdas[4]).toHaveTextContent('2 muy alto · 1 alto · 1 por debajo de alto')
+  })
+})

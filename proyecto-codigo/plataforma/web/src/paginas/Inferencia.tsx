@@ -212,7 +212,7 @@ export default function Inferencia() {
         <div className="mb-3"><Aviso tono="teal">No se usaron estos datos porque el modelo no los conoce: {resultado.variables_ignoradas.join(', ')}.</Aviso></div>
       )}
       <Pestanas prefijo="calculo" etiqueta="Qué ver del cálculo" pestanas={secciones} activa={activa} elegir={setPestana} />
-      <div className="mt-3 lg:min-h-0 lg:flex-1">
+      <div className="mt-2 lg:min-h-0 lg:flex-1">
         <PanelesPestana prefijo="calculo" activa={activa} paneles={secciones} className="lg:h-full lg:overflow-y-auto" />
       </div>
     </div>
@@ -278,102 +278,127 @@ function Formulario({ formulario, calcular, verDatos }: {
   const visitaActiva = formulario.visitas.some((v) => claveVisita(v.etapa) === visita) ? visita : claveVisita(formulario.visitas[0]?.etapa ?? '')
 
   return (
-    <form id={ID_FORMULARIO} onSubmit={enviar} noValidate className="space-y-4">
-      <p className="text-sm text-salvia">
-        Escriba lo que tenga del niño, visita por visita, y vea qué riesgo calcula el modelo y qué datos parecen raros.
-        Lo que deje vacío se toma como dato faltante. No se guarda nada.
-      </p>
+    <form id={ID_FORMULARIO} onSubmit={enviar} noValidate className="space-y-2.5">
       {errores.length > 0 && (
         <Aviso>{errores.length === 1 ? errores[0] : <ul className="list-disc space-y-0.5 pl-4">{errores.map((e) => <li key={e}>{e}</li>)}</ul>}</Aviso>
       )}
-      <Panel titulo="Datos del niño"
+      {/* la guía va junto al título: en un renglón propio le quitaba una fila al formulario */}
+      <Panel denso
+        titulo={<div className="flex min-w-0 flex-[1_1_20rem] flex-wrap items-baseline gap-x-3 gap-y-0.5">
+          <h2 className="text-base">Datos del niño</h2>
+          <p className="text-sm text-salvia">Escriba lo que tenga, visita por visita. Lo que deje vacío se toma como dato faltante. No se guarda nada.</p>
+        </div>}
         accion={<div className="flex flex-wrap gap-2">
           <Boton type="button" chico variante="secundario" onClick={() => ejemplo.mutate()} disabled={ejemplo.isPending}>{ejemplo.isPending ? 'Armando el ejemplo…' : 'Cargar un niño de ejemplo'}</Boton>
           <Boton type="button" chico variante="fantasma" onClick={limpiar}>Limpiar</Boton>
         </div>}>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <CampoSimple id="c-nacimiento" etiqueta="Fecha de nacimiento">
-            <Entrada id="c-nacimiento" type="date" value={nino.nacimiento} onChange={(e) => setNino({ ...nino, nacimiento: e.target.value })} />
-          </CampoSimple>
-          <CampoSimple id="c-eg" etiqueta="Semanas de gestación al nacer" ayuda="Entre 20 y 45.">
-            <Entrada id="c-eg" inputMode="decimal" value={nino.eg} onChange={(e) => setNino({ ...nino, eg: e.target.value })} />
-          </CampoSimple>
-        </div>
-        {formulario.generales.length > 0 && (
-          <div className="mt-4"><Campos campos={formulario.generales} valores={valores} cambiar={cambiar} masTexto="Más datos del niño y la familia" /></div>
-        )}
+        {/* las dos fechas del niño van en la misma cuadrícula que sus datos: en una pantalla ancha, todo en una fila */}
+        <Campos campos={formulario.generales} valores={valores} cambiar={cambiar} masTexto="Más datos del niño y la familia"
+          antes={<>
+            <CampoSimple id="c-nacimiento" etiqueta="Fecha de nacimiento">
+              <Entrada id="c-nacimiento" type="date" className={CASILLA} value={nino.nacimiento} onChange={(e) => setNino({ ...nino, nacimiento: e.target.value })} />
+            </CampoSimple>
+            <CampoSimple id="c-eg" etiqueta="Semanas de gestación al nacer" ayuda="Entre 20 y 45.">
+              <Entrada id="c-eg" inputMode="decimal" placeholder="20 a 45" className={CASILLA} value={nino.eg}
+                onChange={(e) => setNino({ ...nino, eg: e.target.value })} {...conAyuda('c-eg', 'Entre 20 y 45.')} />
+            </CampoSimple>
+          </>} />
         {ejemplo.error && <div className="mt-3"><Aviso>{ejemplo.error.message}</Aviso></div>}
         {ejemplo.isSuccess && <p className="mt-3 text-sm text-salvia">Se cargó un niño simulado: ningún dato es de un niño real.</p>}
       </Panel>
 
       {formulario.visitas.length > 0 && visitaActiva && (
-        <Panel titulo="Visitas" descripcion="Llene solo las que tenga.">
-          <Pestanas prefijo="visita" etiqueta="Visitas" pestanas={pestanasVisitas} activa={visitaActiva} elegir={setVisita} />
-          <PanelesPestana prefijo="visita" activa={visitaActiva} className="pt-4"
-            paneles={formulario.visitas.map((v) => ({
-              clave: claveVisita(v.etapa),
-              contenido: (
-                <>
-                  {v.desenlaces.length > 0 && (
-                    <div className="mb-3 text-sm">
-                      <p className="font-semibold" id={`riesgos-${v.etapa}`}>Con esta visita se calculan:</p>
-                      <ul aria-label="Riesgos que se calculan con esta visita" className="mt-0.5 list-disc space-y-0.5 pl-5 text-salvia">
-                        {riesgosDe(v).map((d) => <li key={d}>{d}</li>)}
-                      </ul>
+        <Panel denso>
+          {/* el título comparte renglón con las pestañas de las visitas; si no caben, las pestañas bajan enteras */}
+          <div className="flex flex-wrap items-end gap-x-4 border-b border-linea">
+            <h2 className="pb-2.5 text-base">Visitas</h2>
+            <Pestanas prefijo="visita" etiqueta="Visitas" pestanas={pestanasVisitas} activa={visitaActiva} elegir={setVisita} className="border-b-0" />
+          </div>
+          <PanelesPestana prefijo="visita" activa={visitaActiva} className="pt-2.5"
+            paneles={formulario.visitas.map((v) => {
+              // la edad esperada de la visita se dice una vez, en la línea de arriba, y describe a la casilla de la fecha
+              const idVentana = `ventana-${claveVisita(v.etapa)}`
+              const esperada = ventana(v)
+              return {
+                clave: claveVisita(v.etapa),
+                contenido: (
+                  <>
+                    <div className="mb-2 flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm">
+                      {v.desenlaces.length > 0 && (
+                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                          <p className="font-semibold" id={`riesgos-${v.etapa}`}>Con esta visita se calculan:</p>
+                          <ul aria-label="Riesgos que se calculan con esta visita" className="flex flex-wrap gap-x-1.5 gap-y-1">
+                            {riesgosDe(v).map((d) => (
+                              <li key={d} className="rounded-full border border-linea bg-fondo px-2 py-0.5 text-xs font-semibold text-salvia">{d}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {alNacer(v) ? <p className="text-salvia">Se toman con la fecha de nacimiento.</p>
+                        : esperada && <p id={idVentana} className="text-salvia">{esperada}</p>}
                     </div>
-                  )}
-                  {alNacer(v) ? (
-                    <p className="mb-3 text-sm text-salvia">Se toman con la fecha de nacimiento.</p>
-                  ) : (
-                    <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                      <CampoSimple id={`f-${v.etapa}`} etiqueta="Fecha de la visita" ayuda={ventana(v)}>
-                        <Entrada id={`f-${v.etapa}`} type="date" value={fechas[v.etapa] ?? ''}
-                          onChange={(e) => setFechas({ ...fechas, [v.etapa]: e.target.value })} />
-                      </CampoSimple>
-                    </div>
-                  )}
-                  {v.campos.length > 0 ? <Campos campos={v.campos} valores={valores} cambiar={cambiar} masTexto="Más datos de esta visita" />
-                    : <p className="text-sm text-salvia">Esta visita no tiene datos propios en el modelo.</p>}
-                </>
-              ),
-            }))} />
+                    <Campos campos={v.campos} valores={valores} cambiar={cambiar} masTexto="Más datos de esta visita"
+                      antes={!alNacer(v) && (
+                        <CampoSimple id={`f-${v.etapa}`} etiqueta="Fecha de la visita">
+                          <Entrada id={`f-${v.etapa}`} type="date" className={CASILLA} value={fechas[v.etapa] ?? ''} aria-describedby={esperada ? idVentana : undefined}
+                            onChange={(e) => setFechas({ ...fechas, [v.etapa]: e.target.value })} />
+                        </CampoSimple>
+                      )} />
+                    {v.campos.length === 0 && <p className="mt-2.5 text-sm text-salvia">Esta visita no tiene datos propios en el modelo.</p>}
+                  </>
+                ),
+              }
+            })} />
         </Panel>
       )}
     </form>
   )
 }
 
+/** La cuadrícula de casillas: tantas columnas como quepan en el ancho (una o dos en un teléfono, siete en un portátil,
+ * ocho en una pantalla grande) para que el formulario se vea entero sin bajar. En un portátil las casillas son más
+ * angostas: así los datos del niño caben en una fila; en una pantalla grande sobra ancho y se les da. Las casillas se
+ * alinean por abajo: una etiqueta de dos renglones no descuadra la fila. */
+const CUADRICULA = 'grid grid-cols-[repeat(auto-fill,minmax(9.25rem,1fr))] min-[1700px]:grid-cols-[repeat(auto-fill,minmax(11.5rem,1fr))] items-end gap-x-3 gap-y-2'
+
+/** El control de una casilla: en escritorio un poco más bajo (en un teléfono conserva el alto para el dedo), y el rango
+ * escrito dentro de la casilla vacía más chico y tenue que un valor, para que no parezca un dato ya escrito. */
+const CASILLA = 'lg:h-9 placeholder:text-sm placeholder:text-salvia/80'
+
+const idAyuda = (id: string) => `${id}-ayuda`
+/** Lo que lleva el control de una casilla con ayuda: la frase completa no se pinta bajo la casilla (ocupaba un renglón
+ * por fila); se lee al pasar el cursor y la oyen los lectores de pantalla. */
+const conAyuda = (id: string, ayuda?: string) => (ayuda ? { 'aria-describedby': idAyuda(id), title: ayuda } : {})
+
 function CampoSimple({ id, etiqueta, ayuda, children }: { id: string; etiqueta: string; ayuda?: string; children: ReactNode }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-semibold text-tinta/90">{etiqueta}</label>
+    <div className="flex min-w-0 flex-col gap-1">
+      <label htmlFor={id} title={etiqueta} className="line-clamp-3 text-[0.8125rem] leading-tight font-semibold text-tinta/90">{etiqueta}</label>
       {children}
-      {ayuda && <p className="text-xs text-salvia">{ayuda}</p>}
+      {ayuda && <span id={idAyuda(id)} className="sr-only">{ayuda}</span>}
     </div>
   )
 }
 
-/** Los campos principales a la vista; el resto, plegado. */
-function Campos({ campos, valores, cambiar, masTexto }: {
-  campos: CampoFormulario[]; valores: Valores; cambiar: (variable: string, valor: string) => void; masTexto: string
+/** Los campos principales a la vista; el resto, plegado. `antes` son casillas que van primero en la misma cuadrícula
+ * (las fechas), para que no gasten una fila aparte. */
+function Campos({ campos, valores, cambiar, masTexto, antes }: {
+  campos: CampoFormulario[]; valores: Valores; cambiar: (variable: string, valor: string) => void; masTexto: string; antes?: ReactNode
 }) {
   const principales = campos.filter((c) => c.principal)
   const resto = campos.filter((c) => !c.principal)
   const llenosResto = resto.filter((c) => valores[c.variable]?.trim()).length
-  const grilla = (lista: CampoFormulario[]) => (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      {lista.map((c) => <CampoDato key={c.variable} c={c} valor={valores[c.variable] ?? ''} cambiar={(x) => cambiar(c.variable, x)} />)}
-    </div>
-  )
+  const casillas = (lista: CampoFormulario[]) =>
+    lista.map((c) => <CampoDato key={c.variable} c={c} valor={valores[c.variable] ?? ''} cambiar={(x) => cambiar(c.variable, x)} />)
   return (
-    <div className="space-y-3">
-      {principales.length > 0 && grilla(principales)}
+    <div className="space-y-2">
+      {(antes || principales.length > 0) && <div data-cuadricula className={CUADRICULA}>{antes}{casillas(principales)}</div>}
       {resto.length > 0 && (
-        <details className="rounded-control border border-linea/70 px-3 py-2" open={principales.length === 0 || llenosResto > 0}>
+        <details className="rounded-control border border-linea/70 px-3 py-1" open={principales.length === 0 || llenosResto > 0}>
           <summary className="cursor-pointer text-sm font-semibold text-teal">
             {masTexto} ({resto.length}){llenosResto > 0 && <span className="font-normal text-salvia"> · {llenosResto} llenos</span>}
           </summary>
-          <div className="mt-3">{grilla(resto)}</div>
+          <div data-cuadricula className={cn(CUADRICULA, 'mt-2 pb-1.5')}>{casillas(resto)}</div>
         </details>
       )}
     </div>
@@ -382,20 +407,23 @@ function Campos({ campos, valores, cambiar, masTexto }: {
 
 function CampoDato({ c, valor, cambiar }: { c: CampoFormulario; valor: string; cambiar: (v: string) => void }) {
   const id = `v-${c.variable}`
-  const rango = c.minimo != null && c.maximo != null ? `Habitual: ${dec(c.minimo)} a ${dec(c.maximo)}${c.unidad ? ` ${c.unidad}` : ''}.` : undefined
+  const conRango = c.minimo != null && c.maximo != null
+  const rango = conRango ? `Habitual: ${dec(c.minimo)} a ${dec(c.maximo)}${c.unidad ? ` ${c.unidad}` : ''}.` : undefined
   const etiqueta = c.unidad && c.tipo === 'numero' ? `${c.etiqueta} (${c.unidad})` : c.etiqueta
   let control: ReactNode
   if (c.tipo === 'lista' || c.tipo === 'si_no') {
     const opciones = c.tipo === 'si_no' && !c.opciones.length ? [{ valor: '1', etiqueta: 'Sí' }, { valor: '0', etiqueta: 'No' }] : c.opciones
     control = (
-      <Selector id={id} value={valor} onChange={(e) => cambiar(e.target.value)}>
+      <Selector id={id} className={CASILLA} value={valor} onChange={(e) => cambiar(e.target.value)} {...conAyuda(id, rango)}>
         <option value="">—</option>
         {opciones.map((o) => <option key={o.valor} value={o.valor}>{o.etiqueta}</option>)}
       </Selector>
     )
   } else {
+    // el rango habitual va dentro de la casilla vacía (la unidad ya está en la etiqueta)
     control = <Entrada id={id} type={c.tipo === 'fecha' ? 'date' : 'text'} inputMode={c.tipo === 'numero' ? 'decimal' : undefined}
-      value={valor} onChange={(e) => cambiar(e.target.value)} />
+      placeholder={conRango ? `${dec(c.minimo)} a ${dec(c.maximo)}` : undefined} className={CASILLA}
+      value={valor} onChange={(e) => cambiar(e.target.value)} {...conAyuda(id, rango)} />
   }
   return <CampoSimple id={id} etiqueta={etiqueta} ayuda={rango}>{control}</CampoSimple>
 }
