@@ -11,6 +11,7 @@ import type { CampoFormulario, FormularioCalculo, PeticionInferencia, PuntoCreci
 import { puede, useSesion } from '../auth/sesion'
 import { descripcionDe } from '../lib/descripciones'
 import { Aviso, Boton, Cargando, Encabezado, Entrada, Insignia, Panel, Selector, Tabla, Texto, Vacio } from '../components/ui'
+import { Termino } from '../components/Termino'
 import { cn } from '../lib/cn'
 import { usePaqueteActivo } from '../lib/consultas'
 import { CrecimientoOms, TarjetaRiesgo } from '../components/ficha'
@@ -19,7 +20,7 @@ import { seccionesDeRiesgo } from '../components/ficha/RiesgoA12Meses'
 import { RangoEsperado } from '../components/graficos'
 import { estadoDe, familiaDe, familiasConRiesgo } from '../lib/familias'
 import { aproximado, dec, edad, indicador, medida } from '../lib/formato'
-import { alerta, AYUDA_DOS_CIFRAS, AYUDA_OMS, ayudaAlerta, ayudaZ, CAYO, frenteOms, motivoExtra } from '../lib/lenguaje'
+import { alerta, AYUDA_DOS_CIFRAS, ayudaAlerta, ayudaZ, CAYO, frenteOms, motivoExtra } from '../lib/lenguaje'
 
 const SUJETO = 'calculo'
 const DIA = 86_400_000
@@ -516,7 +517,7 @@ function seccionesDeResultado(r: ResultadoConHistoria, varios: boolean): Seccion
     {
       clave: 'crecimiento', texto: 'Crecimiento',
       contenido: grafica ? <CrecimientoOms crecimiento={porIndicador(r.crecimiento)} grilla="sm:grid-cols-3" /> : (
-        <Panel titulo={descripcionDe('crecimiento_ficha').titulo} descripcion={descripcionDe('crecimiento_ficha').descripcion} accion={<span className="text-xs text-salvia" title={AYUDA_OMS}>para la edad corregida</span>}>
+        <Panel titulo={descripcionDe('crecimiento_ficha').titulo} descripcion={descripcionDe('crecimiento_ficha').descripcion} accion={<span className="text-xs text-salvia">frente a la <Termino id="oms">OMS</Termino>, para la <Termino id="edad_corregida">edad corregida</Termino></span>}>
           {r.crecimiento.length === 0 ? <p className="text-sm text-salvia">Sin medidas de crecimiento.</p> : (
             <Tabla densa>
               <thead><tr><th>Medida</th><th className="text-right">Edad corregida</th><th>Frente a la OMS</th></tr></thead>

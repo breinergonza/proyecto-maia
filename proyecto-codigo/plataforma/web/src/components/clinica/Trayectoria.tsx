@@ -4,6 +4,7 @@
 // del eje, cuántos niños del grupo tienen dato en ella. Si el grupo es toda la población, la línea de la población sería
 // la misma: no se dibuja y la leyenda lo dice.
 import { Area, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Termino } from '../Termino'
 import type { EtapaClinica } from '../../api/tipos'
 import { cn } from '../../lib/cn'
 import { dec2, indicador as nombreIndicador, num } from '../../lib/formato'
@@ -42,21 +43,22 @@ function filasDe(etapas: EtapaClinica[]): Fila[] {
 
 function Leyenda({ umbral, conPoblacion }: { umbral: string | null; conPoblacion: boolean }) {
   return (
-    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs" aria-hidden>
+    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
       <li className="inline-flex items-center gap-1.5">
-        <span className="inline-block h-0.5 w-4 rounded-full" style={{ background: SERIES_COLOR[0] }} />Mediana del grupo
+        <span className="inline-block h-0.5 w-4 rounded-full" style={{ background: SERIES_COLOR[0] }} aria-hidden />Mediana del grupo
       </li>
       <li className="inline-flex items-center gap-1.5">
-        <span className="inline-block h-3 w-4 rounded-sm opacity-25" style={{ background: SERIES_COLOR[0] }} />Mitad central del grupo
+        <span className="inline-block h-3 w-4 rounded-sm opacity-25" style={{ background: SERIES_COLOR[0] }} aria-hidden />Mitad central del grupo
       </li>
       {conPoblacion ? (
         <li className="inline-flex items-center gap-1.5">
-          <span className="inline-block h-0.5 w-4 rounded-full" style={{ background: COLOR.referencia }} />Toda la población
+          <span className="inline-block h-0.5 w-4 rounded-full" style={{ background: COLOR.referencia }} aria-hidden />Toda la población
         </li>
       ) : null}
       {umbral && (
         <li className="inline-flex items-center gap-1.5">
-          <span className="inline-block w-4 border-t-2 border-dashed border-coral-hondo" />{umbral}
+          <span className="inline-block w-4 border-t-2 border-dashed border-coral-hondo" aria-hidden />
+          <span>{umbral} de la <Termino id="oms">OMS</Termino> (<Termino id="de">−2</Termino>)</span>
         </li>
       )}
     </ul>
@@ -110,7 +112,7 @@ export function Trayectoria({ indicador, unidad, etapas, muestra, conPoblacion, 
   const titulo = `Crecimiento: ${nombreIndicador(indicador).toLowerCase()}`
   const filas = filasDe(etapas).map((f) => (conPoblacion ? f : { ...f, poblacion: null, nPoblacion: null }))
   const z = esPuntajeZ(unidad)
-  const umbral = z ? (indicador === 'talla' ? 'Umbral de talla baja (−2)' : 'Umbral de crecimiento bajo (−2)') : null
+  const umbral = z ? (indicador === 'talla' ? 'Umbral de talla baja' : 'Umbral de crecimiento bajo') : null
   const valores = filas.flatMap((f) => [f.mediana, f.poblacion, ...(f.banda ?? [])]).filter((v): v is number => v != null)
   if (umbral) valores.push(UMBRAL_Z, 0)
   const dominio: [number, number] = valores.length ? [Math.floor(Math.min(...valores) - 0.3), Math.ceil(Math.max(...valores) + 0.3)] : [-3, 1]

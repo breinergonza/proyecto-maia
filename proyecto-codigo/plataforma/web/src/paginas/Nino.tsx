@@ -14,11 +14,12 @@ import { CrecimientoOms, PerfilCohorte, PerfilDelNino, useHistoriaRiesgo, usePer
 import { Desenlaces, desenlacesDelNino, hayRiesgo, type TarjetaConVisita } from '../components/ficha/Desenlaces'
 import { PanelesPestana, Pestanas, usePestanaEnUrl } from '../components/ui/Pestanas'
 import { Boton, Cargando, Insignia, Panel, Tabla, Vacio } from '../components/ui'
+import { Termino } from '../components/Termino'
 import { ErrorConReintento } from '../components/ErrorConReintento'
 import { cn } from '../lib/cn'
 import { desenlaceDeUrlAntigua } from '../lib/familias'
 import { aproximado, dec, edad, fecha, indicador, RIESGO_ALTO } from '../lib/formato'
-import { alerta, AYUDA_OMS, ayudaAlerta, ayudaZ, datosAl, frenteOms, motivo } from '../lib/lenguaje'
+import { alerta, ayudaAlerta, ayudaZ, datosAl, frenteOms, motivo } from '../lib/lenguaje'
 
 export default function Nino() {
   const { sujeto = '' } = useParams()
@@ -224,7 +225,7 @@ function DetalleVisita({ visita }: { visita: Visita }) {
       {conLado && <div className="space-y-5">
         {z.length > 0 && (
           <div>
-            <h3 className="mb-2" title={AYUDA_OMS}>Frente a la OMS</h3>
+            <h3 className="mb-2">Frente a la <Termino id="oms">OMS</Termino></h3>
             <ul className="divide-y divide-linea">
               {z.map(([k, v]) => (
                 <li key={k} className="flex justify-between gap-3 py-1.5">

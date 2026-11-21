@@ -120,7 +120,7 @@ describe('Revisión de riesgos simplificada', () => {
     simularApi(api('experto', [caso(1, { crecimiento: { talla: [z(10, -0.5), z(40, -1)] } })]))
     montar('/revision/riesgos')
     expect(await screen.findByRole('heading', { name: 'Crecimiento frente a la OMS' })).toBeInTheDocument()
-    expect(screen.getAllByText(/Desviaciones frente a lo esperado/)).toHaveLength(1)
+    expect(screen.getAllByText(/Desviaciones estándar frente a la OMS/)).toHaveLength(1)
     expect(screen.queryByText(/Un gráfico por medida/)).not.toBeInTheDocument()
   })
 

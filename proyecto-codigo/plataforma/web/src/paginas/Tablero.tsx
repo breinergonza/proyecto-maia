@@ -12,12 +12,13 @@ import { ROLES_CLINICOS } from '../components/Marco'
 import { BarrasApiladas, LeyendaSeries, LineasSeries, type ColorSerie, type FilaSeries, type Serie } from '../components/graficos'
 import { Grafica, TablaDatos } from '../components/grafica'
 import { Cargando, Encabezado, Insignia, Panel, Vacio } from '../components/ui'
+import { Termino } from '../components/Termino'
 import { ErrorConReintento } from '../components/ErrorConReintento'
 import { cn } from '../lib/cn'
 import { descripcionDe } from '../lib/descripciones'
 import { usePorClasificar } from '../lib/diccionario'
 import { dec, fecha, indicador, INDICADORES, num, pct, riesgo } from '../lib/formato'
-import { alerta, AYUDA_OMS, AYUDA_RIESGO_ALTO, ayudaAlerta, datosAl, definicionAlto, senal, trimestre, trimestresSeguidos } from '../lib/lenguaje'
+import { alerta, AYUDA_RIESGO_ALTO, ayudaAlerta, datosAl, definicionAlto, senal, trimestre, trimestresSeguidos } from '../lib/lenguaje'
 
 /** Alto de las gráficas: con una ventana baja (1366×768) se achican para que el panel quepa sin cortarlas. */
 const altoVentana = () => window.innerHeight
@@ -135,7 +136,7 @@ export default function Tablero() {
 
           <Grafica className="shrink-0" titulo={descripcionDe('crecimiento_oms').titulo} descripcion={DESCRIPCION_CRECIMIENTO}
             exportar={{ nombre: 'crecimiento-oms', ...tablaCrecimiento(r.crecimiento_por_etapa) }}
-            accion={<span className="text-xs text-salvia" title={AYUDA_OMS}>EC: edad corregida</span>}>
+            accion={<span className="text-xs text-salvia">EC: <Termino id="edad_corregida">edad corregida</Termino></span>}>
             <Crecimiento filas={r.crecimiento_por_etapa} alto={altoGrafica} />
           </Grafica>
         </div>

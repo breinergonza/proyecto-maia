@@ -190,7 +190,7 @@ describe('comparar grupos', () => {
     const figura = within(panel).getByRole('figure', { name: /Talla para la edad.*puntaje z/ })
     expect(figura).toHaveAccessibleName(/40 sem\. Grupo A: mediana -2,2, 472 niños con dato; Grupo B: mediana -2,6, 298 niños con dato/)
     expect(figura).toHaveAccessibleName(/6 m EC\. Grupo A: mediana -1,6, 431 niños con dato; Grupo B: sin dato/)
-    expect(within(panel).getByText(/Umbral de talla baja \(−2\)/)).toBeInTheDocument()
+    expect(within(panel).getByText(/Umbral de talla baja/)).toBeInTheDocument()
     fichaVisible(panel)
     expect(within(panel).getByText(/Unidad: puntaje z/)).toBeVisible()
     expect(within(panel).getByText(/Observaciones válidas: niños con dato, bajo cada visita/)).toBeVisible()

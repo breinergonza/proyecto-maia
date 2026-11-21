@@ -736,6 +736,15 @@ Estas son las definiciones que aparecen al pasar el mouse por un término subray
   problema es poco frecuente.
 * **Falsas por 1.000:** niños marcados en riesgo que no tenían el problema, por cada 1.000 revisados.
 * **Mediana:** valor del medio: la mitad de los niños tiene menos riesgo y la otra mitad, más.
+* **OMS:** Organización Mundial de la Salud; sus curvas muestran cómo crecen los niños sanos y aquí se comparan con la
+  edad corregida. Se explica en «Frente a la OMS» (ficha del niño) y en el umbral de la trayectoria (Vista clínica).
+* **−2 (DE):** la desviación estándar (DE) dice cuánto se aleja una medida del valor medio de los niños sanos de su
+  edad en la OMS; por debajo de −2 DE es bajo para la edad. Es la línea punteada «Umbral de talla baja» (o «de
+  crecimiento bajo») de la trayectoria de la Vista clínica.
+* **Rango esperado:** de −2 a +2 DE de la curva de la OMS; ahí queda la medida de unos 95 de cada 100 niños sanos de
+  esa edad. Es la franja de las gráficas de crecimiento de la ficha.
+* **Edad corregida:** edad contada desde la fecha en que el niño debía nacer (40 semanas de gestación), no desde el
+  parto; así se compara bien a un prematuro.
 * **Cron:** forma corta de indicar cuándo se repite una tarea, con cinco campos: minuto, hora, día del mes, mes y día de
   la semana.
 

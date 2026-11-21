@@ -56,7 +56,7 @@ export const DESCRIPCIONES: Record<string, Descripcion> = {
   casos_vs_esperado: { titulo: "Casos frente a lo esperado", descripcion: "Si lo que ocurre sigue lo que el modelo espera." },
   psi: { titulo: "Cambio frente al entrenamiento", descripcion: "Más rojo es más cambio frente a los niños del entrenamiento." },
   alertas_1000: { titulo: "Alertas por mil niños", descripcion: "Cuántas alertas se dan cada trimestre." },
-  tray_media: { titulo: "Trayectoria media", descripcion: "Cómo crece cada grupo; la banda es la variación normal." },
+  tray_media: { titulo: "Trayectoria media", descripcion: "Cómo crece cada grupo; la banda es una DE arriba y abajo del promedio." },
   tray_ninos: { titulo: "Trayectoria de cada niño", descripcion: "Una línea por niño; en coral, los de más riesgo." },
   tray_oms: { titulo: "Distancia a la curva de la OMS", descripcion: "Qué tan lejos de la curva de la OMS está cada visita." },
   perfiles: { titulo: "Perfiles", descripcion: "Grupos de niños parecidos y qué les suele pasar." },

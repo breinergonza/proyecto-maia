@@ -86,7 +86,7 @@ function GraficaZ({ grupos }: { grupos: GrupoTrayectoria[] }) {
           </ComposedChart>
         </ResponsiveContainer>
       </div>
-      <p className="mt-2 text-xs text-salvia">Franja clara: de −2 a +2 de la OMS. Línea punteada: la OMS (0). Banda de cada grupo: un desvío arriba y abajo del promedio (con 20 niños o más por visita).</p>
+      <p className="mt-2 text-xs text-salvia">Franja clara: de −2 a +2 desviaciones estándar (DE) de la OMS, lo esperado. Línea punteada: la OMS (0). Banda de cada grupo: una DE arriba y abajo del promedio (con 20 niños o más por visita).</p>
       {grupos.length > 4 && <p className="mt-1 text-xs text-salvia">Se dibujan los cuatro grupos más grandes; la tabla los muestra todos.</p>}
     </>
   )
@@ -127,7 +127,7 @@ export default function Trayectorias() {
     <div className="flex flex-col gap-3 lg:min-h-0 lg:flex-1">
       <Guia>
         <p>Muestra cómo crece cada grupo de niños frente a la curva de la OMS (puntaje z = 0). Sirve para ver en qué visita un grupo empieza a separarse de lo esperado.</p>
-        <p>Un puntaje z entre −2 y +2 es lo esperado; por debajo de −2 el niño está por debajo de lo esperado.</p>
+        <p>El puntaje z cuenta desviaciones estándar (DE) frente a la OMS. Entre −2 y +2 DE es lo esperado; por debajo de −2 DE el niño está bajo para la edad.</p>
       </Guia>
       <div className="grid shrink-0 gap-3 sm:grid-cols-3">
         <label className="flex items-center gap-2 text-sm font-semibold"><span className="shrink-0">Indicador</span>

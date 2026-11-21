@@ -18,6 +18,10 @@ export const GLOSARIO = {
   pr_auc: 'Qué tan bien acierta el modelo cuando marca a un niño, sobre todo si el problema es poco frecuente. En estadística: PR-AUC.',
   falsas_por_1000: 'Niños marcados en riesgo que al final no tenían el problema, por cada 1.000 revisados.',
   mediana: 'Valor del medio: la mitad de los niños tiene un riesgo menor y la otra mitad, mayor.',
+  oms: 'Organización Mundial de la Salud. Sus curvas muestran cómo crecen los niños sanos; aquí se comparan con la edad corregida.',
+  de: 'Desviación estándar (DE): cuánto se aleja una medida del valor medio de los niños sanos de su edad en la OMS. Bajo −2 DE: bajo para la edad.',
+  rango_esperado: 'De −2 a +2 desviaciones estándar (DE) de la curva de la OMS. Ahí queda la medida de unos 95 de cada 100 niños sanos de esa edad.',
+  edad_corregida: 'Edad contada desde la fecha en que el niño debía nacer (40 semanas de gestación), no desde el parto. Así se compara bien a un prematuro.',
   cron: 'Forma corta de indicar cuándo se repite una tarea con cinco campos: minuto, hora, día del mes, mes y día de la semana.',
 } as const
 

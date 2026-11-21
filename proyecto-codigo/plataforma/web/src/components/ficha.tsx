@@ -6,7 +6,7 @@ import { pedir } from '../api/cliente'
 import type { HistoriaRiesgo, PerfilNino, PerfilProvisional, PrimeraAlerta, PuntoCrecimiento, PuntoHistoria } from '../api/tipos'
 import { cn } from '../lib/cn'
 import { aproximado, dec, edad, indicador, meses, posicion, riesgo, RIESGO_ALTO } from '../lib/formato'
-import { AYUDA_DOS_CIFRAS, AYUDA_MOTIVOS, AYUDA_OMS, ayudaPosicion, BAJO_EDAD, CAYO, cuantosMenos, desviaciones, familia, frenteDemas, frenteOms,
+import { AYUDA_DOS_CIFRAS, AYUDA_MOTIVOS, ayudaPosicion, BAJO_EDAD, CAYO, cuantosMenos, desviaciones, familia, frenteDemas, frenteOms,
   motivosRiesgo, nivelAlto, nombreFamilia, RIESGO_MUY_ALTO } from '../lib/lenguaje'
 import type { EstadoDesenlace } from '../api/ninos'
 import { Distribucion, MiniSerie, Muestra, ticksEnteros, type PuntoSerie } from './graficos'
@@ -14,6 +14,7 @@ import { descripcionDe } from '../lib/descripciones'
 import { familiaDe } from '../lib/familias'
 import { Grafica } from './grafica'
 import { Aviso, Boton, Cargando, Insignia, Panel } from './ui'
+import { Termino } from './Termino'
 
 // ------------------------------------------------------------------ tarjeta de riesgo
 
@@ -234,7 +235,7 @@ export function ticksMeses([a, b]: [number, number]): number[] {
 }
 
 // una sola frase por gráfica: qué mide el eje y cuándo es bajo
-const DESCRIPCION_CRECIMIENTO = 'Desviaciones frente a lo esperado para la edad corregida: 0 es lo esperado; por debajo de −2, bajo para la edad.'
+const DESCRIPCION_CRECIMIENTO = 'Desviaciones estándar frente a la OMS para la edad corregida: 0 es lo esperado; por debajo de −2, bajo para la edad.'
 
 /** `grilla` es la distribución de las gráficas (una por medida); por defecto, las tres en una fila donde hay ancho. */
 export function CrecimientoOms({ crecimiento, grilla = 'sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3', alto }: {
@@ -260,8 +261,8 @@ export function CrecimientoOms({ crecimiento, grilla = 'sm:grid-cols-3 xl:grid-c
   const ticksX = ticksMeses(dominioX)
   return (
     <Grafica titulo={descripcionDe('crecimiento_ficha').titulo} descripcion={DESCRIPCION_CRECIMIENTO} exportar={{ nombre: 'crecimiento-oms' }}
-      accion={<span className="flex flex-wrap gap-x-3 gap-y-1 text-xs" title={AYUDA_OMS}>
-        <Muestra tipo="franja">rango esperado (−2 a +2)</Muestra>
+      accion={<span className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+        <Muestra tipo="franja"><Termino id="rango_esperado">rango esperado</Termino> (−2 a +2)</Muestra>
         {hayMarcadas && <Muestra tipo="marcado">bajo para la edad o caída</Muestra>}
       </span>}>
       <ul className={cn('grid grid-cols-1 gap-x-6 gap-y-4', grilla)}>

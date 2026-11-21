@@ -90,6 +90,9 @@ describe('ficha del niño en pestañas', () => {
     montar('/ninos/s1', <Ubicacion />)
     await userEvent.click(await screen.findByRole('tab', { name: 'Crecimiento' }))
     expect(screen.getByRole('tabpanel')).toHaveTextContent('Crecimiento frente a la OMS')
+    // «rango esperado» se explica en la leyenda (con qué es «DE»), no solo al pasar el cursor
+    await userEvent.click(within(screen.getByRole('tabpanel')).getByRole('button', { name: /rango esperado/ }))
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/desviaciones estándar \(DE\).*95 de cada 100/)
     expect(screen.getByText(/^dirección:/)).toHaveTextContent('ver=crecimiento')
     await userEvent.click(screen.getByRole('tab', { name: 'Desenlaces' }))
     expect(screen.getByRole('tabpanel')).toHaveTextContent('Riesgo de desarrollo psicomotor bajo a los 12 meses')

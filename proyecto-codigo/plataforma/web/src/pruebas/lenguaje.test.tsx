@@ -163,7 +163,13 @@ function api(rol: 'admin' | 'experto' = 'experto') {
   })
 }
 
-const visible = () => document.body.textContent ?? ''
+// lo que se ve sin abrir nada: una definición a pedido (Termino, D66) puede nombrar el término estadístico
+const visible = () => {
+  const copia = document.body.cloneNode(true)
+  if (!(copia instanceof HTMLElement)) return ''
+  copia.querySelectorAll('[role="tooltip"][hidden]').forEach((n) => n.remove())
+  return copia.textContent ?? ''
+}
 
 describe('pantallas del equipo clínico sin términos técnicos', () => {
   it('tablero', async () => {

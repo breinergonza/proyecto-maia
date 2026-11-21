@@ -159,6 +159,10 @@ Todas las versiones de Python están fijadas en `uv.lock` y las de JavaScript en
    * «Calcular el riesgo de un niño» usa el mismo glosario desde el punto 17.
    * Guardia: `pruebas/lenguaje.test.tsx` pinta esas pantallas como experto y falla si en el texto visible vuelve a
      aparecer «posición», «percentil», «puntaje z», «corte», «corrida», «Capa N», «−2 DE», «AUC» o un código interno.
+     Desde 2026-11-20 la guardia mira solo el texto a la vista: la definición que se abre a pedido («¿qué significa?»,
+     D66) sí nombra la desviación estándar (DE) y el umbral −2, porque el asesor pide decir qué es «DE», la referencia
+     OMS y el umbral en cada gráfica de crecimiento. La pantalla sigue diciendo «rango esperado», «bajo para la edad» y
+     «OMS»; la DE se explica al tocar esas palabras.
 
 17. **Calcular el riesgo de un niño con un formulario (2026-10-30; fase 8, punto 6).** Antes era pegar un JSON.
    `GET /api/inferencia/formulario` (experto y administración) arma el formulario con el esquema del paquete activo
