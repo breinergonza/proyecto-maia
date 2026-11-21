@@ -37,15 +37,15 @@ export function SelectoresModelo({ origen }: { origen?: string | null }) {
       {/* dos filas: el desenlace y la visita, y el entrenamiento con el estado y el origen de los datos a su lado; así ningún
           selector corta su texto */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <Campo etiqueta="Desenlace" className="flex-[1_1_28rem]">
+        <Campo etiqueta="Resultado clínico evaluado" className="flex-[1_1_28rem]">
           <Selector value={familia?.clave ?? ''} disabled={!familias.length}
             onChange={(e) => fijar({ desenlace: familias.find((f) => f.clave === e.target.value)?.cortes[0]?.clave ?? null })}>
             {familias.map((f) => <option key={f.clave} value={f.clave}>{f.nombre}</option>)}
           </Selector>
         </Campo>
-        <Campo etiqueta="Calculado a" className="flex-[0_0_14rem]">
+        <Campo etiqueta="Edad al estimar el riesgo" className="flex-[0_0_14rem]">
           <Selector value={desenlace ?? ''} disabled={!familia} onChange={(e) => fijar({ desenlace: e.target.value })}>
-            {familia?.cortes.map((c) => <option key={c.clave} value={c.clave}>{c.corte}</option>)}
+            {familia?.cortes.map((c) => <option key={c.clave} value={c.clave}>{c.corte.replace(/^(\d+) m EC$/, '$1 meses de edad corregida')}</option>)}
           </Selector>
         </Campo>
       </div>

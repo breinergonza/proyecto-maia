@@ -6,25 +6,26 @@ import { SUBMODULOS } from '../paginas/analitica/submodulos'
 export const NOMBRE_APP = 'Observatorio Canguro'
 
 const TITULOS: Record<string, string> = {
-  '/': 'Vista clínica',
-  '/tablero': 'Resumen',
-  '/comparar': 'Comparar grupos',
-  '/explorar': 'Explorar',
-  '/ninos': 'Niños',
-  '/revision/riesgos': 'Revisión de riesgos',
-  '/prediccion': 'Calcular un niño',
-  '/mis-modelos': 'Mis modelos',
-  '/diccionario': 'Diccionario',
-  '/admin/calidad-datos': 'Calidad de datos',
-  '/admin/configuracion': 'Configuración',
-  '/admin/programacion': 'Programación',
-  '/admin/entrenamientos': 'Entrenamientos',
-  '/admin/modelos': 'Modelos',
-  '/admin/corridas': 'Corridas',
-  '/admin/usuarios': 'Usuarios',
-  '/notificaciones/servidor': 'Servidor de correo',
-  '/notificaciones/alertas': 'Alertas por correo',
-  '/analitica': 'Analítica',
+  '/ingresar': 'Iniciar sesión en MAIA',
+  '/': 'Seguimiento clínico',
+  '/tablero': 'Resumen de riesgos y calidad de datos',
+  '/comparar': 'Comparar grupos de niños',
+  '/explorar': 'Explorar grupos de niños',
+  '/ninos': 'Listado de niños',
+  '/revision/riesgos': 'Revisión clínica de casos',
+  '/prediccion': 'Estimar riesgo',
+  '/mis-modelos': 'Entrenamientos propios',
+  '/diccionario': 'Guía de variables y unidades',
+  '/admin/calidad-datos': 'Mediciones por revisar',
+  '/admin/configuracion': 'Configuración del sistema y del entrenamiento',
+  '/admin/programacion': 'Programar ejecuciones automáticas',
+  '/admin/entrenamientos': 'Entrenar y aprobar modelos',
+  '/admin/modelos': 'Modelos disponibles',
+  '/admin/corridas': 'Recalcular riesgos',
+  '/admin/usuarios': 'Usuarios y permisos',
+  '/notificaciones/servidor': 'Configuración del correo saliente',
+  '/notificaciones/alertas': 'Reglas y envíos de alertas por correo',
+  '/analitica': 'Ficha del modelo',
 }
 
 /** Nombre de la página para una ruta (sin el nombre de la aplicación). */
@@ -34,11 +35,11 @@ export function nombrePagina(pathname: string): string {
   const analitica = /^\/analitica\/([^/]+)$/.exec(ruta)
   if (analitica) {
     const sub = SUBMODULOS.find((s) => s.id === analitica[1])
-    return sub ? `Analítica: ${sub.texto}` : 'Analítica'
+    return sub ? sub.titulo : 'Evaluación de modelos'
   }
   const nino = /^\/ninos\/([^/]+)$/.exec(ruta)
   if (nino) {
-    try { return `Niño ${decodeURIComponent(nino[1])}` } catch { return 'Ficha del niño' }
+    try { return `Ficha clínica · ${decodeURIComponent(nino[1])}` } catch { return 'Ficha clínica del niño' }
   }
   return 'No existe esa página'
 }

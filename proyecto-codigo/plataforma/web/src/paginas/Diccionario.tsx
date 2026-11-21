@@ -1,4 +1,4 @@
-// Diccionario de variables (experto y administración). Se edita aquí con formularios (EditorDiccionario): cada hoja
+// Guía de variables y unidades (experto y administración). Se edita aquí con formularios (EditorDiccionario): cada hoja
 // es una pestaña y cada fila un formulario; antes de guardar se ven los cambios frente al vigente. El Excel queda para
 // exportar e importar. Las variables nuevas que trae una actualización se clasifican aquí con un clic (Lista / No usar)
 // o se completan en su formulario, y cada cambio queda como una versión a la que se puede volver.
@@ -60,10 +60,10 @@ export default function Diccionario() {
   const pestanas = [
     {
       clave: 'editar',
-      texto: <>Editar{sinGuardar > 0 && <span className="ml-1 text-ocre-hondo">• {sinGuardar} sin guardar</span>}</>,
+      texto: <>Editar definiciones{sinGuardar > 0 && <span className="ml-1 text-ocre-hondo">• {sinGuardar} sin guardar</span>}</>,
     },
-    { clave: 'clasificar', texto: <>Por clasificar <span className="font-normal opacity-70">{num(porClasificar)}</span></> },
-    { clave: 'versiones', texto: 'Versiones e importación' },
+    { clave: 'clasificar', texto: <>Variables pendientes de clasificar <span className="font-normal opacity-70">{num(porClasificar)}</span></> },
+    { clave: 'versiones', texto: 'Importar diccionario y ver versiones' },
   ] as const
 
   const clasificacion = (
@@ -146,7 +146,7 @@ export default function Diccionario() {
   // Los paneles quedan montados: los cambios sin guardar del editor sobreviven al cambiar de pestaña.
   return (
     <div className="flex flex-col xl:h-full">
-      <Encabezado titulo="Diccionario de variables"
+      <Encabezado titulo="Guía de variables y unidades"
         accion={<Boton variante="secundario" onClick={() => descargar.mutate(null)} disabled={descargar.isPending}>
           <Download size={16} aria-hidden />{descargar.isPending ? 'Descargando…' : 'Exportar a Excel'}
         </Boton>}>
@@ -325,7 +325,7 @@ function Actualizacion({ nuevas, version, ocupado, alAgregar }: {
         <div className="min-w-0">
           <h2 className="text-base">La última actualización trajo {n} variable{n === 1 ? '' : 's'} nueva{n === 1 ? '' : 's'}</h2>
           <p className="mt-1 text-sm text-tinta/75">
-            Del {conPunto(fechaHora(version.creado_en))} Al agregarlas al diccionario quedan «Por clasificar»: el sistema no las usa
+            Del {conPunto(fechaHora(version.creado_en))} Al agregarlas al diccionario quedan «Variables pendientes de clasificar»: el sistema no las usa
             hasta que alguien las marque como «Lista».
           </p>
         </div>

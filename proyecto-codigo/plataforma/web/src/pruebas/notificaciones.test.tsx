@@ -26,7 +26,7 @@ const cuerpoDe = (llamadas: { url: string; init?: RequestInit }[], metodo: strin
   // se ignora «/api/auth/refrescar», que también es POST pero sin cuerpo
   JSON.parse(String(llamadas.find((l) => l.init?.method === metodo && !l.url.startsWith('/api/auth/'))?.init?.body ?? 'null'))
 
-describe('Servidor de correo', () => {
+describe('Configuración del correo saliente', () => {
   it('muestra «Sin configurar» y valida el puerto y el remitente', async () => {
     const u = userEvent.setup()
     api(() => undefined, SERVIDOR_VACIO)
@@ -37,7 +37,7 @@ describe('Servidor de correo', () => {
     expect(screen.getByText('Un número de 1 a 65535.')).toBeInTheDocument()
     await u.type(screen.getByLabelText('Correo remitente'), 'x')
     expect(screen.getByText('Escriba un correo válido.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Guardar' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Guardar configuración de correo' })).toBeDisabled()
   })
   it('no muestra la clave guardada y solo la envía si se cambia', async () => {
     const u = userEvent.setup()
@@ -45,12 +45,12 @@ describe('Servidor de correo', () => {
     montar('/notificaciones/servidor')
     expect(await screen.findByText('Clave guardada')).toBeInTheDocument()
     expect(screen.queryByLabelText('Clave')).toBeNull()
-    await u.click(screen.getByRole('button', { name: 'Guardar' }))
+    await u.click(screen.getByRole('button', { name: 'Guardar configuración de correo' }))
     await waitFor(() => expect(cuerpoDe(llamadas, 'PUT')).toMatchObject({ host: 'smtp.maia.prueba', puerto: 587, tls: true }))
     expect(cuerpoDe(llamadas, 'PUT')).not.toHaveProperty('clave')
     await u.click(await screen.findByRole('button', { name: 'Cambiar' }))
     await u.type(screen.getByLabelText('Clave'), 'nueva')
-    await u.click(screen.getByRole('button', { name: 'Guardar' }))
+    await u.click(screen.getByRole('button', { name: 'Guardar configuración de correo' }))
     await waitFor(() => expect(llamadas.filter((l) => l.init?.method === 'PUT')).toHaveLength(2))
     expect(JSON.parse(String(llamadas.filter((l) => l.init?.method === 'PUT')[1].init?.body))).toMatchObject({ clave: 'nueva' })
   })
@@ -125,7 +125,7 @@ describe('Probar el correo', () => {
     await u.type(campo, 'ana@maia')
     expect(screen.getByText('Escriba un correo válido, por ejemplo nombre@dominio.org.')).toBeInTheDocument()
     expect(campo).toHaveAttribute('aria-invalid', 'true')
-    expect(screen.getByRole('button', { name: 'Enviar' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Enviar correo de prueba' })).toBeDisabled()
     await u.type(campo, '{Enter}')
     expect(llamadas.some((l) => l.url.endsWith('/servidor/prueba'))).toBe(false)
   })
@@ -136,7 +136,7 @@ describe('Probar el correo', () => {
     const campo = await screen.findByLabelText('Enviar un correo de prueba a')
     await u.type(campo, 'Ana@Maia.Prueba')
     expect(screen.queryByText(/Escriba un correo válido, por ejemplo/)).toBeNull()
-    await u.click(screen.getByRole('button', { name: 'Enviar' }))
+    await u.click(screen.getByRole('button', { name: 'Enviar correo de prueba' }))
     await waitFor(() => expect(cuerpoDe(llamadas, 'POST')).toEqual({ destinatario: 'ana@maia.prueba' }))
   })
   it('al pegar varios correos se queda con el primero', async () => {
@@ -164,7 +164,7 @@ describe('Alertas', () => {
     const llamadas = api((url, init) => url === '/api/notificaciones/alertas' && init?.method === 'POST'
       ? { estado: 201, cuerpo: { ...NOTIF, id: 8 } } : undefined, SERVIDOR_LISTO, [])
     montar('/notificaciones/alertas')
-    await u.click(await screen.findByRole('button', { name: 'Nueva notificación' }))
+    await u.click(await screen.findByRole('button', { name: 'Crear regla de envío' }))
     await u.type(screen.getByLabelText('Nombre'), 'Jefatura')
     await u.click(screen.getByRole('checkbox', { name: /readmisión/ }))
     await u.click(screen.getByRole('checkbox', { name: /crecimiento/ }))
@@ -178,7 +178,7 @@ describe('Alertas', () => {
     const u = userEvent.setup()
     api(() => undefined, SERVIDOR_LISTO, [])
     montar('/notificaciones/alertas')
-    await u.click(await screen.findByRole('button', { name: 'Nueva notificación' }))
+    await u.click(await screen.findByRole('button', { name: 'Crear regla de envío' }))
     expect(screen.getByRole('button', { name: 'Guardar' })).toBeDisabled()
     expect(screen.getByText('Elija al menos una alerta.')).toBeInTheDocument()
     await u.type(screen.getByLabelText('Nombre'), 'Solo')
@@ -232,14 +232,14 @@ const conAvisos = (items: object[]) => (url: string) =>
   url.startsWith('/api/notificaciones/historial') ? { cuerpo: { total: items.length, pagina: 1, tamano: 20, items } } : undefined
 /** Las celdas de la única fila de «Avisos enviados». */
 async function celdasDelAviso() {
-  const panel = (await screen.findByRole('heading', { name: 'Avisos enviados' })).closest('section')!
+  const panel = (await screen.findByRole('heading', { name: 'Historial de correos enviados' })).closest('section')!
   const tabla = await within(panel).findByRole('table')
   const filas = within(tabla).getAllByRole('row').slice(1)
   expect(filas).toHaveLength(1)   // una fila por notificación, no una por niño y destinatario
   return { tabla, celdas: within(filas[0]).getAllByRole('cell') }
 }
 
-describe('Avisos enviados', () => {
+describe('Historial de correos enviados', () => {
   it('muestra un registro por notificación con todos sus destinatarios, cuántos niños, el riesgo y el estado', async () => {
     api(conAvisos([registro()]))
     montar('/notificaciones/alertas')

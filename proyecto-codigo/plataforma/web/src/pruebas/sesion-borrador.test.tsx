@@ -62,7 +62,7 @@ describe('aviso de sesión por vencer', () => {
     await waitFor(() => expect(screen.getByTestId('ubicacion').textContent).toBe('/ingresar'))
     await userEvent.type(await screen.findByLabelText('Correo electrónico'), 'e@maia.prueba')
     await userEvent.type(screen.getByLabelText('Contraseña'), 'clave')
-    await userEvent.click(screen.getByRole('button', { name: /Ingresar al sistema/ }))
+    await userEvent.click(screen.getByRole('button', { name: /Iniciar sesión/ }))
     await waitFor(() => expect(screen.getByTestId('ubicacion').textContent).toBe('/tablero?x=1'))
   })
 })

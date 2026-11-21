@@ -25,7 +25,7 @@ import { Guia, Resultado } from './comun'
 import { useContextoAnalitica } from './contexto'
 
 const PESTANAS = [
-  { clave: 'medidas', texto: 'Medidas' },
+  { clave: 'medidas', texto: 'Métricas de validación' },
   { clave: 'roc', texto: 'Curva ROC' },
   { clave: 'ninos', texto: 'Niños y grupos' },
 ] as const
@@ -88,8 +88,8 @@ function ComparaEntrenamientos() {
     const ok = await confirmar({
       titulo: 'Aprobar el entrenamiento B',
       mensaje: `Se aprueba el entrenamiento B (n.º ${b}, alertas clínicas v${clinicoB}) junto con la versión de anomalías v${anomalias} que hoy está en producción. Queda registrado en la auditoría.`,
-      efecto: 'Cambia el modelo oficial de la solución para todos los usuarios: lo usarán el tablero, las corridas y el cálculo de un niño.',
-      reversible: true, textoConfirmar: 'Aprobar B',
+      efecto: 'Cambia el modelo oficial de la solución para todos los usuarios: lo usarán el tablero, los recálculos de riesgo y la estimación individual.',
+      reversible: true, textoConfirmar: 'Aprobar y activar el modelo B',
     })
     if (ok) aprobacion.mutate({ fuente: fuenteB, anomalias, clinico: clinicoB })
   }
@@ -148,10 +148,10 @@ function ComparaEntrenamientos() {
         {esAdmin && (
           <div className="flex min-w-0 flex-1 basis-80 flex-wrap items-center gap-2">
             {dialogo}
-            <Boton onClick={() => void aprobar()} disabled={!puedeAprobar} title={porQueNo || undefined}>Aprobar B</Boton>
-            <Boton variante="secundario" onClick={() => setMantiene(true)} disabled={aprobacion.isPending}>Mantener A</Boton>
+            <Boton onClick={() => void aprobar()} disabled={!puedeAprobar} title={porQueNo || undefined}>Aprobar y activar el modelo B</Boton>
+            <Boton variante="secundario" onClick={() => setMantiene(true)} disabled={aprobacion.isPending}>Mantener el entrenamiento de referencia</Boton>
             <span className="min-w-0 flex-1 basis-60 text-sm text-salvia">
-              {porQueNo || 'Aprobar B lo deja en la solución; queda en la auditoría y en las ejecuciones.'}
+              {porQueNo || 'Al activar el modelo B, se convierte en el modelo oficial y el cambio queda registrado en la auditoría.'}
             </span>
           </div>
         )}
@@ -165,7 +165,7 @@ function ComparaEntrenamientos() {
         <Pestanas className="border-b-0" prefijo="comparar" etiqueta="Qué ver" pestanas={PESTANAS} activa={ver} elegir={elegir} />
         <p className="pb-2 text-sm">
           Aquí se comparan entrenamientos. Para comparar dos grupos de niños, use{' '}
-          <Link to="/comparar" className="font-semibold text-teal underline-offset-2 hover:underline">Comparar grupos</Link>.
+          <Link to="/comparar" className="font-semibold text-teal underline-offset-2 hover:underline">Comparar grupos de niños</Link>.
         </p>
       </div>
       <PanelPestana prefijo="comparar" activa={ver} className={PANEL}>

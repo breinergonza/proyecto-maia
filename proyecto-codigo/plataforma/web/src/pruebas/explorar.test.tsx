@@ -71,8 +71,8 @@ describe('explorar', () => {
     expect(cifra('de los datos de crecimiento, bajos frente a la OMS')).toBe('12,5 %')
     // una gráfica por pestaña, para que la página no se desplace: el riesgo primero
     expect(screen.getByRole('tab', { name: 'Riesgo', selected: true })).toBeInTheDocument()
-    for (const [pestana, t] of [['Riesgo', 'Riesgo del grupo elegido'], ['Crecimiento', 'Crecimiento del grupo elegido'],
-      ['Quiénes son', 'Quiénes son los niños del grupo']]) {
+    for (const [pestana, t] of [['Riesgo', 'Riesgo estimado del grupo'], ['Crecimiento', 'Crecimiento del grupo'],
+      ['Quiénes son', 'Características del grupo']]) {
       fireEvent.click(screen.getByRole('tab', { name: pestana }))
       const panel = screen.getByRole('tabpanel', { name: pestana })
       expect(within(panel).getByRole('heading', { name: t })).toBeInTheDocument()
@@ -85,8 +85,8 @@ describe('explorar', () => {
     api('experto')
     montar('/explorar?ver=crecimiento')
     expect(await screen.findByRole('tab', { name: 'Crecimiento', selected: true })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Crecimiento del grupo elegido' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Riesgo del grupo elegido' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Crecimiento del grupo' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Riesgo estimado del grupo' })).not.toBeInTheDocument()
   })
 
   it('el filtro se lee de la dirección y se manda en la consulta', async () => {
@@ -257,7 +257,7 @@ describe('explorar', () => {
     montar('/explorar?f=sexo|lista|F')
     expect(await screen.findByText(/Con menos de 20 niños no se muestran cifras/)).toBeInTheDocument()
     expect(screen.queryByText('niños con algún riesgo alto')).not.toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Riesgo del grupo elegido' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Riesgo estimado del grupo' })).not.toBeInTheDocument()
   })
 
   it('quien solo consulta no ve los filtros guardados ni un aviso de cifras aproximadas: las ve exactas', async () => {
@@ -293,7 +293,7 @@ describe('explorar', () => {
   it.each(['admin', 'experto', 'visualizador'] as const)('el menú de %s ya no ofrece «Explorar»: se llega desde la vista clínica', async (rol) => {
     api(rol)
     montar('/explorar')
-    expect((await screen.findAllByRole('link', { name: 'Vista clínica' })).length).toBeGreaterThan(0)
+    expect((await screen.findAllByRole('link', { name: 'Seguimiento clínico' })).length).toBeGreaterThan(0)
     expect(screen.queryAllByRole('link', { name: 'Explorar' })).toHaveLength(0)
   })
 })
@@ -311,7 +311,7 @@ describe('explorar: el riesgo agrupado por desenlace', () => {
   it('cada desenlace se dice una vez y cada visita desde la que se calcula es una fila', async () => {
     api('experto', { ...resumen, riesgos_por_desenlace: riesgos })
     montar('/explorar')
-    const grafica = (await screen.findByRole('heading', { name: 'Riesgo del grupo elegido' })).closest('section')!
+    const grafica = (await screen.findByRole('heading', { name: 'Riesgo estimado del grupo' })).closest('section')!
     const dibujo = within(grafica).getByRole('img')
     // en el dibujo y en la tabla: una sola vez cada uno
     expect(within(dibujo).getAllByText('desarrollo psicomotor bajo a los 12 meses')).toHaveLength(1)
@@ -328,7 +328,7 @@ describe('explorar: el riesgo agrupado por desenlace', () => {
     montar('/explorar')
     const filtros = (await screen.findByText('Elija el grupo')).closest('aside')!.className
     expect(filtros).toContain('lg:overflow-y-auto')
-    const resultados = (await screen.findByRole('heading', { name: 'Riesgo del grupo elegido' })).closest('section')!.parentElement!.parentElement!
+    const resultados = (await screen.findByRole('heading', { name: 'Riesgo estimado del grupo' })).closest('section')!.parentElement!.parentElement!
     expect(resultados.className).toContain('lg:overflow-y-auto')
   })
 })

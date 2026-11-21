@@ -1,4 +1,4 @@
-// Calcular el riesgo de un niño con el paquete activo, sin guardar nada. El formulario se arma solo con el esquema del
+// Estimar riesgo de un niño con el paquete activo, sin guardar nada. El formulario se arma solo con el esquema del
 // paquete (GET /inferencia/formulario): primero los datos del niño y luego cada visita, con los campos que más pesan a
 // la vista y el resto plegado. Arma la misma petición que antes se pegaba como JSON, que queda como modo avanzado
 // (solo administración). Los resultados se dicen con el glosario clínico.
@@ -19,7 +19,7 @@ import { PanelesPestana, Pestanas } from '../components/ui/Pestanas'
 import { seccionesDeRiesgo } from '../components/ficha/RiesgoA12Meses'
 import { RangoEsperado } from '../components/graficos'
 import { estadoDe, familiaDe, familiasConRiesgo } from '../lib/familias'
-import { aproximado, dec, edad, indicador, medida } from '../lib/formato'
+import { aproximado, dec, edad, etiquetaCampo, indicador, medida } from '../lib/formato'
 import { alerta, AYUDA_DOS_CIFRAS, ayudaAlerta, ayudaZ, CAYO, frenteOms, motivoExtra } from '../lib/lenguaje'
 
 const SUJETO = 'calculo'
@@ -142,7 +142,7 @@ const nombreCorto = (nombre: string) => nombre.replace(' (edad corregida)', '')
 /** La clave de la pestaña de una visita: su etapa sin espacios, que no valen en los id de pestaña y panel. */
 const claveVisita = (etapa: string) => etapa.replace(/[^\w-]+/g, '-')
 
-/** El formulario es un solo `form`: su botón «Calcular el riesgo» vive junto al título para estar a la vista en cualquier pestaña. */
+/** El formulario es un solo `form`: su botón «Estimar riesgo» vive junto al título para estar a la vista en cualquier pestaña. */
 const ID_FORMULARIO = 'formulario-calculo'
 
 type Seccion = { clave: string; texto: ReactNode; contenido: ReactNode }
@@ -160,7 +160,7 @@ export default function Inferencia() {
   if (activo.data === null) {
     return (
       <>
-        <Encabezado titulo="Calcular un niño" />
+        <Encabezado titulo="Estimar riesgo individual" />
         <Vacio titulo="No hay un paquete de modelos activo"><ActivarModelo admin={puede(usuario, ['admin'])} /></Vacio>
       </>
     )
@@ -178,24 +178,24 @@ export default function Inferencia() {
             : <Formulario formulario={formulario.data} calcular={enviar} verDatos={() => setPestana('datos')} />,
     },
     ...(resultado ? seccionesDeResultado(resultado, avanzado) : [{
-      clave: 'resultado', texto: 'Resultado',
-      contenido: <Vacio titulo="Aquí aparecerá el resultado">Llene los datos y pulse «Calcular el riesgo». Para ver cómo se ve, cargue el niño de ejemplo.</Vacio>,
+      clave: 'resultado', texto: 'Riesgo estimado',
+      contenido: <Vacio titulo="Aquí aparecerá el resultado">Llene los datos y pulse «Estimar riesgo». Para ver cómo se ve, cargue el niño de ejemplo.</Vacio>,
     }]),
   ]
   const activa = secciones.find((s) => s.clave === pestana)?.clave ?? 'datos'
   return (
     <div className="flex flex-col lg:h-full">
-      <Encabezado titulo="Calcular un niño"
+      <Encabezado titulo="Estimar riesgo individual"
         accion={
           <div className="flex flex-wrap items-center gap-2">
             {admin && (
               <Boton chico variante="fantasma" onClick={() => { setAvanzado((a) => !a); setPestana('datos'); calcular.reset() }} aria-pressed={avanzado}>
-                {avanzado ? 'Volver al formulario' : 'Modo avanzado (JSON)'}
+                {avanzado ? 'Volver al formulario' : 'Ingresar datos en formato JSON'}
               </Boton>
             )}
             {!avanzado && (
               <Boton type="submit" form={ID_FORMULARIO} disabled={!formulario.data || calcular.isPending}>
-                {calcular.isPending ? 'Calculando…' : 'Calcular el riesgo'}
+                {calcular.isPending ? 'Calculando…' : 'Estimar riesgo'}
               </Boton>
             )}
           </div>
@@ -409,7 +409,7 @@ function CampoDato({ c, valor, cambiar }: { c: CampoFormulario; valor: string; c
   const id = `v-${c.variable}`
   const conRango = c.minimo != null && c.maximo != null
   const rango = conRango ? `Habitual: ${dec(c.minimo)} a ${dec(c.maximo)}${c.unidad ? ` ${c.unidad}` : ''}.` : undefined
-  const etiqueta = c.unidad && c.tipo === 'numero' ? `${c.etiqueta} (${c.unidad})` : c.etiqueta
+  const etiqueta = etiquetaCampo(c.etiqueta, c.tipo === 'numero' ? c.unidad : undefined)
   let control: ReactNode
   if (c.tipo === 'lista' || c.tipo === 'si_no') {
     const opciones = c.tipo === 'si_no' && !c.opciones.length ? [{ valor: '1', etiqueta: 'Sí' }, { valor: '0', etiqueta: 'No' }] : c.opciones
@@ -445,7 +445,7 @@ function ModoAvanzado({ calcular, pendiente }: { calcular: (p: unknown) => void;
     }
   }
   return (
-    <Panel titulo="Modo avanzado (JSON)"
+    <Panel titulo="Ingresar datos en formato JSON"
       accion={<Boton chico variante="secundario" onClick={() => ejemplo.mutate()} disabled={ejemplo.isPending}>{ejemplo.isPending ? 'Armando el ejemplo…' : 'Cargar un niño de ejemplo'}</Boton>}>
       <p className="mb-2 text-sm text-salvia">
         Hasta 50 niños en JSON con <code>sujetos</code>, <code>mediciones</code> y, si hay, <code>episodios</code>, con los nombres de

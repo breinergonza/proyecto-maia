@@ -123,7 +123,7 @@ export default function CompararGrupos() {
 
   return (
     <div className="flex flex-col gap-3">
-      <Encabezado titulo="Comparar grupos" accion={ok && (
+      <Encabezado titulo="Comparar grupos de niños" accion={ok && (
         // las cifras de la comparación (no los niños uno por uno) en un CSV, cada una con su denominador
         <Boton variante="secundario" title="Descargar las cifras de esta comparación (CSV)"
           onClick={() => descargar(new Blob([aCsv(filasDeLaComparacion(ok), COLUMNAS_COMPARACION)], { type: 'text/csv;charset=utf-8' }), nombreArchivo('comparar-grupos', 'csv'))}>
@@ -136,7 +136,7 @@ export default function CompararGrupos() {
         <LadoComparado serie={SERIE_A} filtros={a} elegido resumen={resumen('a')} contando={contando} error={fallo}
           abierto={editando === 'a'} alternar={() => alternar('a')} nota="El grupo A es el grupo activo: si lo cambia, también cambia en la Vista clínica." />
         {/* Intercambiar es secundario: un botón con icono entre los dos grupos, con su nombre para lectores de pantalla. */}
-        <button type="button" onClick={intercambiar} disabled={!b.elegido} aria-label="Intercambiar A y B" title="Intercambiar A y B"
+        <button type="button" onClick={intercambiar} disabled={!b.elegido} aria-label="Intercambiar los grupos A y B" title="Intercambiar los grupos A y B"
           className="grid size-9 place-items-center justify-self-center rounded-full border border-linea bg-papel text-teal shadow-suave transition-colors hover:border-teal/40 disabled:cursor-not-allowed disabled:opacity-40 md:mt-5">
           <ArrowLeftRight aria-hidden className="size-4 rotate-90 md:rotate-0" />
         </button>

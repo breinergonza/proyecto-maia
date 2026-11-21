@@ -41,12 +41,12 @@ export default function AdminCorridas() {
 
   return (
     <>
-      <Encabezado titulo="Corridas">
+      <Encabezado titulo="Recalcular riesgos">
         Una corrida pasa los datos por los dos modelos del paquete activo y deja los resultados en Resumen. Aquí se
         recalcula con el corte que ya está cargado; para traer antes los datos nuevos de la base de la entidad, use{' '}
-        <strong>Corrida ahora</strong> en <Link className="text-teal underline" to="/admin/programacion">Programación</Link>.
+        <strong>Corrida ahora</strong> en <Link className="text-teal underline" to="/admin/programacion">Programar ejecuciones automáticas</Link>.
       </Encabezado>
-      <Panel titulo="Recalcular con el corte vigente" className="mb-4">
+      <Panel titulo="Recalcular con el corte de datos vigente" className="mb-4">
         {activo.data === null ? <Aviso>No hay un paquete activo. Actívelo en Modelos antes de ejecutar.</Aviso> : (
           <div className="flex flex-wrap items-center gap-4">
             <label className="flex items-center gap-2">
@@ -54,7 +54,7 @@ export default function AdminCorridas() {
               <span>En silencio <span className="text-salvia">(guarda los riesgos sin mostrarlos ni enviar correos)</span></span>
             </label>
             <Boton onClick={() => ejecutar.mutate()} disabled={ejecutar.isPending || enCurso}>
-              {enCurso ? 'Hay una corrida en curso' : 'Ejecutar corrida'}
+              {enCurso ? 'Hay una corrida en curso' : 'Iniciar recálculo de riesgos'}
             </Boton>
           </div>
         )}
@@ -62,7 +62,7 @@ export default function AdminCorridas() {
       </Panel>
 
       {lista.isPending ? <Cargando /> : lista.error ? <Aviso>{lista.error.message}</Aviso> : lista.data.length === 0 ? (
-        <Vacio titulo="Todavía no hay corridas" />
+        <Vacio titulo="Todavía no se han recalculado los riesgos" />
       ) : (
         <CorridasTabla corridas={lista.data} />
       )}

@@ -8,6 +8,7 @@ import { ErrorApi } from '../api/cliente'
 import { useSesion } from '../auth/sesion'
 import { AvisoDemo, Marca } from '../components/Marco'
 import { Aviso, Boton, Entrada } from '../components/ui'
+import { useTituloPagina } from '../lib/useTituloPagina'
 
 const esquema = z.object({
   email: z.string().trim().min(1, 'Escriba su correo.').email('Ese correo no es válido.'),
@@ -29,6 +30,7 @@ const SELLOS = [
 const tras = (s: number): CSSProperties => ({ animationDelay: `${s}s` })
 
 export default function Ingresar() {
+  useTituloPagina()
   const { usuario, cargando, ingresar } = useSesion()
   const ir = useNavigate()
   const lugar = useLocation()
@@ -91,7 +93,7 @@ export default function Ingresar() {
                 <span className="grid size-14 place-items-center rounded-2xl bg-teal-tinte text-teal" aria-hidden>
                   <HeartPulse size={28} />
                 </span>
-                <h1 className="mt-5">Ingresar</h1>
+                <h1 className="mt-5">Iniciar sesión en MAIA</h1>
                 <p className="mt-1.5 text-salvia">Acceda a la plataforma de monitoreo y alertas clínicas.</p>
               </div>
 
@@ -137,7 +139,7 @@ export default function Ingresar() {
               </div>
 
               <Boton type="submit" className="group h-12 w-full rounded-xl text-base" disabled={isSubmitting}>
-                {isSubmitting ? 'Ingresando…' : 'Ingresar al sistema'}
+                {isSubmitting ? 'Ingresando…' : 'Iniciar sesión'}
                 {!isSubmitting && <ArrowRight size={18} aria-hidden className="transition-transform duration-200 group-hover:translate-x-0.5" />}
               </Boton>
 

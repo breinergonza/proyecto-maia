@@ -15,10 +15,10 @@ import { dec2, fechaHora, FUENTES, MODELOS, parametro } from '../lib/formato'
 
 type Tipo = 'anomalias' | 'clinico'
 type Fuente = 'kmc' | 'simulado'
-const HP_VISIBLES = ['rondas', 'tasa', 'hojas', 'min_hoja']
+const HP_VISIBLES = { rondas: 'Rondas', tasa: 'Tasa de aprendizaje', hojas: 'Hojas', min_hoja: 'Mínimo de registros por hoja' }
 const PESTANAS = [
-  { clave: 'clinico', texto: MODELOS.clinico },
-  { clave: 'anomalias', texto: MODELOS.anomalias },
+  { clave: 'clinico', texto: 'Modelos de riesgo clínico' },
+  { clave: 'anomalias', texto: 'Modelos de calidad de datos' },
   { clave: 'entrenar', texto: 'Entrenar ahora' },
 ] as const
 const CLAVES = PESTANAS.map((p) => p.clave)
@@ -60,9 +60,9 @@ export default function AdminEntrenamientos() {
   const { confirmar, dialogo } = useConfirmar()
   const aprobarVersiones = async () => {
     const ok = await confirmar({
-      titulo: 'Aprobar y activar en la solución',
+      titulo: 'Aprobar y poner los modelos en uso',
       mensaje: `Se usarán anomalías v${aprobar.anomalias} y alertas clínicas v${aprobar.clinico} (${FUENTES[fuente]}).`,
-      efecto: 'El alias produccion pasa a estas versiones y la API activa el paquete: lo usarán el tablero, las corridas y el cálculo de un niño, para todos los usuarios.',
+      efecto: 'El alias produccion pasa a estas versiones y la API activa el paquete: El tablero, los recálculos de riesgo y la estimación individual usarán estas versiones.',
       reversible: true, textoConfirmar: 'Activar en la solución',
     })
     if (ok) aprobacion.mutate()
@@ -81,7 +81,7 @@ export default function AdminEntrenamientos() {
   // abarca las dos tablas, queda siempre a la vista debajo de ellas
   return (
     <div className="flex flex-col xl:h-full">
-      <Encabezado titulo="Entrenamientos">
+      <Encabezado titulo="Entrenar y aprobar modelos">
         Cada entrenamiento queda en MLflow con sus hiperparámetros, sus métricas de validación (entrena con el pasado y
         mide con lo más reciente) y la versión registrada. Los nuevos entran como <em>candidato</em>; la solución usa los
         que tienen el alias <em>produccion</em>, que se fija al aprobar.
@@ -109,7 +109,7 @@ export default function AdminEntrenamientos() {
               <strong>{aprobar.clinico ? `v${aprobar.clinico}` : 'sin elegir'}</strong>
             </p>
             <Boton disabled={!aprobar.anomalias || !aprobar.clinico || aprobacion.isPending || !!aprobacion.data} onClick={aprobarVersiones}>
-              Aprobar y activar
+              Aprobar y poner el modelo en uso
             </Boton>
           </div>
         }>
@@ -140,8 +140,8 @@ function TablaModelo({ tipo, lista, comparar, alternar, aprobar, elegir }: {
         <Tabla densa apilar className={cn(ENCABEZADO_FIJO, '[&_th]:whitespace-normal! [&_th]:align-bottom')}>
           <thead>
             <tr>
-              <th><span className="sr-only">Comparar</span></th><th>Fecha</th><th>Corte</th><th>Versión</th>
-              {HP_VISIBLES.map((h) => <th key={h} className="text-right">{h}</th>)}
+              <th><span className="sr-only">Comparar</span></th><th>Fecha</th><th>Corte de datos</th><th>Versión</th>
+              {Object.entries(HP_VISIBLES).map(([h, etiqueta]) => <th key={h} className="text-right">{etiqueta}</th>)}
               {nombres.map((n) => <th key={n} className="text-right">{n}</th>)}
               <th>Aprobar</th><th data-acciones><span className="sr-only">Acciones</span></th>
             </tr>
@@ -159,7 +159,7 @@ function TablaModelo({ tipo, lista, comparar, alternar, aprobar, elegir }: {
                     {e.modelo?.alias?.map((a) => <Insignia key={a} tono={a === 'produccion' ? 'teal' : 'ocre'} className="ml-1">{a}</Insignia>)}
                     {e.etiquetas?.hiperparametros && e.etiquetas.hiperparametros !== 'nucleo' && <Insignia className="ml-1">ajustado</Insignia>}
                   </td>
-                  {HP_VISIBLES.map((h) => <td key={h} className="text-right tabular-nums">{parametro(e.hiperparametros?.[h])}</td>)}
+                  {Object.keys(HP_VISIBLES).map((h) => <td key={h} className="text-right tabular-nums">{parametro(e.hiperparametros?.[h])}</td>)}
                   {principales(tipo, e.metricas ?? {}).map(([n, v]) => <td key={n} className="text-right tabular-nums">{dec2(v)}</td>)}
                   <td>{e.modelo ? <input type="radio" name={`aprobar-${tipo}`} className="size-4 accent-teal" aria-label={`Aprobar ${etiquetaVersion(e)}`}
                     checked={aprobar === e.modelo.version} onChange={() => elegir(e.modelo!.version)} /> : '—'}</td>
@@ -170,7 +170,7 @@ function TablaModelo({ tipo, lista, comparar, alternar, aprobar, elegir }: {
                     {e.enlace && <a className="ml-1 inline-flex items-center text-teal" href={e.enlace} target="_blank" rel="noreferrer" aria-label="Ver en MLflow"><ExternalLink size={16} aria-hidden /></a>}
                   </td>
                 </tr>
-                {abierto === e.run_id && <tr><td colSpan={6 + HP_VISIBLES.length + nombres.length}><Detalle e={e} /></td></tr>}
+                {abierto === e.run_id && <tr><td colSpan={6 + Object.keys(HP_VISIBLES).length + nombres.length}><Detalle e={e} /></td></tr>}
               </Fragment>
             ))}
           </tbody>

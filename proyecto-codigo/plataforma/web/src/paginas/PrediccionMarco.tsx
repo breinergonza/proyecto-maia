@@ -9,8 +9,8 @@ const Inferencia = lazy(() => import('./Inferencia'))
 const Prediccion = lazy(() => import('./Prediccion'))
 
 const VISTAS = [
-  { clave: 'nino', texto: 'Un niño' },
-  { clave: 'grupo', texto: 'Un grupo de niños' },
+  { clave: 'nino', texto: 'Estimación individual' },
+  { clave: 'grupo', texto: 'Estimación por grupo' },
 ] as const
 
 export default function PrediccionMarco() {

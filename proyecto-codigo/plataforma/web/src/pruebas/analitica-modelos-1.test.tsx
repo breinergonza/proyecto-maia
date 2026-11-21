@@ -50,7 +50,7 @@ const calibracion = {
   decision: { lectura: 'Beneficio neto de ejemplo.', puntos: [{ umbral: 0.1, modelo: 0.05, todos: 0.02, ninguno: 0, alertas_pct: 30 }, { umbral: 0.2, modelo: 0.04, todos: -0.1, ninguno: 0, alertas_pct: 10 }] },
   hist_riesgo: { estado: 'ok', n: 1000, casos: 160, mediana_con: 0.3, mediana_sin: 0.1, tramos: [{ desde: 0, hasta: 0.5, con: 30, sin: 600 }, { desde: 0.5, hasta: 1, con: 130, sin: 240 }] },
 }
-const resumenPorDesenlace = { auc: 0.78, ic_bajo: 0.7, ic_alto: 0.85, auc_ref: 0.6, semaforos: [{ id: 'auc', nombre: 'Rendimiento', estado: 'verde', valor: 0.78, detalle: 'Ordena bien.', umbral: 'AUC ≥ 0,7' }] }
+const resumenPorDesenlace = { auc: 0.78, ic_bajo: 0.7, ic_alto: 0.85, auc_ref: 0.6, semaforos: [{ id: 'auc', nombre: 'Detección y falsas alertas', estado: 'verde', valor: 0.78, detalle: 'Ordena bien.', umbral: 'AUC ≥ 0,7' }] }
 const por = (t: number, a: number, d: number | null, c: number | null) => ({ top_pct: t, alertas: a, casos_detectados_pct: d, alertas_acertadas_pct: c })
 const anticipacion = {
   nombre: 'readmisión entre los 3 y los 6 meses', etiqueta: 'En uso', top_pct: 10,
@@ -111,8 +111,8 @@ describe('Modelos 1: Resumen en pestañas', () => {
   it('abre en «Cómo le fue» y lo técnico del entrenamiento queda en la última pestaña', async () => {
     api()
     montar(ruta('resumen'), <Ubicacion />)
-    expect((await screen.findAllByRole('tab')).map((t) => t.textContent)).toEqual(['Cómo le fue', 'Aciertos y calibración', 'Cómo se entrenó'])
-    expect(await pestana('Cómo le fue')).toHaveAttribute('aria-selected', 'true')
+    expect((await screen.findAllByRole('tab')).map((t) => t.textContent)).toEqual(['Resultados de validación', 'Aciertos y calibración', 'Datos y configuración del entrenamiento'])
+    expect(await pestana('Resultados de validación')).toHaveAttribute('aria-selected', 'true')
     expect(await screen.findByRole('heading', { name: 'Evaluación en prueba' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Comparación técnica' })).toBeInTheDocument()
     expect(screen.getByText('Rendimiento', { selector: 'span.font-semibold' })).toBeInTheDocument()   // la revisión rápida, junto a la evaluación
@@ -122,7 +122,7 @@ describe('Modelos 1: Resumen en pestañas', () => {
     expect(await screen.findByRole('table', { name: 'Aciertos y errores de la alerta' })).toBeInTheDocument()
     expect(screen.getByRole('figure', { name: /Riesgo estimado frente a riesgo observado/ })).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('tab', { name: 'Cómo se entrenó' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Datos y configuración del entrenamiento' }))
     expect(await screen.findByRole('heading', { name: 'Configuración' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Trazabilidad' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Evaluación en prueba' })).not.toBeInTheDocument()
@@ -141,12 +141,12 @@ describe('Modelos 1: Rendimiento en pestañas', () => {
   it('«Curvas» responde primero; «Línea de alerta» trae el control, la matriz y la tabla; «Por desenlace» la lista', async () => {
     api()
     montar(ruta('rendimiento'), <Ubicacion />)
-    expect(await pestana('Curvas')).toHaveAttribute('aria-selected', 'true')
+    expect(await pestana('Curvas de rendimiento')).toHaveAttribute('aria-selected', 'true')
     expect(await screen.findByText('Aciertos frente a falsas alarmas')).toBeInTheDocument()
     expect(screen.getByText('Alertas acertadas frente a casos detectados')).toBeInTheDocument()
     expect(screen.queryByRole('slider')).not.toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('tab', { name: 'Línea de alerta' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Umbral de alerta' }))
     const control = await screen.findByRole('slider')
     expect(control).toHaveValue('10')
     expect(screen.getByRole('table', { name: 'Aciertos y errores de la alerta' })).toBeInTheDocument()
@@ -165,8 +165,8 @@ describe('Modelos 1: Rendimiento en pestañas', () => {
     api()
     montar(ruta('rendimiento', 'linea'))
     fireEvent.change(await screen.findByRole('slider'), { target: { value: '30' } })
-    await userEvent.click(screen.getByRole('tab', { name: 'Curvas' }))
-    await userEvent.click(screen.getByRole('tab', { name: 'Línea de alerta' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Curvas de rendimiento' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Umbral de alerta' }))
     expect(await screen.findByRole('slider')).toHaveValue('30')
   })
 })
@@ -211,17 +211,17 @@ describe('Modelos 1: Calibración en pestañas', () => {
   it('cada pestaña responde una pregunta de la calibración y las elecciones se conservan', async () => {
     api()
     montar(ruta('calibracion'), <Ubicacion />)
-    expect(await pestana('Es creíble el riesgo')).toHaveAttribute('aria-selected', 'true')
+    expect(await pestana('Riesgo estimado frente al observado')).toHaveAttribute('aria-selected', 'true')
     expect(await screen.findByText('Qué tan fiable es el porcentaje')).toBeInTheDocument()
-    expect(screen.getByRole('figure', { name: 'Riesgo dicho frente a riesgo real' })).toBeInTheDocument()
+    expect(screen.getByRole('figure', { name: 'Riesgo estimado frente al observado' })).toBeInTheDocument()
     expect(screen.getByText('Por grupos de niños')).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('tab', { name: 'Cómo se reparte' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Distribución del riesgo estimado' }))
     expect(await screen.findByText('Riesgo de los niños con y sin el desenlace')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Cómo se reparte el riesgo' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Distribución del riesgo estimado' })).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('tab', { name: 'A cuántos revisar' }))
-    expect(await screen.findByRole('heading', { name: 'A cuántos revisar' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: 'Niños por revisar según el umbral' }))
+    expect(await screen.findByRole('heading', { name: 'Niños por revisar según el umbral' })).toBeInTheDocument()
     const capacidad = screen.getByLabelText('Niños que el equipo puede revisar')
     fireEvent.change(capacidad, { target: { value: '7' } })
 
@@ -231,7 +231,7 @@ describe('Modelos 1: Calibración en pestañas', () => {
     fireEvent.change(screen.getByRole('slider'), { target: { value: '5' } })
     expect(screen.getByTestId('ubicacion').textContent).toContain('ver=beneficio')
 
-    await userEvent.click(screen.getByRole('tab', { name: 'A cuántos revisar' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Niños por revisar según el umbral' }))
     expect(screen.getByLabelText('Niños que el equipo puede revisar')).toHaveValue(7)
     await userEvent.click(screen.getByRole('tab', { name: 'Beneficio y costo' }))
     expect(screen.getByRole('slider')).toHaveValue('5')
@@ -262,13 +262,13 @@ describe('Modelos 1: el marco de Analítica es compacto', () => {
     api()
     montar(ruta('rendimiento'))
     const region = await screen.findByRole('region', { name: 'Contexto de análisis' })
-    expect(await within(region).findByLabelText('Desenlace')).toBeInTheDocument()
-    expect(within(region).getByLabelText('Calculado a')).toBeInTheDocument()
+    expect(await within(region).findByLabelText('Resultado clínico evaluado')).toBeInTheDocument()
+    expect(within(region).getByLabelText('Edad al estimar el riesgo')).toBeInTheDocument()
     expect(within(region).getByLabelText('Entrenamiento')).toBeInTheDocument()
     expect(await within(region).findByText('Estado:')).toBeInTheDocument()
     expect(within(region).getByText(/Datos simulados/)).toBeInTheDocument()
     // el título, la pregunta y la guía siguen en el encabezado; no hay modo técnico: una sola palabra (S22)
-    expect(screen.getByRole('heading', { level: 1, name: 'Rendimiento' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Detección y falsas alertas' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Guía de lectura' })).toBeInTheDocument()
     expect(screen.queryByRole('switch', { name: 'Modo técnico' })).not.toBeInTheDocument()
   })

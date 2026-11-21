@@ -44,8 +44,8 @@ describe('Configuración en pestañas', () => {
     api()
     montar('/admin/configuracion')
     expect(visible(await screen.findByText('2. Conexión a la base de la entidad'))).toBe(true)
-    expect(nombresDePestanas()).toEqual(['Estado', 'Base de datos', 'Hiperparámetros · Anomalías', 'Hiperparámetros · Alertas clínicas'])
-    expect(seleccionada()).toHaveTextContent('Estado')
+    expect(nombresDePestanas()).toEqual(['Estado del sistema', 'Base de datos', 'Parámetros de entrenamiento para detectar mediciones atípicas', 'Parámetros de entrenamiento para estimar riesgo clínico'])
+    expect(seleccionada()).toHaveTextContent('Estado del sistema')
     expect(visible(screen.getByLabelText('Servidor'))).toBe(false)
     expect(visible(screen.getByLabelText('Rondas de boosting (máximo)'))).toBe(false)
   })
@@ -58,7 +58,7 @@ describe('Configuración en pestañas', () => {
     await waitFor(() => expect(servidor).toHaveValue('db.entidad'))
     await userEvent.clear(servidor)
     await userEvent.type(servidor, 'otro.host')
-    await userEvent.click(screen.getByRole('tab', { name: 'Hiperparámetros · Alertas clínicas' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Parámetros de entrenamiento para estimar riesgo clínico' }))
     expect(visible(screen.getByLabelText('Hojas por árbol'))).toBe(true)
     expect(visible(screen.getByLabelText('Servidor'))).toBe(false)
     await userEvent.click(screen.getByRole('tab', { name: 'Base de datos' }))
@@ -68,7 +68,7 @@ describe('Configuración en pestañas', () => {
   it('la pestaña va en la dirección', async () => {
     api()
     montar('/admin/configuracion?ver=anomalias')
-    expect(await screen.findByRole('tab', { name: 'Hiperparámetros · Anomalías' })).toHaveAttribute('aria-selected', 'true')
+    expect(await screen.findByRole('tab', { name: 'Parámetros de entrenamiento para detectar mediciones atípicas' })).toHaveAttribute('aria-selected', 'true')
     expect(visible(await screen.findByLabelText('Rondas de boosting (máximo)'))).toBe(true)
     expect(within(screen.getByRole('tabpanel')).getByRole('button', { name: 'Guardar' })).toBeInTheDocument()   // solo el panel elegido lleva el rol
   })
@@ -96,8 +96,8 @@ describe('Programación en pestañas', () => {
     api()
     montar('/admin/programacion')
     expect(visible(await screen.findByText('Corrida semestral'))).toBe(true)
-    expect(nombresDePestanas()).toEqual(['Horarios y ejecuciones', 'Nueva programación'])
-    expect(visible(screen.getByRole('heading', { name: 'Ejecuciones' }))).toBe(true)
+    expect(nombresDePestanas()).toEqual(['Horarios y ejecuciones', 'Crear programación'])
+    expect(visible(screen.getByRole('heading', { name: 'Historial de ejecuciones automáticas' }))).toBe(true)
     expect(visible(screen.getByText('Entrenamiento · Base de la Fundación'))).toBe(true)
     expect(visible(screen.getByLabelText('Nombre'))).toBe(false)
   })
@@ -121,7 +121,7 @@ describe('Programación en pestañas', () => {
     await userEvent.clear(nombre)
     await userEvent.type(nombre, 'Mensual')
     await userEvent.click(screen.getByRole('tab', { name: 'Horarios y ejecuciones' }))
-    await userEvent.click(screen.getByRole('tab', { name: 'Nueva programación' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Crear programación' }))
     expect(screen.getByLabelText('Nombre')).toHaveValue('Mensual')
   })
 })
@@ -144,7 +144,7 @@ describe('Entrenamientos en pestañas', () => {
     api()
     montar('/admin/entrenamientos')
     expect(visible(await screen.findByLabelText('Comparar c2'))).toBe(true)
-    expect(nombresDePestanas('Qué ver')).toEqual(['Alertas clínicas', 'Anomalías (revisión de datos)', 'Entrenar ahora'])
+    expect(nombresDePestanas('Qué ver')).toEqual(['Modelos de riesgo clínico', 'Modelos de calidad de datos', 'Entrenar ahora'])
     expect(visible(screen.getByLabelText('Comparar a1'))).toBe(false)
     expect(visible(screen.getByRole('button', { name: 'Entrenar ahora' }))).toBe(false)
   })
@@ -157,12 +157,12 @@ describe('Entrenamientos en pestañas', () => {
     expect(visible(resumenAprobar())).toBe(true)
     expect(visible(within(resumenAprobar()).getByText('v5'))).toBe(true)
     const pestanas = within(screen.getByRole('tablist', { name: 'Qué ver' }))
-    await userEvent.click(pestanas.getByRole('tab', { name: 'Anomalías (revisión de datos)' }))
+    await userEvent.click(pestanas.getByRole('tab', { name: 'Modelos de calidad de datos' }))
     expect(visible(resumenAprobar())).toBe(true)
     expect(visible(within(resumenAprobar()).getByText('v5'))).toBe(true)
-    expect(screen.getByRole('button', { name: 'Aprobar y activar' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Aprobar y poner el modelo en uso' })).toBeDisabled()
     await userEvent.click(screen.getByLabelText('Aprobar v2'))
-    expect(screen.getByRole('button', { name: 'Aprobar y activar' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Aprobar y poner el modelo en uso' })).toBeEnabled()
     await userEvent.click(pestanas.getByRole('tab', { name: 'Entrenar ahora' }))
     expect(screen.queryByRole('heading', { name: 'Aprobar para usar en la solución' })).not.toBeInTheDocument()
   })
@@ -205,7 +205,7 @@ describe('Mis modelos en pestañas', () => {
     api('experto')
     montar('/mis-modelos')
     expect(visible(await screen.findByText('Mi prueba'))).toBe(true)
-    expect(nombresDePestanas()).toEqual(['Entrenar', 'Banco de modelos'])
+    expect(nombresDePestanas()).toEqual(['Nuevo entrenamiento', 'Modelos propios'])
     expect(visible(screen.getByText(/1 de 2/))).toBe(true)
     expect(visible(screen.getByRole('button', { name: 'Entrenar modelo nuevo' }))).toBe(true)
     expect(visible(screen.getByText('Modelo de Ana'))).toBe(false)
@@ -215,7 +215,7 @@ describe('Mis modelos en pestañas', () => {
     api('experto')
     montar('/mis-modelos?ver=banco')
     expect(visible(await screen.findByText('Modelo de Ana'))).toBe(true)
-    expect(seleccionada()).toHaveTextContent('Banco de modelos')
+    expect(seleccionada()).toHaveTextContent('Modelos propios')
     expect(visible(screen.getByLabelText('Mostrar'))).toBe(true)
     expect(visible(screen.getByLabelText('Nombre'))).toBe(false)
   })
@@ -223,7 +223,7 @@ describe('Mis modelos en pestañas', () => {
   it('el administrador ve además la pestaña de límites', async () => {
     api('admin')
     montar('/mis-modelos')
-    await userEvent.click(await screen.findByRole('tab', { name: 'Límites' }))
+    await userEvent.click(await screen.findByRole('tab', { name: 'Límites de uso' }))
     expect(visible(await screen.findByRole('button', { name: 'Guardar límites' }))).toBe(true)
     expect(visible(screen.getByRole('button', { name: 'Entrenar modelo nuevo' }))).toBe(false)
   })
@@ -232,7 +232,7 @@ describe('Mis modelos en pestañas', () => {
     api('experto')
     montar('/mis-modelos')
     await userEvent.type(await screen.findByLabelText('Nombre'), 'Prueba A')
-    await userEvent.click(screen.getByRole('button', { name: 'Armar una muestra' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Seleccionar niños para el entrenamiento' }))
     expect(visible(await screen.findByLabelText('Título de la muestra'))).toBe(true)
     expect(screen.queryByRole('button', { name: 'Entrenar modelo nuevo' })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Cerrar' }))
@@ -253,14 +253,14 @@ const vista: VistaDiccionario = {
   hojas: [
     { nombre: 'Variables', describe: 'Una fila por variable de la base', clave: 'variable', agregar: false,
       columnas: [col('variable', 'Variable', { obligatoria: true }), col('estado', 'Estado')],
-      filas: [['var_simulada_a', 'Por clasificar'], ['var_simulada_b', 'Lista']] },
+      filas: [['var_simulada_a', 'Variables pendientes de clasificar'], ['var_simulada_b', 'Lista']] },
     { nombre: 'Visitas', describe: 'Las visitas del seguimiento', clave: 'etapa', agregar: true,
       columnas: [col('etapa', 'Visita', { obligatoria: true }), col('nombre', 'Nombre')], filas: [['3 m EC', '3 meses']] },
   ],
 }
 const porClasificar = {
   vigente, total: 1, borrador: null,
-  variables: [{ variable: 'var_simulada_a', etiqueta: 'Variable simulada A', estado: 'Por clasificar', tema: null, etapa: '3 m EC', visita: '3 meses', nota: null }],
+  variables: [{ variable: 'var_simulada_a', etiqueta: 'Variable simulada A', estado: 'Variables pendientes de clasificar', tema: null, etapa: '3 m EC', visita: '3 meses', nota: null }],
 }
 
 describe('Diccionario en pestañas', () => {
@@ -277,7 +277,7 @@ describe('Diccionario en pestañas', () => {
     expect(visible(await screen.findByRole('button', { name: 'Editar var_simulada_a' }))).toBe(true)
     const secciones = screen.getByRole('tablist', { name: 'Secciones del diccionario' })
     expect(within(secciones).getAllByRole('tab').map((t) => t.textContent?.replace(/\s+/g, ' ').trim()))
-      .toEqual(['Editar', 'Por clasificar 1', 'Versiones e importación'])
+      .toEqual(['Editar definiciones', 'Variables pendientes de clasificar 1', 'Importar diccionario y ver versiones'])
     expect(visible(screen.getByText('Variable simulada A'))).toBe(false)   // las variables por clasificar están en su pestaña
   })
 
@@ -295,9 +295,9 @@ describe('Diccionario en pestañas', () => {
     expect(visible(await screen.findByText('Variable simulada A'))).toBe(true)
     await userEvent.click(screen.getByRole('button', { name: 'Completar var_simulada_a' }))
     expect(visible(await screen.findByRole('dialog', { name: /var_simulada_a/ }))).toBe(true)
-    expect(screen.getByRole('tab', { name: 'Editar' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Editar definiciones' })).toHaveAttribute('aria-selected', 'true')
     await userEvent.keyboard('{Escape}')
-    await userEvent.click(screen.getByRole('tab', { name: 'Versiones e importación' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Importar diccionario y ver versiones' }))
     expect(visible(screen.getByRole('button', { name: 'Ver la versión 1' }))).toBe(true)
     expect(visible(screen.getByLabelText('Archivo de Excel (.xlsx)'))).toBe(true)
   })

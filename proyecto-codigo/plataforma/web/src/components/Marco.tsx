@@ -30,10 +30,10 @@ export const ROLES_CLINICOS: Rol[] = ['admin', 'experto']
 export const ROLES_CONSULTA: Rol[] = ['admin', 'experto', 'visualizador']
 
 const MODELOS: Enlace = {
-  a: '/analitica', texto: 'Modelos', icono: Activity, roles: ROLES_CONSULTA,
+  a: '/analitica', texto: 'Evaluación de modelos', icono: Activity, roles: ROLES_CONSULTA,
   hijos: [
     ...SUBMODULOS.map((s) => ({ a: `/analitica/${s.id}`, texto: s.texto })),
-    { a: '/mis-modelos', texto: 'Mis modelos', roles: ROLES_CLINICOS },
+    { a: '/mis-modelos', texto: 'Entrenamientos propios', roles: ROLES_CLINICOS },
   ],
 }
 
@@ -41,27 +41,27 @@ const SECCIONES: { titulo: string; enlaces: Enlace[] }[] = [
   {
     titulo: 'Clínica',
     enlaces: [
-      { a: '/', texto: 'Vista clínica', icono: LayoutDashboard },
-      { a: '/ninos', texto: 'Niños', icono: Baby, roles: ROLES_CLINICOS },   // niños uno por uno: D65
-      { a: '/comparar', texto: 'Comparar grupos', icono: GitCompare, roles: ROLES_CONSULTA },
-      { a: '/revision/riesgos', texto: 'Revisión de riesgos', icono: HeartPulse, roles: ROLES_CLINICOS },
-      { a: '/prediccion', texto: 'Calcular un niño', icono: LineChart, roles: ROLES_CLINICOS },
+      { a: '/', texto: 'Seguimiento clínico', icono: LayoutDashboard },
+      { a: '/ninos', texto: 'Listado de niños', icono: Baby, roles: ROLES_CLINICOS },   // niños uno por uno: D65
+      { a: '/comparar', texto: 'Comparar grupos de niños', icono: GitCompare, roles: ROLES_CONSULTA },
+      { a: '/revision/riesgos', texto: 'Revisión clínica de casos', icono: HeartPulse, roles: ROLES_CLINICOS },
+      { a: '/prediccion', texto: 'Estimar riesgo', icono: LineChart, roles: ROLES_CLINICOS },
     ],
   },
   {
-    titulo: 'Técnica',
+    titulo: 'Datos y modelos',
     enlaces: [
       MODELOS,
-      { a: '/admin/calidad-datos', texto: 'Calidad de datos', icono: ClipboardCheck, roles: ROLES_CLINICOS },
-      { a: '/diccionario', texto: 'Diccionario', icono: BookOpen, roles: ROLES_CLINICOS },
-      { a: '/tablero', texto: 'Resumen', icono: Gauge, roles: ROLES_CONSULTA },
+      { a: '/admin/calidad-datos', texto: 'Mediciones por revisar', icono: ClipboardCheck, roles: ROLES_CLINICOS },
+      { a: '/diccionario', texto: 'Guía de variables y unidades', icono: BookOpen, roles: ROLES_CLINICOS },
+      { a: '/tablero', texto: 'Resumen de riesgos y calidad de datos', icono: Gauge, roles: ROLES_CONSULTA },
     ],
   },
   {
     titulo: 'Notificaciones',
     enlaces: [
-      { a: '/notificaciones/servidor', texto: 'Servidor de correo', icono: Mail, roles: ROLES_ADMIN },
-      { a: '/notificaciones/alertas', texto: 'Alertas', icono: BellRing, roles: ROLES_ADMIN },
+      { a: '/notificaciones/servidor', texto: 'Configuración del correo saliente', icono: Mail, roles: ROLES_ADMIN },
+      { a: '/notificaciones/alertas', texto: 'Reglas y envíos de alertas por correo', icono: BellRing, roles: ROLES_ADMIN },
     ],
   },
   {
@@ -70,19 +70,19 @@ const SECCIONES: { titulo: string; enlaces: Enlace[] }[] = [
       {
         a: '/admin/configuracion', texto: 'Configuración', icono: Settings, roles: ROLES_ADMIN,
         hijos: [
-          { a: '/admin/configuracion', texto: 'General' },
-          { a: '/admin/programacion', texto: 'Programación' },
+          { a: '/admin/configuracion', texto: 'Configuración del sistema y del entrenamiento' },
+          { a: '/admin/programacion', texto: 'Programar ejecuciones automáticas' },
         ],
       },
       {
-        a: '/admin/modelos-y-corridas', texto: 'Modelos y corridas', icono: Package, roles: ROLES_ADMIN,
+        a: '/admin/modelos-y-corridas', texto: 'Operación de modelos', icono: Package, roles: ROLES_ADMIN,
         hijos: [
-          { a: '/admin/entrenamientos', texto: 'Entrenamientos' },
-          { a: '/admin/modelos', texto: 'Modelos' },
-          { a: '/admin/corridas', texto: 'Corridas' },
+          { a: '/admin/entrenamientos', texto: 'Entrenar y aprobar modelos' },
+          { a: '/admin/modelos', texto: 'Modelos disponibles' },
+          { a: '/admin/corridas', texto: 'Recalcular riesgos' },
         ],
       },
-      { a: '/admin/usuarios', texto: 'Usuarios', icono: Users, roles: ROLES_ADMIN },
+      { a: '/admin/usuarios', texto: 'Usuarios y permisos', icono: Users, roles: ROLES_ADMIN },
     ],
   },
 ]
@@ -335,7 +335,7 @@ export function Marco({ children }: { children?: ReactNode }) {
           </div>
         </main>
         <footer className="w-full shrink-0 px-4 pb-4 text-xs text-salvia sm:px-6 lg:border-t lg:border-linea lg:px-5 lg:py-1.5">
-          Apoyo a la decisión, no diagnóstico. El riesgo ordena a los niños; la decisión es del equipo clínico.
+          Apoyo a la decisión clínica. El riesgo estimado ayuda a priorizar la revisión. El equipo clínico toma la decisión.
         </footer>
       </div>
     </div>

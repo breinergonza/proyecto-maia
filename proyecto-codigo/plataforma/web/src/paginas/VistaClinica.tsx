@@ -68,7 +68,7 @@ export default function VistaClinica() {
     <div className="flex flex-col gap-3 xl:h-full">
       <div className="flex animate-aparecer flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-          <h1>Vista clínica</h1>
+          <h1>Seguimiento clínico</h1>
           <p className="text-sm text-salvia">
             {r?.datos_al ? `${datosAl(r.datos_al)} · qué pasó` : 'Qué pasó'} a los 12 meses y a quién mirar primero
           </p>
@@ -129,7 +129,7 @@ function Contenido({ r, activa, elegir }: { r: ClinicaResumen; activa: string; e
         <div className="flex flex-col gap-3 xl:min-h-0">
           <RiesgoPorCorte filas={r.riesgo} conModelo={r.riesgo_con_modelo} alertaPercentil={r.alerta_percentil}
             desenlace={r.familias.find((f) => f.clave === r.familia)?.nombre} className="shrink-0" />
-          {r.ninos && <NinosMasRiesgo ninos={r.ninos} riesgos={r.riesgo} medida={r.trayectoria.indicador === 'talla' ? 'Última talla (z)' : 'Última medida (z)'}
+          {r.ninos && <NinosMasRiesgo ninos={r.ninos} riesgos={r.riesgo} medida={r.trayectoria.indicador === 'talla' ? 'Último puntaje Z de talla para la edad' : 'Último puntaje Z de la medida'}
             alertaPercentil={r.alerta_percentil} esPoblacion={esPoblacion} className="xl:min-h-0 xl:flex-1" />}
         </div>
       </div>

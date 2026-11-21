@@ -1,4 +1,4 @@
-// «Qué les pasó a los 12 meses»: el porcentaje de niños del grupo que tuvo el desenlace, entre los que tienen dato a los
+// «Resultados observados a los 12 meses»: el porcentaje de niños del grupo que tuvo el desenlace, entre los que tienen dato a los
 // 12 meses (con su numerador, su denominador y cuántos no tienen dato), y la población completa como referencia. Si el
 // grupo es toda la población, una línea corta lo dice en vez de repetir la misma cifra.
 import type { ObservadoClinico } from '../../api/tipos'
@@ -12,7 +12,7 @@ export function Observado({ grupo, poblacion, esPoblacion, className }: {
   className?: string
 }) {
   return (
-    <Panel className={className} titulo="Qué les pasó a los 12 meses">
+    <Panel className={className} titulo="Resultados observados a los 12 meses">
       {grupo ? (
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <p className="text-3xl font-bold leading-none tracking-tight text-teal">{pct(grupo.pct)}</p>

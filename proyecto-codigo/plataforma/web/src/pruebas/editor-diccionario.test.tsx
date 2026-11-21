@@ -19,9 +19,9 @@ const vista: VistaDiccionario = {
   hojas: [
     { nombre: 'Variables', describe: 'Una fila por variable de la base', clave: 'variable', agregar: false,
       columnas: [col('variable', 'Variable', { obligatoria: true }),
-        col('estado', 'Estado', { opciones: ['Lista', 'Por clasificar', 'No usar'], obligatoria: true }),
+        col('estado', 'Estado', { opciones: ['Lista', 'Variables pendientes de clasificar', 'No usar'], obligatoria: true }),
         col('etiqueta', 'Nombre'), col('etapa', 'Visita', { lista: 'Visitas' }), col('tolerancia', 'Tolerancia', { tipo: 'numero' })],
-      filas: [['var_simulada_a', 'Por clasificar', 'Variable simulada A', '3 m EC', null],
+      filas: [['var_simulada_a', 'Variables pendientes de clasificar', 'Variable simulada A', '3 m EC', null],
         ['var_simulada_b', 'Lista', 'Variable simulada B', null, '2']] },
     { nombre: 'Visitas', describe: 'Las visitas del seguimiento', clave: 'etapa', agregar: true,
       columnas: [col('etapa', 'Visita', { obligatoria: true }), col('nombre', 'Nombre'), col('orden', 'Orden', { tipo: 'numero', obligatoria: true })],
@@ -31,11 +31,11 @@ const vista: VistaDiccionario = {
 const diferencias = {
   nuevas: [], quitadas: [], desenlaces_activados: [], desenlaces_apagados: [], sin_cambios: false, vigente: 2,
   estados: [{ variable: 'var_simulada_a', etiqueta: 'Nombre corregido', estado: 'Lista', tema: null, etapa: '3 m EC', visita: '3 meses',
-    nota: null, antes: 'Por clasificar', despues: 'Lista' }],
+    nota: null, antes: 'Variables pendientes de clasificar', despues: 'Lista' }],
 }
 const pendientes = {
   vigente, total: 1, borrador: null,
-  variables: [{ variable: 'var_simulada_a', etiqueta: 'Variable simulada A', estado: 'Por clasificar', tema: null, etapa: '3 m EC',
+  variables: [{ variable: 'var_simulada_a', etiqueta: 'Variable simulada A', estado: 'Variables pendientes de clasificar', tema: null, etapa: '3 m EC',
     visita: '3 meses', nota: null }],
 }
 
@@ -82,7 +82,7 @@ describe('editar el diccionario con formularios', () => {
 
     await userEvent.click(within(editor).getByRole('button', { name: 'Revisar y guardar' }))
     const revision = await screen.findByRole('dialog', { name: 'Revisar los cambios' })
-    expect(await within(revision).findByText(/Por clasificar → /)).toBeInTheDocument()
+    expect(await within(revision).findByText(/Variables pendientes de clasificar → /)).toBeInTheDocument()
     expect(within(revision).getByText('Variable simulada A → Nombre corregido')).toBeInTheDocument()
     expect(cuerpo(llamadas, '/api/diccionario/editar/revisar')).toEqual({
       base: 20, nota: null,

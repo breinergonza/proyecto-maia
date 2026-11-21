@@ -56,7 +56,7 @@ describe('calidad de datos: cifras y encabezado', () => {
   it('dice que son datos a revisar y no riesgos clínicos, y muestra las tres cifras del servidor', async () => {
     api()
     montar('/admin/calidad-datos')
-    expect(await screen.findByRole('heading', { level: 1, name: 'Calidad de datos' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Mediciones por revisar' })).toBeInTheDocument()
     expect(screen.getByText('Mediciones dudosas o faltantes. No son riesgos clínicos: son datos a revisar antes de usarlos.')).toBeInTheDocument()
     expect(await screen.findByText('mediciones por revisar')).toBeInTheDocument()
     expect(screen.getByText('38')).toBeInTheDocument()
@@ -78,7 +78,7 @@ describe('calidad de datos: cifras y encabezado', () => {
   it('el experto clínico también entra y ve la cola', async () => {
     api([dato()], undefined, 'experto')
     montar('/admin/calidad-datos')
-    expect(await screen.findByRole('heading', { level: 1, name: 'Calidad de datos' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Mediciones por revisar' })).toBeInTheDocument()
     expect(await screen.findByRole('link', { name: 'S-02210' })).toBeInTheDocument()
   })
 })
@@ -89,7 +89,7 @@ describe('calidad de datos: la cola', () => {
     montar('/admin/calidad-datos')
     const tabla = (await screen.findByRole('table')).closest('table')!
     expect(within(tabla).getAllByRole('columnheader').map((c) => c.textContent)).toEqual(
-      ['Niño', 'Visita', 'Medición', 'Valor registrado', 'Por qué es dudosa', 'Detectado por', 'Estado', 'Acción'])
+      ['Niño', 'Visita', 'Medición', 'Valor registrado', 'Por qué es dudosa', 'Regla o modelo que detectó la medición', 'Estado', 'Acción'])
     const fila = within(tabla).getByRole('link', { name: 'S-02210' }).closest('tr')!
     const celdas = within(fila).getAllByRole('cell').map((c) => c.textContent)
     expect(celdas.slice(0, 7)).toEqual(['S-02210', '6 m', 'Talla', '58 cm', 'Esperado entre 62 y 70 cm.', 'Valor fuera de lo esperado', 'Por revisar'])
@@ -122,7 +122,7 @@ describe('calidad de datos: la cola', () => {
     await waitFor(() => expect(within(screen.getByLabelText('Visita')).getByRole('option', { name: /6 m/ })).toBeInTheDocument())
     fireEvent.change(screen.getByLabelText('Visita'), { target: { value: 'e6' } })
     fireEvent.change(screen.getByLabelText('Medición'), { target: { value: 'talla_6' } })
-    fireEvent.change(screen.getByLabelText('Detectado por'), { target: { value: '2' } })
+    fireEvent.change(screen.getByLabelText('Regla o modelo que detectó la medición'), { target: { value: '2' } })
     fireEvent.change(screen.getByLabelText('Estado'), { target: { value: 'todos' } })
     await waitFor(() => expect(llamadas.some((l) => l.url.startsWith('/api/revision/datos?') && l.url.includes('etapa=e6')
       && l.url.includes('variable=talla_6') && l.url.includes('capa=2') && l.url.includes('estado=todos') && l.url.includes('pagina=1'))).toBe(true))
@@ -263,7 +263,7 @@ describe('calidad de datos: las medidas de la revisión siguen ahí', () => {
   it('los paneles de alertas por tipo, aciertos y concentración están en el detalle', async () => {
     api()
     montar('/admin/calidad-datos')
-    await userEvent.click(await screen.findByText('Cómo se comportan las alertas'))
+    await userEvent.click(await screen.findByText('Resumen de alertas de calidad de datos'))
     for (const t of ['Alertas por tipo', 'Aciertos frente a la revisión', 'Dónde se concentran']) {
       expect(await screen.findByRole('heading', { name: t })).toBeInTheDocument()
     }
@@ -272,7 +272,7 @@ describe('calidad de datos: las medidas de la revisión siguen ahí', () => {
   it('dónde se concentran muestra cada dato con su cifra, aunque tenga una sola alerta', async () => {
     api()
     montar('/admin/calidad-datos')
-    await userEvent.click(await screen.findByText('Cómo se comportan las alertas'))
+    await userEvent.click(await screen.findByText('Resumen de alertas de calidad de datos'))
     const lista = await screen.findByRole('list', { name: 'Alertas por sede y dato' })
     expect(within(lista).getByText('Perímetro cefálico').closest('li')).toHaveTextContent(/\D1 alerta$/)
     expect(within(lista).getByText('Peso').closest('li')).toHaveTextContent('12 alertas')

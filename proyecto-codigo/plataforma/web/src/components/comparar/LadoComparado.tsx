@@ -56,12 +56,11 @@ export function LadoComparado({ serie, filtros, elegido, resumen, contando, erro
         <div className="flex items-start justify-between gap-x-4">
           <div className="flex min-w-0 flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
             <p className="text-sm font-semibold" aria-hidden>{letra}</p>
-            <h2 className="text-lg leading-tight">{elegido ? nombreDelGrupo(guardado, criterios.length) : 'Sin elegir'}</h2>
+            <h2 className="text-lg leading-tight">{elegido ? nombreDelGrupo(guardado, criterios.length) : 'Grupo B sin seleccionar'}</h2>
             {cuantos && <p className="text-sm font-semibold text-teal">{cuantos}</p>}
           </div>
-          <Boton variante="secundario" chico aria-haspopup="dialog" onClick={alternar}
-            aria-label={elegido ? `Editar grupo ${letra.slice(-1)}` : undefined}>
-            {elegido ? 'Editar' : 'Elegir grupo B'}
+          <Boton variante="secundario" chico aria-haspopup="dialog" onClick={alternar}>
+            {elegido ? `Cambiar criterios del grupo ${letra.slice(-1)}` : 'Elegir grupo B'}
           </Boton>
         </div>
         <div className="mt-0.5 flex flex-wrap gap-x-4 text-sm">

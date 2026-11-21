@@ -73,8 +73,8 @@ describe('analítica: contexto en la URL', () => {
     const llamadas = api('experto')
     montar('/analitica/rendimiento?entrenamiento=7&desenlace=des_b', <Ubicacion />)
     // el encabezado nombra el submódulo y su pregunta (plan v3.7, 6.1)
-    expect(await screen.findByRole('heading', { level: 1, name: 'Rendimiento' })).toBeInTheDocument()
-    await waitFor(() => expect(screen.getByLabelText('Desenlace')).toHaveValue('des_b'))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Detección y falsas alertas' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByLabelText('Resultado clínico evaluado')).toHaveValue('des_b'))
     expect(screen.getAllByText('En prueba').length).toBeGreaterThan(0)
     await waitFor(() => expect(llamadas.some((l) => l.url === '/api/analitica/7/rendimiento?desenlace=des_b')).toBe(true))
     expect(screen.getByText(/versión 3/)).toBeInTheDocument()
@@ -83,7 +83,7 @@ describe('analítica: contexto en la URL', () => {
   it('al cambiar de desenlace la URL guarda el contexto y las fichas lo conservan', async () => {
     api('experto')
     montar('/analitica/rendimiento?entrenamiento=7', <Ubicacion />)
-    const selector = await screen.findByLabelText('Desenlace')
+    const selector = await screen.findByLabelText('Resultado clínico evaluado')
     await waitFor(() => expect(selector).toHaveValue('des_a'))
     fireEvent.change(selector, { target: { value: 'des_b' } })
     await waitFor(() => expect(screen.getByTestId('ubicacion').textContent).toBe('/analitica/rendimiento?entrenamiento=7&desenlace=des_b'))
@@ -189,22 +189,22 @@ describe('analítica: acceso y menú', () => {
   it('el perfil de consulta (visualizador) entra a la analítica', async () => {
     api('visualizador')
     montar('/analitica/resumen?entrenamiento=7')
-    expect(await screen.findByRole('heading', { level: 1, name: 'Modelos' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Ficha del modelo' })).toBeInTheDocument()
     expect(screen.queryByText('Sin permiso')).not.toBeInTheDocument()
   })
 
   it('el menú tiene el grupo «Modelos» con sus submódulos para todos los perfiles', async () => {
     api('visualizador')
     montar('/tablero')
-    const enlaces = await screen.findAllByRole('link', { name: 'Modelos' })
+    const enlaces = await screen.findAllByRole('link', { name: 'Evaluación de modelos' })
     expect(enlaces[0]).toHaveAttribute('href', '/analitica/resumen')
-    expect(screen.getAllByRole('button', { name: /Desplegar Modelos/ }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: /Desplegar Evaluación de modelos/ }).length).toBeGreaterThan(0)
   })
 
   it('en la analítica el grupo del menú se abre solo y lista los submódulos', async () => {
     api('experto')
     montar('/analitica/resumen?entrenamiento=7')
-    await screen.findByRole('heading', { level: 1, name: 'Modelos' })
+    await screen.findByRole('heading', { level: 1, name: 'Ficha del modelo' })
     for (const s of SUBMODULOS) expect(screen.getAllByRole('link', { name: s.texto }).length).toBeGreaterThan(0)
   })
 })
@@ -213,7 +213,7 @@ describe('analítica: comparar', () => {
   it('«Aprobar B» solo para administración; sin registro de modelos queda deshabilitado y lo explica', async () => {
     api('admin')
     montar('/analitica/comparar?entrenamiento=7&desenlace=des_a')
-    const boton = await screen.findByRole('button', { name: /Aprobar B/ })
+    const boton = await screen.findByRole('button', { name: /Aprobar y activar el modelo B/ })
     await waitFor(() => expect(boton).toBeDisabled())
     expect(await screen.findByText('Diferencia de B frente a A')).toBeInTheDocument()
   })
@@ -222,7 +222,7 @@ describe('analítica: comparar', () => {
     api('experto')
     montar('/analitica/comparar?entrenamiento=7&desenlace=des_a')
     await screen.findByText('Entrenamiento B')
-    expect(screen.queryByRole('button', { name: /Aprobar B/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Aprobar y activar el modelo B/ })).not.toBeInTheDocument()
   })
 })
 
@@ -234,7 +234,7 @@ describe('analítica: sin riesgo calculado para el desenlace', () => {
       : undefined))
     montar('/analitica/trayectorias?entrenamiento=7&desenlace=des_a')
     expect(await screen.findByText(/siguen en seguimiento/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Perfil' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Perfil de niños' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Sexo' })).toBeInTheDocument()
   })
 })

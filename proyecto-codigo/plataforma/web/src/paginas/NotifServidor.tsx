@@ -11,7 +11,7 @@ export default function NotifServidor() {
   const q = useQuery({ queryKey: ['notificaciones', 'servidor'], queryFn: () => pedir<ServidorSalida>('/notificaciones/servidor') })
   return (
     <>
-      <Encabezado titulo="Servidor de correo">
+      <Encabezado titulo="Configuración del correo saliente">
         Desde aquí se configura el servidor por donde salen los avisos. Lo que se guarda en esta pantalla es lo único que se
         usa; la clave se guarda cifrada y nunca se vuelve a mostrar.
       </Encabezado>
@@ -70,7 +70,7 @@ function Formulario({ s }: { s: ServidorSalida }) {
     if (ok) reestablecer.mutate()
   }
   return (
-    <Panel titulo={<div className="flex items-center gap-2"><h2 className="text-base">Datos del servidor</h2>
+    <Panel titulo={<div className="flex items-center gap-2"><h2 className="text-base">Datos del servidor de correo (SMTP)</h2>
       {s.configurado ? <Insignia tono="teal">Configurado</Insignia> : <Insignia tono="ocre">Sin configurar</Insignia>}</div>}>
       <form className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2" onSubmit={(e) => { e.preventDefault(); guardar.mutate() }}>
         <Campo id="smtp-host" etiqueta="Servidor (host)" error={errores.host}>
@@ -120,7 +120,7 @@ function Formulario({ s }: { s: ServidorSalida }) {
               Reestablecer
             </Boton>
           )}
-          <Boton chico type="submit" disabled={guardar.isPending || hayError}>Guardar</Boton>
+          <Boton chico type="submit" disabled={guardar.isPending || hayError}>Guardar configuración de correo</Boton>
         </div>
       </form>
       {dialogo}
@@ -144,7 +144,7 @@ function Prueba({ activo }: { activo: boolean }) {
           <div className="flex gap-2">
             <Entrada id="prueba" type="email" value={correo} placeholder="nombre@dominio.org" aria-invalid={invalido}
               onChange={(e) => setCorreo(normalizarCorreo(e.target.value))} />
-            <Boton type="submit" variante="secundario" className="shrink-0" disabled={!activo || !esCorreo(correo) || m.isPending}>Enviar</Boton>
+            <Boton type="submit" variante="secundario" className="shrink-0" disabled={!activo || !esCorreo(correo) || m.isPending}>Enviar correo de prueba</Boton>
           </div>
         </Campo>
         {m.error && <Aviso>{m.error.message}</Aviso>}

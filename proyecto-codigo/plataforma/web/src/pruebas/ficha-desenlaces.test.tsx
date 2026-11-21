@@ -120,8 +120,8 @@ describe('pestaña «Desenlaces»', () => {
     api(historia(), linea({ crecimiento: { talla: [z(10, -0.5), z(60, -1)] } }))
     montar('/ninos/s1')
     const lista = await pestanas()
-    await waitFor(() => expect(lista.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Desenlaces', 'Crecimiento', 'Visitas']))
-    expect(lista.getByRole('tab', { name: 'Desenlaces' })).toHaveAttribute('aria-selected', 'true')
+    await waitFor(() => expect(lista.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Resultados clínicos y riesgo estimado', 'Evolución del crecimiento', 'Historial de visitas']))
+    expect(lista.getByRole('tab', { name: 'Resultados clínicos y riesgo estimado' })).toHaveAttribute('aria-selected', 'true')
   })
 
   it('lista todos los desenlaces, el de más riesgo primero y elegido; el elegido vive en la dirección', async () => {
@@ -231,14 +231,14 @@ describe('pestaña «Desenlaces»', () => {
     api()
     const { unmount } = montar('/ninos/s1?ver=riesgo-talla_baja_12m')
     const lista = await screen.findByRole('list', { name: 'Desenlaces del niño' })
-    expect(screen.getByRole('tab', { name: 'Desenlaces' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Resultados clínicos y riesgo estimado' })).toHaveAttribute('aria-selected', 'true')
     expect(within(lista).getAllByRole('button')[1]).toHaveAttribute('aria-current', 'true')
     unmount()
 
     api()
     montar('/ninos/s1?ver=otros')
     const otra = await screen.findByRole('list', { name: 'Desenlaces del niño' })
-    expect(screen.getByRole('tab', { name: 'Desenlaces' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Resultados clínicos y riesgo estimado' })).toHaveAttribute('aria-selected', 'true')
     expect(within(otra).getAllByRole('button')[2]).toHaveAttribute('aria-current', 'true')
   })
 
@@ -269,7 +269,7 @@ describe('pestaña «Desenlaces»', () => {
     })
     montar('/ninos/s1')
     expect((await screen.findAllByText('No se pudo calcular el riesgo en las visitas anteriores de este niño.')).length).toBeGreaterThan(0)
-    expect(await screen.findByRole('heading', { name: 'Niño s1' })).toBeInTheDocument()   // el resto de la ficha sigue a la vista
+    expect(await screen.findByRole('heading', { name: 'Ficha clínica · Niño s1' })).toBeInTheDocument()   // el resto de la ficha sigue a la vista
     // lo que no depende de esa consulta se ve igual
     expect(screen.getByRole('list', { name: 'Desenlaces del niño' })).toHaveTextContent('Desarrollo psicomotor bajo a los 6 meses')
     falla = false
@@ -283,11 +283,11 @@ describe('la ficha abre en una pestaña con contenido', () => {
     api(sinRiesgo(), linea({ visitas: [{ ...linea().visitas[0], riesgos: [] }] }), [])
     montar('/ninos/s1')
     const lista = await pestanas()
-    await waitFor(() => expect(lista.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Desenlaces', 'Visitas']))
-    expect(lista.getByRole('tab', { name: 'Visitas' })).toHaveAttribute('aria-selected', 'true')
+    await waitFor(() => expect(lista.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Resultados clínicos y riesgo estimado', 'Historial de visitas']))
+    expect(lista.getByRole('tab', { name: 'Historial de visitas' })).toHaveAttribute('aria-selected', 'true')
     expect(await within(screen.getByRole('tabpanel')).findByText('Peso a los 3 meses')).toBeInTheDocument()
     // la pestaña de desenlaces sigue ahí, para ver por qué no hay riesgo
-    await userEvent.click(lista.getByRole('tab', { name: 'Desenlaces' }))
+    await userEvent.click(lista.getByRole('tab', { name: 'Resultados clínicos y riesgo estimado' }))
     expect(within(screen.getByRole('tabpanel')).getAllByText('Aún no hay datos de la visita de 3 meses.').length).toBeGreaterThan(0)
   })
 
@@ -295,8 +295,8 @@ describe('la ficha abre en una pestaña con contenido', () => {
     api({ paquete: 'p1', puntos: [] }, linea({ visitas: [{ ...linea().visitas[0], riesgos: [] }] }), [])
     montar('/ninos/s1')
     const lista = await pestanas()
-    await waitFor(() => expect(lista.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Visitas']))
-    expect(lista.getByRole('tab', { name: 'Visitas' })).toHaveAttribute('aria-selected', 'true')
+    await waitFor(() => expect(lista.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Historial de visitas']))
+    expect(lista.getByRole('tab', { name: 'Historial de visitas' })).toHaveAttribute('aria-selected', 'true')
   })
 })
 
@@ -325,14 +325,14 @@ describe('encabezado de la ficha', () => {
   it('dice si es niña, con qué peso nació y cuál fue su última visita con datos', async () => {
     api(historia(), conTalla({ sexo: 'femenino', peso_nacer: { valor: '1240', unidad: 'GRAMOS' } }))
     montar('/ninos/s1')
-    expect(await screen.findByRole('heading', { level: 1, name: 'Niña s1' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Ficha clínica · Niña s1' })).toBeInTheDocument()
     expect(screen.getByText(/^Nació a las 30 semanas de gestación, en 2026, con 1\.240 g\. Sede 1\. Última visita: 3 meses \(12 de mar de 2026\)\. Datos al/)).toBeInTheDocument()
   })
 
   it('sin sexo ni peso al nacer en la base no los inventa', async () => {
     api(historia(), conTalla())
     montar('/ninos/s1')
-    expect(await screen.findByRole('heading', { level: 1, name: 'Niño s1' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Ficha clínica · Niño s1' })).toBeInTheDocument()
     expect(screen.getByText(/^Nació a las 30 semanas de gestación, en 2026\. Sede 1\./)).toBeInTheDocument()
   })
 })

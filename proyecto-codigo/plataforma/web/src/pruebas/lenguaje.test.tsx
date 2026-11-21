@@ -185,7 +185,7 @@ describe('pantallas del equipo clínico sin términos técnicos', () => {
     expect(screen.getByText('No cuadra con el resto de sus datos')).toBeInTheDocument()
     expect(visible()).toMatch(/Datos al 30 de jun/)
     expect(screen.getByText('Visita: 40 semanas')).toBeInTheDocument()   // no «se calcula a los 40 semanas»
-    expect(screen.getByRole('columnheader', { name: 'Promedio' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Riesgo estimado promedio' })).toBeInTheDocument()
     expect(visible()).not.toMatch(PROHIBIDO)
   })
 

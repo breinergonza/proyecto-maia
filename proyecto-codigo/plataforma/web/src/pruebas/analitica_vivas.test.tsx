@@ -71,7 +71,7 @@ describe('analítica viva', () => {
     expect(screen.queryByText(/n menor que 5|celda.*omitid|grupo.*omitid/)).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('tab', { name: 'Niños individuales' }))
     expect((await screen.findByRole('link', { name: 'N-001' })).getAttribute('href')).toBe('/ninos/N-001')
-    fireEvent.change(screen.getByLabelText('Indicador'), { target: { value: 'peso_para_talla' } })
+    fireEvent.change(screen.getByLabelText('Medida de crecimiento'), { target: { value: 'peso_para_talla' } })
     await waitFor(() => expect(llamadas.some((l) => l.url.includes('indicador=peso_para_talla&agrupar=riesgo&eje=edad_corregida'))).toBe(true))
     expect(await screen.findAllByText('En prueba')).not.toHaveLength(0)
   })

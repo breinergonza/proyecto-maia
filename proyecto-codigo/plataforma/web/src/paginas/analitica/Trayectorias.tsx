@@ -22,7 +22,7 @@ const INDICADORES: [IndicadorTrayectoria, string][] = [
   ['peso', 'Peso'], ['talla', 'Talla'], ['perimetro_cefalico', 'Perímetro cefálico'], ['peso_para_talla', 'Peso para la talla'],
 ]
 const AGRUPACIONES: [AgruparTrayectoria, string][] = [
-  ['riesgo', 'Riesgo del niño'], ['sexo', 'Sexo'], ['perfil', 'Perfil'], ['sede', 'Sede'],
+  ['riesgo', 'Riesgo del niño'], ['sexo', 'Sexo'], ['perfil', 'Perfil de niños'], ['sede', 'Sede'],
 ]
 const EJES: [EjeTrayectoria, string][] = [['edad_corregida', 'Edad corregida'], ['cronologica', 'Edad cronológica']]
 
@@ -130,7 +130,7 @@ export default function Trayectorias() {
         <p>El puntaje z cuenta desviaciones estándar (DE) frente a la OMS. Entre −2 y +2 DE es lo esperado; por debajo de −2 DE el niño está bajo para la edad.</p>
       </Guia>
       <div className="grid shrink-0 gap-3 sm:grid-cols-3">
-        <label className="flex items-center gap-2 text-sm font-semibold"><span className="shrink-0">Indicador</span>
+        <label className="flex items-center gap-2 text-sm font-semibold"><span className="shrink-0">Medida de crecimiento</span>
           <Selector className="min-w-0" value={indicador} onChange={(e) => setIndicador(e.target.value as IndicadorTrayectoria)}>
             {INDICADORES.map(([v, t]) => <option key={v} value={v}>{t}{v === 'peso_para_talla' ? ' (en prueba)' : ''}</option>)}
           </Selector>
@@ -140,7 +140,7 @@ export default function Trayectorias() {
             {AGRUPACIONES.map(([v, t]) => <option key={v} value={v}>{t}</option>)}
           </Selector>
         </label>
-        <label className="flex items-center gap-2 text-sm font-semibold"><span className="shrink-0">Edad en el eje</span>
+        <label className="flex items-center gap-2 text-sm font-semibold"><span className="shrink-0">Tipo de edad en la gráfica</span>
           <Selector className="min-w-0" value={eje} onChange={(e) => setEje(e.target.value as EjeTrayectoria)}>
             {EJES.map(([v, t]) => <option key={v} value={v}>{t}</option>)}
           </Selector>
@@ -151,7 +151,7 @@ export default function Trayectorias() {
           <p>{r.mensaje}</p>
           <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
             <span className="font-semibold">Ver agrupado por:</span>
-            <Boton variante="secundario" chico onClick={() => setAgrupar('perfil')}>Perfil</Boton>
+            <Boton variante="secundario" chico onClick={() => setAgrupar('perfil')}>Perfil de niños</Boton>
             <Boton variante="secundario" chico onClick={() => setAgrupar('sexo')}>Sexo</Boton>
           </div>
         </Vacio>

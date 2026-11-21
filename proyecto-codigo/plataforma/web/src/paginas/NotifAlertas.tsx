@@ -46,8 +46,8 @@ export default function NotifAlertas() {
 
   return (
     <>
-      <Encabezado titulo="Alertas por correo"
-        accion={<Boton type="button" onClick={() => { setResultado(undefined); setEditando('nueva') }}>Nueva notificación</Boton>}>
+      <Encabezado titulo="Reglas y envíos de alertas por correo"
+        accion={<Boton type="button" onClick={() => { setResultado(undefined); setEditando('nueva') }}>Crear regla de envío</Boton>}>
         Cada notificación junta una o varias alertas y tiene sus propios correos: así cada grupo de especialistas recibe solo lo
         que le corresponde. Cree todas las que necesite, con las combinaciones que quiera. Se envían al terminar cada
         actualización de resultados (solo con los niños nuevos para cada correo), con un resumen y un Excel adjunto con el
@@ -73,7 +73,7 @@ export default function NotifAlertas() {
                   onClick={() => void pedirEnvio(n)}>Enviar ahora</Boton>
                 <Boton chico variante="secundario" type="button" onClick={() => { setResultado(undefined); setEditando(n) }}>Editar</Boton>
               </div>}>
-              <ul className="mb-3 flex flex-wrap gap-1.5" aria-label="Alertas">
+              <ul className="mb-3 flex flex-wrap gap-1.5" aria-label="Alertas clínicas incluidas">
                 {n.alertas.map((c) => <li key={c}><Insignia tono="teal">{nombres.get(c) ?? c}</Insignia></li>)}
               </ul>
               <p className="text-sm text-salvia">
@@ -126,7 +126,7 @@ function Formulario({ inicial, opciones, alCerrar }: { inicial: NotificacionConf
     if (ok) borrar.mutate()
   }
   return (
-    <Panel titulo={inicial ? `Editar «${inicial.nombre}»` : 'Nueva notificación'}>
+    <Panel titulo={inicial ? `Editar «${inicial.nombre}»` : 'Crear regla de envío'}>
       <form className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2" onSubmit={(e) => { e.preventDefault(); guardar.mutate() }}>
         <div className="space-y-4">
           <Campo id="notif-nombre" etiqueta="Nombre" error={errores.nombre} ayuda="Cómo se llama el grupo, por ejemplo «Neonatología».">
@@ -143,7 +143,7 @@ function Formulario({ inicial, opciones, alCerrar }: { inicial: NotificacionConf
             Enviar avisos
           </label>
         </div>
-        <SelectorAlertas id="notif-alertas" etiqueta="Alertas que activan esta notificación" opciones={opciones}
+        <SelectorAlertas id="notif-alertas" etiqueta="Alertas clínicas que activan el correo" opciones={opciones}
           value={alertas} onChange={setAlertas} error={errores.alertas} />
         {(guardar.error || borrar.error) && <div className="lg:col-span-2"><Aviso>{(guardar.error ?? borrar.error)?.message}</Aviso></div>}
         <div className="flex flex-wrap items-center justify-between gap-3 lg:col-span-2">
@@ -177,7 +177,7 @@ function EstadoAviso({ a }: { a: AvisoEnviado }) {
   )
 }
 
-/** «Avisos enviados»: un registro por notificación y actualización de resultados, con todos sus destinatarios, cuántos niños
+/** «Historial de correos enviados»: un registro por notificación y actualización de resultados, con todos sus destinatarios, cuántos niños
  *  fueron, su nivel de riesgo y si llegó. El detalle niño por niño va en el Excel de cada correo, no en esta tabla. */
 function Historial() {
   const [pagina, setPagina] = useState(1)
@@ -186,7 +186,7 @@ function Historial() {
     queryFn: () => pedir<Pagina<AvisoEnviado>>('/notificaciones/historial', { params: { pagina, tamano: 20 } }),
   })
   return (
-    <Panel titulo="Avisos enviados">
+    <Panel titulo="Historial de correos enviados">
       {q.isPending ? <Cargando /> : q.error ? <Aviso>{q.error.message}</Aviso> : q.data.items.length === 0 ? (
         <p className="text-salvia">Todavía no se ha enviado ningún aviso.</p>
       ) : (

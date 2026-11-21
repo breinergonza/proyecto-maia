@@ -40,7 +40,7 @@ export default function AdminCalidadDatos() {
   const [detalle, setDetalle] = useState(false)   // las tres medidas piden sus datos solo si se abre el detalle
   return (
     <div className="flex flex-col lg:h-full">
-      <Encabezado titulo="Calidad de datos">
+      <Encabezado titulo="Mediciones por revisar">
         Mediciones dudosas o faltantes. No son riesgos clínicos: son datos a revisar antes de usarlos.
       </Encabezado>
       {resumen.isPending ? <Cargando />
@@ -58,7 +58,7 @@ export default function AdminCalidadDatos() {
       <details className="group mt-4 shrink-0" onToggle={(e) => setDetalle(e.currentTarget.open)}>
         <summary className="flex cursor-pointer list-none items-center gap-1.5 text-base font-semibold [&::-webkit-details-marker]:hidden">
           <ChevronDown size={18} aria-hidden className="transition-transform group-open:rotate-180" />
-          Cómo se comportan las alertas
+          Resumen de alertas de calidad de datos
         </summary>
         {detalle && <div className="mt-3"><MedidasDeRevision /></div>}
       </details>

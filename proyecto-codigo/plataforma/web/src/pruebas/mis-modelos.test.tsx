@@ -32,7 +32,7 @@ const api = (rol: 'admin' | 'experto' | 'visualizador') => (url: string) =>
             : url === '/api/exploracion/facetas' ? { cuerpo: { n: 900, minimo: 20, n_base: 1000, facetas: { sede: { etiqueta: 'Sede', tipo: 'lista', cuando: null, opciones: [{ valor: 'A', etiqueta: 'Sede A', n: 600, texto: '600' }] } } } }
               : url === '/api/muestras/contar' ? { cuerpo: { n: 150, n_base: 1000, minimo: 20, suficiente: true, huella: 'h' } } : undefined
 
-describe('Mis modelos', () => {
+describe('Entrenamientos propios', () => {
   it('el visualizador no entra', async () => {
     simularApi(api('visualizador'))
     montar('/mis-modelos')
@@ -85,7 +85,7 @@ describe('Mis modelos', () => {
       : url === '/api/muestras' && init?.method === 'POST' ? { estado: 201, cuerpo: { ...muestras[0], id: 11 } }
         : url === '/api/entrenamientos/entrenar' && init?.method === 'POST' ? { estado: 202, cuerpo: {} } : api('experto')(url))
     montar('/mis-modelos')
-    await userEvent.click(await screen.findByRole('button', { name: 'Armar una muestra' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Seleccionar niños para el entrenamiento' }))
     expect(await screen.findByText(/Son pocos niños \(150/)).toBeInTheDocument()
     await userEvent.selectOptions(screen.getByLabelText('Cuántos niños'), 'estratificado')
     await userEvent.type(screen.getByLabelText('Desde'), '2018')

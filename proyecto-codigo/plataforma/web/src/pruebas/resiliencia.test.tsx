@@ -18,9 +18,9 @@ const api = (caida: string) => (url: string) => {
 }
 
 const casos = [
-  { pagina: 'Niños', ruta: '/ninos?desenlace=talla_baja_12m', caida: '/api/ninos?', contexto: 'desenlace=talla_baja_12m' },
+  { pagina: 'Listado de niños', ruta: '/ninos?desenlace=talla_baja_12m', caida: '/api/ninos?', contexto: 'desenlace=talla_baja_12m' },
   { pagina: 'Ficha de un niño', ruta: '/ninos/N-7', caida: '/api/ninos/N-7/linea-temporal', contexto: 'N-7' },
-  { pagina: 'Revisión de riesgos', ruta: '/revision/riesgos', caida: '/api/revision/riesgos', contexto: '/api/revision/riesgos' },
+  { pagina: 'Revisión clínica de casos', ruta: '/revision/riesgos', caida: '/api/revision/riesgos', contexto: '/api/revision/riesgos' },
   { pagina: 'Resumen', ruta: '/tablero', caida: '/api/tablero/resumen', contexto: '/api/tablero/resumen' },
 ]
 

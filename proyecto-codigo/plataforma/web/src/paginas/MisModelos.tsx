@@ -1,4 +1,4 @@
-// Mis modelos: entrenar un modelo propio, ver la cola con la posición y el tiempo estimado, y el banco compartido.
+// Entrenamientos propios: entrenar un modelo propio, ver la cola con la posición y el tiempo estimado, y el banco compartido.
 // Los modelos personales no cambian el tablero ni envían correos; solo administración aprueba los oficiales.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -65,9 +65,9 @@ export default function MisModelos() {
   const secciones: Seccion[] = admin ? ['entrenar', 'banco', 'limites'] : ['entrenar', 'banco']
   const [activa, elegir] = usePestanaEnUrl('ver', secciones)
   const pestanas: { clave: Seccion; texto: string }[] = [
-    { clave: 'entrenar', texto: 'Entrenar' },
+    { clave: 'entrenar', texto: 'Nuevo entrenamiento' },
     { clave: 'banco', texto: dBanco.titulo },
-    ...(admin ? [{ clave: 'limites' as const, texto: 'Límites' }] : []),
+    ...(admin ? [{ clave: 'limites' as const, texto: 'Límites de uso' }] : []),
   ]
 
   const limites = (
@@ -106,7 +106,7 @@ export default function MisModelos() {
             ))}
           </Selector>
         </Campo>
-        <div className="flex items-start sm:pt-7"><Boton variante="secundario" onClick={() => setArmando(true)}>Armar una muestra</Boton></div>
+        <div className="flex items-start sm:pt-7"><Boton variante="secundario" onClick={() => setArmando(true)}>Seleccionar niños para el entrenamiento</Boton></div>
         <div className="flex flex-col justify-end gap-2 sm:col-span-2">
           {entrenar.error && <Aviso>{entrenar.error.message}</Aviso>}
           {entrenar.isSuccess && <Aviso tono="teal">Entrenamiento en cola.</Aviso>}
@@ -211,11 +211,11 @@ export default function MisModelos() {
   // reemplaza el formulario (lo escrito en él se conserva al cerrarla)
   return (
     <div className="flex flex-col xl:h-full">
-      <Encabezado titulo="Mis modelos">
+      <Encabezado titulo="Entrenamientos propios">
         Entrene un modelo propio con los hiperparámetros vigentes. Queda como «Personal»: no cambia el tablero ni envía
         correos. Solo administración aprueba un modelo como oficial.
       </Encabezado>
-      <Pestanas prefijo="mis-modelos" etiqueta="Secciones de Mis modelos" pestanas={pestanas} activa={activa} elegir={elegir} />
+      <Pestanas prefijo="mis-modelos" etiqueta="Secciones de Entrenamientos propios" pestanas={pestanas} activa={activa} elegir={elegir} />
       <PanelesPestana prefijo="mis-modelos" activa={activa} className="mt-3 flex min-h-0 flex-col gap-3 xl:flex-1" paneles={[
         {
           clave: 'entrenar',
@@ -251,7 +251,7 @@ function LimitesAdmin({ valores, alGuardar }: { valores: CuotasConfig; alGuardar
     { k: 'dias_aviso', etiqueta: 'Días de aviso antes de borrar', ayuda: 'Cuántos días antes empieza a verse el aviso en el banco.' },
   ]
   return (
-    <Panel titulo="Límites de Mis modelos" descripcion="Solo administración los cambia. La administración no tiene límite.">
+    <Panel titulo="Límites de Entrenamientos propios" descripcion="Solo administración los cambia. La administración no tiene límite.">
       <form className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" onSubmit={(e) => { e.preventDefault(); guardar.mutate() }}>
         {campos.map((c) => (
           <Campo key={c.k} id={`lim-${c.k}`} etiqueta={c.etiqueta} ayuda={c.ayuda}>

@@ -26,15 +26,15 @@ import { Aviso, Boton, Campo, Cargando, Cifra, Encabezado, Entrada, Insignia, Pa
 import { cn } from '../lib/cn'
 import { descripcionDe } from '../lib/descripciones'
 import { descargar, nombreArchivo } from '../lib/exportar'
-import { num, riesgo as formatoRiesgo } from '../lib/formato'
+import { etiquetaCampo, num, riesgo as formatoRiesgo } from '../lib/formato'
 import { cuantosMenos, nivelAlto } from '../lib/lenguaje'
 import { useFiltros } from '../lib/useFiltros'
 
 type Modo = 'muestra' | 'universo' | 'nino'
 const MODOS: { clave: Modo; texto: string }[] = [
-  { clave: 'muestra', texto: 'Muestra' },
-  { clave: 'universo', texto: 'Todo el universo' },
-  { clave: 'nino', texto: 'Niño nuevo desde un perfil' },
+  { clave: 'muestra', texto: 'Seleccionar un grupo' },
+  { clave: 'universo', texto: 'Usar todos los niños disponibles' },
+  { clave: 'nino', texto: 'Crear un caso a partir de un perfil' },
 ]
 
 /** Calcular un grupo: el modo (muestra, universo o niño nuevo) vive en la dirección (?modo=) y cada modo llena el alto que queda;
@@ -44,7 +44,7 @@ export default function Prediccion() {
   const [modelo, setModelo] = useState<string>('')
   return (
     <div className="flex flex-col lg:h-full">
-      <Encabezado titulo="Calcular un grupo de niños">
+      <Encabezado titulo="Estimar riesgo por grupo">
         Calcule el riesgo de un grupo de niños o de un niño nuevo con el modelo que elija. Los resultados no se guardan: existen solo en esta pantalla.
       </Encabezado>
       {/* los modos y el modelo comparten una fila: el modelo vale para los tres */}
@@ -140,7 +140,7 @@ function Calculo({ modelo, universo, grupo, listo }: {
           {universo ? 'Todos los niños del corte vigente, con la visita que elija.' : 'Los niños que cumplen el grupo que armó a la izquierda.'}
         </p>
         <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-end" onSubmit={(e) => { e.preventDefault(); lanzarCon(cuerpo) }}>
-          <Campo etiqueta="Visita" id="visita-prediccion">
+          <Campo etiqueta="Visita usada para estimar el riesgo" id="visita-prediccion">
             <Selector id="visita-prediccion" value={visita} onChange={(e) => setVisita(e.target.value)}>
               <option value="">La última a la que fue cada niño</option>
               {(biblioteca.data?.visitas ?? []).map((v) => <option key={v.etapa} value={v.etapa}>{v.nombre}</option>)}
@@ -148,9 +148,9 @@ function Calculo({ modelo, universo, grupo, listo }: {
           </Campo>
           <label className="flex items-center gap-2 text-sm lg:pb-2.5">
             <input type="checkbox" checked={excluir} onChange={(e) => setExcluir(e.target.checked)} />
-            Dejar fuera a los niños con que se entrenó el modelo
+            Excluir a los niños usados para entrenar el modelo
           </label>
-          <div><Boton type="submit" disabled={corriendo || !listo}>{corriendo ? 'Calculando…' : 'Calcular el riesgo'}</Boton></div>
+          <div><Boton type="submit" disabled={corriendo || !listo}>{corriendo ? 'Calculando…' : 'Estimar riesgo'}</Boton></div>
           {!listo && <p className="text-xs text-salvia sm:col-span-2 lg:col-span-3">Marque al menos una opción o elija un filtro guardado para armar la muestra.</p>}
         </form>
       </Panel>
@@ -273,7 +273,7 @@ function ResultadoMuestra({ t, r, admin }: { t: TrabajoPrediccion; r: Extract<Re
           <TablaDatos llenar className="lg:max-h-full" titulo={descripcionDe('riesgo_por_desenlace').titulo} descripcion={descripcionDe('riesgo_por_desenlace').descripcion}
             exportar={{ nombre: 'riesgo-por-desenlace', filas: a.por_desenlace.map((d) => ({ Desenlace: d.desenlace, Visita: d.momento_nombre, Niños: d.n, 'Riesgo mediano': d.riesgo_mediano, Altos: d.altos, 'Muy altos': d.muy_altos })) }}>
             <Tabla apilar densa className={ENCABEZADO_FIJO}>
-              <thead><tr><th>Desenlace</th><th>Visita</th><th className="text-right">Niños</th><th className="text-right">Riesgo <Termino id="mediana">mediano</Termino></th><th className="text-right">Riesgo alto</th></tr></thead>
+              <thead><tr><th>Resultado clínico evaluado</th><th>Visita</th><th className="text-right">Niños</th><th className="text-right">Riesgo <Termino id="mediana">mediano</Termino></th><th className="text-right">Riesgo alto</th></tr></thead>
               <tbody>
                 {a.por_desenlace.map((d) => (
                   <tr key={d.clave}>
@@ -350,7 +350,7 @@ function TablaNinos({ t, total, accion, pagina, cambiarPagina }: {
         <>
           <Tabla apilar densa className={ENCABEZADO_FIJO}>
             <thead>
-              <tr><th>Niño</th><th>Desenlace</th><th className="text-right">Riesgo</th><th>Frente a los demás</th><th>Perfil</th><th>Primera alerta</th><th>Motivos</th></tr>
+              <tr><th>Niño</th><th>Resultado clínico evaluado</th><th className="text-right">Riesgo</th><th>Frente a los demás</th><th>Perfil</th><th>Primera alerta</th><th>Motivos</th></tr>
             </thead>
             <tbody>
               {filas.map((f) => <FilaNino key={`${f.sujeto}-${f.clave}`} f={f} />)}
@@ -385,7 +385,7 @@ function FilaNino({ f }: { f: FilaPrediccion }) {
 
 type SeccionNino = 'perfil' | 'ejemplo' | 'resultado' | 'visitas' | 'guardar'
 
-/** Niño nuevo desde un perfil, en pestañas que siguen el camino: elegir visita y perfil, ajustar el niño de ejemplo,
+/** Crear un caso a partir de un perfil, en pestañas que siguen el camino: elegir visita y perfil, ajustar el niño de ejemplo,
  *  ver el resultado (riesgos y riesgo por visita) y guardarlo. Elegir pasa a los datos y calcular pasa al resultado; todo queda montado, así que lo escrito
  *  sobrevive al cambiar de pestaña. */
 function NinoNuevo({ modelo }: { modelo: string }) {
@@ -470,7 +470,7 @@ function NinoNuevo({ modelo }: { modelo: string }) {
               <Boton disabled={predecir.isPending} onClick={() => predecir.mutate({
                 modelo: modelo || null, visita, perfil, cambios: valores,
               }, { onSuccess: () => setSeccion('resultado') })}>
-                {predecir.isPending ? 'Calculando…' : 'Calcular el riesgo'}
+                {predecir.isPending ? 'Calculando…' : 'Estimar riesgo'}
               </Boton>
             )} />
         </div>
@@ -479,13 +479,13 @@ function NinoNuevo({ modelo }: { modelo: string }) {
     {
       clave: 'resultado', texto: 'Resultado',
       contenido: predecir.data ? <ResultadoNino r={predecir.data} parte="riesgos" /> : (
-        <Vacio titulo="Aquí aparecerá el resultado">Ajuste el niño de ejemplo y pulse «Calcular el riesgo».</Vacio>
+        <Vacio titulo="Aquí aparecerá el resultado">Ajuste el niño de ejemplo y pulse «Estimar riesgo».</Vacio>
       ),
     },
     {
       clave: 'visitas', texto: 'Riesgo por visita',
       contenido: predecir.data ? <ResultadoNino r={predecir.data} parte="visitas" /> : (
-        <Vacio titulo="Aquí aparecerá el riesgo por visita">Ajuste el niño de ejemplo y pulse «Calcular el riesgo».</Vacio>
+        <Vacio titulo="Aquí aparecerá el riesgo por visita">Ajuste el niño de ejemplo y pulse «Estimar riesgo».</Vacio>
       ),
     },
     {
@@ -615,7 +615,7 @@ function EditorEjemplo({ campos, visitas, cambios, todos, verTodos, cambiar, eti
                 return (
                   <div key={c.variable}>
                     <div className="mb-1 flex items-center justify-between gap-2">
-                      <label htmlFor={id} className="text-sm">{c.etiqueta}{c.unidad ? ` (${c.unidad})` : ''}</label>
+                      <label htmlFor={id} className="text-sm">{etiquetaCampo(c.etiqueta, c.unidad)}</label>
                       <Insignia tono={cambiado ? 'coral' : 'teal'}>{cambiado ? 'cambiado' : 'típico'}</Insignia>
                     </div>
                     {c.tipo === 'lista' || c.tipo === 'si_no' ? (
