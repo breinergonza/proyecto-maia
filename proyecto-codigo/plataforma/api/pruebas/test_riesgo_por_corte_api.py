@@ -2,8 +2,8 @@
 """Riesgo por corte (S7): el riesgo de cada familia de desenlaces en cada visita a la que fue el niño, calculado solo con
 lo medido hasta esa visita, en la ficha (``/ninos/{s}/historia-riesgo``) y en «Calcular un niño» (``/inferencia``).
 
-Reutiliza el paquete simulado y la API de ``test_api``, pero con la anticipación encendida (``MAIA_ANTICIPACION``): así el
-paquete trae las filas ``_desde_`` y cada familia tiene más de un corte."""
+Reutiliza el paquete simulado y la API de ``test_api``. La anticipación está encendida por defecto (D68): el paquete trae
+las filas ``_desde_`` y cada familia tiene más de un corte."""
 from __future__ import annotations
 
 import pytest
@@ -12,15 +12,6 @@ from test_api import _subir, admin, cliente, corrida, paquetes  # noqa: F401
 pytestmark = [pytest.mark.integracion, pytest.mark.timeout(1800)]
 
 ESTADOS = {'en_uso', 'en_prueba'}
-
-
-@pytest.fixture(scope='module', autouse=True)
-def con_anticipacion():
-    """Antes que el paquete: ``paquetes`` entrena con la configuración que dice esta variable."""
-    mp = pytest.MonkeyPatch()
-    mp.setenv('MAIA_ANTICIPACION', '1')
-    yield
-    mp.undo()
 
 
 @pytest.fixture(scope='module')
@@ -46,11 +37,14 @@ def nino(cliente, admin, listo, corrida):  # noqa: F811
 def test_la_historia_trae_las_familias_del_paquete_con_sus_cortes(cliente, admin, nino):
     h = _historia(cliente, admin, nino)
     familias = {f['clave']: f for f in h['familias']}
-    # la anticipación suma filas _desde_: «desarrollo_6m» se predice desde tres visitas, no desde una
-    desarrollo = familias['desarrollo_6m']
-    assert [c['clave'] for c in desarrollo['cortes']] == ['desarrollo_6m_desde_pmc', 'desarrollo_6m_desde_40', 'desarrollo_6m']
+    # la anticipación suma filas _desde_: «desarrollo_12m» se predice desde cuatro visitas, no desde una
+    desarrollo = familias['desarrollo_12m']
+    assert [c['clave'] for c in desarrollo['cortes']] == ['desarrollo_12m_desde_pmc', 'desarrollo_12m_desde_40',
+                                                         'desarrollo_12m_desde_3', 'desarrollo_12m']
     assert [c['orden'] for c in desarrollo['cortes']] == sorted(c['orden'] for c in desarrollo['cortes'])
-    assert [c['estado'] for c in desarrollo['cortes']] == ['en_prueba', 'en_prueba', 'en_uso']
+    assert [c['estado'] for c in desarrollo['cortes']] == ['en_prueba', 'en_prueba', 'en_prueba', 'en_uso']
+    # la talla baja solo tiene filas _desde_: toda la familia está «En prueba»
+    assert familias['talla_baja_12m']['estado'] == 'en_prueba'
     assert desarrollo['estado'] == 'en_uso' and 'desarrollo' in desarrollo['nombre'].lower()
     assert '(riesgo calculado' not in desarrollo['nombre']
     assert desarrollo['definicion'].startswith('Resultado por debajo del percentil 10')
@@ -121,7 +115,7 @@ def _inferir(cliente, admin, peticion: dict) -> dict:
 def test_calcular_un_nino_trae_el_riesgo_de_cada_corte(cliente, admin, ejemplo):
     peticion, formulario = ejemplo
     h = _inferir(cliente, admin, peticion)['historia']
-    assert h['modelo']['version'] and {f['clave'] for f in h['familias']} >= {'desarrollo_6m', 'readm_3m'}
+    assert h['modelo']['version'] and {f['clave'] for f in h['familias']} == {'desarrollo_12m', 'talla_baja_12m'}
     assert h['puntos'] and all(isinstance(p['motivos'], list) for p in h['puntos'])
     # el riesgo de la última visita es el que ya devolvía /inferencia
     ultimo = max(p['orden'] for p in h['puntos'])

@@ -13,32 +13,49 @@ import pytest
 from anomalias import modelo as MA
 from clinico import modelo as AC
 from maia_comun import anticipacion as ANT
+from maia_comun import diccionarios as DIC
 from maia_comun import simulados
 from maia_entrenamiento import analitica_clinica as AL
 from maia_entrenamiento import anticipacion as AA
 from maia_entrenamiento import datos as D
 
-FAMILIAS = ('readm_3m', 'oxigeno_3m', 'desarrollo_6m')
+FAMILIAS = ('desarrollo_12m', 'talla_baja_12m')
 
 
 @pytest.fixture(scope='module')
 def resultados():
     sev = simulados.simular(2500, 3)
-    cfg = replace(D.config_clinica('simulado', anticipacion=True), rondas=40, min_casos=20, hilos=2)
+    cfg = replace(D.config_clinica('simulado'), rondas=40, min_casos=20, hilos=2)
     tr, _, te, _ = MA.dividir_por_tiempo(sev, (0.85, 0.0, 0.15))
     modelo = AC.ModeloClinico(cfg).ajustar(tr, progreso=False, tardias=[])
     _, _, preparado = AC.evaluar(modelo, te)
     return AL.calcular(modelo, preparado)
 
 
-def test_la_configuracion_suma_las_filas_desde_solo_si_se_pide(monkeypatch):
+def test_el_simulador_entrena_por_defecto_los_dos_desenlaces_a_12_meses(monkeypatch):
+    """D68: desarrollo psicomotor 12 m (con sus filas «_desde_») y talla baja 12 m, sin pedir la anticipación."""
     monkeypatch.delenv(ANT.VARIABLE_ENTORNO, raising=False)
+    assert {d.clave for d in D.config_clinica('simulado').desenlaces} == {
+        'desarrollo_12m', 'desarrollo_12m_desde_pmc', 'desarrollo_12m_desde_40', 'desarrollo_12m_desde_3',
+        'talla_baja_12m_desde_40', 'talla_baja_12m_desde_3', 'talla_baja_12m_desde_6'}
+    assert D.config_clinica('simulado', anticipacion=True) == D.config_clinica('simulado')
+    # se puede apagar: queda solo lo «En uso»
+    monkeypatch.setenv(ANT.VARIABLE_ENTORNO, '0')
     assert D.config_clinica('simulado') is simulados.CONFIG_CLINICA_DEMO
-    claves = {d.clave for d in D.config_clinica('simulado', anticipacion=True).desenlaces}
-    assert {'readm_3m_desde_pmc', 'oxigeno_3m_desde_pmc', 'desarrollo_6m_desde_pmc', 'desarrollo_6m_desde_40'} <= claves
-    assert not any(c.startswith('no_vuelve_3m_desde') for c in claves), 'no vuelve a la visita queda fuera (D20)'
-    monkeypatch.setenv(ANT.VARIABLE_ENTORNO, '1')
-    assert len(D.config_clinica('simulado').desenlaces) == len(claves)
+    assert [d.clave for d in simulados.CONFIG_CLINICA_DEMO.desenlaces] == ['desarrollo_12m']
+
+
+def test_la_base_real_entrena_por_defecto_lo_que_el_diccionario_semilla_deja_activo(monkeypatch):
+    """Con el Diccionario semilla, la base real entrena desarrollo psicomotor 12 m y la talla baja 12 m «En prueba»
+    desde cada visita, sin pedir la anticipación; los otros 47 desenlaces están «No usar»."""
+    monkeypatch.delenv(ANT.VARIABLE_ENTORNO, raising=False)
+    semilla = DIC.leer(DIC.SEMILLA.read_bytes())
+    monkeypatch.setattr(D.CF, 'cargar', lambda prueba=False: D.CF.leer(semilla, prueba))
+    assert [d.clave for d in D.config_clinica('kmc').desenlaces] == [
+        'desarrollo_12m', 'talla_baja_12m_desde_40', 'talla_baja_12m_desde_3', 'talla_baja_12m_desde_6',
+        'talla_baja_12m_desde_9']
+    monkeypatch.setenv(ANT.VARIABLE_ENTORNO, 'no')
+    assert [d.clave for d in D.config_clinica('kmc').desenlaces] == ['desarrollo_12m']
 
 
 def test_cada_variante_se_predice_antes_y_copia_la_regla():
@@ -50,23 +67,24 @@ def test_cada_variante_se_predice_antes_y_copia_la_regla():
         assert orden[d.momento] < orden[ANT.EVENTOS_SIMULADO[raiz.clave]] and d.momento != raiz.momento
 
 
-def test_las_tres_familias_dejan_los_tres_artefactos(resultados):
+def test_las_dos_familias_dejan_los_tres_artefactos(resultados):
     res, descripcion = resultados
     for familia in FAMILIAS:
         assert {'anticipacion', 'metricas_por_visita', 'primera_alerta'} <= set(res[familia]), familia
-        # la fila base conserva sus artefactos de siempre
-        assert {'rendimiento', 'calibracion'} <= set(res[familia])
-    assert 'metricas_por_visita' not in res['no_vuelve_3m']
+    # la fila base conserva sus artefactos de siempre; la talla baja no tiene fila base, solo filas «_desde_»
+    assert {'rendimiento', 'calibracion'} <= set(res['desarrollo_12m'])
+    assert 'metricas_por_visita' not in res['talla_baja_12m_desde_40']
     etiquetas = {d['clave']: d['etiqueta'] for d in descripcion}
-    assert etiquetas['readm_3m'] == 'En uso' and etiquetas['readm_3m_desde_pmc'] == 'En prueba'
+    assert etiquetas['desarrollo_12m'] == 'En uso' and etiquetas['desarrollo_12m_desde_pmc'] == 'En prueba'
+    assert etiquetas['talla_baja_12m_desde_40'] == 'En prueba'
 
 
 def test_anticipacion_cuenta_la_ventaja_en_visitas_y_los_avisados_antes(resultados):
     res, _ = resultados
-    a = res['desarrollo_6m']['anticipacion']
+    a = res['desarrollo_12m']['anticipacion']
     assert a['etiqueta'] == 'En uso' and a['top_pct'] == 10
-    assert [v['desde'] for v in a['visitas']] == ['hospitalización', '40 sem', '3 m EC']
-    assert [v['ventaja_visitas'] for v in a['visitas']] == [3, 2, 1]
+    assert [v['desde'] for v in a['visitas']] == ['hospitalización', '40 sem', '3 m EC', '6 m EC']
+    assert [v['ventaja_visitas'] for v in a['visitas']] == [4, 3, 2, 1]
     assert all(v['alertas'] >= 5 for v in a['visitas'])
     av = a['avisados_antes']
     if av['avisados'] is not None:   # la unión de los avisados no baja de los de ninguna visita con ventaja
@@ -78,7 +96,7 @@ def test_anticipacion_cuenta_la_ventaja_en_visitas_y_los_avisados_antes(resultad
 
 def test_metricas_por_visita_trae_los_cinco_porcentajes_y_el_auc(resultados):
     res, _ = resultados
-    m = res['readm_3m']['metricas_por_visita']
+    m = res['desarrollo_12m']['metricas_por_visita']
     assert m['tops'] == [5, 10, 20, 30, 40]
     for v in m['visitas']:
         assert [t['top_pct'] for t in v['por_top']] == [5, 10, 20, 30, 40]

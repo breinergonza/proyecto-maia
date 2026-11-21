@@ -69,9 +69,10 @@ def corte_local(almacen: Almacen, fuente: str, fecha: str | None = None) -> tupl
 
 
 def config_clinica(fuente: str, prueba: bool = False, anticipacion: bool | None = None) -> AC.ConfigClinica:
-    """La configuración clínica de la fuente. Con ``anticipacion`` (o ``MAIA_ANTICIPACION=1``) suma los desenlaces
-    desde otras visitas (D20): en el simulador, las variantes de ``maia_comun.anticipacion``; en la base real, las
-    filas ``_desde_`` «En prueba» del Diccionario. Sin pedirla, nada cambia."""
+    """La configuración clínica de la fuente. Con la anticipación (encendida por defecto, D68; ``anticipacion=False``
+    o ``MAIA_ANTICIPACION=0`` la apagan) suma los desenlaces desde otras visitas (D20): en el simulador, las variantes
+    de ``maia_comun.anticipacion`` y la talla baja a 12 meses; en la base real, las filas ``_desde_`` «En prueba» del
+    Diccionario."""
     anticipar = ANT.activa() if anticipacion is None else anticipacion
     if fuente == 'simulado':
         if anticipar:

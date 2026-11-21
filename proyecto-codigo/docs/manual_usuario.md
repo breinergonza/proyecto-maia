@@ -288,8 +288,8 @@ submódulos, como fichas arriba (en el teléfono se deslizan): **Resumen**, **Re
   privacidad).
 * **Perfiles** son provisionales: edad gestacional y clasificación de Lubchenco; ningún experto los ha aprobado todavía.
 * **Anticipación:** elija una familia de desenlaces y vea cuántos casos se avisaron antes, con qué ventaja, la primera
-  visita con alerta y el costo de avisar antes. Experto y administración ven además tres niños visita por visita. Solo
-  funciona si el entrenamiento se hizo con las familias «En prueba» activadas.
+  visita con alerta y el costo de avisar antes. Experto y administración ven además tres niños visita por visita. Los
+  entrenamientos la calculan por defecto; los anteriores a esta versión pueden no traerla.
 * **Calibración y Población:** Calibración suma el riesgo de los niños con y sin el desenlace; Población, la muestra frente
   a todos los niños y sus cuantiles. Un entrenamiento anterior no trae estos dos paneles y lo explica.
 * **Qué datos pesan (Interpretabilidad):** importancia de cada dato, cómo cambia el riesgo al variar un dato, los motivos más
@@ -409,6 +409,11 @@ edita en la página, con formularios, y guarda todas sus versiones. El Excel que
   Pulse **Lista** para que el sistema la use o **No usar** para descartarla. Si a una le falta información (por
   ejemplo, el rol), pulse **Completar**: abre su formulario. Si una actualización trajo variables que aún no están
   en el diccionario, verá un aviso con **Agregarlas al diccionario**.
+* **Desenlaces que se entrenan:** por defecto, dos. **Desarrollo psicomotor bajo a los 12 meses** está «En uso» (da
+  alertas) y **talla baja para la edad a los 12 meses**, calculada desde cada visita, está «En prueba»: se entrena y
+  se muestra, pero no da alertas hasta que un entrenamiento con datos reales muestre que funciona. Los demás
+  desenlaces siguen en la hoja **Desenlaces** como «No usar»; para volver a usar uno, cambie su estado y entrene de
+  nuevo.
 * El número junto a **Diccionario** en el menú, y el aviso del **Tablero**, dicen cuántas variables faltan por revisar.
 * **Exportar a Excel** (arriba) baja el que está en uso. **Importar desde Excel** sube uno editado fuera: antes de
   confirmar verá qué cambia; si el archivo tiene un error, dice en qué hoja y fila; si es igual al que está en uso, no

@@ -43,7 +43,7 @@ MSG_SIN_RIESGO = ('La última corrida no calculó el riesgo de este desenlace: e
                   'siguen en seguimiento. Agrupe por sexo o por perfil, o elija otro desenlace.')
 AL_TOP = 10   # el grupo «Riesgo alto» guardado por el entrenamiento (TOP_RIESGO_ALTO de analitica_clinica)
 MSG_SIN_ANTICIPACION = ('Este entrenamiento no incluye desenlaces predichos desde varias visitas, que son los que permiten medir '
-                        'con cuánta ventaja avisa la alerta. Vuelva a entrenar con la anticipación activada para verlos.')
+                        'con cuánta ventaja avisa la alerta. Los entrenamientos nuevos los incluyen: vuelva a entrenar para verlos.')
 
 
 def _metas(s: Session, entrenamiento: int | None = None) -> list[Analitica]:

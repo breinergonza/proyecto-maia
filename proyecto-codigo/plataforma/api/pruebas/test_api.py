@@ -632,7 +632,9 @@ def test_riesgo_por_visita_marca_la_primera_alerta_y_solo_lo_ve_el_experto(clien
     cuerpo = sin_pedir.json()
     assert cuerpo['elegidos_por'] == 'mayor_riesgo' and cuerpo['umbral_percentil'] == 90 and 1 <= len(cuerpo['ninos']) <= 2
     nino = cuerpo['ninos'][0]
-    assert nino['puntos'] and {p['clave'] for p in nino['puntos']} == {desenlace}
+    # una familia de anticipación junta la fila base y sus filas «_desde_» (encendida por defecto, D68)
+    assert nino['puntos'] and all(p['clave'] == desenlace or p['clave'].startswith(f'{desenlace}_desde_')
+                                  for p in nino['puntos'])
     ordenes = [p['orden'] for p in nino['puntos']]
     assert ordenes == sorted(ordenes)
     altos = [p for p in nino['puntos'] if p['percentil'] >= 90]

@@ -6,9 +6,11 @@ base real a propósito (códigos especiales, errores de unidad, redondeo desde e
 * etiquetas legibles para cada variable, para que el tablero no muestre códigos;
 * tres desenlaces con causa conocida (readmisión, oxígeno y desarrollo), como en nucleo/pruebas/conftest.py, más el
   desarrollo a los 12 meses;
-* CONFIG_CLINICA_DEMO: la configuración clínica de esos desenlaces, que en la base real sale del diccionario;
+* CONFIG_CLINICA_DEMO: la configuración clínica que se entrena, que en la base real sale del diccionario. Como el
+  Diccionario semilla (D68), solo el desarrollo psicomotor a los 12 meses está «En uso»; los demás desenlaces siguen
+  en los datos simulados, pero no se entrenan;
 * EN_PRUEBA_DEMO: la talla baja a los 12 meses calculada desde visitas anteriores, «En prueba» como en el
-  Diccionario: solo se entrena con la anticipación (``MAIA_ANTICIPACION=1``).
+  Diccionario: se entrena con la anticipación, encendida por defecto (``MAIA_ANTICIPACION=0`` la apaga).
 
 simular(n, semilla) es lo único que usan el trainer (maia simular) y la API (semillas de la demo).
 """
@@ -174,13 +176,6 @@ NOMBRES_ETAPA = {'prenatal': 'Prenatal', 'nacimiento': 'Nacimiento', 'hospitaliz
 REGLA_SIMPLE = ('eg_semanas', 'peso_nacer')
 CONFIG_CLINICA_DEMO = AC.ConfigClinica(
     desenlaces=(
-        AC.Desenlace('readm_3m', 'readmisión entre las 40 semanas y los 3 meses', '40 sem', 'mayor_que_cero',
-                     'readm_3m', comparar=REGLA_SIMPLE),
-        AC.Desenlace('no_vuelve_3m', 'no vuelve a la visita de 3 meses', '40 sem', 'no_vuelve', comparar=REGLA_SIMPLE),
-        AC.Desenlace('oxigeno_3m', 'oxigenodependencia a los 3 meses', '40 sem', 'en_codigos', 'oxigeno_3m',
-                     codigos=(1.0,), negativos=(9.0,), comparar=REGLA_SIMPLE),
-        AC.Desenlace('desarrollo_6m', 'desarrollo psicomotor bajo a los 6 meses', '3 m EC', 'percentil_bajo',
-                     'desarrollo_6m', comparar=REGLA_SIMPLE),
         AC.Desenlace('desarrollo_12m', 'desarrollo psicomotor bajo a los 12 meses', '6 m EC', 'percentil_bajo',
                      'desarrollo_12m', comparar=REGLA_SIMPLE),
     ),

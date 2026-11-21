@@ -126,8 +126,9 @@ respaldo:  ## copia de la base (pg_dump) y de los buckets de MinIO en respaldos/
 
 sincronizar-nucleo:  ## trae la versión nueva de insumo-datos (solo lectura) y vuelve a aplicar nucleo/parches
 	@test -d "$(INSUMO)" || (echo "No encuentro $(INSUMO); use INSUMO=/ruta/a/insumo-datos" && exit 1)
+	# el Diccionario semilla es de la plataforma (D68: solo los desenlaces a 12 meses activos); no se pisa
 	rsync -a --exclude '.git' --exclude 'salidas/' --exclude 'interno/' --exclude 'privado/' --exclude '__pycache__/' \
-	  --exclude 'entradas/retroalimentacion/' --exclude '*.parquet' --exclude '*.pkl' \
+	  --exclude 'entradas/retroalimentacion/' --exclude 'entradas/diccionario.xlsx' --exclude '*.parquet' --exclude '*.pkl' \
 	  --exclude 'pyproject.toml' --exclude 'parches/' "$(INSUMO)/" nucleo/
 	for p in nucleo/parches/*.patch; do patch -p1 -d nucleo --forward --binary < "$$p" || exit 1; done
 	uv run pytest nucleo/pruebas -q

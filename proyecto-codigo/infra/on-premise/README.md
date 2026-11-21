@@ -128,8 +128,15 @@ Luego abra http://localhost:5000 (MLflow) y http://localhost:9001 (MinIO, usuari
 
 * **Código:** un push a la rama vuelve a desplegar (con la GitHub App y *Auto Deploy*). La API aplica las migraciones
   al arrancar. El trainer se reconstruye, pero los datos siguen en los volúmenes.
-* **Diccionario de los expertos:** se edita en `nucleo/entradas/diccionario.xlsx`, se sube a git y el trainer lo
-  copia al volumen cada vez que arranca.
+* **Diccionario de los expertos:** vive con versiones en Postgres y se edita en la página **Diccionario**. Antes de cada
+  corrida o entrenamiento el trainer baja la versión en uso al volumen. `nucleo/entradas/diccionario.xlsx` solo se
+  siembra si la base no tiene ninguna versión: cambiarlo en git no cambia una instalación que ya tiene diccionario.
+* **Desenlaces por defecto (D68):** la semilla deja solo desarrollo psicomotor 12 m («En uso») y talla baja 12 m («En
+  prueba»). En una instalación que ya tiene diccionario: **Diccionario › Importar desde Excel** con
+  `nucleo/entradas/diccionario.xlsx`. Confirme solo si la vista previa muestra únicamente cambios de estado en
+  **Desenlaces**; si muestra otros cambios (variables que los expertos ya clasificaron), cancele, use **Exportar a
+  Excel**, cambie a «No usar» el estado de los demás desenlaces en la hoja **Desenlaces** e importe ese archivo. Luego
+  entrene de nuevo y ejecute una corrida.
 * **Réplicas:** una por servicio. El paquete activo vive en la memoria de la API.
 
 ## Si algo falla
