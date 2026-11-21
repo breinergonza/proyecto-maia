@@ -37,6 +37,21 @@ export const riesgo = (v: number | null | undefined) =>
 export const posicion = (v: number | null | undefined) => (v == null ? '—' : nf.format(Math.round(v)))
 /** Valor medido tal como llega de la base (texto): si es un número, sin ruido de coma flotante y con hasta 3
  * decimales, para que un dato mal registrado (p. ej. un peso en kilos donde van gramos) se siga viendo como es. */
+// las unidades como las trae la base («GRAMOS», «CMS», «DIAS»), dichas como se escriben en clínica
+const UNIDADES: Record<string, string> = {
+  gramos: 'g', gramo: 'g', gr: 'g', g: 'g', kg: 'kg', kilos: 'kg', kilogramos: 'kg', cms: 'cm', cm: 'cm', centimetros: 'cm',
+  dias: 'días', dia: 'día', semanas: 'semanas', semana: 'semana', meses: 'meses', mes: 'mes', horas: 'horas', hora: 'hora',
+  anos: 'años', ano: 'año',
+}
+/** La unidad de una medición para ponerla junto a su valor: «GRAMOS» → «g», «CMS» → «cm», «DIAS» → «días». Una unidad que
+ * no está en la lista sale tal cual. */
+export const unidad = (u: string | null | undefined): string => {
+  const limpia = (u ?? '').trim()
+  if (!limpia) return ''
+  const clave = limpia.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\.$/, '')
+  return UNIDADES[clave] ?? limpia
+}
+
 export const medida = (v: string | null | undefined) => {
   if (v == null || v === '') return '—'
   const n = Number(v)

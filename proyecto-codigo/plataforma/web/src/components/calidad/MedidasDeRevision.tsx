@@ -1,4 +1,4 @@
-// Cómo se comportan las alertas de datos: cuántas hay por tipo, cuántas confirmó el equipo al revisar las primeras y dónde se
+// Cómo se comportan las alertas de datos: cuántas hay por tipo, cuántas marcó el equipo para corregir al revisar las primeras y dónde se
 // concentran. Alimentan la exigencia del siguiente entrenamiento; la cola de mediciones por revisar está arriba, en la página.
 import { useQuery } from '@tanstack/react-query'
 import { pedir } from '../../api/cliente'
@@ -11,7 +11,7 @@ import { Aviso, Cargando, Cifra, Panel } from '../ui'
 import { NotaGrafica } from '../modelos/NotaGrafica'
 
 const SERIE_ALERTAS: Serie[] = [{ clave: 'alertas', nombre: 'Alertas', color: 0 }]
-const SERIE_ACIERTOS: Serie[] = [{ clave: 'precision', nombre: 'Confirmadas como error', color: 0 }]
+const SERIE_ACIERTOS: Serie[] = [{ clave: 'precision', nombre: 'Marcadas para corregir', color: 0 }]
 
 /** Lo que dicen las alertas de la corrida y qué tanto aciertan frente a lo que respondió el equipo. */
 export function MedidasDeRevision() {
@@ -29,7 +29,7 @@ export function MedidasDeRevision() {
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <Cifra valor={r ? num(r.datos_revisar) : '—'} texto="datos por revisar" />
           <Cifra valor={r ? numero(r.alertas_por_1000) : '—'} texto="alertas por cada mil datos" />
-          <Cifra valor={pct(aciertos.data?.confirmadas_error_pct)} texto="de los respondidos, confirmados como error" />
+          <Cifra valor={pct(aciertos.data?.confirmadas_error_pct)} texto="de las respondidas, marcadas para corregir" />
           <Cifra valor={r ? num(r.alarmas_grupo) : '—'} texto="alarmas de grupo" />
         </div>
       </Panel>
@@ -48,21 +48,21 @@ export function MedidasDeRevision() {
           }} />
         </Panel>
         <Panel titulo="Aciertos frente a la revisión">
-          <p className="mb-2 text-sm text-tinta/80">Cuántas alertas confirmó el equipo al revisar las primeras.</p>
+          <p className="mb-2 text-sm text-tinta/80">Cuántas alertas marcó el equipo para corregir al revisar las primeras.</p>
           {aciertos.isPending ? <Cargando /> : puntos.length === 0 ? (
             <p className="text-sm text-tinta/80">Todavía no hay alertas respondidas.</p>
           ) : (
             <>
               <LineasSeries filas={puntos} series={SERIE_ACIERTOS} alto={200} dominioY={[0, 100]} formatoY={(v) => `${v} %`}
                 formatoTooltip={(v, f) => `${pct(v)} de ${num(Number(f.respondidas))} respondidas`}
-                etiqueta={`Porcentaje de alertas confirmadas como error entre las primeras: ${puntos.map((f) => `${f.x}, ${pct(Number(f.precision))}`).join('; ')}`} />
+                etiqueta={`Porcentaje de alertas marcadas para corregir entre las primeras: ${puntos.map((f) => `${f.x}, ${pct(Number(f.precision))}`).join('; ')}`} />
               <p className="mt-1 text-xs text-tinta/80">Eje inferior: las primeras alertas de la cola.</p>
               <NotaGrafica className="mt-3 border-t border-linea/70 pt-3" datos={{
-                variable: 'Alertas confirmadas como error de registro', unidad: '% de alertas respondidas',
+                variable: 'Alertas marcadas para corregir (error de registro)', unidad: '% de alertas respondidas',
                 momento: 'Las k primeras alertas de la cola actual',
                 poblacion: 'Alertas de esa cola que el equipo ya respondió',
                 validos: `${num(aciertos.data?.respondidas)} alertas respondidas`,
-                porcentaje: 'Respondidas «es un error» entre respondidas (las «no sé» cuentan en el denominador); el denominador está en cada punto',
+                porcentaje: 'Respondidas «corregir» entre respondidas (las «no sé» cuentan en el denominador); el denominador está en cada punto',
               }} />
             </>
           )}

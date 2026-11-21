@@ -97,6 +97,17 @@ def test_la_semilla_usa_solo_los_desenlaces_a_12_meses():
     assert len(des) == 52 and len(por_estado[D.APAGADO]) == 47
 
 
+def test_la_talla_baja_se_compara_con_la_talla_que_el_nino_ya_tiene():
+    """La regla de referencia de la talla baja a 12 meses es «solo el puntaje z de talla» de la visita del cálculo: lo
+    que ya se sabe del niño sin ningún modelo. El desarrollo psicomotor sigue comparándose con la edad gestacional y
+    los pesos al nacer. El simulador entrena con la misma regla."""
+    from maia_comun import simulados as SI
+    des = D.leer(DIC.SEMILLA).desenlaces.set_index('clave')
+    assert {des.comparar[f'talla_baja_12m_desde_{v}'] for v in ('40', '3', '6', '9')} == {'z_talla'}
+    assert des.comparar['desarrollo_12m'] == 'eg_semanas;ern_peso;v196a'
+    assert all(d.comparar == ('z_talla',) for d in SI.EN_PRUEBA_DEMO)
+
+
 def test_diferencias_entre_versiones():
     base = D.leer(DIC.SEMILLA)
     nuevo = DIC.leer(con_nuevas(('var_simulada_a', 'medicion')))

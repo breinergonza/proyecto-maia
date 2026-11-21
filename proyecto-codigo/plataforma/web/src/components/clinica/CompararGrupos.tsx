@@ -17,10 +17,13 @@ import { LadoComparado } from '../comparar/LadoComparado'
 import { usePantallaAlta } from '../comparar/pantalla'
 import { PREFIJO_PREGUNTA, preguntaDe, Preguntas, type Pregunta } from '../comparar/Preguntas'
 import { PanelPestana } from '../ui/Pestanas'
-import { SERIE_A, SERIE_B, ninos } from '../comparar/comun'
+import { COLUMNAS_COMPARACION, filasDeLaComparacion, porcentaje, SERIE_A, SERIE_B, ninos } from '../comparar/comun'
 import { TallaPorVisita } from '../comparar/TallaPorVisita'
 import { cuerpoDeFiltros } from '../GrupoActivo'
 import { Aviso, Boton, Cargando, Encabezado, Vacio } from '../ui'
+import { aCsv, descargar, nombreArchivo } from '../../lib/exportar'
+import { num } from '../../lib/formato'
+import { aMomento } from './RiesgoPorCorte'
 import { ErrorConReintento } from '../ErrorConReintento'
 
 const DESENLACE_DE_TALLA = 'talla_baja_12m'
@@ -32,8 +35,26 @@ function Falla({ error, reintentar, reintentando }: { error: Error; reintentar: 
   return <ErrorConReintento error={error} que="la comparación" conserva="Los grupos elegidos siguen aquí: al reintentar se pide la misma comparación." reintentar={reintentar} reintentando={reintentando} />
 }
 
-function Respuesta({ r, pregunta, vista, elegirVista }: {
-  r: GruposClinicoOk; pregunta: Pregunta; vista: Vista; elegirVista: (v: Vista) => void
+/** Cuánta talla falta en la última visita en que los dos grupos tienen niños con dato: quien mira cómo crecen ve, sin cambiar
+ *  de pregunta, con cuánto seguimiento se compara cada grupo; el detalle por visita está en «¿Faltan datos distintos?». */
+function TallaQueFalta({ r, verFaltantes }: { r: GruposClinicoOk; verFaltantes: () => void }) {
+  const ultima = r.trayectoria.etapas.findLast((e) => e.a && e.b)
+  if (!ultima?.a || !ultima.b) return null
+  const momento = aMomento(ultima.etapa)
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-panel border border-linea/80 bg-papel px-4 py-2.5 text-sm shadow-suave">
+      <p className="min-w-0">
+        {momento.charAt(0).toUpperCase() + momento.slice(1)} falta la talla del{' '}
+        <strong className="whitespace-nowrap">{porcentaje(ultima.a.pct_sin_dato)}</strong> del grupo A ({num(ultima.a.sin_dato)} de {num(r.a.n)}) y del{' '}
+        <strong className="whitespace-nowrap">{porcentaje(ultima.b.pct_sin_dato)}</strong> del grupo B ({num(ultima.b.sin_dato)} de {num(r.b.n)}).
+      </p>
+      <button type="button" onClick={verFaltantes} className="font-semibold text-teal underline underline-offset-2">Ver los datos que faltan</button>
+    </div>
+  )
+}
+
+function Respuesta({ r, pregunta, vista, elegirVista, verFaltantes }: {
+  r: GruposClinicoOk; pregunta: Pregunta; vista: Vista; elegirVista: (v: Vista) => void; verFaltantes: () => void
 }) {
   const talla = r.desenlaces.find((d) => d.clave === DESENLACE_DE_TALLA)
   // En una pantalla alta (1920×1080) hay sitio para lo que en un portátil se alterna: se usa en lugar de dejarlo vacío.
@@ -55,10 +76,13 @@ function Respuesta({ r, pregunta, vista, elegirVista }: {
   // lado ancho para que se lean sus cuatro visitas y los niños con dato de cada una. En una pantalla alta van una debajo
   // de la otra, a todo lo ancho, y la gráfica crece con la altura que queda.
   return (
-    <div className={cn('grid items-start gap-4 [&>*]:min-w-0', !alta && 'xl:grid-cols-[minmax(0,4fr)_minmax(0,5fr)]')}>
-      {talla ? <DesenlaceObservado d={talla} r={r} ancho={alta} />
-        : <Aviso tono="teal">La corrida activa no trae la talla baja a los 12 meses observada; se ve la talla por visita.</Aviso>}
-      <TallaPorVisita r={r} alta={alta} />
+    <div className="flex flex-col gap-3">
+      <div className={cn('grid items-start gap-4 [&>*]:min-w-0', !alta && 'xl:grid-cols-[minmax(0,4fr)_minmax(0,5fr)]')}>
+        {talla ? <DesenlaceObservado d={talla} r={r} ancho={alta} />
+          : <Aviso tono="teal">La corrida activa no trae la talla baja a los 12 meses observada; se ve la talla por visita.</Aviso>}
+        <TallaPorVisita r={r} alta={alta} />
+      </div>
+      <TallaQueFalta r={r} verFaltantes={verFaltantes} />
     </div>
   )
 }
@@ -99,7 +123,13 @@ export default function CompararGrupos() {
 
   return (
     <div className="flex flex-col gap-3">
-      <Encabezado titulo="Comparar grupos">
+      <Encabezado titulo="Comparar grupos" accion={ok && (
+        // las cifras de la comparación (no los niños uno por uno) en un CSV, cada una con su denominador
+        <Boton variante="secundario" title="Descargar las cifras de esta comparación (CSV)"
+          onClick={() => descargar(new Blob([aCsv(filasDeLaComparacion(ok), COLUMNAS_COMPARACION)], { type: 'text/csv;charset=utf-8' }), nombreArchivo('comparar-grupos', 'csv'))}>
+          Exportar
+        </Boton>
+      )}>
         Elija dos grupos de niños y vea en qué se parecen y en qué se diferencian.
       </Encabezado>
       <div className="grid items-start gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
@@ -140,7 +170,8 @@ export default function CompararGrupos() {
               <Preguntas activa={pregunta} elegir={(p) => ponerParam('pregunta', p)} />
               <PanelPestana prefijo={PREFIJO_PREGUNTA} activa={pregunta} ocupado={consulta.isPlaceholderData}
                 className={consulta.isPlaceholderData ? 'opacity-60 transition-opacity' : undefined}>
-                <Respuesta r={r} pregunta={pregunta} vista={vista} elegirVista={(v) => ponerParam('vista', v)} />
+                <Respuesta r={r} pregunta={pregunta} vista={vista} elegirVista={(v) => ponerParam('vista', v)}
+                  verFaltantes={() => ponerParam('pregunta', 'faltan')} />
               </PanelPestana>
             </>
           )}

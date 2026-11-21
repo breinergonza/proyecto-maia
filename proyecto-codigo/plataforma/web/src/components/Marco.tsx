@@ -52,7 +52,7 @@ const SECCIONES: { titulo: string; enlaces: Enlace[] }[] = [
     titulo: 'Técnica',
     enlaces: [
       MODELOS,
-      { a: '/admin/calidad-datos', texto: 'Calidad de datos', icono: ClipboardCheck, roles: ROLES_ADMIN },
+      { a: '/admin/calidad-datos', texto: 'Calidad de datos', icono: ClipboardCheck, roles: ROLES_CLINICOS },
       { a: '/diccionario', texto: 'Diccionario', icono: BookOpen, roles: ROLES_CLINICOS },
       { a: '/tablero', texto: 'Resumen', icono: Gauge, roles: ROLES_CONSULTA },
     ],

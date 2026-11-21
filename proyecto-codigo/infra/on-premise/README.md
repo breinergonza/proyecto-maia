@@ -137,6 +137,10 @@ Luego abra http://localhost:5000 (MLflow) y http://localhost:9001 (MinIO, usuari
   **Desenlaces**; si muestra otros cambios (variables que los expertos ya clasificaron), cancele, use **Exportar a
   Excel**, cambie a «No usar» el estado de los demás desenlaces en la hoja **Desenlaces** e importe ese archivo. Luego
   entrene de nuevo y ejecute una corrida.
+* **Regla de referencia de la talla baja (D72):** la semilla compara la talla baja a 12 meses con `z_talla` (el puntaje
+  z de talla de la visita del cálculo). En una instalación que ya tiene diccionario: **Diccionario › Desenlaces**, abra
+  cada fila `talla_baja_12m_desde_*`, ponga `z_talla` en **Comparar con** y guarde; la vista previa de «Importar desde
+  Excel» no lista este cambio. Luego entrene de nuevo: **Modelos › Comparación técnica** dirá «solo talla, puntaje z…».
 * **Réplicas:** una por servicio. El paquete activo vive en la memoria de la API.
 
 ## Si algo falla

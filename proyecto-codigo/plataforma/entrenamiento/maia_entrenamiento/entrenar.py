@@ -4,6 +4,7 @@ agrega el registro en MLflow."""
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import time
 from dataclasses import dataclass, fields, replace
@@ -20,7 +21,7 @@ from maia_entrenamiento import analitica_clinica as AL
 from maia_entrenamiento import datos as D
 from maia_entrenamiento import registro as R
 from sevarti import contrato as SV
-from sevarti.contrato import Sevarti
+from sevarti.contrato import Sevarti, nacimiento_referencia
 
 
 @dataclass
@@ -113,15 +114,32 @@ def entrenar_anomalias(sev: Sevarti, fuente: str, cfg: MA.Config, validar: bool 
                      (time.time() - t0) / 60)
 
 
+def _cohorte(sev: Sevarti) -> dict:
+    """Cuántos niños son y entre qué años nacieron: con quiénes se entrenó o se probó, para «Cómo se entrenó»."""
+    suj = sev.sujetos.drop_duplicates('sujeto')
+    anios = nacimiento_referencia(suj).dt.year.dropna()
+    return {'ninos': int(len(suj)), 'nacidos_desde': int(anios.min()) if len(anios) else None,
+            'nacidos_hasta': int(anios.max()) if len(anios) else None}
+
+
+def version_del_diccionario() -> int | None:
+    """La versión del Diccionario con que se entrena, si el programador la dio (``MAIA_DICCIONARIO_VERSION``). Un
+    entrenamiento lanzado a mano desde la terminal no la conoce: no se inventa."""
+    try:
+        return int(os.environ['MAIA_DICCIONARIO_VERSION'])
+    except (KeyError, ValueError):
+        return None
+
+
 def validar_clinico(sev: Sevarti, cfg: AC.ConfigClinica, tardias: list[str], retener: dict | None = None
                     ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame], dict[str, str]]:
     """Entrena con los nacidos antes y mide con los más recientes (como ``python -m clinico entrenar``). Con
-    ``retener`` deja ahí el modelo de validación y lo preparado, para la analítica."""
+    ``retener`` deja ahí el modelo de validación, lo preparado y las dos cohortes, para la analítica."""
     tr, _, te, _ = MA.dividir_por_tiempo(sev, (0.85, 0.0, 0.15))
     modelo = AC.ModeloClinico(cfg).ajustar(tr, progreso=True, tardias=tardias)
     tabla, calibraciones, preparado = AC.evaluar(modelo, te)
     if retener is not None:
-        retener.update(modelo=modelo, preparado=preparado)
+        retener.update(modelo=modelo, preparado=preparado, cohortes={'entrenamiento': _cohorte(tr), 'prueba': _cohorte(te)})
     return tabla, calibraciones, modelo.omitidos
 
 
@@ -159,6 +177,7 @@ def entrenar_clinico(sev: Sevarti, fuente: str, cfg: AC.ConfigClinica, validar: 
                               {'fuente': fuente, 'registro': nombre, 'version_registro': str(numero),
                                'version_modelo': modelo.version, 'corte': None if sev.corte is None else str(sev.corte.date()),
                                'hiperparametros': HP.usados('clinico', cfg),
+                               'cohortes': retenido.get('cohortes'), 'diccionario': version_del_diccionario(),
                                **({'embudo': muestra.embudo} if muestra else {})})
     return Entrenado('clinico', modelo.version, nombre, numero, carpeta, metricas, _dispositivos(),
                      (time.time() - t0) / 60)

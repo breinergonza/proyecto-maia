@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from clinico import crecimiento as CR
 from clinico.modelo import Desenlace
 from maia_api import estado as E
+from maia_api import poblacion as P
 from maia_api.consultas import (
     corrida_de,
     esquema,
@@ -39,6 +40,9 @@ from maia_comun import puntuacion as PU
 from maia_comun.modelos_db import PERCENTIL_ALTO, Usuario
 from maia_comun.perfiles import VARIABLE_LUBCHENCO, perfil_provisional
 from sevarti.contrato import Sevarti
+
+# El peso al nacer en la base de la Fundación y en los datos simulados (como ``VARIABLES_SEXO`` para el sexo).
+VARIABLES_PESO_NACER = ('ern_peso', 'peso_nacer')
 
 ruta = APIRouter(prefix='/ninos', tags=['niños'])
 registro = logging.getLogger(__name__)
@@ -179,6 +183,8 @@ def linea_temporal(sujeto: str, corrida_id: int | None = None, s: Session = Depe
 
     visitas: dict[str, dict] = {}
     sin_visita: list[dict] = []
+    sexo: str | None = None          # para el encabezado de la ficha: «Niña» o «Niño»
+    peso_nacer: dict | None = None   # y el peso al nacer, con la unidad en que se registró
 
     def visita(etapa: str) -> dict:
         if etapa not in visitas:
@@ -194,6 +200,11 @@ def linea_temporal(sujeto: str, corrida_id: int | None = None, s: Session = Depe
         item = {'variable': m.variable, 'etiqueta': d.get('etiqueta') or m.variable,
                 'valor': None if m.valor is None else valor_legible(d, m.valor),
                 'unidad': unidad_mostrada(d), 'fecha': m.fecha, 'tema': d.get('tema')}
+        if item['valor'] is not None:
+            if sexo is None and m.variable in P.VARIABLES_SEXO:
+                sexo = P.etiqueta_sexo(item['valor'])
+            elif peso_nacer is None and m.variable in VARIABLES_PESO_NACER:
+                peso_nacer = {'valor': item['valor'], 'unidad': str(d.get('unidad') or '').strip() or None}
         etapa = d.get('etapa')
         if etapa:
             v = visita(etapa)
@@ -229,6 +240,7 @@ def linea_temporal(sujeto: str, corrida_id: int | None = None, s: Session = Depe
     actual = (con_datos or ordenadas or [None])[-1]
     return {
         'sujeto': sujeto, 'grupo': datos_nino['grupo'], 'eg_semanas': datos_nino['eg_semanas'],
+        'sexo': sexo, 'peso_nacer': peso_nacer,
         'perfil': perfil_provisional(datos_nino['eg_semanas'], lub, actual['nombre'] if actual else None),
         'anio_nacimiento': datos_nino['anio_nacimiento'] or (datos_nino['fecha_nacimiento'].year
                                                               if datos_nino['fecha_nacimiento'] else None),

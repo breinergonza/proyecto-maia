@@ -19,7 +19,8 @@ No hace falta saber de programación. Los nombres en **negrita** son los mismos 
 Trabaja con los datos del Programa Madre Canguro y usa dos modelos:
 
 * **Anomalías.** Busca datos raros en la historia de cada niño (un peso que no cuadra con su edad, una talla que
-  baja de una visita a otra, etc.). Esos datos forman la lista de **Calidad de datos**, que responde la administración.
+  baja de una visita a otra, etc.). Esos datos forman la lista de **Calidad de datos**, que responden los expertos
+  clínicos y la administración.
 * **Alertas clínicas.** Calcula el riesgo de desenlaces que se pueden prevenir, ordena a los niños de mayor a menor
   riesgo y dice qué fue lo que más pesó en cada caso. También compara el crecimiento con el estándar de la OMS.
 
@@ -31,8 +32,8 @@ la base de la Fundación).
 | Perfil (como aparece en pantalla) | Qué puede hacer |
 |---|---|
 | **Consulta** | Ver cifras de grupo: **Vista clínica**, **Comparar grupos**, **Explorar**, **Modelos** y el **Resumen**. No ve niños uno por uno |
-| **Experto clínico** | Todo lo de Consulta, más la lista de **Niños** y la historia de cada niño, **Revisión de riesgos**, **Predicción**, **Mis modelos** y **Diccionario** |
-| **Administración** | Todo lo anterior, más **Calidad de datos**, **Configuración**, **Modelos y corridas** y **Usuarios** |
+| **Experto clínico** | Todo lo de Consulta, más la lista de **Niños** y la historia de cada niño, **Revisión de riesgos**, **Predicción**, **Mis modelos**, **Calidad de datos** y **Diccionario** |
+| **Administración** | Todo lo anterior, más **Configuración**, **Modelos y corridas** y **Usuarios** |
 
 Si una opción del menú no aparece, su perfil no la incluye. Pida el cambio a la administración.
 
@@ -77,8 +78,8 @@ nuevo**. Al ingresar, la aplicación lo devuelve a la misma pantalla en que esta
 
 * **Menú lateral** (en el teléfono se abre con el botón de las tres rayas, arriba a la derecha) con tres secciones:
   * **Seguimiento:** **Tablero**, **Explorar**, **Niños** (solo Experto clínico y Administración) y **Analítica**.
-  * **Revisión clínica:** **Revisión de riesgos**, **Predicción**, **Mis modelos** y **Diccionario**.
-  * **Administración:** **Calidad de datos**, **Configuración**, **Modelos y corridas** y **Usuarios**.
+  * **Revisión clínica:** **Revisión de riesgos**, **Predicción**, **Mis modelos**, **Calidad de datos** y **Diccionario**.
+  * **Administración:** **Configuración**, **Modelos y corridas** y **Usuarios**.
 * **Grupos que se abren y se cierran.** **Analítica**, **Configuración** y **Modelos y corridas** son grupos: el nombre
   lleva a su primera pantalla y la flecha de al lado muestra u oculta las demás (**General**, **Programación** y
   **Notificaciones** dentro de Configuración; **Entrenamientos**, **Modelos** y **Corridas** dentro de Modelos y
@@ -328,42 +329,38 @@ niños**, que ubica al niño frente al resto del programa.
 Además de lo de Consulta, el experto clínico tiene la sección **Revisión clínica**. Sus respuestas son las que dicen
 si los modelos sirven: tómese el tiempo necesario y use **No sé** cuando no esté seguro.
 
-### Calidad de datos (Administración, solo administración)
+### Calidad de datos (Experto clínico y Administración)
 
-Se abre en **Administración › Calidad de datos**; los perfiles Consulta y Experto clínico no ven esta opción. La
-dirección antigua `/revision/datos` lleva a esta página.
+Se abre en **Técnica › Calidad de datos**; el perfil Consulta no ve esta opción. La dirección antigua
+`/revision/datos` lleva a esta página. Son mediciones dudosas o faltantes, no riesgos clínicos: datos a revisar antes de
+usarlos.
 
-Arriba hay cuatro cifras (**datos por revisar**, **alertas por cada mil datos**, **de los respondidos, confirmados
-como error** y **alarmas de grupo**) y tres paneles:
+Arriba hay tres cifras: **mediciones por revisar** (las que usted no ha respondido), **revisadas este mes** y
+**completitud a los 12 meses** (de los niños elegibles, cuántos tienen talla medida en esa visita).
 
-* **Alertas por tipo.** Cuántos datos raros encontró cada revisión.
-* **Aciertos frente a la revisión.** Cuántas alertas confirmó el equipo al revisar las primeras: de las 50, 100, 200…
-  primeras alertas de la cola que ya tienen respuesta, qué porcentaje se marcó como error.
-* **Dónde se concentran.** Sede y dato con más alertas, de más a menos. Si el corte no trae sedes, solo se muestra por
-  dato. Cada uno sale con su cifra, aunque tenga una sola alerta.
+**Mediciones por revisar** es la lista de trabajo:
 
-Debajo está la lista de **Datos por revisar**: datos que el modelo de anomalías encontró raros. Para cada uno, la
-pregunta es si cree que es un **error de registro**.
+* **Filtros:** **Visita**, **Medición**, **Detectado por** (**Valor fuera de lo esperado**, **No cuadra con el resto de
+  sus datos** o **Cambio raro entre controles**) y **Estado** (**Por revisar**, por defecto, **Ya revisadas** o
+  **Todos**).
+* Van primero las que tienen más alertas y más fuertes. Hay 12 por página.
+* Cada fila dice el **niño** (enlace a su historia), la **visita**, la **medición**, el **valor registrado** tal como está
+  en la base (en coral), **por qué es dudosa** («Esperado entre A y B»), quién la **detectó** y su **estado**.
+* **Acción:** **Confirmar** dice que el valor registrado es correcto. **Corregir** la marca como error de registro: solo
+  la marca, el valor no cambia en la plataforma (se corrige en la base de la entidad). **No sé** queda para cuando no se
+  puede decidir. La respuesta se guarda al pulsar y se puede cambiar.
+* La flecha de cada fila abre el detalle: lo más probable para ese niño, cuándo se midió, sus otras visitas, las
+  respuestas de todo el equipo y un **comentario** opcional. Escriba el comentario **antes** de pulsar la respuesta,
+  porque se guarda junto con ella.
 
-* **Filtros (arriba a la derecha):** **Sin responder** (por defecto), **Ya respondidos** o **Todos**. Y **Todas las
-  alertas**, o un solo tipo: **Valor fuera de lo esperado**, **No cuadra con el resto de sus datos** o **Cambio raro
-  entre controles**.
-* Los datos van ordenados: primero los que tienen más alertas y más fuertes. Hay 12 por página.
+Cada persona responde por su cuenta: «Por revisar» y «Ya revisadas» se refieren a sus propias respuestas.
 
-Cada tarjeta muestra:
+**Completitud por visita** está al lado: el porcentaje de niños con talla medida en cada visita, entre todos los niños
+elegibles. Quien aún no llega a la visita, no asistió o no tiene una talla válida cuenta como sin dato; es la misma
+cuenta de **Comparar grupos › ¿Faltan datos distintos?**
 
-* **Niño …** (enlace a su historia), la visita y la fecha.
-* El dato y su valor tal como está en la base (en coral). Un dato mal digitado se ve tal cual, por ejemplo un peso en
-  kilos donde van gramos.
-* «Para este niño se esperaba entre A y B (lo más probable: C).»: el rango que calculó el modelo para ese niño.
-* El motivo y las capas que lo marcaron.
-* **¿Es un error de registro?** con tres botones: **Sí**, **No**, **No sé**. La respuesta se guarda al pulsar.
-* **Comentario (opcional):** escríbalo **antes** de pulsar la respuesta, porque se guarda junto con ella. Si lo
-  escribe después, vuelva a pulsar la misma respuesta.
-
-Debajo aparece «Respuesta guardada.» y después «Puede cambiar su respuesta.». Cada administrador responde por su cuenta
-(«Sin responder» y «Ya respondidos» se refieren a sus propias respuestas) y puede cambiar su respuesta las veces que
-quiera.
+**Cómo se comportan las alertas** (abajo, se despliega) trae cuántas alertas hay por tipo, cuántas marcó el equipo para
+corregir entre las primeras de la lista y en qué sede y dato se concentran.
 
 **Para qué sirven sus respuestas.** Con ellas se mide qué parte de lo que marca cada capa es de verdad un error. Esa
 precisión ajusta qué tan exigente será el modelo en el siguiente entrenamiento.
@@ -821,7 +818,7 @@ No. Cada experto ve solo las suyas. La administración ve el resumen agregado de
 Su perfil es Consulta: ve cifras de grupo, no niños uno por uno. Si necesita esas opciones, pídale a la administración el perfil de Experto clínico.
 
 **¿Por qué no veo Calidad de datos?**
-Es una opción de Administración y solo la ve el perfil de administración.
+La ven los perfiles Experto clínico y Administración. Si su perfil es Consulta, pídale a la administración el perfil de Experto clínico.
 
 **Me apareció una franja que dice «Su sesión está por vencer».**
 No pierde nada. Termine o guarde lo que está haciendo y pulse **Ingresar de nuevo**; al ingresar vuelve a la misma

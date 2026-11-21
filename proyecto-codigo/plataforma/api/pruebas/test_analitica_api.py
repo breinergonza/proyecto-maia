@@ -76,7 +76,10 @@ def entrenamiento(cliente):
                       {'fuente': 'simulado', 'registro': 'maia-clinico-demo', 'version_registro': '3',
                        'version_modelo': 'abc', 'corte': '2026-06-30',
                        'hiperparametros': {'rondas': 400, 'tasa': 0.05, 'hojas': 31, 'min_hoja': 20, 'semilla': 7,
-                                           'min_casos': 30}})
+                                           'min_casos': 30},
+                       'cohortes': {'entrenamiento': {'ninos': 3400, 'nacidos_desde': 2007, 'nacidos_hasta': 2021},
+                                    'prueba': {'ninos': 600, 'nacidos_desde': 2020, 'nacidos_hasta': 2021}},
+                       'diccionario': 14})
 
 
 def test_sin_sesion_no_entra(cliente):
@@ -108,6 +111,14 @@ def test_la_configuracion_trae_los_hiperparametros_con_que_se_entreno(cliente, t
             {'nombre': 'min_hoja', 'etiqueta': 'Datos mínimos por hoja', 'valor': 20},
             {'nombre': 'semilla', 'etiqueta': 'Semilla', 'valor': 7},
             {'nombre': 'min_casos', 'etiqueta': 'Casos mínimos para modelar un desenlace', 'valor': 30}]
+
+
+def test_la_trazabilidad_dice_con_quienes_se_entreno_y_con_que_diccionario(cliente, tokens, entrenamiento):
+    lista = cliente.get('/api/analitica/entrenamientos', headers=tokens['experto']).json()['entrenamientos']
+    e = next(x for x in lista if x['entrenamiento'] == entrenamiento)
+    assert e['cohortes'] == {'entrenamiento': {'ninos': 3400, 'nacidos_desde': 2007, 'nacidos_hasta': 2021},
+                             'prueba': {'ninos': 600, 'nacidos_desde': 2020, 'nacidos_hasta': 2021}}
+    assert e['diccionario'] == 14
 
 
 def test_formas_por_submodulo(cliente, tokens, entrenamiento):

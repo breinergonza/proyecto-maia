@@ -64,7 +64,9 @@ def _resumen_meta(a: Analitica) -> dict:
             'fuente': m.get('fuente'), 'registro': m.get('registro'), 'version_registro': m.get('version_registro'),
             'version_modelo': m.get('version_modelo'), 'corte': m.get('corte'), 'creada': a.creada,
             'desenlaces': m.get('desenlaces', []), 'submodulos': _submodulos(m),
-            'hiperparametros': HP.rotulados(a.modelo, m.get('hiperparametros'))}
+            'hiperparametros': HP.rotulados(a.modelo, m.get('hiperparametros')),
+            # con quiénes se entrenó y se probó, y con qué versión del Diccionario; nulos en entrenamientos anteriores
+            'cohortes': m.get('cohortes'), 'diccionario': m.get('diccionario')}
 
 
 @ruta.get('/entrenamientos')

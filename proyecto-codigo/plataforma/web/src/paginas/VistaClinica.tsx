@@ -10,6 +10,7 @@ import { useResumenClinico } from '../api/clinica'
 import { ErrorApi } from '../api/cliente'
 import type { ClinicaResumen, CuerpoClinica } from '../api/tipos'
 import { GrupoActivo, cuerpoDeFiltros } from '../components/GrupoActivo'
+import { COLUMNAS_VISTA, filasDeLaVista } from '../components/clinica/exportarVista'
 import { NinosMasRiesgo } from '../components/clinica/NinosMasRiesgo'
 import { Observado } from '../components/clinica/Observado'
 import { RiesgoPorCorte } from '../components/clinica/RiesgoPorCorte'
@@ -17,6 +18,7 @@ import { idPestana, PANEL_DESENLACE, SelectorDesenlace } from '../components/cli
 import { Trayectoria } from '../components/clinica/Trayectoria'
 import { Aviso, Vacio } from '../components/ui'
 import { ErrorConReintento } from '../components/ErrorConReintento'
+import { aCsv, descargar, nombreArchivo } from '../lib/exportar'
 import { num } from '../lib/formato'
 import { datosAl } from '../lib/lenguaje'
 import { cn } from '../lib/cn'
@@ -74,6 +76,11 @@ export default function VistaClinica() {
         <div className="flex flex-wrap gap-2">
           <Link className={enlace} to={{ pathname: '/comparar', search: params.toString() }}>Comparar con otro grupo</Link>
           <Link className={enlace} to={{ pathname: '/explorar', search: params.toString() }}>Explorar más variables</Link>
+          {/* las cifras de la vista (no los niños uno por uno) en un CSV, cada una con su denominador */}
+          <button type="button" className={cn(enlace, 'disabled:cursor-not-allowed disabled:opacity-50')} disabled={!r} title="Descargar las cifras de esta vista (CSV)"
+            onClick={() => r && descargar(new Blob([aCsv(filasDeLaVista(r), COLUMNAS_VISTA)], { type: 'text/csv;charset=utf-8' }), nombreArchivo(`vista-clinica-${r.familia}`, 'csv'))}>
+            Exportar
+          </button>
         </div>
       </div>
       <GrupoActivo ninos={ninos} total={total} minimo={minimo} error={consulta.isError} conDato={conDato} />
@@ -120,9 +127,10 @@ function Contenido({ r, activa, elegir }: { r: ClinicaResumen; activa: string; e
             conPoblacion={!esPoblacion} className="xl:min-h-0 xl:flex-1" />
         </div>
         <div className="flex flex-col gap-3 xl:min-h-0">
-          <RiesgoPorCorte filas={r.riesgo} conModelo={r.riesgo_con_modelo} alertaPercentil={r.alerta_percentil} className="shrink-0" />
+          <RiesgoPorCorte filas={r.riesgo} conModelo={r.riesgo_con_modelo} alertaPercentil={r.alerta_percentil}
+            desenlace={r.familias.find((f) => f.clave === r.familia)?.nombre} className="shrink-0" />
           {r.ninos && <NinosMasRiesgo ninos={r.ninos} riesgos={r.riesgo} medida={r.trayectoria.indicador === 'talla' ? 'Última talla (z)' : 'Última medida (z)'}
-            className="xl:min-h-0 xl:flex-1" />}
+            alertaPercentil={r.alerta_percentil} esPoblacion={esPoblacion} className="xl:min-h-0 xl:flex-1" />}
         </div>
       </div>
     </>

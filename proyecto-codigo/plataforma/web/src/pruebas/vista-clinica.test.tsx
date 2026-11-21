@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { FamiliaClinica, RespuestaClinica, Usuario } from '../api/tipos'
+import { filasDeLaVista } from '../components/clinica/exportarVista'
 import { montar, simularApi, usuario } from './util'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -100,7 +101,7 @@ describe('vista clínica', () => {
   it('el aviso «Apoyo a la decisión» sale una sola vez en la pantalla (el pie)', async () => {
     api('experto')
     montar('/')
-    await screen.findByRole('heading', { name: 'Riesgo estimado' })
+    await screen.findByRole('heading', { name: 'Riesgo estimado de talla baja a los 12 meses' })
     expect(screen.getAllByText(/Apoyo a la decisión/)).toHaveLength(1)
   })
 
@@ -200,13 +201,13 @@ describe('vista clínica', () => {
     expect(within(sexta).getAllByText('—').length).toBeGreaterThan(0)
   })
 
-  it('el riesgo estimado dice, por corte, cuántos niños del grupo tienen riesgo calculado y cuántos están en alerta; «En prueba» una vez', async () => {
+  it('el riesgo estimado nombra el desenlace y dice, por visita de cálculo, cuántos de los niños con riesgo calculado están en alerta; «En prueba» una vez', async () => {
     api('experto')
     montar('/')
-    const panel = (await screen.findByRole('heading', { name: 'Riesgo estimado' })).closest('section')!
+    const panel = (await screen.findByRole('heading', { name: 'Riesgo estimado de talla baja a los 12 meses' })).closest('section')!
     expect(within(panel).getAllByRole('listitem').map((l) => l.textContent)).toEqual([
-      'A las 40 semanas: 290 con riesgo calculado · 58 en alerta (20,0 %)',
-      'A los 3 meses: 268 con riesgo calculado · 61 en alerta (22,8 %)',
+      'Calculado a las 40 semanas: 58 de 290 niños en alerta (20,0 %)',
+      'Calculado a los 3 meses: 61 de 268 niños en alerta (22,8 %)',
     ])
     // el denominador se explica: solo los niños que siguen en seguimiento a esa visita tienen riesgo calculado
     expect(within(panel).getByText(/siguen en seguimiento/)).toBeInTheDocument()
@@ -218,7 +219,7 @@ describe('vista clínica', () => {
     api('experto', () => ({ ...resumen, riesgo: [...resumen.riesgo,
       { momento: '6 m EC', clave: 'talla_baja_12m', estado: 'en_uso', calculados: 120, en_alerta: 12, pct_en_alerta: 10 }] }))
     montar('/')
-    const panel = (await screen.findByRole('heading', { name: 'Riesgo estimado' })).closest('section')!
+    const panel = (await screen.findByRole('heading', { name: 'Riesgo estimado de talla baja a los 12 meses' })).closest('section')!
     expect(within(panel).getAllByText(/En prueba/)).toHaveLength(1)
     expect(within(panel).getByText('En prueba, salvo a los 6 meses')).toBeInTheDocument()
   })
@@ -236,24 +237,23 @@ describe('vista clínica', () => {
     expect(screen.queryByText(/aún no calcula este desenlace/)).not.toBeInTheDocument()
   })
 
-  it('los niños con más riesgo enlazan a su ficha', async () => {
+  it('los niños con más riesgo enlazan a su ficha y dicen su riesgo estimado en porcentaje, con la visita del cálculo', async () => {
     api('experto')
     montar('/')
     const panel = (await screen.findByRole('heading', { name: 'Niños del grupo con más riesgo' })).closest('section')!
     expect(within(panel).getByRole('link', { name: 'S-01633' })).toHaveAttribute('href', '/ninos/S-01633')
     expect(within(panel).getByRole('link', { name: 'S-02210' })).toHaveAttribute('href', '/ninos/S-02210')
-    expect(within(panel).getAllByRole('columnheader').map((c) => c.textContent)).toEqual(['Niño', 'Edad gestacional', 'Lugar en el grupo', 'Última talla (z)'])
-    // una fila por niño, en una línea: el lugar dentro de los niños del grupo con riesgo calculado en esa visita
+    expect(within(panel).getAllByRole('columnheader').map((c) => c.textContent)).toEqual(['Niño', 'Edad gestacional', 'Riesgo estimado', 'Última talla (z)'])
     const primero = within(panel).getByRole('row', { name: /S-01633/ })
-    expect(within(primero).getByText('1.º de 268 · 3 m EC')).toBeInTheDocument()
+    expect(within(primero).getAllByRole('cell')[2]).toHaveTextContent('61,0 % · 3 m EC')
     expect(within(primero).getByText('sin dato')).toBeInTheDocument()
     const segundo = within(panel).getByRole('row', { name: /S-02210/ })
-    expect(within(segundo).getByText('2.º de 268 · 3 m EC')).toBeInTheDocument()
+    expect(within(segundo).getAllByRole('cell')[2]).toHaveTextContent('57,0 % · 3 m EC')
     expect(within(segundo).getByText('30,5 sem')).toBeInTheDocument()
     expect(within(segundo).getByText('-2,3')).toBeInTheDocument()
   })
 
-  it('el lugar discrimina aunque el riesgo esté saturado: empates comparten lugar y cada corte cuenta por separado', async () => {
+  it('con el riesgo saturado el porcentaje no ordena: el lugar entre los niños de su visita queda al pasar el cursor', async () => {
     api('experto', () => ({ ...resumen, ninos: [
       { sujeto: 'S-1', semanas: 30, momento: '3 m EC', riesgo: 1, percentil: 98.4, ultima_z: -2.5 },
       { sujeto: 'S-2', semanas: 39, momento: '40 sem', riesgo: 1, percentil: 98, ultima_z: -1.2 },
@@ -263,14 +263,31 @@ describe('vista clínica', () => {
     ] }))
     montar('/')
     const panel = (await screen.findByRole('heading', { name: 'Niños del grupo con más riesgo' })).closest('section')!
-    const lugar = (s: string) => within(within(panel).getByRole('row', { name: new RegExp(s) })).getAllByRole('cell')[2].textContent
-    expect(lugar('S-1')).toBe('1.º de 268 · 3 m EC')
-    expect(lugar('S-2')).toBe('1.º de 290 · 40 sem')
-    expect(lugar('S-3')).toBe('1.º de 290 · 40 sem')
-    expect(lugar('S-4')).toBe('2.º de 268 · 3 m EC')
-    // un corte sin fila de riesgo (menos de 5 calculados) no inventa el denominador
-    expect(lugar('S-5')).toBe('1.º · 6 m EC')
-    expect(within(panel).queryByText(/99,9 %/)).toBeNull()
+    const celda = (s: string) => within(within(panel).getByRole('row', { name: new RegExp(s) })).getAllByRole('cell')[2]
+    expect(celda('S-1')).toHaveTextContent('más de 99,9 % · 3 m EC')
+    expect(celda('S-1')).toHaveAttribute('title', '1.º entre los 268 niños del grupo con riesgo calculado a los 3 meses.')
+    // los empates comparten lugar y cada visita cuenta por separado
+    expect(celda('S-2')).toHaveAttribute('title', '1.º entre los 290 niños del grupo con riesgo calculado a las 40 semanas.')
+    expect(celda('S-3')).toHaveAttribute('title', '1.º entre los 290 niños del grupo con riesgo calculado a las 40 semanas.')
+    expect(celda('S-4')).toHaveAttribute('title', '2.º entre los 268 niños del grupo con riesgo calculado a los 3 meses.')
+    // una visita sin fila de riesgo (menos de 5 calculados) no inventa el denominador
+    expect(celda('S-5')).toHaveAttribute('title', '1.º entre los niños del grupo con riesgo calculado a los 6 meses.')
+  })
+
+  it('con todos los niños, «Ver los niños en alerta» lleva a la lista de Niños con ese desenlace y ese umbral', async () => {
+    api('experto', () => ({ ...resumen, grupo: { n: 5000, n_total: 5000 } }))
+    montar('/')
+    const panel = (await screen.findByRole('heading', { name: 'Niños del grupo con más riesgo' })).closest('section')!
+    // los 61 en alerta de la visita de cálculo más reciente (3 meses)
+    expect(within(panel).getByRole('link', { name: 'Ver los 61 niños en alerta a los 3 meses' }))
+      .toHaveAttribute('href', '/ninos?desenlace=talla_baja_12m_desde_3m&percentil_min=90')
+  })
+
+  it('con un grupo filtrado no enlaza a la lista de Niños, que no filtra por grupo', async () => {
+    api('experto')
+    montar('/')
+    const panel = (await screen.findByRole('heading', { name: 'Niños del grupo con más riesgo' })).closest('section')!
+    expect(within(panel).queryByRole('link', { name: /Ver los .* niños en alerta/ })).toBeNull()
   })
 
   it('para quien no ve niños individuales (ninos nulo) la tabla no aparece', async () => {
@@ -340,6 +357,33 @@ describe('vista clínica', () => {
     await screen.findByRole('heading', { name: 'Qué les pasó a los 12 meses' })
     expect(screen.getByRole('link', { name: 'Comparar con otro grupo' })).toHaveAttribute('href', '/comparar?f=sexo%7Clista%7CF')
     expect(screen.getByRole('link', { name: 'Explorar más variables' })).toHaveAttribute('href', '/explorar?f=sexo%7Clista%7CF')
+  })
+})
+
+describe('vista clínica: exportar', () => {
+  it('las filas del CSV traen el grupo, lo observado, el riesgo por visita y el crecimiento, cada cifra con su denominador', () => {
+    const filas = filasDeLaVista(resumen)
+    const de = (seccion: string) => filas.filter((f) => f['Sección'] === seccion).map((f) => `${f.Dato}: ${f.Valor}`)
+    expect(de('Grupo')).toEqual(['Niños elegibles del grupo: 312', 'Niños elegibles en total: 5000', 'Desenlace: Talla baja a los 12 meses', 'Datos al: 2026-06-30'])
+    expect(de('Observado a los 12 meses')).toEqual([
+      'Grupo: % con el desenlace: 18,4', 'Grupo: casos: 41', 'Grupo: niños con dato: 223', 'Grupo: niños sin dato: 89',
+      'Toda la población: % con el desenlace: 11,2', 'Toda la población: casos: 412', 'Toda la población: niños con dato: 3680'])
+    expect(de('Riesgo estimado')).toEqual([
+      'Calculado a las 40 semanas: niños en alerta: 58', 'Calculado a las 40 semanas: niños con riesgo calculado: 290', 'Calculado a las 40 semanas: % en alerta: 20',
+      'Calculado a los 3 meses: niños en alerta: 61', 'Calculado a los 3 meses: niños con riesgo calculado: 268', 'Calculado a los 3 meses: % en alerta: 22,8'])
+    expect(de('Crecimiento: talla para la edad (puntaje z)')).toContain('40 sem: mediana del grupo: -1')
+    expect(de('Crecimiento: talla para la edad (puntaje z)')).toContain('40 sem: niños del grupo con dato: 298')
+    // una visita sin dato del grupo no inventa una mediana
+    expect(de('Crecimiento: talla para la edad (puntaje z)').some((x) => x.startsWith('6 m EC: mediana del grupo'))).toBe(false)
+    // ningún niño individual sale en el archivo
+    expect(JSON.stringify(filas)).not.toContain('S-01633')
+  })
+
+  it('el botón «Exportar» está junto a los enlaces de la página', async () => {
+    api('experto')
+    montar('/')
+    await screen.findByRole('heading', { name: 'Qué les pasó a los 12 meses' })
+    expect(screen.getByRole('button', { name: 'Exportar' })).toHaveAttribute('title', 'Descargar las cifras de esta vista (CSV)')
   })
 })
 

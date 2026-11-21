@@ -140,6 +140,8 @@ class Programador:
     borrar_modelo: BorrarModelo = borrar_en_mlflow
     leer_metricas: LectorMetricas = metricas_en_mlflow
     _purgado: float = field(default=-CADA_PURGAR, repr=False)
+    # la versión del Diccionario que se bajó para la ejecución en curso: viaja a ``maia`` para la trazabilidad
+    _version_diccionario: int | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         self.motor = self.motor or db.motor()
@@ -216,6 +218,7 @@ class Programador:
                     s.commit()
 
         base = self._bajar_diccionario(al_linea) if e.tipo in USAN_DICCIONARIO else None
+        self._version_diccionario = base.version if base is not None else None
         try:
             atender = {'corrida': self._corrida, 'aprobacion': self._aprobacion, 'entrenamiento': self._entrenamiento}
             resultado = atender[e.tipo](e, al_linea)
@@ -280,6 +283,9 @@ class Programador:
     def _entorno(self, e: Ejecucion) -> dict[str, str]:
         env = {k: v for k, v in os.environ.items() if not k.startswith('KMC_')}
         env.update({'MAIA_EJECUCION_ID': str(e.id), 'PYTHONUNBUFFERED': '1'})
+        env.pop('MAIA_DICCIONARIO_VERSION', None)   # nunca la de otra ejecución ni la del entorno
+        if self._version_diccionario is not None:
+            env['MAIA_DICCIONARIO_VERSION'] = str(self._version_diccionario)
         if e.programacion_id:
             env['MAIA_PROGRAMACION_ID'] = str(e.programacion_id)
         # dueño y etiqueta Personal/Oficial en todo lo que se registra: quedan como tags en MLflow (corrida programada

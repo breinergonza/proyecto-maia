@@ -1,6 +1,7 @@
-// Calidad de datos (S9): mediciones dudosas o faltantes que conviene revisar antes de usarlas, no riesgos clínicos. Arriba dos
-// cifras; debajo, la cola de mediciones por revisar con sus filtros y acciones y, al lado, la completitud por visita. Más abajo, en un
-// detalle, cómo se comportan las alertas (por tipo, aciertos frente a la revisión y dónde se concentran).
+// Calidad de datos (S9): mediciones dudosas o faltantes que conviene revisar antes de usarlas, no riesgos clínicos. La ven
+// administración y los expertos clínicos. Arriba tres cifras (por revisar, revisadas este mes y completitud de la talla a los 12
+// meses); debajo, la cola de mediciones por revisar con sus filtros y acciones y, al lado, la completitud por visita. Más abajo,
+// en un detalle, cómo se comportan las alertas (por tipo, aciertos frente a la revisión y dónde se concentran).
 import { ChevronDown } from 'lucide-react'
 import { useState } from 'react'
 import { useResumenCalidad, type ResumenCalidad } from '../api/calidad'
@@ -9,14 +10,27 @@ import { CompletitudPorVisita } from '../components/calidad/CompletitudPorVisita
 import { MedidasDeRevision } from '../components/calidad/MedidasDeRevision'
 import { ErrorConReintento } from '../components/ErrorConReintento'
 import { Cargando, Encabezado } from '../components/ui'
-import { num } from '../lib/formato'
+import { num, pct } from '../lib/formato'
+
+function Cifra({ valor, texto, titulo }: { valor: string; texto: string; titulo?: string }) {
+  return (
+    <p className="flex items-baseline gap-2" title={titulo}>
+      <b className="text-3xl font-bold tracking-tight text-teal">{valor}</b><span className="text-sm text-salvia">{texto}</span>
+    </p>
+  )
+}
 
 function Cifras({ r }: { r: ResumenCalidad }) {
-  // la completitud a los 12 meses ya está en su celda de «Completitud por visita»: aquí no se repite
+  // la tercera cifra es la barra de 12 meses de «Completitud por visita»; sin esa visita no hay cifra que mostrar
+  const doce = r.completitud.etapas.find((e) => e.a_12_meses)
   return (
-    <section aria-label="Cifras de calidad de datos" className="mb-3 flex flex-wrap items-baseline gap-x-8 gap-y-1">
-      <p className="flex items-baseline gap-2"><b className="text-2xl font-bold tracking-tight text-teal">{num(r.por_revisar)}</b><span className="text-sm text-salvia">mediciones por revisar</span></p>
-      <p className="flex items-baseline gap-2"><b className="text-2xl font-bold tracking-tight text-teal">{num(r.revisadas_mes)}</b><span className="text-sm text-salvia">revisadas este mes</span></p>
+    <section aria-label="Cifras de calidad de datos" className="mb-3 flex flex-wrap items-baseline gap-x-10 gap-y-1">
+      <Cifra valor={num(r.por_revisar)} texto="mediciones por revisar" />
+      <Cifra valor={num(r.revisadas_mes)} texto="revisadas este mes" />
+      {doce && (
+        <Cifra valor={pct(doce.pct)} texto="completitud a los 12 meses"
+          titulo={`${num(doce.con_dato)} de ${num(doce.elegibles)} niños elegibles tienen talla medida a los 12 meses`} />
+      )}
     </section>
   )
 }

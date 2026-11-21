@@ -270,6 +270,9 @@ def test_ninos_y_linea_temporal(cliente, admin, corrida):
     # la versión del modelo clínico con que se calcularon sus riesgos (la de la corrida)
     assert lt['modelo_clinico'] and lt['modelo_clinico'] == corrida['modelo_clinico']
     assert all(lt['visitas'][i]['orden'] <= lt['visitas'][i + 1]['orden'] for i in range(len(lt['visitas']) - 1))
+    # el encabezado de la ficha: el sexo en palabras y el peso al nacer con la unidad en que se registró
+    assert lt['sexo'] in ('Femenino', 'Masculino')
+    assert float(lt['peso_nacer']['valor']) > 0 and lt['peso_nacer']['unidad'] == 'g'
     assert cliente.get('/api/ninos/no-existe/linea-temporal', headers=admin).status_code == 404
     if r['items'][0]['percentil_max'] is not None:
         filtrado = cliente.get('/api/ninos', headers=admin, params={'percentil_min': 90}).json()
@@ -386,7 +389,7 @@ def test_perfil_un_valor_por_nino_y_sin_codigos_de_no_se_hizo(cliente, admin, co
 
 def test_revision(cliente, admin, corrida):
     experta = _login(cliente, 'experta@maia.prueba', 'clave-larga-123')
-    assert cliente.get('/api/revision/datos', headers=experta).status_code == 403   # la calidad de datos es de la administración
+    assert cliente.get('/api/revision/datos', headers=experta).status_code == 200   # la calidad de datos también es de los expertos
     cola = cliente.get('/api/revision/datos', headers=admin).json()
     if cola['items']:
         a = cola['items'][0]
