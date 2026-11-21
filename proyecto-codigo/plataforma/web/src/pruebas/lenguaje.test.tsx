@@ -212,10 +212,10 @@ describe('pantallas del equipo clínico sin términos técnicos', () => {
     expect(screen.getByText(/Valor muy distinto al de los demás niños; la fecha no corresponde a esta visita/)).toBeInTheDocument()
     expect(screen.getByText('Peso al nacer: 769')).toBeInTheDocument()
     expect(screen.getByText('Nació después del cambio de sistema 2022')).toBeInTheDocument()
-    expect(screen.getByText(/También suben el riesgo: Talla a 40 sem\./)).toBeInTheDocument()   // no entre lo que sube por su valor
+    expect(screen.getByText(/Talla a 40 sem\. También suben el riesgo\./)).toBeInTheDocument()   // en su propia línea, no entre lo que sube por su valor
     expect(visible()).toMatch(/Probabilidad estimada: 41,0 % · promedio de los niños: 12,0 %/)
     expect(visible()).toMatch(/Nació a las 31 semanas de gestación/)   // sin «31,0»
-    expect(await screen.findByText('Readmisión', { selector: 'h3' })).toBeInTheDocument()   // riesgo en cada visita, por familia
+    expect(await screen.findByText('Readmisión entre los 3 y los 6 meses', { selector: 'h3' })).toBeInTheDocument()   // riesgo en cada visita, por desenlace
     expect(await screen.findByText(/40 de cada 100 niños tienen menos/)).toBeInTheDocument()   // perfil al nacer
     expect(screen.getByText('31 semanas', { selector: 'strong' })).toBeInTheDocument()
     expect(screen.getByText('Sin dato')).toBeInTheDocument()

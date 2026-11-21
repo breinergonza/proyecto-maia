@@ -187,17 +187,35 @@ Al pulsar el nombre de una columna, la lista se ordena por ella; un segundo clic
 Se abre al pulsar el código de un niño en **Niños**, en **Datos por revisar** o en un correo de aviso. **Todos los
 niños** vuelve a la lista.
 
-* **Encabezado:** «Niño …», semanas de gestación al nacer, año de nacimiento, grupo y fecha de los datos. A la derecha,
-  el botón **Imprimir ficha** abre la impresión del navegador (o permite guardar en PDF). La hoja sale solo con el
-  contenido del niño, en blanco y negro, sin menú ni botones y con la frase «Apoyo a la decisión, no diagnóstico» al pie.
-  Imprima solo donde la Fundación lo autorice (ver [Privacidad](#privacidad)).
-* **Tarjetas de riesgo** (si tiene riesgo calculado), una por desenlace:
-  * Grande, **«N de 10»**: de cada 10 niños, cuántos tienen menos riesgo. Si es alto, borde coral y la marca
-    **Riesgo alto** o **Riesgo muy alto**. Al pasar el mouse se ve la posición técnica.
-  * «Calculado con lo medido hasta …»: la visita cuyos datos se usaron.
-  * **Riesgo estimado:** la probabilidad que calcula el modelo, en porcentaje.
-  * **Lo que más pesó:** los motivos que más influyeron en el riesgo de ese niño (por ejemplo, «Días en UCI: 20» o
-    «Nació después del cambio de sistema 2022»).
+* **Encabezado:** «Niño …», semanas de gestación al nacer, año de nacimiento, la sede («Sede 1») y fecha de los datos;
+  lo que no se conoce no se menciona. A la derecha, el botón **Imprimir ficha** abre la impresión del navegador (o
+  permite guardar en PDF). La hoja sale con el contenido de todas las pestañas del niño, en blanco y negro, sin menú ni
+  botones y con la frase «Apoyo a la decisión, no diagnóstico» al pie. Imprima solo donde la Fundación lo autorice (ver
+  [Privacidad](#privacidad)).
+* **Pestañas:** **Desenlaces**, **Crecimiento**, **Frente a los demás niños** y **Visitas** (solo aparecen las que
+  tienen algo que mostrar). La ficha abre en **Desenlaces** si el niño tiene algún riesgo calculado; si no, en la primera
+  pestaña con contenido. Las direcciones antiguas que abrían un desenlace (`?ver=riesgo-…` u `?ver=otros`) también
+  llevan a **Desenlaces**.
+* **Desenlaces:** todos los desenlaces del niño en una lista y, al lado, el detalle del que se elige (el de más riesgo
+  abre elegido; el elegido queda en la dirección, `?desenlace=`). En el teléfono, la lista va sobre el detalle.
+  * **La lista** dice, de cada desenlace, su riesgo más reciente, cómo queda frente a los demás niños («Más que N de
+    10», y además «Alto» o «Muy alto» en coral cuando lo es), cuánto cambió frente a la visita anterior («Subió 13
+    puntos») y **En prueba** si todavía no da alertas. Cada desenlace sale una sola vez. Los
+    desenlaces sin riesgo calculado van aparte, bajo **Sin riesgo calculado**, con una línea que dice por qué (por
+    ejemplo, «Aún no hay datos de la visita de 3 meses»).
+  * **Los desenlaces a 12 meses** (talla baja y desarrollo psicomotor bajo) muestran el riesgo del niño con lo medido
+    hasta cada visita (40 semanas, 3 meses, …), con el cambio de una visita a otra y, desde tres visitas, una gráfica de
+    evolución. **Ver como tabla** y **CSV** traen los mismos datos. Al pie dice cómo se calculó (modelo, entrenamiento y
+    con qué niños se calibró).
+  * **Los demás desenlaces** muestran su tarjeta de riesgo y cómo cambió su posición en cada visita:
+    * Grande, **«N de 10»**: de cada 10 niños, cuántos tienen menos riesgo. Si es alto, borde coral y la marca
+      **Riesgo alto** o **Riesgo muy alto**. Al pasar el mouse se ve la posición técnica.
+    * «Calculado con lo medido hasta …»: la visita cuyos datos se usaron.
+    * **Probabilidad estimada:** la probabilidad que calcula el modelo, en porcentaje.
+  * **Lo que más pesó** y **Datos que faltan:** los rótulos solo salen con algo debajo. **Lo que más pesó** lista los
+    datos que subieron el riesgo (por ejemplo, «Días en UCI: 20»). **Datos que faltan** es una línea aparte: dice qué
+    datos no se midieron, que también suben el riesgo, y que conviene registrarlos si se midieron. Si ningún dato subió el
+    riesgo de forma notable, la ficha lo dice en una frase.
 * **Crecimiento frente a la OMS:** gráfica de cada medida frente a la OMS según la edad corregida. La línea en 0 es lo
   esperado para la edad; la franja ocre es la zona **baja para la edad**. Al pasar el mouse sobre un punto se ve cómo
   quedó («Bajo para la edad», «En el rango esperado») y su puntaje z. Los puntos que la OMS considera improbables no
@@ -663,6 +681,8 @@ nunca como un diagnóstico.
 
 Los factores que más influyeron en el cálculo de ese niño. Explican el número, pero no prueban una causa. «Nació después
 del cambio de sistema 2022» quiere decir que sus datos se registraron con el sistema nuevo.
+Si un dato no se midió y su falta también sube el riesgo, no va en esta lista: sale en su propia línea, **Datos que
+faltan**, para que no parezca un dato medido. Si nada subió el riesgo de forma notable, la ficha lo dice en una frase.
 
 ### Tipos de alerta (capas del modelo de anomalías)
 

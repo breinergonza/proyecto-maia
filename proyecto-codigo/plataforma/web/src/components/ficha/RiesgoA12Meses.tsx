@@ -2,7 +2,8 @@
 // medido hasta cada visita a la que fue (40 semanas, 3 meses, ...), lo que más pesó en cada una y cuánto cambió al sumar la
 // visita. La usan la ficha del niño y «Calcular un niño»; cada columna sale de la misma consulta del servidor, que no usa
 // datos de visitas posteriores. «Cómo se calculó» (modelo, entrenamiento, calibración) sale una vez al pie de la sección: el
-// modelo es el mismo para todos los desenlaces; cada uno dice su visita («Calculado a …») y si está «En prueba».
+// modelo es el mismo para todos los desenlaces; cada uno dice su visita («Calculado a …») y si está «En prueba». Ningún rótulo
+// sale sin contenido propio: «Lo que más pesó» solo con algo debajo y los datos que faltan en su propia línea.
 import { ArrowDown, ArrowUp, Minus } from 'lucide-react'
 import { type ReactNode, useId, useState } from 'react'
 import type { RiesgoPorCorte } from '../../api/ninos'
@@ -11,7 +12,7 @@ import { aCsv, descargar, nombreArchivo, type FilaCsv } from '../../lib/exportar
 import { type ColumnaDeRiesgo, type FamiliaDelNino, familiasDelNino, fraseCalibrada, razonSinRiesgo, sinFamilia, textoPorcentaje } from '../../lib/familias'
 import { fecha, RIESGO_ALTO } from '../../lib/formato'
 import { AYUDA_MOTIVOS, ayudaPosicion, frenteDemas, motivosRiesgo, nivelAlto } from '../../lib/lenguaje'
-import { EnPrueba } from '../ficha'
+import { DatosQueFaltan, EnPrueba } from '../ficha'
 import { MiniSerie, type PuntoSerie } from '../graficos'
 import { Aviso, Boton, Cargando, Insignia, Panel, Tabla } from '../ui'
 
@@ -81,7 +82,18 @@ const textoDePestana = (nombre: string) => {
   return corto.charAt(0).toUpperCase() + corto.slice(1)
 }
 
-function Familia({ f, intro }: { f: FamiliaDelNino; intro?: string }) {
+/** Un desenlace a 12 meses de la pestaña «Desenlaces» de la ficha: su tarjeta con una columna por visita y, al pie, cómo se calculó.
+ * Va en una columna más angosta que la página entera, así que la gráfica de evolución pasa al costado solo en pantallas muy anchas. */
+export function DetalleDe12Meses({ f, historia }: { f: FamiliaDelNino; historia: RiesgoPorCorte }) {
+  return (
+    <div className="space-y-3">
+      <Familia f={f} intro={INTRO} enColumna />
+      <ComoSeCalculo familias={[f]} historia={historia} sinIntro />
+    </div>
+  )
+}
+
+function Familia({ f, intro, enColumna }: { f: FamiliaDelNino; intro?: string; enColumna?: boolean }) {
   const { familia, columnas, sinRiesgo } = f
   const [tabla, setTabla] = useState(false)
   const ultima = columnas[columnas.length - 1]
@@ -94,7 +106,8 @@ function Familia({ f, intro }: { f: FamiliaDelNino; intro?: string }) {
   const filas = columnas.map(filaDe)
   const nombreCsv = `riesgo-${familia.clave}`
   return (
-    <Panel titulo={titulo} descripcion={[familia.definicion, intro].filter(Boolean).join(' ') || null}
+    // «Cada columna es…» solo se explica si hay columnas
+    <Panel titulo={titulo} descripcion={[familia.definicion, columnas.length > 0 ? intro : null].filter(Boolean).join(' ') || null}
       accion={columnas.length > 0 && (
         <span className="no-imprimir flex flex-wrap items-center gap-2">
           <Boton variante={tabla ? 'primario' : 'secundario'} chico aria-pressed={tabla} onClick={() => setTabla(!tabla)}>Ver como tabla</Boton>
@@ -113,9 +126,11 @@ function Familia({ f, intro }: { f: FamiliaDelNino; intro?: string }) {
         <>
           {/* con tres columnas la gráfica de evolución cabe a su derecha; con más, va debajo. Con dos sería una raya entre dos
               puntos: las columnas ya dicen el cambio */}
-          <div className={cn(columnas.length === 3 && 'lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] lg:gap-4')}>
+          <div className={cn(columnas.length === 3 && (enColumna
+            ? '2xl:grid 2xl:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] 2xl:gap-4'
+            : 'lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] lg:gap-4'))}>
             <Columnas columnas={columnas} enUso={familia.estado === 'en_uso'} />
-            {columnas.length >= 3 && <Evolucion columnas={columnas} nombre={familia.nombre} aLaDerecha={columnas.length === 3} />}
+            {columnas.length >= 3 && <Evolucion columnas={columnas} nombre={familia.nombre} aLaDerecha={columnas.length === 3} enColumna={enColumna} />}
           </div>
           <Razones cortes={sinRiesgo} />
         </>
@@ -146,11 +161,16 @@ function Columnas({ columnas, enUso }: { columnas: ColumnaDeRiesgo[]; enUso: boo
             {nivelAlto(punto.percentil) && <Insignia tono="coral" className="mt-1">{nivelAlto(punto.percentil)}</Insignia>}
             {cambio && <Cambio c={cambio} />}
             {punto.motivos && (
-              <div className="mt-3">
-                <p className="text-sm font-semibold" title={AYUDA_MOTIVOS}>Lo que más pesó</p>
-                {suben.length > 0 && <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm">{suben.map((m) => <li key={m}>{m}</li>)}</ul>}
-                {faltan.length > 0 && <p className="mt-1 text-sm"><strong>Datos que faltan:</strong> {faltan.join(', ')}</p>}
-                {suben.length === 0 && faltan.length === 0 && <p className="mt-1 text-sm">Ningún dato subió el riesgo de forma notable.</p>}
+              <div className="mt-3 space-y-1 text-sm">
+                {/* el rótulo solo sale con algo debajo; los datos que faltan son su propia línea, no lo que más pesó */}
+                {suben.length > 0 && (
+                  <div>
+                    <p className="font-semibold" title={AYUDA_MOTIVOS}>Lo que más pesó</p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-5">{suben.map((m) => <li key={m}>{m}</li>)}</ul>
+                  </div>
+                )}
+                <DatosQueFaltan faltan={faltan} />
+                {suben.length === 0 && faltan.length === 0 && <p>Ningún dato subió el riesgo de forma notable.</p>}
               </div>
             )}
           </li>
@@ -171,14 +191,14 @@ function Cambio({ c }: { c: NonNullable<ColumnaDeRiesgo['cambio']> }) {
 }
 
 /** Cómo fue cambiando el riesgo de visita en visita. La tabla de «Ver como tabla» trae los mismos datos. */
-function Evolucion({ columnas, nombre, aLaDerecha }: { columnas: ColumnaDeRiesgo[]; nombre: string; aLaDerecha: boolean }) {
+function Evolucion({ columnas, nombre, aLaDerecha, enColumna }: { columnas: ColumnaDeRiesgo[]; nombre: string; aLaDerecha: boolean; enColumna?: boolean }) {
   const ordenes = columnas.map((c) => c.corte.orden)
   const dominioX: [number, number] = ordenes.length > 1 ? [ordenes[0], ordenes[ordenes.length - 1]] : [ordenes[0] - 0.5, ordenes[0] + 0.5]
   const techo = Math.min(100, Math.max(10, Math.ceil((100 * Math.max(...columnas.map((c) => c.punto.riesgo))) / 10) * 10))
   const nombres = new Map(columnas.map((c) => [c.corte.orden, c.corte.momento_nombre]))
   return (
-    <div className={cn('mt-4', aLaDerecha && 'lg:mt-0')}>
-      {aLaDerecha && <p className="mb-1 hidden text-sm font-semibold lg:block">Cómo cambió el riesgo</p>}
+    <div className={cn('mt-4', aLaDerecha && (enColumna ? '2xl:mt-0' : 'lg:mt-0'))}>
+      {aLaDerecha && <p className={cn('mb-1 hidden text-sm font-semibold', enColumna ? '2xl:block' : 'lg:block')}>Cómo cambió el riesgo</p>}
       <MiniSerie
         alto={aLaDerecha ? 170 : 120}
         etiqueta={`Riesgo de ${nombre} por visita: ${columnas.map((c) => `${c.corte.momento_nombre}, ${textoPorcentaje(c.punto.riesgo)}`).join('; ')}`}

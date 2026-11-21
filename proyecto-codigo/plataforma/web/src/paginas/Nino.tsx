@@ -1,22 +1,24 @@
-// La historia de un niño: su identidad arriba y, debajo, una pestaña por pregunta: el riesgo a 12 meses de cada desenlace
-// visita por visita, los otros riesgos, su crecimiento frente a la OMS, cómo nació frente a los demás niños y sus visitas con
-// lo que se midió en cada una. Cada pestaña cabe en una pantalla de escritorio; al imprimir salen todas.
+// La historia de un niño: su identidad arriba y, debajo, una pestaña por pregunta: todos sus desenlaces (los de 12 meses visita
+// por visita y los demás con su riesgo calculado), su crecimiento frente a la OMS, cómo nació frente a los demás niños y sus
+// visitas con lo que se midió en cada una. Abre en «Desenlaces» si el niño tiene algún riesgo y, si no, en la primera pestaña
+// con algo que mostrar; ninguna pestaña ni rótulo sale vacío. Cada pestaña cabe en una pantalla de escritorio; al imprimir
+// salen todas.
 import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import { ArrowLeft, Printer } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useParams, useSearchParams } from 'react-router'
 import { pedir } from '../api/cliente'
 import { historiaPorCorte, type RiesgoPorCorte } from '../api/ninos'
 import type { AlertaDato, HistoriaRiesgo, LineaTemporal, PerfilNino, Visita } from '../api/tipos'
-import { CrecimientoOms, familiasSinExcluidas, PerfilCohorte, PerfilDelNino, TarjetaRiesgo, TrayectoriaRiesgo, useHistoriaRiesgo, usePerfilCohorte } from '../components/ficha'
+import { CrecimientoOms, PerfilCohorte, PerfilDelNino, useHistoriaRiesgo, usePerfilCohorte } from '../components/ficha'
+import { Desenlaces, desenlacesDelNino, hayRiesgo, type TarjetaConVisita } from '../components/ficha/Desenlaces'
 import { PanelesPestana, Pestanas, usePestanaEnUrl } from '../components/ui/Pestanas'
-import { seccionesDeRiesgo } from '../components/ficha/RiesgoA12Meses'
 import { Boton, Cargando, Insignia, Panel, Tabla, Vacio } from '../components/ui'
 import { ErrorConReintento } from '../components/ErrorConReintento'
 import { cn } from '../lib/cn'
-import { estadoDe, familiaDe, familiasConRiesgo } from '../lib/familias'
+import { desenlaceDeUrlAntigua } from '../lib/familias'
 import { aproximado, dec, edad, fecha, indicador, RIESGO_ALTO } from '../lib/formato'
-import { alerta, AYUDA_DOS_CIFRAS, AYUDA_OMS, ayudaAlerta, ayudaZ, datosAl, frenteOms, motivo } from '../lib/lenguaje'
+import { alerta, AYUDA_OMS, ayudaAlerta, ayudaZ, datosAl, frenteOms, motivo } from '../lib/lenguaje'
 
 export default function Nino() {
   const { sujeto = '' } = useParams()
@@ -40,28 +42,17 @@ function Ficha({ n, historia, trayectoria, perfil }: {
   const [elegida, setElegida] = useState<string | null>(null)
   const inicial = (n.visitas.find((x) => x.riesgos.length) ?? n.visitas.find((x) => x.alertas_dato.length) ?? n.visitas[n.visitas.length - 1])?.etapa ?? null
   const visita = n.visitas.find((v) => v.etapa === (elegida ?? inicial))
-  // lo que «Riesgo a los 12 meses» ya cuenta visita por visita no se repite en una tarjeta de la última visita
-  const enSeccion = familiasConRiesgo(historia.data)
-  const riesgos = n.visitas.flatMap((v) => v.riesgos.map((r) => ({ ...r, visita: v.nombre }))).filter((r) => !enSeccion.has(familiaDe(r.clave)))
-  const hayTrayectoria = familiasSinExcluidas(trayectoria?.puntos, enSeccion).length > 0
+  // todos los desenlaces del niño: los de 12 meses visita por visita y los demás con su tarjeta de la última visita y su evolución
+  const tarjetas: TarjetaConVisita[] = n.visitas.flatMap((v) => v.riesgos.map((r) => ({ ...r, visita: v.nombre })))
+  const desenlaces = desenlacesDelNino({ historia: historia.data, trayectoria, riesgos: tarjetas })
   const conCrecimiento = Object.values(n.crecimiento).some((ps) => ps.length > 0)
   const conPerfil = n.perfil != null || (perfil?.variables?.length ?? 0) > 0
 
+  // mientras se piden o si fallan, la pestaña dice qué pasa; con una API anterior (sin las familias) y sin otros riesgos, no hay
+  const conDesenlaces = historia.isPending || historia.error != null || desenlaces.length > 0
   const secciones = [
-    ...seccionesDeRiesgo({ historia: historia.data, cargando: historia.isPending, error: historia.error, reintentar: () => { void historia.refetch() } }),
-    ...(riesgos.length > 0 || hayTrayectoria ? [{ clave: 'otros', texto: 'Otros riesgos', contenido: (
-      <div className={cn('grid grid-cols-1 items-start gap-4', riesgos.length > 0 && hayTrayectoria && 'xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]')}>
-        {riesgos.length > 0 && (
-          <section aria-label="Riesgo calculado" className="space-y-3">
-            <p className="text-sm">{AYUDA_DOS_CIFRAS}</p>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-1">
-              {riesgos.map((r) => <TarjetaRiesgo key={r.id} r={r} nota={`Calculado con lo medido hasta ${r.visita}`}
-                origen={{ estado: estadoDe(r.clave), version: n.modelo_clinico }} />)}
-            </div>
-          </section>
-        )}
-        <TrayectoriaRiesgo sujeto={n.sujeto} excluir={enSeccion} grilla="sm:grid-cols-2" />
-      </div>
+    ...(conDesenlaces ? [{ clave: 'desenlaces', texto: 'Desenlaces', contenido: (
+      <Desenlaces sujeto={n.sujeto} historia={historia} desenlaces={desenlaces} modeloClinico={n.modelo_clinico} />
     ) }] : []),
     ...(conCrecimiento ? [{ clave: 'crecimiento', texto: 'Crecimiento', contenido: <CrecimientoOms crecimiento={n.crecimiento} grilla="sm:grid-cols-3" /> }] : []),
     ...(conPerfil ? [{ clave: 'perfil', texto: 'Frente a los demás niños', contenido: (
@@ -72,18 +63,20 @@ function Ficha({ n, historia, trayectoria, perfil }: {
     ) }] : []),
     { clave: 'visitas', texto: 'Visitas', contenido: <PanelVisitas n={n} visita={visita} elegir={setElegida} /> },
   ]
-  const [activa, elegirPestana] = usePestanaEnUrl('ver', secciones.map((s) => s.clave))
+  // abre en la primera pestaña con algo que mostrar: «Desenlaces» solo si hay riesgo (o se está pidiendo); si no, queda al final
+  // (sigue ahí para ver por qué no hay riesgo). Las direcciones de antes (`?ver=riesgo-…`, `?ver=otros`) también abren «Desenlaces».
+  const [params] = useSearchParams()
+  const sinRiesgo = !historia.isPending && historia.error == null && !hayRiesgo(desenlaces)
+  const esAntigua = desenlaceDeUrlAntigua(params.get('ver'), desenlaces.map((d) => d.resumen.clave), undefined) != null
+  const claves = secciones.map((s) => s.clave)
+  const [activa, elegirPestana] = usePestanaEnUrl('ver', conDesenlaces && sinRiesgo && !esAntigua ? [...claves.filter((c) => c !== 'desenlaces'), 'desenlaces'] : claves)
 
   return (
     <div className="flex flex-col lg:h-full">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
         <div>
           <h1>Niño {n.sujeto}</h1>
-          <p className="mt-1 text-salvia">
-            {n.eg_semanas != null && <>Nació a las {dec(n.eg_semanas)} semanas de gestación</>}
-            {n.anio_nacimiento && <>, en {n.anio_nacimiento}</>}
-            {n.grupo && <>. Grupo {n.grupo}</>}. {datosAl(n.corte)}.
-          </p>
+          <p className="mt-1 text-salvia">{subtitulo(n)}</p>
         </div>
         <div className="no-imprimir flex flex-wrap items-center gap-x-4 gap-y-2">
           <Link to="/ninos" className="inline-flex items-center gap-1 text-sm text-teal hover:underline">
@@ -104,6 +97,14 @@ function Ficha({ n, historia, trayectoria, perfil }: {
       </p>
     </div>
   )
+}
+
+/** Cómo nació y dónde se atiende, en frases que no quedan sueltas cuando falta un dato. El grupo del niño es su sede. */
+function subtitulo(n: LineaTemporal) {
+  const nacio = n.eg_semanas != null ? `Nació a las ${dec(n.eg_semanas)} semanas de gestación` : null
+  const anio = n.anio_nacimiento ? (nacio ? `en ${n.anio_nacimiento}` : `Nació en ${n.anio_nacimiento}`) : null
+  const nacimiento = [nacio, anio].filter((x) => x != null).join(', ')
+  return `${[nacimiento || null, n.grupo ? `Sede ${n.grupo}` : null, datosAl(n.corte)].filter((f) => f != null).join('. ')}.`
 }
 
 /** Las visitas del niño y lo que se midió en la elegida. Con pocas mediciones la tarjeta mide lo que su contenido; con muchas se
@@ -185,8 +186,10 @@ function rango(a: AlertaDato) {
 function DetalleVisita({ visita }: { visita: Visita }) {
   const alertas = new Map(visita.alertas_dato.map((a) => [a.variable, a]))
   const z = Object.entries(visita.z).filter(([, v]) => v != null)
+  // la columna de la derecha solo existe si tiene algo: sin ella, las mediciones usan todo el ancho
+  const conLado = z.length > 0 || visita.alertas_dato.length > 0
   return (
-    <div className="mt-4 grid grid-cols-1 gap-5 border-t border-linea pt-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+    <div className={cn('mt-4 grid grid-cols-1 gap-5 border-t border-linea pt-4', conLado && 'lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]')}>
       <div>
         <h3>{visita.nombre}: lo que se midió</h3>
         <p className="mb-3 text-sm text-salvia">{fecha(visita.fecha)}{visita.edad_corregida != null && ` · ${edad(visita.edad_corregida)} de edad corregida`}</p>
@@ -218,7 +221,7 @@ function DetalleVisita({ visita }: { visita: Visita }) {
           </Tabla>
         )}
       </div>
-      <div className="space-y-5">
+      {conLado && <div className="space-y-5">
         {z.length > 0 && (
           <div>
             <h3 className="mb-2" title={AYUDA_OMS}>Frente a la OMS</h3>
@@ -247,7 +250,7 @@ function DetalleVisita({ visita }: { visita: Visita }) {
             </ul>
           </div>
         )}
-      </div>
+      </div>}
     </div>
   )
 }

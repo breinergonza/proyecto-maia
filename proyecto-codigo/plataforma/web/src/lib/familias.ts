@@ -3,6 +3,7 @@
 // es de la familia ``<familia>``; una clave sin ``_desde_`` es su propia familia. Aquí también se arma lo que la ficha dice de
 // cada familia: una columna por visita con riesgo y el cambio frente a la visita anterior.
 import type { CorteDeFamilia, EstadoDesenlace, FamiliaDelPaquete, MotivoSinRiesgo, PuntoPorCorte, RiesgoPorCorte } from '../api/ninos'
+import { frase, riesgo as textoRiesgo } from './formato'
 
 /** Los desenlaces a 12 meses que se presentan primero, en este orden. */
 export const FAMILIAS_PRIORIZADAS = ['talla_baja_12m', 'desarrollo_12m'] as const
@@ -130,4 +131,86 @@ export function fraseCalibrada(riesgo: number, desenlace: string, enUso: boolean
   return n < 1
     ? `De cada 100 niños con un riesgo menor de 1 %, menos de 1 tuvo ${desenlace}.`
     : `De cada 100 niños con un riesgo de ${n} %, unos ${n} tuvieron ${desenlace}.`
+}
+
+// ------------------------------------------------------------------ todos los desenlaces del niño (pestaña «Desenlaces»)
+
+/** Lo que dice la lista de «Desenlaces» de cada uno: su riesgo más reciente, cuánto cambió y, si no hay riesgo, por qué. */
+export interface ResumenDeDesenlace {
+  clave: string
+  /** Con mayúscula inicial, como se lee en la lista. */
+  nombre: string
+  riesgo: { texto: string; percentil: number } | null
+  /** Frente a la visita anterior con riesgo; null si solo hay una. */
+  cambio: CambioDeRiesgo | null
+  enPrueba: boolean
+  /** Una frase que dice por qué no hay riesgo; solo si no lo hay. */
+  sinRiesgo: string | null
+}
+
+/** Lo que se dice de un desenlace sin riesgo cuando la API no da una razón por visita. */
+const SIN_RIESGO_GENERAL = 'No hay riesgo calculado para este niño en este desenlace.'
+
+export const resumenDeFamilia = (f: FamiliaDelNino): ResumenDeDesenlace => {
+  const ultima = f.columnas[f.columnas.length - 1]
+  const razon = f.sinRiesgo[f.sinRiesgo.length - 1]
+  return {
+    clave: f.familia.clave,
+    nombre: frase(f.familia.nombre),
+    riesgo: ultima ? { texto: textoPorcentaje(ultima.punto.riesgo), percentil: ultima.punto.percentil } : null,
+    cambio: ultima?.cambio ?? null,
+    enPrueba: f.familia.estado === 'en_prueba' || ultima?.corte.estado === 'en_prueba',
+    sinRiesgo: ultima ? null : razon ? razonSinRiesgo(razon) : SIN_RIESGO_GENERAL,
+  }
+}
+
+/** Una priorizada que el paquete activo no calcula: se lista con su razón, no se esconde. */
+export const resumenDeAusente = (a: FamiliaAusente): ResumenDeDesenlace =>
+  ({ clave: a.clave, nombre: frase(a.nombre), riesgo: null, cambio: null, enPrueba: false, sinRiesgo: sinFamilia(a.nombre) })
+
+/** El riesgo de un desenlace que no es de 12 meses (la clave es la de `familiaDe`: el desenlace con su ventana) en cada visita,
+ * de la más antigua a la más reciente, y la tarjeta de su última visita si la hay. */
+export interface SerieDeRiesgo {
+  clave: string
+  nombre: string
+  puntos: { clave: string; riesgo: number; percentil: number; momento_nombre: string }[]
+  /** La tarjeta más reciente del modelo en uso: la que da alertas, con la que se encabeza el desenlace. */
+  tarjeta?: { clave: string; riesgo: number; percentil: number }
+}
+
+/** El desenlace se encabeza con la tarjeta de su modelo en uso; sin ella, con el último punto de su evolución (y «En prueba» si
+ * ese modelo lo está). El cambio es frente al punto anterior al que encabeza. */
+export function resumenDeSerie(s: SerieDeRiesgo): ResumenDeDesenlace {
+  const cabeza = s.tarjeta ?? s.puntos[s.puntos.length - 1]
+  const base = { clave: s.clave, nombre: frase(s.nombre) }
+  if (!cabeza) return { ...base, riesgo: null, cambio: null, enPrueba: false, sinRiesgo: SIN_RIESGO_GENERAL }
+  const i = s.puntos.findIndex((p) => p.clave === cabeza.clave)
+  const punto = s.puntos[i]
+  const anterior = s.puntos[i - 1]
+  return {
+    ...base,
+    riesgo: { texto: textoRiesgo(cabeza.riesgo), percentil: cabeza.percentil },
+    cambio: punto && anterior ? cambioDeRiesgo(anterior.riesgo, cabeza.riesgo, punto.momento_nombre) : null,
+    enPrueba: estadoDe(cabeza.clave) === 'en_prueba',
+    sinRiesgo: null,
+  }
+}
+
+/** Primero los de más riesgo frente a los demás niños y, al final, los que no tienen riesgo; los empates conservan su orden. */
+export const ordenarPorRiesgo = <T,>(desenlaces: readonly T[], resumen: (d: T) => ResumenDeDesenlace): T[] =>
+  [...desenlaces].sort((a, b) => (resumen(b).riesgo?.percentil ?? -1) - (resumen(a).riesgo?.percentil ?? -1))
+
+/** El cambio dicho para la lista, sin la visita: «Subió 13 puntos». */
+export const cambioCorto = (c: CambioDeRiesgo) =>
+  c.sentido === 'igual' ? 'Sin cambio' : `${c.sentido === 'subio' ? 'Subió' : 'Bajó'} ${c.puntos} ${c.puntos === 1 ? 'punto' : 'puntos'}`
+
+/** Las direcciones de antes (`?ver=riesgo-<familia>`, `?ver=riesgo`, `?ver=otros` y `?ver=<familia>`) eran pestañas por familia;
+ * ahora todas son «Desenlaces». Devuelve null si `ver` no es una de ellas; si lo es, el desenlace que nombraba (si existe). */
+export function desenlaceDeUrlAntigua(ver: string | null, claves: readonly string[], primeroDeLosOtros: string | undefined): { desenlace: string | undefined } | null {
+  if (ver == null) return null
+  if (ver === 'otros') return { desenlace: primeroDeLosOtros }
+  if (ver === 'riesgo') return { desenlace: undefined }
+  const nombrado = ver.startsWith('riesgo-') ? ver.slice('riesgo-'.length) : ver
+  const clave = claves.find((c) => c === nombrado)
+  return clave != null || ver.startsWith('riesgo-') ? { desenlace: clave } : null
 }

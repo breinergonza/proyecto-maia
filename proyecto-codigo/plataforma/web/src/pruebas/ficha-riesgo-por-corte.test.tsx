@@ -1,5 +1,5 @@
-// La ficha del niño con «Riesgo a los 12 meses, visita por visita» (S7): arriba de las tarjetas, sin repetir lo que ya cuenta,
-// y con una falla de red dicha con reintento.
+// La ficha del niño con «Riesgo a los 12 meses, visita por visita» (S7) dentro de la pestaña «Desenlaces» (S21): sin repetir lo
+// que ya cuenta y con una falla de red dicha con reintento.
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -51,27 +51,25 @@ describe('ficha del niño: riesgo a los 12 meses', () => {
     api(() => ({ cuerpo: historia }), { linea: { ...linea, modelo_clinico: 'f00dcafe12', visitas: [{ ...linea.visitas[0], riesgos: [...linea.visitas[0].riesgos, otra] }] } })
     montar('/ninos/s1')
     const tarjeta = async (nombre: string) => (await screen.findByText(nombre, { selector: 'h2' })).closest('article')!
-    const enUso = await tarjeta('desarrollo psicomotor bajo a los 6 meses')
+    const enUso = await tarjeta('Desarrollo psicomotor bajo a los 6 meses')
     expect(within(enUso).getByText('En uso')).toBeInTheDocument()
     expect(within(enUso).getByText('Modelo clínico f00dcafe12')).toBeInTheDocument()
-    const enPrueba = await tarjeta('desarrollo bajo a los 12 meses (riesgo calculado a 3 m EC)')
+    const enPrueba = await tarjeta('Desarrollo bajo a los 12 meses (riesgo calculado a 3 m EC)')
     expect(within(enPrueba).getByText('En prueba')).toBeInTheDocument()
     expect(within(enPrueba).queryByText('En uso')).not.toBeInTheDocument()
     expect(within(enPrueba).getByText('Modelo clínico f00dcafe12')).toBeInTheDocument()
   })
 
-  it('va arriba de las tarjetas y no las repite', async () => {
+  it('lista el desenlace de 12 meses visita por visita y los demás con su tarjeta, sin repetir la de 12 meses', async () => {
     const llamadas = api(() => ({ cuerpo: historia }))
     montar('/ninos/s1')
-    const seccion = await screen.findByRole('heading', { level: 2, name: 'Riesgo a los 12 meses, visita por visita' })
-    expect(screen.getAllByText(/^Calculado a /)).toHaveLength(2)
+    const lista = await screen.findByRole('list', { name: 'Desenlaces del niño' })
+    expect(within(lista).getAllByRole('button').map((b) => b.getAttribute('data-desenlace'))).toEqual(['talla_baja_12m', 'desarrollo_6m'])
+    expect(screen.getAllByText(/^Calculado a /, { selector: 'h4' })).toHaveLength(2)
     expect(llamadas.some((l) => l.url === '/api/ninos/s1/historia-riesgo?motivos=true')).toBe(true)
-
-    const tarjetas = await screen.findByRole('region', { name: 'Riesgo calculado' })
-    expect(seccion.compareDocumentPosition(tarjetas) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    // la tarjeta de talla baja ya está en la sección; la de otro desenlace sigue
-    expect(within(tarjetas).queryByText('talla baja a los 12 meses (riesgo calculado a 3 m EC)')).not.toBeInTheDocument()
-    expect(within(tarjetas).getByText('desarrollo psicomotor bajo a los 6 meses')).toBeInTheDocument()
+    // la tarjeta de talla baja ya está en su desenlace de 12 meses; la de otro desenlace va en el suyo
+    expect(screen.queryByText('Talla baja a los 12 meses (riesgo calculado a 3 m EC)')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Desarrollo psicomotor bajo a los 6 meses' })).getByText('Desarrollo psicomotor bajo a los 6 meses', { selector: 'h2' })).toBeInTheDocument()
   })
 
   it('una falla de red se dice con un reintento que recupera la sección', async () => {
@@ -90,23 +88,23 @@ describe('ficha del niño: riesgo a los 12 meses', () => {
   it('con una API anterior (sin las familias) la ficha queda como estaba', async () => {
     api(() => ({ cuerpo: { paquete: 'p1', puntos: [] } }))
     montar('/ninos/s1')
-    expect(await screen.findByRole('region', { name: 'Riesgo calculado' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Riesgo a los 12 meses, visita por visita' })).not.toBeInTheDocument()
-    expect(screen.getByText('talla baja a los 12 meses (riesgo calculado a 3 m EC)')).toBeInTheDocument()
+    expect(await screen.findByRole('list', { name: 'Desenlaces del niño' })).toBeInTheDocument()
+    expect(screen.queryByText(/^Calculado a /, { selector: 'h4' })).not.toBeInTheDocument()
+    expect(screen.getByText('Talla baja a los 12 meses (riesgo calculado a 3 m EC)')).toBeInTheDocument()
   })
 
-  it('las pestañas de la ficha llevan al riesgo, al resto de riesgos, al crecimiento y a las visitas, en ese orden', async () => {
+  it('las pestañas de la ficha llevan a los desenlaces, al crecimiento y a las visitas, en ese orden', async () => {
     const z = (edad: number, valor: number) => ({ etapa: '3 m EC', indicador: 'talla', fecha: null, edad_corregida: edad, valor: 50, unidad: 'cm', z: valor, bajo_2de: false, caida_1de: false, improbable: false })
     const conCrecimiento = { ...linea, crecimiento: { talla: [z(10, -0.5), z(60, -1)] } }
     api(() => ({ cuerpo: historia }), { linea: conCrecimiento })
     montar('/ninos/s1')
     const lista = await screen.findByRole('tablist', { name: 'Qué ver de este niño' })
     expect(lista).toHaveClass('no-imprimir')
-    await waitFor(() => expect(within(lista).getAllByRole('tab').map((t) => t.textContent)).toEqual(['Talla baja a 12 meses', 'Otros riesgos', 'Crecimiento', 'Visitas']))
-    // las tarjetas del resto de desenlaces vienen antes que el crecimiento
+    await waitFor(() => expect(within(lista).getAllByRole('tab').map((t) => t.textContent)).toEqual(['Desenlaces', 'Crecimiento', 'Visitas']))
+    // los desenlaces vienen antes que el crecimiento
     const crecimiento = screen.getByRole('heading', { name: 'Crecimiento frente a la OMS' })
-    const tarjetas = await screen.findByRole('region', { name: 'Riesgo calculado' })
-    expect(tarjetas.compareDocumentPosition(crecimiento) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const desenlaces = await screen.findByRole('list', { name: 'Desenlaces del niño' })
+    expect(desenlaces.compareDocumentPosition(crecimiento) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('«Riesgo en cada visita» no repite los desenlaces que la sección de 12 meses ya cuenta', async () => {

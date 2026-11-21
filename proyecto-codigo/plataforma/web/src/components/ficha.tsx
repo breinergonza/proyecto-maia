@@ -11,6 +11,7 @@ import { AYUDA_DOS_CIFRAS, AYUDA_MOTIVOS, AYUDA_OMS, ayudaPosicion, BAJO_EDAD, C
 import type { EstadoDesenlace } from '../api/ninos'
 import { Distribucion, MiniSerie, Muestra, ticksEnteros, type PuntoSerie } from './graficos'
 import { descripcionDe } from '../lib/descripciones'
+import { familiaDe } from '../lib/familias'
 import { Grafica } from './grafica'
 import { Aviso, Boton, Cargando, Insignia, Panel } from './ui'
 
@@ -31,6 +32,17 @@ export const EnPrueba = () => (
     <span title="Aún no se usa para dar alertas: se muestra para seguirlo y evaluarlo.">En prueba</span>
   </Insignia>
 )
+
+/** Los datos que no se midieron y aun así suben el riesgo, en una línea propia que dice qué significa: no cuelga de otro rótulo,
+ * que sin sus propios datos quedaría vacío. Sin datos que falten no sale nada. */
+export function DatosQueFaltan({ faltan, className }: { faltan: string[]; className?: string }) {
+  if (faltan.length === 0) return null
+  return (
+    <p className={className}>
+      <strong>Datos que faltan:</strong> {faltan.join(', ')}. También suben el riesgo. Si se midieron, conviene registrarlos.
+    </p>
+  )
+}
 
 /** De qué modelo sale el riesgo: si ya se usa para dar alertas y su versión (la del pie de «Cómo se calculó»). */
 export interface OrigenRiesgo { estado: EstadoDesenlace; version: string | null }
@@ -64,14 +76,7 @@ export function TarjetaRiesgo({ r, nota, origen }: { r: DatosTarjeta; nota?: str
           <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm">{suben.map((m) => <li key={m}>{m}</li>)}</ul>
         </>
       )}
-      {faltan.length > 0 && (
-        <>
-          <p className="mt-3 text-sm font-semibold">Datos que faltan</p>
-          <p className="text-sm">
-            También suben el riesgo: {faltan.join(', ')}. Si se midieron, conviene registrarlos.
-          </p>
-        </>
-      )}
+      <DatosQueFaltan faltan={faltan} className="mt-3 text-sm" />
       {origen && (
         <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-linea pt-2 text-xs">
           {origen.estado === 'en_prueba' ? <EnPrueba /> : <span className="font-semibold" title="Ya se usa para dar alertas.">En uso</span>}
@@ -87,10 +92,11 @@ export function TarjetaRiesgo({ r, nota, origen }: { r: DatosTarjeta; nota?: str
 interface Familia { clave: string; nombre: string; puntos: PuntoHistoria[]; ultimo: PuntoHistoria }
 
 /** Agrupa los puntos por familia de desenlace (el mismo evento visto desde varias visitas), la de mayor riesgo actual
- * primero. */
-export function familiasDeRiesgo(puntos: PuntoHistoria[]): Familia[] {
+ * primero. `agrupar` dice qué es una familia: por defecto `familia` de lenguaje (readm_3m y readm_6m son «readm»); con `familiaDe`,
+ * cada desenlace con su ventana es el suyo y sus filas `_desde_<visita>` se juntan con la base. */
+export function familiasDeRiesgo(puntos: PuntoHistoria[], agrupar: (clave: string) => string = familia): Familia[] {
   const grupos = new Map<string, PuntoHistoria[]>()
-  for (const p of puntos) grupos.set(familia(p.clave), [...(grupos.get(familia(p.clave)) ?? []), p])
+  for (const p of puntos) grupos.set(agrupar(p.clave), [...(grupos.get(agrupar(p.clave)) ?? []), p])
   return [...grupos.entries()]
     .map(([clave, ps]) => {
       const orden = [...ps].sort((a, b) => a.orden - b.orden)
@@ -132,17 +138,20 @@ export function useHistoriaRiesgo(sujeto: string) {
   })
 }
 
-/** `excluir`: familias de desenlaces que la ficha ya cuenta con su riesgo por visita (no se repiten aquí). */
-export const familiasSinExcluidas = (puntos: PuntoHistoria[] | undefined, excluir?: ReadonlySet<string>) =>
-  familiasDeRiesgo(puntos ?? []).filter((f) => !excluir?.has(f.clave))
+/** `excluir`: familias de desenlaces que la ficha ya cuenta con su riesgo por visita (no se repiten aquí). Una familia sale si
+ * su clave está ahí o si todas sus claves son de una familia de 12 meses de `excluir` («desarrollo_12m» se agrupa aquí como
+ * «desarrollo», pero es la misma que la ficha ya cuenta). */
+export const familiasSinExcluidas = (puntos: PuntoHistoria[] | undefined, excluir?: ReadonlySet<string>, agrupar?: (clave: string) => string) =>
+  familiasDeRiesgo(puntos ?? [], agrupar).filter((f) => !excluir?.has(f.clave) && !f.puntos.every((p) => excluir?.has(familiaDe(p.clave))))
 
-/** `grilla` es la distribución de las gráficas; por defecto, la de una columna angosta. */
-export function TrayectoriaRiesgo({ sujeto, excluir, grilla = 'sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2' }: {
-  sujeto: string; excluir?: ReadonlySet<string>; grilla?: string
+/** `grilla` es la distribución de las gráficas; por defecto, la de una columna angosta. `solo`: la clave de un desenlace según
+ * `familiaDe` (el de la pestaña «Desenlaces»), con todas sus visitas en una sola gráfica; sin ella salen todas las familias. */
+export function TrayectoriaRiesgo({ sujeto, excluir, solo, grilla = 'sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2' }: {
+  sujeto: string; excluir?: ReadonlySet<string>; solo?: string; grilla?: string
 }) {
   const q = useHistoriaRiesgo(sujeto)
   const [todas, setTodas] = useState(false)
-  const familias = useMemo(() => familiasSinExcluidas(q.data?.puntos, excluir), [q.data, excluir])
+  const familias = useMemo(() => familiasSinExcluidas(q.data?.puntos, excluir, solo == null ? undefined : familiaDe).filter((f) => solo == null || f.clave === solo), [q.data, excluir, solo])
   const visitas = useMemo(() => {
     const m = new Map<number, string>()
     for (const p of q.data?.puntos ?? []) m.set(p.orden, p.momento_nombre)
@@ -158,16 +167,19 @@ export function TrayectoriaRiesgo({ sujeto, excluir, grilla = 'sm:grid-cols-2 xl
   const dominioX: [number, number] = ordenes.length > 1 ? [ordenes[0], ordenes[ordenes.length - 1]]
     : [ordenes[0] - 0.5, ordenes[0] + 0.5]
   const mostradas = todas ? familias : familias.slice(0, VISIBLES)
+  // cada marca de la leyenda sale solo si hay algo así en las gráficas
+  const hayAlto = mostradas.some((f) => f.puntos.some((p) => p.percentil >= RIESGO_ALTO))
+  const hayAlerta = mostradas.some((f) => ordenPrimeraAlerta(f, q.data.primera_alerta) != null)
   return (
     <Grafica titulo={d.titulo} descripcion={d.descripcion} exportar={{ nombre: 'riesgo-por-visita' }}
       accion={<span className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
         <Muestra tipo="alerta">10 % con más riesgo</Muestra>
-        <Muestra tipo="marcado">riesgo alto</Muestra>
-        <Muestra tipo="estrella">primera alerta</Muestra>
+        {hayAlto && <Muestra tipo="marcado">riesgo alto</Muestra>}
+        {hayAlerta && <Muestra tipo="estrella">primera alerta</Muestra>}
       </span>}>
       {q.data.paquete_corrida && q.data.paquete !== q.data.paquete_corrida && (
         <p className="mb-3 text-sm text-ocre-hondo" title={`Modelos vigentes: ${q.data.paquete}; tarjetas: ${q.data.paquete_corrida}`}>
-          Calculado con los modelos vigentes; las tarjetas de arriba se calcularon con modelos anteriores y pueden no coincidir.
+          Calculado con los modelos vigentes; las tarjetas de este desenlace se calcularon con modelos anteriores y pueden no coincidir.
         </p>
       )}
       <ul className={cn('grid grid-cols-1 gap-x-6 gap-y-4', grilla)}>
@@ -240,6 +252,8 @@ export function CrecimientoOms({ crecimiento, grilla = 'sm:grid-cols-3 xl:grid-c
     .filter((s) => s.puntos.length > 0 || s.improbables > 0), [crecimiento])
   if (!series.length) return null
 
+  // «bajo para la edad o caída» solo se explica si alguna medida lo está
+  const hayMarcadas = series.some((s) => s.puntos.some((p) => p.bajo_2de || p.caida_1de))
   const edades = series.flatMap((s) => s.puntos.map((p) => p.edad_corregida as number))
   const dominioX: [number, number] = edades.length ? [Math.min(...edades), Math.max(...edades)] : [0, 0]
   if (dominioX[0] === dominioX[1]) { dominioX[0] -= DIA_MES; dominioX[1] += DIA_MES }
@@ -248,7 +262,7 @@ export function CrecimientoOms({ crecimiento, grilla = 'sm:grid-cols-3 xl:grid-c
     <Grafica titulo={descripcionDe('crecimiento_ficha').titulo} descripcion={DESCRIPCION_CRECIMIENTO} exportar={{ nombre: 'crecimiento-oms' }}
       accion={<span className="flex flex-wrap gap-x-3 gap-y-1 text-xs" title={AYUDA_OMS}>
         <Muestra tipo="franja">rango esperado (−2 a +2)</Muestra>
-        <Muestra tipo="marcado">bajo para la edad o caída</Muestra>
+        {hayMarcadas && <Muestra tipo="marcado">bajo para la edad o caída</Muestra>}
       </span>}>
       <ul className={cn('grid grid-cols-1 gap-x-6 gap-y-4', grilla)}>
         {series.map(({ k, puntos, improbables }) => {
@@ -320,7 +334,7 @@ export function PerfilCohorte({ sujeto, grilla }: { sujeto: string; grilla?: str
     <Grafica titulo={dn.titulo} descripcion={dn.descripcion} exportar={{ nombre: 'al-nacer' }}
       accion={<span className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
         <Muestra tipo="franja">la mitad de los niños</Muestra>
-        <Muestra tipo="marcado">este niño</Muestra>
+        {q.data.variables.some((v) => v.valor != null) && <Muestra tipo="marcado">este niño</Muestra>}
       </span>}>
       <ul className={cn('grid grid-cols-1 gap-x-8 gap-y-4', grilla)}>
         {q.data.variables.map((v) => {

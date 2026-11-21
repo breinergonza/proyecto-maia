@@ -67,17 +67,20 @@ const panel = (prefijo: string) => within(document.getElementById(`${prefijo}-pa
 const textos = (lista: HTMLElement) => within(lista).getAllByRole('tab').map((t) => t.textContent)
 
 describe('ficha del niño en pestañas', () => {
-  it('una pestaña por desenlace de 12 meses y luego una por pregunta; abre la primera con su riesgo visita por visita', async () => {
+  it('una pestaña «Desenlaces» con todos y luego una por pregunta; abre «Desenlaces» con el de más riesgo y su riesgo visita por visita', async () => {
     apiFicha()
     montar('/ninos/s1')
     const lista = await screen.findByRole('tablist', { name: 'Qué ver de este niño' })
-    await waitFor(() => expect(textos(lista)).toEqual([
-      'Talla baja a 12 meses', 'Desarrollo psicomotor bajo a 12 meses', 'Otros riesgos', 'Crecimiento', 'Frente a los demás niños', 'Visitas']))
-    expect(within(lista).getByRole('tab', { name: 'Talla baja a 12 meses' })).toHaveAttribute('aria-selected', 'true')
-    const panel = screen.getByRole('tabpanel')
-    expect(within(panel).getByText('Calculado a 40 semanas')).toBeInTheDocument()
-    expect(within(panel).getByText('Calculado a 3 meses')).toBeInTheDocument()
-    expect(within(panel).getByText('Modelo en prueba: aún no se ha comprobado si, de cada 100 niños con un riesgo de 35 %, unos 35 tienen talla baja a los 12 meses.')).toBeInTheDocument()
+    await waitFor(() => expect(textos(lista)).toEqual(['Desenlaces', 'Crecimiento', 'Frente a los demás niños', 'Visitas']))
+    expect(within(lista).getByRole('tab', { name: 'Desenlaces' })).toHaveAttribute('aria-selected', 'true')
+    const desarrollo = within(await screen.findByRole('region', { name: 'Desarrollo psicomotor bajo a los 12 meses' }))
+    expect(desarrollo.getByText('Calculado a 3 meses')).toBeInTheDocument()
+    // un clic en la lista abre la talla baja, con sus dos visitas y el modelo en prueba
+    await userEvent.click(within(screen.getByRole('list', { name: 'Desenlaces del niño' })).getByRole('button', { name: /^Talla baja a los 12 meses/ }))
+    const talla = within(screen.getByRole('region', { name: 'Talla baja a los 12 meses' }))
+    expect(talla.getByText('Calculado a 40 semanas')).toBeInTheDocument()
+    expect(talla.getByText('Calculado a 3 meses')).toBeInTheDocument()
+    expect(talla.getByText('Modelo en prueba: aún no se ha comprobado si, de cada 100 niños con un riesgo de 35 %, unos 35 tienen talla baja a los 12 meses.')).toBeInTheDocument()
     // el nombre y los datos del niño quedan arriba de las pestañas
     expect(screen.getByRole('heading', { level: 1, name: 'Niño s1' })).toBeInTheDocument()
   })
@@ -88,9 +91,9 @@ describe('ficha del niño en pestañas', () => {
     await userEvent.click(await screen.findByRole('tab', { name: 'Crecimiento' }))
     expect(screen.getByRole('tabpanel')).toHaveTextContent('Crecimiento frente a la OMS')
     expect(screen.getByText(/^dirección:/)).toHaveTextContent('ver=crecimiento')
-    await userEvent.click(screen.getByRole('tab', { name: 'Desarrollo psicomotor bajo a 12 meses' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Desenlaces' }))
     expect(screen.getByRole('tabpanel')).toHaveTextContent('Riesgo de desarrollo psicomotor bajo a los 12 meses')
-    expect(screen.getByText(/^dirección:/)).toHaveTextContent('ver=riesgo-desarrollo_12m')
+    expect(screen.getByText(/^dirección:/)).toHaveTextContent('ver=desenlaces')
   })
 
   it('con la pestaña en la dirección abre esa', async () => {
@@ -105,11 +108,11 @@ describe('ficha del niño en pestañas', () => {
     apiFicha()
     montar('/ninos/s1')
     await screen.findByRole('tablist', { name: 'Qué ver de este niño' })
-    const tabla = () => within(screen.getByRole('tabpanel')).getByRole('button', { name: 'Ver como tabla' })
+    const tabla = () => within(screen.getByRole('region', { name: 'Desarrollo psicomotor bajo a los 12 meses' })).getByRole('button', { name: 'Ver como tabla' })
     await userEvent.click(tabla())
     expect(tabla()).toHaveAttribute('aria-pressed', 'true')
     await userEvent.click(screen.getByRole('tab', { name: 'Visitas' }))
-    await userEvent.click(screen.getByRole('tab', { name: 'Talla baja a 12 meses' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Desenlaces' }))
     expect(tabla()).toHaveAttribute('aria-pressed', 'true')
   })
 
@@ -126,13 +129,14 @@ describe('ficha del niño en pestañas', () => {
     expect(screen.getAllByRole('tabpanel')).toHaveLength(1)
   })
 
-  it('sin desenlaces de 12 meses en la API, la primera pestaña es «Otros riesgos»', async () => {
+  it('sin desenlaces de 12 meses en la API, «Desenlaces» lista los demás y es la primera pestaña', async () => {
     apiFicha({ paquete: 'p1', puntos: [] })
     montar('/ninos/s1')
     const lista = await screen.findByRole('tablist', { name: 'Qué ver de este niño' })
-    expect(textos(lista)).toEqual(['Otros riesgos', 'Crecimiento', 'Frente a los demás niños', 'Visitas'])
-    expect(within(lista).getByRole('tab', { name: 'Otros riesgos' })).toHaveAttribute('aria-selected', 'true')
-    expect(within(screen.getByRole('tabpanel')).getByRole('region', { name: 'Riesgo calculado' })).toBeInTheDocument()
+    expect(textos(lista)).toEqual(['Desenlaces', 'Crecimiento', 'Frente a los demás niños', 'Visitas'])
+    expect(within(lista).getByRole('tab', { name: 'Desenlaces' })).toHaveAttribute('aria-selected', 'true')
+    const region = await screen.findByRole('region', { name: 'Desarrollo psicomotor bajo a los 6 meses' })
+    expect(within(region).getByText('Desarrollo psicomotor bajo a los 6 meses', { selector: 'h2' })).toBeInTheDocument()
   })
 })
 
