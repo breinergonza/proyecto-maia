@@ -20,26 +20,27 @@ const etapa = (e: string, nombre: string, orden: number, z: number | null, n = 1
   etapa: e, nombre, orden, n, edad_media_meses: orden * 3, z_media: z, z_desvio: 0.8, diferencia_oms: z, valor_medio: 5.2, valor_desvio: 0.5, unidad: 'kg',
 })
 const tray = {
-  estado: 'ok', entrenamiento: 7, indicador: 'peso', etiqueta: 'En uso', celdas_omitidas: 1, grupos_omitidos: 1, individuales_visibles: true,
+  estado: 'ok', entrenamiento: 7, indicador: 'peso', etiqueta: 'En uso', individuales_visibles: true,
   grupos: [
     { grupo: 'Riesgo alto', ninos: 12, etapas: [etapa('3m', '3 meses', 1, -1.2), etapa('6m', '6 meses', 2, -1.5)] },
     { grupo: 'Resto', ninos: 40, etapas: [etapa('3m', '3 meses', 1, 0.1), etapa('6m', '6 meses', 2, 0.2)] },
+    { grupo: 'Pocos', ninos: 3, etapas: [etapa('3m', '3 meses', 1, -0.4, 3), etapa('6m', '6 meses', 2, null, 1)] },
   ],
   individuales: [{ codigo: 'N-001', grupo: 'Riesgo alto', serie: [{ etapa: '3m', nombre: '3 meses', orden: 1, edad_meses: 3, z: -1.4 }] }],
 }
 const perfiles = {
-  estado: 'ok', entrenamiento: 7, ninos: 100, categorias_ocultas: 1, unidad_peso: 'g',
-  confianza: { minimo_ninos: 5, aprobacion: 'pendiente' }, tasa_significa: 'proporción de niños con riesgo alto',
-  eg: [{ categoria: 'a', etiqueta: 'Muy prematuro', n: 20, tasa: 0.25, oculto: false, eg_media: 29.5, peso_medio: 1200 },
-    { categoria: 'b', etiqueta: 'Prematuro tardío', n: null, tasa: null, oculto: true }],
-  lubchenco: [{ categoria: 'c', etiqueta: 'Pequeño para la edad', n: 15, tasa: 0.4, oculto: false, eg_media: 33, peso_medio: 1500 }],
+  estado: 'ok', entrenamiento: 7, ninos: 100, unidad_peso: 'g',
+  confianza: { aprobacion: 'pendiente' }, tasa_significa: 'proporción de niños con riesgo alto',
+  eg: [{ categoria: 'a', etiqueta: 'Muy prematuro', n: 20, tasa: 0.25, eg_media: 29.5, peso_medio: 1200 },
+    { categoria: 'b', etiqueta: 'Prematuro tardío', n: 3, tasa: 0.33 }],
+  lubchenco: [{ categoria: 'c', etiqueta: 'Pequeño para la edad', n: 15, tasa: 0.4, eg_media: 33, peso_medio: 1500 }],
 }
 const anticipacion = {
   talla_baja_12m: {
     nombre: 'talla baja a los 12 meses', etiqueta: 'En prueba', top_pct: 10,
     visitas: [
       { desde: '3 m EC', etapa: '12 m EC', ventaja_visitas: 3, casos: 12, alertas: 20, casos_detectados_pct: 30, alertas_acertadas_pct: 40 },
-      { desde: '6 m EC', etapa: '12 m EC', ventaja_visitas: 2, casos: null, alertas: 20, casos_detectados_pct: null, alertas_acertadas_pct: null },
+      { desde: '6 m EC', etapa: '12 m EC', ventaja_visitas: 2, casos: 3, alertas: 20, casos_detectados_pct: 33.3, alertas_acertadas_pct: 15 },
     ],
     avisados_antes: { casos: 12, avisados: 6, pct: 50, meta: 'avisar al menos una visita antes del desenlace' },
   },
@@ -62,23 +63,27 @@ function api(rol: Usuario['rol'], pendiente = false) {
 describe('analítica viva', () => {
   it('trayectorias: tabla frente a la OMS, niños individuales con enlace y selectores', async () => {
     const llamadas = api('experto')
-    montar('/analitica/trayectorias?entrenamiento=7')
+    montar('/analitica/trayectorias?entrenamiento=7&ver=oms')   // cada pregunta tiene su pestaña (?ver=): aquí, la tabla frente a la OMS
     expect(await screen.findByText('Diferencia con la OMS (z)')).toBeInTheDocument()
     expect(screen.getAllByText('Riesgo alto').length).toBeGreaterThan(0)
-    expect(screen.getByRole('link', { name: 'N-001' }).getAttribute('href')).toBe('/ninos/N-001')
     expect(screen.getAllByText(/5,2 kg/).length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/n menor que 5/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Pocos').length).toBeGreaterThan(0)   // un grupo de 3 niños sale con su fila
+    expect(screen.queryByText(/n menor que 5|celda.*omitid|grupo.*omitid/)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: 'Niños individuales' }))
+    expect((await screen.findByRole('link', { name: 'N-001' })).getAttribute('href')).toBe('/ninos/N-001')
     fireEvent.change(screen.getByLabelText('Indicador'), { target: { value: 'peso_para_talla' } })
     await waitFor(() => expect(llamadas.some((l) => l.url.includes('indicador=peso_para_talla&agrupar=riesgo&eje=edad_corregida'))).toBe(true))
     expect(await screen.findAllByText('En prueba')).not.toHaveLength(0)
   })
 
-  it('perfiles: tarjetas, n menor que 5 y nota de confianza', async () => {
+  it('perfiles: tarjetas, una categoría de 3 niños con su cifra y nota de confianza', async () => {
     api('experto')
     montar('/analitica/perfiles?entrenamiento=7')
     expect(await screen.findByText('Muy prematuro')).toBeInTheDocument()
     expect(screen.getByText('25,0 %')).toBeInTheDocument()
-    expect(screen.getAllByText('n menor que 5').length).toBeGreaterThan(0)
+    expect(screen.getByText('Prematuro tardío')).toBeInTheDocument()
+    expect(screen.getByText('33,0 %')).toBeInTheDocument()   // una categoría de 3 niños dice su tasa
+    expect(screen.queryByText(/n menor que 5|categoría\(s\)/)).not.toBeInTheDocument()
     expect(screen.getByText(/Aún no hay perfiles reales aprobados por los expertos/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Por Lubchenco' }))
     expect(await screen.findByText('Pequeño para la edad')).toBeInTheDocument()
@@ -89,9 +94,11 @@ describe('analítica viva', () => {
     montar('/analitica/anticipacion?entrenamiento=7')
     expect(await screen.findByText('Casos avisados al menos una visita antes')).toBeInTheDocument()
     expect(screen.getByText('50,0 %')).toBeInTheDocument()
-    expect(screen.getByText('Avisar antes detecta menos casos y da más ventaja.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: 'Qué cuesta avisar antes' }))   // el costo de avisar antes tiene su pestaña
+    expect(await screen.findByText('Avisar antes detecta menos casos y da más ventaja.')).toBeInTheDocument()
     expect(screen.getAllByText('En prueba').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('n menor que 5').length).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('tab', { name: /^Tabla/ }))   // la tabla por visita, con sus cifras pequeñas omitidas, tiene su pestaña
+    expect((await screen.findAllByText('33,3 %')).length).toBeGreaterThan(0)   // 3 casos: su porcentaje sale tal cual
   })
 
   it.each(['trayectorias', 'perfiles', 'anticipacion'])('%s: estado pendiente con mensaje', async (sub) => {

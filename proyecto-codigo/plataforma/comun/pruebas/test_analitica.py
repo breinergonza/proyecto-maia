@@ -1,4 +1,4 @@
-"""Analítica agregada: AUC conocido, calibración perfecta, celdas pequeñas omitidas y JSON serializable."""
+"""Analítica agregada: AUC conocido, calibración perfecta, celdas pequeñas con su cifra y JSON serializable."""
 import json
 
 import numpy as np
@@ -31,12 +31,34 @@ def test_auc_con_ic_contiene_el_auc_y_no_se_calcula_con_pocos_casos():
     assert pocos['ic_bajo'] is None
 
 
+def test_el_intervalo_del_auc_pide_5_casos_de_cada_clase_por_estadistica_no_por_privacidad():
+    """Con 3 casos el AUC se da (es una cifra) pero no su intervalo: el bootstrap no es estable. Es un límite
+    estadístico propio (``MIN_CASOS_IC``), no la regla de privacidad que se abandonó (D4)."""
+    r = np.linspace(0, 1, 100)
+    tres = np.zeros(100, dtype=bool)
+    tres[[80, 90, 99]] = True
+    d = AN.auc_con_ic(tres, r)
+    assert d['auc'] is not None and d['casos'] == 3 and d['n'] == 100
+    assert d['ic_bajo'] is None and d['ic_alto'] is None
+    cinco = np.zeros(100, dtype=bool)
+    cinco[[60, 70, 80, 90, 99]] = True
+    assert AN.auc_con_ic(cinco, r)['ic_bajo'] is not None
+    assert AN.MIN_CASOS_IC == 5 and not hasattr(AN, 'MIN_CELDA')
+
+
 def test_calibracion_perfecta():
     r, y, _ = _datos(n=20000, semilla=3)
     c = AN.calibracion(y, r)
     assert abs(c['razon_riesgo_observado'] - 1) < 0.1
     assert len(c['bins']) == 10 and c['ece'] < 0.05
-    assert all(b['n'] >= AN.MIN_CELDA for b in c['bins'])
+    assert all(b['n'] > 0 for b in c['bins'])
+
+
+def test_calibracion_con_pocos_ninos_por_grupo_da_cada_grupo_con_su_n():
+    r, y, _ = _datos(n=25, semilla=5)         # 10 grupos de 2 o 3 niños
+    c = AN.calibracion(y, r)
+    assert len(c['bins']) == 10 and sum(b['n'] for b in c['bins']) == 25 and min(b['n'] for b in c['bins']) < 5
+    assert all(h['n'] is not None for h in c['histograma']) and sum(h['n'] for h in c['histograma']) == 25
 
 
 def test_metricas_por_top_y_confusion():
@@ -54,18 +76,37 @@ def test_metricas_por_top_y_confusion():
     assert c['tp'] + c['fp'] == 400 and c['tp'] + c['fn'] == int(y.sum())
 
 
-def test_celdas_con_menos_de_5_ninos_se_omiten():
+def test_celdas_de_1_a_4_ninos_dan_su_cifra():
     r, y, _ = _datos(n=400)
     sexo = np.where(np.arange(400) < 3, 'raro', np.where(np.arange(400) % 2 == 0, 'femenino', 'masculino'))
     a = AN.analizar(r, y, grupos={'sexo': pd.Series(sexo)})
-    niveles = {f['grupo'] for f in a['equidad']['subgrupos']['sexo']}
-    assert niveles == {'femenino', 'masculino'}                       # el grupo de 3 niños no sale
+    por_grupo = {f['grupo']: f for f in a['equidad']['subgrupos']['sexo']}
+    assert set(por_grupo) == {'femenino', 'masculino', 'raro'}        # el grupo de 3 niños sale, con su n
+    assert por_grupo['raro']['n'] == 3 and por_grupo['raro']['auc'] is None   # el AUC pide 20 niños (D52)
     c5 = a['rendimiento']['metricas_por_top'][0]                      # 5 % de 400 = 20 alertas
     assert c5['alertas'] == 20
-    pequeno = AN.metricas_top(y[:60], np.argsort(-r[:60]))[0][0]      # 5 % de 60 = 3 alertas: sin porcentajes
-    assert pequeno['alertas'] == 3 and pequeno['casos_detectados_pct'] is None
+    pequeno = AN.metricas_top(y[:60], np.argsort(-r[:60]))[0][0]      # 5 % de 60 = 3 alertas: con porcentajes
+    assert pequeno['alertas'] == 3 and pequeno['casos_detectados_pct'] is not None
+    assert pequeno['alertas_acertadas_pct'] is not None and pequeno['sin_falsa_alarma_pct'] is not None
     conf = AN.metricas_top(y, np.argsort(-r))[2]
-    assert all(v is None or v >= AN.MIN_CELDA for fila in conf for k, v in fila.items() if k != 'top_pct')
+    assert all(isinstance(v, int) for fila in conf for k, v in fila.items() if k != 'top_pct')
+
+
+def test_un_caso_en_el_top_se_dice_con_su_cifra():
+    y = np.zeros(200, dtype=bool)
+    y[[0, 150, 151]] = True
+    orden = np.arange(200)                                            # el riesgo baja con el índice
+    tops, _, conf = AN.metricas_top(y, orden)
+    assert conf[0]['tp'] == 1 and conf[0]['fn'] == 2 and conf[0]['fp'] == 9    # 5 % de 200 = 10 alertas, 1 caso
+    assert tops[0]['alertas_acertadas_pct'] == 10.0
+
+
+def test_deciles_y_lift_con_pocos_ninos_dan_su_tasa():
+    y = np.zeros(30, dtype=bool)
+    y[[0, 1]] = True
+    d = AN.lift(y, np.arange(30))
+    assert [f['niños'] for f in d['deciles']] == [3] * 10 and d['deciles'][0]['tasa'] is not None
+    assert d['deciles'][0]['lift'] is not None and all(f['lift'] is not None for f in d['acumulado'])
 
 
 def test_subgrupos_con_menos_de_20_no_dan_auc():

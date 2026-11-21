@@ -30,8 +30,8 @@ la base de la Fundación).
 
 | Perfil (como aparece en pantalla) | Qué puede hacer |
 |---|---|
-| **Consulta** | Ver el **Tablero**, la lista de **Niños** y la historia de cada niño |
-| **Experto clínico** | Todo lo de Consulta, más **Revisión de riesgos**, **Predicción**, **Mis modelos** y **Diccionario** |
+| **Consulta** | Ver cifras de grupo: **Vista clínica**, **Comparar grupos**, **Explorar**, **Modelos** y el **Resumen**. No ve niños uno por uno |
+| **Experto clínico** | Todo lo de Consulta, más la lista de **Niños** y la historia de cada niño, **Revisión de riesgos**, **Predicción**, **Mis modelos** y **Diccionario** |
 | **Administración** | Todo lo anterior, más **Calidad de datos**, **Configuración**, **Modelos y corridas** y **Usuarios** |
 
 Si una opción del menú no aparece, su perfil no la incluye. Pida el cambio a la administración.
@@ -76,7 +76,7 @@ nuevo**. Al ingresar, la aplicación lo devuelve a la misma pantalla en que esta
 ## Cómo está organizada la pantalla
 
 * **Menú lateral** (en el teléfono se abre con el botón de las tres rayas, arriba a la derecha) con tres secciones:
-  * **Seguimiento:** **Tablero**, **Explorar**, **Niños** y **Analítica**.
+  * **Seguimiento:** **Tablero**, **Explorar**, **Niños** (solo Experto clínico y Administración) y **Analítica**.
   * **Revisión clínica:** **Revisión de riesgos**, **Predicción**, **Mis modelos** y **Diccionario**.
   * **Administración:** **Calidad de datos**, **Configuración**, **Modelos y corridas** y **Usuarios**.
 * **Grupos que se abren y se cierran.** **Analítica**, **Configuración** y **Modelos y corridas** son grupos: el nombre
@@ -115,7 +115,9 @@ corrientes; se cierra con Esc o al salir de la palabra. Las explicaciones están
 
 ## Perfil Consulta
 
-Estas pantallas las ven todos los perfiles.
+Estas pantallas las ven todos los perfiles, salvo **Niños**, la historia de un niño y su perfil, que son de
+Experto clínico y Administración: el perfil Consulta ve cifras de grupo, nunca un niño uno por uno. En el Tablero ve
+las mismas cifras, sin el enlace a la lista de niños.
 
 ### Tablero
 
@@ -132,7 +134,7 @@ Si aparece «Todavía no hay resultados», la administración aún no ha hecho l
 | **datos leídos** | Total de mediciones revisadas por el modelo de anomalías |
 | **datos por revisar · N por mil** | Datos que el modelo encontró raros y cuántos son por cada mil datos leídos. Para la administración es un enlace a **Calidad de datos** |
 | **datos ya respondidos** | Datos por revisar que ya tienen respuesta de la administración |
-| **niños con algún riesgo alto** | Niños distintos con al menos un desenlace en riesgo alto (posición 90 o más: entre el 10 % de niños con más riesgo para ese desenlace). Un niño con riesgo alto en tres desenlaces cuenta una vez; al pasar el mouse se ve el total de riesgos altos. Lleva a la lista de **Niños** ya filtrada, que muestra la misma cifra |
+| **niños con algún riesgo alto** | Niños distintos con al menos un desenlace en riesgo alto (posición 90 o más: entre el 10 % de niños con más riesgo para ese desenlace). Un niño con riesgo alto en tres desenlaces cuenta una vez; al pasar el mouse se ve el total de riesgos altos. Para Experto clínico y Administración lleva a la lista de **Niños** ya filtrada, que muestra la misma cifra |
 | **alarmas de grupo** | Cambios bruscos en todo un grupo de niños de un trimestre a otro (ver abajo) |
 
 **Paneles:**
@@ -144,9 +146,8 @@ Si aparece «Todavía no hay resultados», la administración aún no ha hecho l
   siempre vienen de un cambio en la forma de medir y no de los niños. Las más recientes van primero. Arriba dice
   cuántas hay en total y, si son más de 100, que se muestran las 100 más recientes.
 * **Riesgo por desenlace.** Una fila por desenlace, con el momento en que se calcula («se calcula a los …»):
-  **Niños** (cuántos tienen el riesgo calculado), **Alto** (cuántos tienen riesgo alto; al pulsar el número se abre
-  la lista filtrada) y **Medio** (riesgo promedio). El enlace **Ver riesgo alto** abre la lista de niños con riesgo
-  alto.
+  **Niños** (cuántos tienen el riesgo calculado), **Alto** (cuántos tienen riesgo alto; para Experto clínico y Administración, al pulsar el número se abre
+  la lista filtrada) y **Promedio** (riesgo promedio).
   Si el panel dice que ningún niño tiene riesgo calculado, no es un error: el riesgo solo se calcula en la visita en
   que se mide cada desenlace, cuando la siguiente visita aún no ha pasado.
 * **Crecimiento frente a la OMS.** Una fila por visita y una columna por medida (**Peso para la edad**, **Talla para
@@ -154,7 +155,7 @@ Si aparece «Todavía no hay resultados», la administración aún no ha hecho l
   color ocre si es 10 % o más) y, con la flecha ↓, el porcentaje que **cayó desde el control anterior**. «EC» quiere
   decir edad corregida. Al pasar el cursor sobre una celda se ve también cuántos datos hay y el puntaje z mediano.
 
-### Niños
+### Niños (Experto y Administración)
 
 La lista de todos los niños con datos. Por defecto los primeros son los de riesgo más alto.
 
@@ -181,22 +182,40 @@ Al pulsar el nombre de una columna, la lista se ordena por ella; un segundo clic
 | **Datos por revisar** | Cuántos datos raros tiene el niño |
 | **Crecimiento** | «Bajo para la edad ×N»: cuántas medidas quedaron bajas para la edad. «Cayó ×N»: cuántas veces cayó desde el control anterior |
 
-### La historia de un niño (línea temporal)
+### La historia de un niño (línea temporal, Experto y Administración)
 
 Se abre al pulsar el código de un niño en **Niños**, en **Datos por revisar** o en un correo de aviso. **Todos los
 niños** vuelve a la lista.
 
-* **Encabezado:** «Niño …», semanas de gestación al nacer, año de nacimiento, grupo y fecha de los datos. A la derecha,
-  el botón **Imprimir ficha** abre la impresión del navegador (o permite guardar en PDF). La hoja sale solo con el
-  contenido del niño, en blanco y negro, sin menú ni botones y con la frase «Apoyo a la decisión, no diagnóstico» al pie.
-  Imprima solo donde la Fundación lo autorice (ver [Privacidad](#privacidad)).
-* **Tarjetas de riesgo** (si tiene riesgo calculado), una por desenlace:
-  * Grande, **«N de 10»**: de cada 10 niños, cuántos tienen menos riesgo. Si es alto, borde coral y la marca
-    **Riesgo alto** o **Riesgo muy alto**. Al pasar el mouse se ve la posición técnica.
-  * «Calculado con lo medido hasta …»: la visita cuyos datos se usaron.
-  * **Riesgo estimado:** la probabilidad que calcula el modelo, en porcentaje.
-  * **Lo que más pesó:** los motivos que más influyeron en el riesgo de ese niño (por ejemplo, «Días en UCI: 20» o
-    «Nació después del cambio de sistema 2022»).
+* **Encabezado:** «Niño …», semanas de gestación al nacer, año de nacimiento, la sede («Sede 1») y fecha de los datos;
+  lo que no se conoce no se menciona. A la derecha, el botón **Imprimir ficha** abre la impresión del navegador (o
+  permite guardar en PDF). La hoja sale con el contenido de todas las pestañas del niño, en blanco y negro, sin menú ni
+  botones y con la frase «Apoyo a la decisión, no diagnóstico» al pie. Imprima solo donde la Fundación lo autorice (ver
+  [Privacidad](#privacidad)).
+* **Pestañas:** **Desenlaces**, **Crecimiento**, **Frente a los demás niños** y **Visitas** (solo aparecen las que
+  tienen algo que mostrar). La ficha abre en **Desenlaces** si el niño tiene algún riesgo calculado; si no, en la primera
+  pestaña con contenido. Las direcciones antiguas que abrían un desenlace (`?ver=riesgo-…` u `?ver=otros`) también
+  llevan a **Desenlaces**.
+* **Desenlaces:** todos los desenlaces del niño en una lista y, al lado, el detalle del que se elige (el de más riesgo
+  abre elegido; el elegido queda en la dirección, `?desenlace=`). En el teléfono, la lista va sobre el detalle.
+  * **La lista** dice, de cada desenlace, su riesgo más reciente, cómo queda frente a los demás niños («Más que N de
+    10», y además «Alto» o «Muy alto» en coral cuando lo es), cuánto cambió frente a la visita anterior («Subió 13
+    puntos») y **En prueba** si todavía no da alertas. Cada desenlace sale una sola vez. Los
+    desenlaces sin riesgo calculado van aparte, bajo **Sin riesgo calculado**, con una línea que dice por qué (por
+    ejemplo, «Aún no hay datos de la visita de 3 meses»).
+  * **Los desenlaces a 12 meses** (talla baja y desarrollo psicomotor bajo) muestran el riesgo del niño con lo medido
+    hasta cada visita (40 semanas, 3 meses, …), con el cambio de una visita a otra y, desde tres visitas, una gráfica de
+    evolución. **Ver como tabla** y **CSV** traen los mismos datos. Al pie dice cómo se calculó (modelo, entrenamiento y
+    con qué niños se calibró).
+  * **Los demás desenlaces** muestran su tarjeta de riesgo y cómo cambió su posición en cada visita:
+    * Grande, **«N de 10»**: de cada 10 niños, cuántos tienen menos riesgo. Si es alto, borde coral y la marca
+      **Riesgo alto** o **Riesgo muy alto**. Al pasar el mouse se ve la posición técnica.
+    * «Calculado con lo medido hasta …»: la visita cuyos datos se usaron.
+    * **Probabilidad estimada:** la probabilidad que calcula el modelo, en porcentaje.
+  * **Lo que más pesó** y **Datos que faltan:** los rótulos solo salen con algo debajo. **Lo que más pesó** lista los
+    datos que subieron el riesgo (por ejemplo, «Días en UCI: 20»). **Datos que faltan** es una línea aparte: dice qué
+    datos no se midieron, que también suben el riesgo, y que conviene registrarlos si se midieron. Si ningún dato subió el
+    riesgo de forma notable, la ficha lo dice en una frase.
 * **Crecimiento frente a la OMS:** gráfica de cada medida frente a la OMS según la edad corregida. La línea en 0 es lo
   esperado para la edad; la franja ocre es la zona **baja para la edad**. Al pasar el mouse sobre un punto se ve cómo
   quedó («Bajo para la edad», «En el rango esperado») y su puntaje z. Los puntos que la OMS considera improbables no
@@ -215,20 +234,33 @@ niños** vuelve a la lista.
 Está en **Seguimiento**, justo debajo de **Tablero**, y lo ven todos los perfiles. Muestra las mismas cifras del
 Tablero, pero para el grupo de niños que usted elija; el Tablero no cambia y sigue mostrando a todos.
 
-* **Filtros (panel de la izquierda):** casillas por variable (por ejemplo sexo o categoría al nacer), con cuántos niños
-  tendría cada opción. Lo elegido aparece como fichas que se quitan con la **x**. Con **+ Agregar variable** suma otras.
-  Si una variable se mide muchas veces, elija si cuenta la primera, la última, en alguna visita o en una visita concreta.
-  La **edad gestacional (categoría)** es una lista (extremo, muy prematuro, moderado o tardío, a término): cada casilla
-  es su propio tramo. Las secciones **Tiempo** y **Muestreo** acotan por fecha y fijan un tope por grupo; todo viaja en
-  la dirección, así que un enlace copiado abre el mismo filtro.
-* **Guardar este filtro:** queda en la lista de filtros guardados para volver a usarlo (por ejemplo en Predicción).
+* **Elija el grupo (panel de la izquierda):** casillas por variable (por ejemplo sexo, sede o edad gestacional), con
+  cuántos niños tendría cada opción en la columna **Niños**; un clic en cualquier parte de la fila la marca, y las
+  opciones se leen sin códigos («Sede 1», «Femenino», «Muy prematuro (28 a 31 sem)»). Lo elegido aparece como fichas
+  que se quitan con la **x**. Con **Agregar otra característica** suma otras. Si una variable se mide muchas veces,
+  elija si cuenta la primera, la última, en alguna visita o en una visita concreta. La **edad gestacional (categoría)**
+  es una lista (extremo, muy prematuro, moderado o tardío, a término): cada casilla es su propio tramo. Un rango se
+  escribe en dos campos cortos («de … a … semanas»); lo que se ve gris dentro de ellos («mín. 24», «máx. 41») es solo
+  una pista de lo que hay, no un valor puesto. La sección **Período** dice por qué fecha se cuenta a los niños
+  («Contar a los niños por: fecha de nacimiento») y si se toma todo el período, entre dos fechas o los últimos meses
+  antes del corte; debajo dice entre qué años nacieron los niños del corte. Todo viaja en la dirección, así que un
+  enlace copiado abre el mismo grupo. El mismo panel se abre como cajón al lado derecho con **Cambiar grupo** (Vista
+  clínica) y con **Editar** o **Elegir grupo B** (Comparar grupos): los filtros se aplican al instante, abajo se ve
+  cuántos niños quedan en el grupo, **Listo** o **Esc** lo cierran y la página de atrás no se mueve.
+* **Grupo guardado y Guardar este grupo (experto y administración):** el grupo guardado se elige arriba del panel para
+  volver a usarlo (por ejemplo en Predicción). Al guardar, el formulario ofrece el **Muestreo para entrenar** (todos los
+  que cumplen o un tope por categoría): es propio de la muestra que se guarda para entrenar, así que no aparece en la
+  Vista clínica, en Comparar grupos ni en Explorar, y el grupo guardado conserva el que traiga la dirección.
 * **Qué se ve:** niños en el grupo, datos leídos, niños con algún riesgo alto, crecimiento bajo frente a la OMS, y
-  tres gráficas: riesgo del grupo, crecimiento del grupo y quiénes son los niños.
-* **Privacidad:** con menos de 20 niños no se muestran cifras; basta quitar algún filtro. Quien solo consulta ve las
-  cifras menores de 100 aproximadas de 5 en 5. Los grupos de menos de 5 niños se ocultan.
-* **Cómo leer los símbolos:** una opción sin niños se ve **0**; **<5** es un dato oculto por privacidad; **—** es un grupo
+  tres gráficas: riesgo del grupo, crecimiento del grupo y quiénes son los niños. En el crecimiento del grupo, bajo cada
+  visita dice cuántos niños tienen dato. La mediana sale con cualquier número de niños; la mitad central pide 20 niños o
+  más con dato en esa visita (límite estadístico, no de privacidad): con menos, esa visita tiene su punto pero no su
+  banda, la leyenda dice «Sin mitad central» y la tabla, «sin cifra».
+* **Privacidad:** con menos de 20 niños no se muestran cifras; basta quitar algún filtro. Todos los perfiles ven las
+  mismas cifras, exactas: nada se redondea ni se aproxima. Una opción con 1 a 4 niños dice su número.
+* **Cómo leer los símbolos:** una opción sin niños se ve **0**; una opción con 1 a 4 niños dice cuántos son; **—** es un grupo
   de menos de 20 niños. Si ningún niño cumple, aparece «Ningún niño cumple estos filtros» con el botón para quitarlos.
-  El muestreo no cambia las cifras de Explorar: solo dice con cuántos niños se entrenaría.
+  El muestreo de un grupo guardado no cambia las cifras de Explorar: solo dice con cuántos niños se entrenaría.
 
 ### Analítica de los modelos
 
@@ -242,18 +274,22 @@ submódulos, como fichas arriba (en el teléfono se deslizan): **Resumen**, **Re
   Además, la aplicación recuerda el último **desenlace** y la última **visita** que eligió: al volver a entrar a
   Analítica en la misma pestaña del navegador no tiene que elegirlos de nuevo. Si abre un enlace con otros valores, mandan
   los del enlace.
-* **Guía de lectura:** cada submódulo explica en pocas líneas cómo leerlo. Su interruptor **Modo técnico** agrega los
-  términos y cifras de detalle (se recuerda en el navegador).
+* **Guía de lectura:** cada submódulo explica en pocas líneas cómo leerlo.
+* **Una sola palabra:** las pantallas usan la palabra clínica («Casos detectados», «Alertas acertadas»). La palabra
+  subrayada explica qué mide y da su nombre estadístico («En estadística: sensibilidad»); no hay un modo técnico aparte.
+* **Modelos:** abre en **Cómo le fue**; **Cómo se entrenó** (configuración, trazabilidad e hiperparámetros) va al final.
 * **En prueba:** un desenlace marcado así se ve, pero aún no es oficial ni genera correos.
 * **Sin analítica / «Este análisis estará disponible pronto»:** si el entrenamiento es anterior y no guardó los
   resultados de analítica, aparece **Sin analítica** y la opción de reentrenar (no se recalcula en silencio). Una ficha con
   «pronto» o un análisis **pendiente** todavía no se calcula para ese modelo (por ejemplo Anticipación, si no hay
   desenlaces entrenados desde varias visitas).
-* Un grupo con menos de 5 niños dice «n menor que 5» y no muestra cifras.
+* Un grupo o una celda con 1 a 4 niños dice cuántos son. **sin cifra** es lo que no se puede calcular: un desvío, unos cuartiles o un AUC
+  piden 20 niños o más, y el intervalo del AUC pide además 5 niños con el desenlace y 5 sin él (es un límite estadístico, no de
+  privacidad).
 * **Perfiles** son provisionales: edad gestacional y clasificación de Lubchenco; ningún experto los ha aprobado todavía.
 * **Anticipación:** elija una familia de desenlaces y vea cuántos casos se avisaron antes, con qué ventaja, la primera
-  visita con alerta y el costo de avisar antes. Experto y administración ven además tres niños visita por visita. Solo
-  funciona si el entrenamiento se hizo con las familias «En prueba» activadas.
+  visita con alerta y el costo de avisar antes. Experto y administración ven además tres niños visita por visita. Los
+  entrenamientos la calculan por defecto; los anteriores a esta versión pueden no traerla.
 * **Calibración y Población:** Calibración suma el riesgo de los niños con y sin el desenlace; Población, la muestra frente
   a todos los niños y sus cuantiles. Un entrenamiento anterior no trae estos dos paneles y lo explica.
 * **Qué datos pesan (Interpretabilidad):** importancia de cada dato, cómo cambia el riesgo al variar un dato, los motivos más
@@ -277,7 +313,7 @@ teléfono). Sus botones permiten llevarse el dato: **PNG** de la gráfica (con t
   punto o barra al siguiente; **Inicio** y **Fin** saltan al primero y al último. Cada valor se anuncia en voz alta para
   los lectores de pantalla.
 
-### Perfil del niño y primera alerta
+### Perfil del niño y primera alerta (Experto y Administración)
 
 En la ficha de un niño, la tarjeta **Perfil del niño** muestra fichas con su categoría por edad gestacional
 (prematuro extremo, muy prematuro, moderado a tardío, a término), su clasificación de Lubchenco (peso adecuado, pequeño
@@ -303,8 +339,8 @@ como error** y **alarmas de grupo**) y tres paneles:
 * **Alertas por tipo.** Cuántos datos raros encontró cada revisión.
 * **Aciertos frente a la revisión.** Cuántas alertas confirmó el equipo al revisar las primeras: de las 50, 100, 200…
   primeras alertas de la cola que ya tienen respuesta, qué porcentaje se marcó como error.
-* **Dónde se concentran.** Sede y dato con más alertas. Si el corte no trae sedes, solo se muestra por dato. Los
-  grupos con menos de 5 alertas no se muestran solos: se suman en «Otras».
+* **Dónde se concentran.** Sede y dato con más alertas, de más a menos. Si el corte no trae sedes, solo se muestra por
+  dato. Cada uno sale con su cifra, aunque tenga una sola alerta.
 
 Debajo está la lista de **Datos por revisar**: datos que el modelo de anomalías encontró raros. Para cada uno, la
 pregunta es si cree que es un **error de registro**.
@@ -373,6 +409,11 @@ edita en la página, con formularios, y guarda todas sus versiones. El Excel que
   Pulse **Lista** para que el sistema la use o **No usar** para descartarla. Si a una le falta información (por
   ejemplo, el rol), pulse **Completar**: abre su formulario. Si una actualización trajo variables que aún no están
   en el diccionario, verá un aviso con **Agregarlas al diccionario**.
+* **Desenlaces que se entrenan:** por defecto, dos. **Desarrollo psicomotor bajo a los 12 meses** está «En uso» (da
+  alertas) y **talla baja para la edad a los 12 meses**, calculada desde cada visita, está «En prueba»: se entrena y
+  se muestra, pero no da alertas hasta que un entrenamiento con datos reales muestre que funciona. Los demás
+  desenlaces siguen en la hoja **Desenlaces** como «No usar»; para volver a usar uno, cambie su estado y entrene de
+  nuevo.
 * El número junto a **Diccionario** en el menú, y el aviso del **Tablero**, dicen cuántas variables faltan por revisar.
 * **Exportar a Excel** (arriba) baja el que está en uso. **Importar desde Excel** sube uno editado fuera: antes de
   confirmar verá qué cambia; si el archivo tiene un error, dice en qué hoja y fila; si es igual al que está en uso, no
@@ -648,6 +689,8 @@ nunca como un diagnóstico.
 
 Los factores que más influyeron en el cálculo de ese niño. Explican el número, pero no prueban una causa. «Nació después
 del cambio de sistema 2022» quiere decir que sus datos se registraron con el sistema nuevo.
+Si un dato no se midió y su falta también sube el riesgo, no va en esta lista: sale en su propia línea, **Datos que
+faltan**, para que no parezca un dato medido. Si nada subió el riesgo de forma notable, la ficha lo dice en una frase.
 
 ### Tipos de alerta (capas del modelo de anomalías)
 
@@ -677,21 +720,39 @@ anotado en otra unidad», «la fecha no corresponde a esta visita», «cambió d
 Estas son las definiciones que aparecen al pasar el mouse por un término subrayado (ver
 [Términos con «¿qué significa?»](#términos-con-qué-significa)):
 
-* **AUC:** qué tan bien separa el modelo a los niños con y sin el problema. 1 es perfecto; 0,5 equivale a lanzar una
-  moneda.
-* **Curva ROC:** compara los aciertos con las falsas alarmas; mientras más se aleja de la diagonal, mejor.
-* **PSI:** cuánto cambió el grupo de niños actual frente al de entrenamiento; si es alto, conviene revisar el modelo.
+* **Qué tan bien ordena (AUC):** qué tan bien separa el modelo a los niños con y sin el problema. 1 es perfecto; 0,5
+  es lanzar una moneda.
+* **Curva ROC:** los casos detectados frente a las falsas alarmas; cuanto más se aleja de la diagonal, mejor ordena.
+* **Curva de precisión y exhaustividad:** las alertas acertadas frente a los casos detectados.
+* **Cambio frente al entrenamiento (PSI):** cuánto cambiaron los niños actuales frente a los del entrenamiento; si es
+  alto, conviene revisar el modelo.
 * **Percentil:** lugar del niño entre todos, de 0 a 100. Un percentil 95 significa que solo 5 de cada 100 niños tienen
   más riesgo.
 * **Calibración:** qué tanto coincide el riesgo que dice el modelo con lo que ocurre de verdad. Con 20 % de riesgo,
   debería pasar en 2 de cada 10.
-* **Sensibilidad:** de los niños que sí tendrán el problema, qué parte detecta el modelo.
-* **Especificidad:** de los niños que no tendrán el problema, qué parte descarta bien el modelo.
-* **Brier:** error promedio de las probabilidades, de 0 a 1; más cerca de 0 es más confiable.
-* **Precisión promedio (PR-AUC):** qué tan bien acierta el modelo cuando marca a un niño en riesgo, sobre todo si el
+* **Casos detectados (sensibilidad):** de los niños que tuvieron el problema, cuántos recibieron alerta.
+* **Alertas acertadas (valor predictivo positivo, VPP):** de los niños con alerta, cuántos tuvieron el problema.
+* **Niños sin falsa alarma (especificidad):** de los niños que no tuvieron el problema, cuántos quedaron sin alerta.
+* **Alertar al (umbral, percentil de riesgo):** qué parte de los niños, los de más riesgo, recibe alerta. Al 10 %: 1
+  de cada 10.
+* **Error del porcentaje de riesgo (puntaje de Brier):** error promedio del porcentaje de riesgo, de 0 a 1; cuanto más
+  cerca de 0, más confiable. Se muestra con tres decimales.
+* **Riesgo dicho entre riesgo real (razón esperado / observado):** el riesgo promedio que dijo el modelo dividido por el
+  que ocurrió; 1 es lo ideal.
+* **Error medio entre el riesgo dicho y el real (ECE):** distancia promedio entre ambos, por tramos; cerca de 0 es mejor.
+* **Alertas acertadas en promedio (PR-AUC):** qué tan bien acierta el modelo cuando marca a un niño, sobre todo si el
   problema es poco frecuente.
 * **Falsas por 1.000:** niños marcados en riesgo que no tenían el problema, por cada 1.000 revisados.
 * **Mediana:** valor del medio: la mitad de los niños tiene menos riesgo y la otra mitad, más.
+* **OMS:** Organización Mundial de la Salud; sus curvas muestran cómo crecen los niños sanos y aquí se comparan con la
+  edad corregida. Se explica en «Frente a la OMS» (ficha del niño) y en el umbral de la trayectoria (Vista clínica).
+* **−2 (DE):** la desviación estándar (DE) dice cuánto se aleja una medida del valor medio de los niños sanos de su
+  edad en la OMS; por debajo de −2 DE es bajo para la edad. Es la línea punteada «Umbral de talla baja» (o «de
+  crecimiento bajo») de la trayectoria de la Vista clínica.
+* **Rango esperado:** de −2 a +2 DE de la curva de la OMS; ahí queda la medida de unos 95 de cada 100 niños sanos de
+  esa edad. Es la franja de las gráficas de crecimiento de la ficha.
+* **Edad corregida:** edad contada desde la fecha en que el niño debía nacer (40 semanas de gestación), no desde el
+  parto; así se compara bien a un prematuro.
 * **Cron:** forma corta de indicar cuándo se repite una tarea, con cinco campos: minuto, hora, día del mes, mes y día de
   la semana.
 
@@ -716,6 +777,8 @@ Estas son las definiciones que aparecen al pasar el mouse por un término subray
 * **No escriba datos que identifiquen** (nombres, documentos, direcciones, teléfonos) en los comentarios, en los
   motivos ni en **Predicción › Un niño**.
 * **Los datos reales no salen del equipo de la Fundación.** La versión de demostración usa solo niños simulados.
+* **Los conteos pequeños se dicen.** Una cifra de 1 a 4 niños se muestra con su número; las pantallas solo exigen un mínimo de
+  20 niños para dar cifras de grupo, distribuciones y cuartiles. Ninguna cifra se redondea, tampoco para quien solo consulta.
 * **Cuide su cuenta.** No comparta su contraseña, cierre la sesión en equipos compartidos y avise a la administración
   si cree que alguien más la conoce.
 * **No saque capturas, impresiones ni exportaciones con datos de niños** fuera de los canales que autorice la Fundación (esto incluye **Imprimir ficha**).
@@ -731,6 +794,12 @@ No. Quiere decir que, frente a los demás niños del corte, conviene mirarlo pri
 **¿Por qué un niño dice «Sin riesgo calculado»?**
 El riesgo de cada desenlace se calcula en la visita en que se mide ese desenlace y solo mientras la siguiente visita
 no ha pasado. Si el niño ya pasó ese momento, o aún no llega a él, no tiene riesgo vigente en este corte.
+
+**¿Qué pasa si se cae la conexión mientras uso una página?**
+La parte que no cargó dice «No se pudo cargar …» (o «No se pudo calcular …» si usted pidió un cálculo), explica qué
+pasó y ofrece **Reintentar**. Lo que eligió (filtros, grupo, desenlace, modelo, los datos del niño) sigue igual, y
+reintentar pide exactamente lo mismo. Si Anticipación dice que todavía no hay una corrida, no es una falla de conexión:
+falta ejecutar una corrida con un paquete activo.
 
 **¿Por qué el tablero dice «Todavía no hay resultados»?**
 No se ha ejecutado ninguna corrida con un paquete activo. La administración debe activar un paquete en **Modelos** y
@@ -748,8 +817,8 @@ Es a propósito (revisión ciega): así se puede saber si el modelo coincide con
 **¿Mis respuestas las ven los demás expertos?**
 No. Cada experto ve solo las suyas. La administración ve el resumen agregado de todos.
 
-**¿Por qué no veo Revisión de riesgos o Predicción?**
-Su perfil es Consulta. Si necesita esas opciones, pídale a la administración el perfil de Experto clínico.
+**¿Por qué no veo Niños, Revisión de riesgos o Predicción?**
+Su perfil es Consulta: ve cifras de grupo, no niños uno por uno. Si necesita esas opciones, pídale a la administración el perfil de Experto clínico.
 
 **¿Por qué no veo Calidad de datos?**
 Es una opción de Administración y solo la ve el perfil de administración.

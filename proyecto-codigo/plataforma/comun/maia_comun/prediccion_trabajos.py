@@ -21,7 +21,6 @@ import pandas as pd
 
 TTL_SEGUNDOS = 3600
 MAXIMO = 4                 # cálculos que se conservan en memoria a la vez
-MINIMO_CELDA = 5           # D4: una celda con menos niños no se muestra
 NOMBRE_LISTA = 'ninos_entrenamiento.parquet'
 
 
@@ -92,12 +91,10 @@ def fuga_entrenamiento(ids: Iterable[str], entrenados: set[str] | None, excluir:
 
 # ------------------------------------------------------------------ riesgo por visita
 
-def por_visita(hist: pd.DataFrame, orden: dict[str, int], nombres: dict[str, str], percentil_alto: float,
-               minimo: int = MINIMO_CELDA) -> list[dict]:
+def por_visita(hist: pd.DataFrame, orden: dict[str, int], nombres: dict[str, str], percentil_alto: float) -> list[dict]:
     """Para cada desenlace y visita: cuántos niños, riesgo mediano y cuántos en riesgo alto. ``hist`` trae una fila por
     niño, desenlace y visita (``clave, desenlace, momento, riesgo, percentil``; sin el código del niño, que aquí no hace
-    falta). Las celdas con menos de
-    ``minimo`` niños no llevan cifras (D4)."""
+    falta). Toda celda lleva sus cifras, aunque tenga un solo niño (D63, que reemplaza a D4)."""
     if hist.empty:
         return []
     salida = []
@@ -105,11 +102,8 @@ def por_visita(hist: pd.DataFrame, orden: dict[str, int], nombres: dict[str, str
         n = len(g)
         celda: dict[str, Any] = {'clave': clave, 'desenlace': desenlace, 'momento': str(momento),
                                  'momento_nombre': nombres.get(str(momento), str(momento)),
-                                 'orden': orden.get(str(momento), 99), 'n': n, 'oculta': n < minimo}
-        if n >= minimo:
-            altos = int((g.percentil >= percentil_alto).sum())
-            celda |= {'riesgo_mediano': float(np.median(g.riesgo)), 'altos': altos, 'pct_altos': round(100 * altos / n, 1)}
-        else:
-            celda |= {'riesgo_mediano': None, 'altos': None, 'pct_altos': None}
+                                 'orden': orden.get(str(momento), 99), 'n': n}
+        altos = int((g.percentil >= percentil_alto).sum())
+        celda |= {'riesgo_mediano': float(np.median(g.riesgo)), 'altos': altos, 'pct_altos': round(100 * altos / n, 1)}
         salida.append(celda)
     return sorted(salida, key=lambda c: (c['clave'], c['orden']))

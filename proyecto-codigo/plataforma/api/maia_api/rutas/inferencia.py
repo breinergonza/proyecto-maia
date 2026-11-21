@@ -27,9 +27,11 @@ from maia_api import estado as E
 from maia_api.consultas import opciones, unidades_crecimiento
 from maia_api.dependencias import EXPERTO, auditar, sesion
 from maia_api.esquemas import PeticionInferencia
+from maia_api.rutas.ninos import riesgo_por_corte
 from maia_comun import puntuacion as PU
 from maia_comun.modelos_db import Usuario
 from sevarti import contrato as SV
+from sevarti.contrato import Sevarti
 
 ruta = APIRouter(prefix='/inferencia', tags=['inferencia'])
 registro = logging.getLogger(__name__)
@@ -78,14 +80,30 @@ def _pesos(modelos, esquema: pd.DataFrame) -> dict[str, float]:
     return pesos
 
 
-def _calcular(p: PeticionInferencia, mediciones: list[dict], base: Path, modelos) -> dict[str, pd.DataFrame]:
-    """Los dos modelos sobre los niños de la petición, sin guardar nada."""
+def _sevarti(p: PeticionInferencia, mediciones: list[dict], base: Path) -> Sevarti:
     parcial = {
         'sujetos': pd.DataFrame([x.model_dump(exclude={'anio_nacimiento'}) for x in p.sujetos]),
         'mediciones': pd.DataFrame(mediciones),
         'episodios': pd.DataFrame([x.model_dump() for x in p.episodios]),
     }
-    return PU.inferir(PU.completar(parcial, base, pd.Timestamp(p.corte) if p.corte else None), modelos)
+    return PU.completar(parcial, base, pd.Timestamp(p.corte) if p.corte else None)
+
+
+def _calcular(p: PeticionInferencia, mediciones: list[dict], base: Path, modelos) -> dict[str, pd.DataFrame]:
+    """Los dos modelos sobre los niños de la petición, sin guardar nada."""
+    return PU.inferir(_sevarti(p, mediciones, base), modelos)
+
+
+def _historia(p: PeticionInferencia, mediciones: list[dict], base: Path, modelos, manifest: dict) -> dict | None:
+    """El riesgo del niño en cada visita (cada una solo con lo escrito hasta ella), con lo que más pesó. Solo con un niño:
+    la vista compara las visitas de uno, no de una tanda. Si no se puede calcular, la respuesta sigue sin ella."""
+    if len(p.sujetos) != 1:
+        return None
+    try:
+        return riesgo_por_corte(_sevarti(p, mediciones, base), modelos, manifest, base, p.sujetos[0].sujeto, con_motivos=True)
+    except (ValueError, KeyError):
+        registro.warning('No se pudo calcular el riesgo por visita', exc_info=True)
+        return None
 
 
 @ruta.post('')
@@ -128,7 +146,8 @@ def inferir(p: PeticionInferencia, s: Session = Depends(sesion), u: Usuario = De
     auditar(s, u, 'inferencia', manifest['version'], {'sujetos': len(sujetos), 'mediciones': len(mediciones)})
     s.commit()
     return {'paquete': manifest['version'], 'fuente': manifest['fuente'], 'variables_ignoradas': ignoradas,
-            'alertas_dato': alertas, 'riesgos': riesgos, 'crecimiento': crecimiento}
+            'modelo_clinico': modelos.clinico.version, 'alertas_dato': alertas, 'riesgos': riesgos, 'crecimiento': crecimiento,
+            'historia': _historia(p, mediciones, base, modelos, manifest)}
 
 
 @ruta.get('/formulario')

@@ -16,10 +16,12 @@ import type {
 } from '../api/tipos'
 import { puede, useSesion } from '../auth/sesion'
 import { TarjetaRiesgo } from '../components/ficha'
+import { PanelesPestana, PanelPestana, Pestanas, usePestanaEnUrl } from '../components/ui/Pestanas'
 import { Grafica, TablaDatos } from '../components/grafica'
 import { Termino } from '../components/Termino'
 import { PanelFacetas } from '../components/PanelFacetas'
 import { LeyendaSeries, LineasSeries, type FilaSeries, type Serie } from '../components/graficos'
+import { ErrorConReintento } from '../components/ErrorConReintento'
 import { Aviso, Boton, Campo, Cargando, Cifra, Encabezado, Entrada, Insignia, Paginador, Panel, Selector, Tabla, Vacio } from '../components/ui'
 import { cn } from '../lib/cn'
 import { descripcionDe } from '../lib/descripciones'
@@ -29,32 +31,32 @@ import { cuantosMenos, nivelAlto } from '../lib/lenguaje'
 import { useFiltros } from '../lib/useFiltros'
 
 type Modo = 'muestra' | 'universo' | 'nino'
-const MODOS: { id: Modo; texto: string }[] = [
-  { id: 'muestra', texto: 'Muestra' },
-  { id: 'universo', texto: 'Todo el universo' },
-  { id: 'nino', texto: 'Niño nuevo desde un perfil' },
+const MODOS: { clave: Modo; texto: string }[] = [
+  { clave: 'muestra', texto: 'Muestra' },
+  { clave: 'universo', texto: 'Todo el universo' },
+  { clave: 'nino', texto: 'Niño nuevo desde un perfil' },
 ]
 
+/** Calcular un grupo: el modo (muestra, universo o niño nuevo) vive en la dirección (?modo=) y cada modo llena el alto que queda;
+ *  lo que no cabe se reparte en pestañas o se desplaza dentro de su propio panel, no en la página. */
 export default function Prediccion() {
-  const [modo, setModo] = useState<Modo>('muestra')
+  const [modo, elegirModo] = usePestanaEnUrl('modo', MODOS.map((m) => m.clave))
   const [modelo, setModelo] = useState<string>('')
   return (
-    <div>
-      <Encabezado titulo="Predicción">
+    <div className="flex flex-col lg:h-full">
+      <Encabezado titulo="Calcular un grupo de niños">
         Calcule el riesgo de un grupo de niños o de un niño nuevo con el modelo que elija. Los resultados no se guardan: existen solo en esta pantalla.
       </Encabezado>
-      <div role="tablist" aria-label="Qué calcular" className="mb-4 flex flex-wrap gap-2">
-        {MODOS.map((m) => (
-          <button key={m.id} role="tab" type="button" aria-selected={modo === m.id} onClick={() => setModo(m.id)}
-            className={cn('rounded-control border px-3 py-1.5 text-sm font-semibold',
-              modo === m.id ? 'border-teal bg-teal-tinte text-teal' : 'border-linea bg-papel text-salvia hover:border-teal/50')}>
-            {m.texto}
-          </button>
-        ))}
+      {/* los modos y el modelo comparten una fila: el modelo vale para los tres */}
+      <div className="flex flex-wrap items-end justify-between gap-x-4 border-b border-linea">
+        <Pestanas prefijo="modo" etiqueta="Qué calcular" pestanas={MODOS} activa={modo} elegir={elegirModo} className="min-w-0 max-w-full shrink border-b-0" />
+        <SelectorModelo valor={modelo} cambiar={setModelo} />
       </div>
-      <div className="mb-4 max-w-xl"><SelectorModelo valor={modelo} cambiar={setModelo} /></div>
-      {modo === 'nino' ? <NinoNuevo modelo={modelo} key={`n${modelo}`} />
-        : modo === 'universo' ? <Universo modelo={modelo} key={`u${modelo}`} /> : <Muestra modelo={modelo} key={`m${modelo}`} />}
+      <AvisoModelo valor={modelo} />
+      <PanelPestana prefijo="modo" activa={modo} className="mt-3 lg:min-h-0 lg:flex-1">
+        {modo === 'nino' ? <NinoNuevo modelo={modelo} key={`n${modelo}`} />
+          : modo === 'universo' ? <Universo modelo={modelo} key={`u${modelo}`} /> : <Muestra modelo={modelo} key={`m${modelo}`} />}
+      </PanelPestana>
     </div>
   )
 }
@@ -64,39 +66,43 @@ export default function Prediccion() {
 function SelectorModelo({ valor, cambiar }: { valor: string; cambiar: (v: string) => void }) {
   const modelos = useModelosPrediccion()
   const lista = modelos.data?.modelos ?? []
-  const elegido = lista.find((m) => m.version === valor) ?? lista.find((m) => m.activo)
   return (
-    <div>
-      <Campo etiqueta="Modelo" id="modelo-prediccion">
-        <Selector id="modelo-prediccion" value={valor} onChange={(e) => cambiar(e.target.value)} disabled={!lista.length}>
-          <option value="">{lista.length ? 'El modelo activo' : 'Sin modelos'}</option>
-          {lista.map((m) => (
-            <option key={m.version} value={m.version}>
-              {m.version} · {m.origen === 'personal' ? `personal${m.dueno ? ` de ${m.dueno}` : ''}` : 'oficial'}
-              {m.activo ? ' (activo)' : ''}{m.corte_anterior ? ' · corte anterior' : ''}
-            </option>
-          ))}
-        </Selector>
-      </Campo>
-      {elegido?.aviso && <div className="mt-2"><Aviso tono="coral">Corte anterior. {elegido.aviso}</Aviso></div>}
+    <div className="flex items-center gap-2 pb-1">
+      <label htmlFor="modelo-prediccion" className="text-sm font-semibold text-tinta/90">Modelo</label>
+      <Selector id="modelo-prediccion" className="w-64 max-w-full" value={valor} onChange={(e) => cambiar(e.target.value)} disabled={!lista.length}>
+        <option value="">{lista.length ? 'El modelo activo' : 'Sin modelos'}</option>
+        {lista.map((m) => (
+          <option key={m.version} value={m.version}>
+            {m.version} · {m.origen === 'personal' ? `personal${m.dueno ? ` de ${m.dueno}` : ''}` : 'oficial'}
+            {m.activo ? ' (activo)' : ''}{m.corte_anterior ? ' · corte anterior' : ''}
+          </option>
+        ))}
+      </Selector>
     </div>
   )
 }
 
+/** El aviso del modelo elegido (por ejemplo, que es de un corte anterior): aparte del selector para que el encabezado no crezca. */
+function AvisoModelo({ valor }: { valor: string }) {
+  const lista = useModelosPrediccion().data?.modelos ?? []
+  const elegido = lista.find((m) => m.version === valor) ?? lista.find((m) => m.activo)
+  return elegido?.aviso ? <div className="mt-3"><Aviso tono="coral">Corte anterior. {elegido.aviso}</Aviso></div> : null
+}
+
 // ------------------------------------------------------------------ muestra y universo
 
-/** Muestra: el grupo se arma con las facetas (o un filtro guardado) de Explorar. */
+/** Muestra: el grupo se arma con las facetas (o un filtro guardado) de Explorar; las opciones se desplazan en su columna. */
 function Muestra({ modelo }: { modelo: string }) {
   const filtros = useFiltros()
   const { usuario } = useSesion()
   const grupo: CuerpoExplorar = filtros.guardada ? { muestra_id: filtros.guardada } : { muestra: filtros.muestra }
   const facetas = useFacetasExplorar(grupo)
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-      <aside className="lg:col-span-4 xl:col-span-3">
+    <div className="grid grid-cols-1 gap-4 lg:h-full lg:grid-cols-12 lg:grid-rows-[minmax(0,1fr)]">
+      <aside className="lg:col-span-4 lg:min-h-0 lg:overflow-y-auto xl:col-span-3">
         <PanelFacetas facetas={facetas.data} cargando={facetas.isPending} filtros={filtros} esExperto={puede(usuario, ['admin', 'experto'])} />
       </aside>
-      <div className="min-w-0 lg:col-span-8 xl:col-span-9">
+      <div className="min-w-0 lg:col-span-8 lg:min-h-0 xl:col-span-9">
         <Calculo modelo={modelo} universo={false} grupo={grupo}
           listo={filtros.guardada !== null || filtros.entradas.length > 0} />
       </div>
@@ -108,7 +114,8 @@ function Universo({ modelo }: { modelo: string }) {
   return <Calculo modelo={modelo} universo grupo={{}} listo />
 }
 
-/** Lanza el cálculo (asíncrono: estado y progreso), y muestra los agregados y la tabla por páginas cuando termina. */
+/** Lanza el cálculo (asíncrono: estado y progreso), y muestra los agregados y la tabla por páginas cuando termina. El formulario
+ *  ocupa una fila y el resultado, en pestañas, el resto del alto. */
 function Calculo({ modelo, universo, grupo, listo }: {
   modelo: string; universo: boolean; grupo: { muestra?: MuestraJson; muestra_id?: number }; listo: boolean
 }) {
@@ -119,6 +126,7 @@ function Calculo({ modelo, universo, grupo, listo }: {
   const [excluir, setExcluir] = useState(false)
   const [trabajoId, setTrabajoId] = useState<number | null>(null)
   const lanzar = useLanzarPrediccion()
+  const lanzarCon = (c: Parameters<typeof lanzar.mutate>[0]) => lanzar.mutate(c, { onSuccess: (x) => setTrabajoId(x.id) })
   const trabajo = useTrabajoPrediccion(trabajoId)
   const cuerpo: CuerpoPrediccionMuestra = {
     modelo: modelo || null, ...grupo, excluir_entrenamiento: excluir, visita: visita || null,
@@ -126,28 +134,34 @@ function Calculo({ modelo, universo, grupo, listo }: {
   const t = trabajo.data
   const corriendo = lanzar.isPending || (t !== undefined && EN_CURSO.includes(t.estado))
   return (
-    <div className="space-y-4">
-      <Panel titulo={universo ? 'Todo el universo' : 'Muestra'}
-        descripcion={universo ? 'Todos los niños del corte vigente, con la visita que elija.' : 'Los niños que cumplen el grupo que armó a la izquierda.'}>
-        <form className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" onSubmit={(e) => { e.preventDefault(); lanzar.mutate(cuerpo, { onSuccess: (x) => setTrabajoId(x.id) }) }}>
+    <div className="flex flex-col gap-3 lg:h-full">
+      <Panel className="shrink-0">
+        <p className="mb-2 text-sm text-salvia">
+          {universo ? 'Todos los niños del corte vigente, con la visita que elija.' : 'Los niños que cumplen el grupo que armó a la izquierda.'}
+        </p>
+        <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-end" onSubmit={(e) => { e.preventDefault(); lanzarCon(cuerpo) }}>
           <Campo etiqueta="Visita" id="visita-prediccion">
             <Selector id="visita-prediccion" value={visita} onChange={(e) => setVisita(e.target.value)}>
               <option value="">La última a la que fue cada niño</option>
               {(biblioteca.data?.visitas ?? []).map((v) => <option key={v.etapa} value={v.etapa}>{v.nombre}</option>)}
             </Selector>
           </Campo>
-          <label className="flex items-center gap-2 self-end text-sm">
+          <label className="flex items-center gap-2 text-sm lg:pb-2.5">
             <input type="checkbox" checked={excluir} onChange={(e) => setExcluir(e.target.checked)} />
             Dejar fuera a los niños con que se entrenó el modelo
           </label>
-          <div className="sm:col-span-2">
-            <Boton type="submit" disabled={corriendo || !listo}>{corriendo ? 'Calculando…' : 'Calcular el riesgo'}</Boton>
-            {!listo && <p className="mt-1 text-xs text-salvia">Marque al menos una opción o elija un filtro guardado para armar la muestra.</p>}
-          </div>
+          <div><Boton type="submit" disabled={corriendo || !listo}>{corriendo ? 'Calculando…' : 'Calcular el riesgo'}</Boton></div>
+          {!listo && <p className="text-xs text-salvia sm:col-span-2 lg:col-span-3">Marque al menos una opción o elija un filtro guardado para armar la muestra.</p>}
         </form>
       </Panel>
-      {lanzar.isError && <Aviso>{lanzar.error.message}</Aviso>}
-      {trabajo.isError && <Aviso>{trabajo.error.message}</Aviso>}
+      {/* reintentar envía la misma muestra que no llegó (prueba de resiliencia del asesor) */}
+      {lanzar.isError && (
+        <ErrorConReintento error={lanzar.error} verbo="iniciar" que="el cálculo del grupo" reintentando={lanzar.isPending}
+          reintentar={() => { if (lanzar.variables) lanzarCon(lanzar.variables) }} />
+      )}
+      {trabajo.isError && (
+        <ErrorConReintento error={trabajo.error} que="el avance del cálculo" reintentando={trabajo.isFetching} reintentar={() => void trabajo.refetch()} />
+      )}
       {t && EN_CURSO.includes(t.estado) && <Avance t={t} />}
       {t?.estado === 'error' && <Aviso>{t.mensaje ?? 'El cálculo falló. Intente de nuevo.'}</Aviso>}
       {t?.estado === 'ok' && t.resultado && <Resultado t={t} r={t.resultado} admin={admin} />}
@@ -177,11 +191,22 @@ function Resultado({ t, r, admin }: { t: TrabajoPrediccion; r: ResultadoTrabajoP
   return <ResultadoMuestra t={t} r={r} admin={admin} />
 }
 
+type SeccionGrupo = 'resumen' | 'desenlaces' | 'visitas' | 'ninos'
+
+/** Las tablas de un panel que se desplaza: el encabezado queda fijo mientras las filas pasan por debajo (el -top-4 compensa el
+ *  relleno del panel, para que no se asomen filas por encima). */
+const ENCABEZADO_FIJO = 'lg:overflow-visible [&_th]:sticky [&_th]:-top-4 [&_th]:z-10 [&_th]:bg-papel'
+
+/** El resultado de un grupo, en pestañas por pregunta: cuántos hay y cómo se reparten (resumen), qué riesgo hay por desenlace,
+ *  cómo cambia el riesgo alto de una visita a otra, y qué niños tienen más riesgo. Los avisos del cálculo quedan sobre las pestañas, siempre a la vista. */
 function ResultadoMuestra({ t, r, admin }: { t: TrabajoPrediccion; r: Extract<ResultadoTrabajoPrediccion, { insuficiente: false }>; admin: boolean }) {
   const a = r.agregados
   const cuerpo = t.parametros
   const [error, setError] = useState<string | null>(null)
   const [bajando, setBajando] = useState(false)
+  const [seccion, setSeccion] = useState<SeccionGrupo>('resumen')
+  // la página de la tabla por niño vive aquí: sobrevive a cambiar de pestaña
+  const [pagina, setPagina] = useState(1)
   const bajar = async () => {
     setError(null)
     setBajando(true)
@@ -195,8 +220,15 @@ function ResultadoMuestra({ t, r, admin }: { t: TrabajoPrediccion; r: Extract<Re
   }
   const dist = descripcionDe('distribucion_riesgo')
   const maximo = Math.max(1, ...a.histograma.map((b) => b.n))
+  const muestra = `${num(a.n_puntuados)} niños · modelo ${r.modelo.version}`
+  const secciones: { clave: SeccionGrupo; texto: string }[] = [
+    { clave: 'resumen', texto: 'Resumen' },
+    { clave: 'desenlaces', texto: 'Por desenlace' },
+    { clave: 'visitas', texto: 'Por visita' },
+    { clave: 'ninos', texto: 'Niños con más riesgo' },
+  ]
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-2 lg:min-h-0 lg:flex-1">
       {r.aviso_corte && <Aviso tono="coral">{r.aviso_corte}</Aviso>}
       {r.excluidos > 0 && <Aviso tono="teal">Se dejaron fuera {num(r.excluidos)} niños con que se entrenó el modelo.</Aviso>}
       {!r.fuga_no_verificable && r.en_entrenamiento === 0 && (
@@ -205,57 +237,69 @@ function ResultadoMuestra({ t, r, admin }: { t: TrabajoPrediccion; r: Extract<Re
       {r.fuga_no_verificable && cuerpo.excluir_entrenamiento && (
         <Aviso tono="coral">Este modelo no trae la lista de niños con que se entrenó: no se pudieron dejar fuera.</Aviso>
       )}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Cifra valor={num(a.n_puntuados)} texto="niños con el riesgo calculado" />
-        <Cifra valor={num(a.niveles.muy_alto)} texto={`con riesgo muy alto (percentil ${a.niveles.percentil_muy_alto} o más)`} tono="coral" />
-        <Cifra valor={num(a.niveles.alto)} texto={`con riesgo alto (percentil ${a.niveles.percentil_alto} a ${a.niveles.percentil_muy_alto})`} tono="coral" />
-      </div>
-      <p className="text-xs text-salvia">El <Termino id="percentil">percentil</Termino> ordena a los niños de menor a mayor riesgo.</p>
-      <Grafica titulo={dist.titulo} descripcion={dist.descripcion}
-        exportar={{ nombre: 'distribucion-del-riesgo', filas: a.histograma.map((b) => ({ 'Percentil desde': b.desde, 'Percentil hasta': b.hasta, Niños: b.n })),
-          muestra: `${num(a.n_puntuados)} niños · modelo ${r.modelo.version}` }}>
-        <svg role="img" aria-label={dist.titulo} viewBox="0 0 400 140" className="w-full max-w-xl">
-          {a.histograma.map((b, i) => {
-            const alto = (b.n / maximo) * 90
-            return (
-              <g key={b.desde}>
-                <rect x={10 + i * 38} y={110 - alto} width={32} height={alto} rx={3}
-                  fill={b.desde >= a.niveles.percentil_alto ? 'var(--color-coral)' : 'var(--color-teal)'} />
-                <text x={26 + i * 38} y={105 - alto} textAnchor="middle" fontSize={9} fill="currentColor">{b.n}</text>
-                <text x={26 + i * 38} y={125} textAnchor="middle" fontSize={9} fill="currentColor">{b.desde}</text>
-              </g>
-            )
-          })}
-        </svg>
-        <p className="mt-1 text-xs text-salvia">Cada barra es un tramo de 10 puntos de <Termino id="percentil">percentil</Termino>; en coral, el riesgo alto.</p>
-      </Grafica>
-      <TablaDatos titulo={descripcionDe('riesgo_por_desenlace').titulo} descripcion={descripcionDe('riesgo_por_desenlace').descripcion}
-        exportar={{ nombre: 'riesgo-por-desenlace', filas: a.por_desenlace.map((d) => ({ Desenlace: d.desenlace, Visita: d.momento_nombre, Niños: d.n, 'Riesgo mediano': d.riesgo_mediano, Altos: d.altos, 'Muy altos': d.muy_altos })) }}>
-        <Tabla apilar>
-          <thead><tr><th>Desenlace</th><th>Visita</th><th className="text-right">Niños</th><th className="text-right">Riesgo <Termino id="mediana">mediano</Termino></th><th className="text-right">Riesgo alto</th></tr></thead>
-          <tbody>
-            {a.por_desenlace.map((d) => (
-              <tr key={d.clave}>
-                <td>{d.desenlace}</td><td>{d.momento_nombre}</td>
-                <td className="text-right">{num(d.n)}</td><td className="text-right">{formatoRiesgo(d.riesgo_mediano)}</td>
-                <td className="text-right">{num(d.altos)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </Tabla>
-      </TablaDatos>
-      <RiesgoPorVisita celdas={r.por_visita} muestra={`${num(a.n_puntuados)} niños · modelo ${r.modelo.version}`} />
-      <TablaNinos t={t} total={r.tabla_total} accion={admin && (
-        <Boton variante="secundario" chico onClick={bajar} disabled={bajando}>
-          <Download aria-hidden className="size-4" /> Exportar CSV
-        </Boton>
-      )} />
       {error && <Aviso>{error}</Aviso>}
+      <Pestanas prefijo="grupo" etiqueta="Qué ver del grupo" pestanas={secciones} activa={seccion} elegir={setSeccion} />
+      <PanelPestana prefijo="grupo" activa={seccion} className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+        {seccion === 'resumen' ? (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(15rem,1fr)_minmax(0,2fr)] lg:items-start">
+            <div className="space-y-3">
+              <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
+                <Cifra valor={num(a.n_puntuados)} texto="niños con el riesgo calculado" />
+                <Cifra valor={num(a.niveles.muy_alto)} texto={`con riesgo muy alto (percentil ${a.niveles.percentil_muy_alto} o más)`} tono="coral" />
+                <Cifra valor={num(a.niveles.alto)} texto={`con riesgo alto (percentil ${a.niveles.percentil_alto} a ${a.niveles.percentil_muy_alto})`} tono="coral" />
+              </div>
+              <p className="text-xs text-salvia">El <Termino id="percentil">percentil</Termino> ordena a los niños de menor a mayor riesgo.</p>
+            </div>
+            <Grafica titulo={dist.titulo} descripcion={dist.descripcion}
+              exportar={{ nombre: 'distribucion-del-riesgo', filas: a.histograma.map((b) => ({ 'Percentil desde': b.desde, 'Percentil hasta': b.hasta, Niños: b.n })),
+                muestra }}>
+              <svg role="img" aria-label={dist.titulo} viewBox="0 0 400 140" className="w-full max-w-xl">
+                {a.histograma.map((b, i) => {
+                  const alto = (b.n / maximo) * 90
+                  return (
+                    <g key={b.desde}>
+                      <rect x={10 + i * 38} y={110 - alto} width={32} height={alto} rx={3}
+                        fill={b.desde >= a.niveles.percentil_alto ? 'var(--color-coral)' : 'var(--color-teal)'} />
+                      <text x={26 + i * 38} y={105 - alto} textAnchor="middle" fontSize={9} fill="currentColor">{b.n}</text>
+                      <text x={26 + i * 38} y={125} textAnchor="middle" fontSize={9} fill="currentColor">{b.desde}</text>
+                    </g>
+                  )
+                })}
+              </svg>
+              <p className="mt-1 text-xs text-salvia">Cada barra es un tramo de 10 puntos de <Termino id="percentil">percentil</Termino>; en coral, el riesgo alto.</p>
+            </Grafica>
+          </div>
+        ) : seccion === 'desenlaces' ? (
+          <TablaDatos llenar className="lg:max-h-full" titulo={descripcionDe('riesgo_por_desenlace').titulo} descripcion={descripcionDe('riesgo_por_desenlace').descripcion}
+            exportar={{ nombre: 'riesgo-por-desenlace', filas: a.por_desenlace.map((d) => ({ Desenlace: d.desenlace, Visita: d.momento_nombre, Niños: d.n, 'Riesgo mediano': d.riesgo_mediano, Altos: d.altos, 'Muy altos': d.muy_altos })) }}>
+            <Tabla apilar densa className={ENCABEZADO_FIJO}>
+              <thead><tr><th>Desenlace</th><th>Visita</th><th className="text-right">Niños</th><th className="text-right">Riesgo <Termino id="mediana">mediano</Termino></th><th className="text-right">Riesgo alto</th></tr></thead>
+              <tbody>
+                {a.por_desenlace.map((d) => (
+                  <tr key={d.clave}>
+                    <td>{d.desenlace}</td><td>{d.momento_nombre}</td>
+                    <td className="text-right">{num(d.n)}</td><td className="text-right">{formatoRiesgo(d.riesgo_mediano)}</td>
+                    <td className="text-right">{num(d.altos)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </Tabla>
+          </TablaDatos>
+        ) : seccion === 'visitas' ? (
+          <RiesgoPorVisita celdas={r.por_visita} muestra={muestra} />
+        ) : (
+          <TablaNinos t={t} total={r.tabla_total} pagina={pagina} cambiarPagina={setPagina} accion={admin && (
+            <Boton variante="secundario" chico onClick={bajar} disabled={bajando}>
+              <Download aria-hidden className="size-4" /> Exportar CSV
+            </Boton>
+          )} />
+        )}
+      </PanelPestana>
     </div>
   )
 }
 
-/** El porcentaje de niños con riesgo alto en cada visita, para los tres desenlaces con más casos; sin cifras si la celda tiene menos de 5. */
+/** El porcentaje de niños con riesgo alto en cada visita, para los tres desenlaces con más casos. */
 function RiesgoPorVisita({ celdas, muestra }: { celdas: CeldaVisitaPrediccion[]; muestra: string }) {
   const { titulo, descripcion } = descripcionDe('riesgo_alto_visita')
   const { series, filas } = useMemo(() => {
@@ -277,31 +321,34 @@ function RiesgoPorVisita({ celdas, muestra }: { celdas: CeldaVisitaPrediccion[];
     })
     return { series: s, filas: f }
   }, [celdas])
-  if (series.length === 0) return null
+  if (series.length === 0) return <Aviso tono="teal">Ninguna visita tiene niños con riesgo calculado: no hay gráfica que mostrar.</Aviso>
   return (
     <Grafica titulo={titulo} descripcion={descripcion}
       exportar={{ nombre: 'riesgo-alto-por-visita', muestra,
-        filas: celdas.filter((c) => !c.oculta).map((c) => ({ Desenlace: c.desenlace, Visita: c.momento_nombre, Niños: c.n, 'Riesgo mediano': c.riesgo_mediano, 'Con riesgo alto (%)': c.pct_altos })) }}>
+        filas: celdas.map((c) => ({ Desenlace: c.desenlace, Visita: c.momento_nombre, Niños: c.n, 'Riesgo mediano': c.riesgo_mediano, 'Con riesgo alto (%)': c.pct_altos })) }}>
       <LeyendaSeries series={series} />
       <LineasSeries filas={filas} series={series} etiqueta={titulo} formatoY={(v) => `${Math.round(v)} %`} dominioY={[0, 100]} />
     </Grafica>
   )
 }
 
-function TablaNinos({ t, total, accion }: { t: TrabajoPrediccion; total: number; accion?: ReactNode }) {
+/** Los niños del grupo de mayor a menor riesgo, por páginas. La tabla se desplaza dentro de su panel, con el encabezado y los
+ *  botones de página siempre a la vista. */
+function TablaNinos({ t, total, accion, pagina, cambiarPagina }: {
+  t: TrabajoPrediccion; total: number; accion?: ReactNode; pagina: number; cambiarPagina: (p: number) => void
+}) {
   const d = descripcionDe('riesgo_calculado')
-  const [pagina, setPagina] = useState(1)
   const tabla = useTablaPrediccion(t.id, pagina, t.tabla_disponible)
   const filas = tabla.data?.filas ?? []
   const limite = tabla.data?.limite ?? 200
   return (
-    <TablaDatos titulo="Niños con más riesgo" accion={accion}
+    <TablaDatos llenar className="lg:h-full" titulo="Niños con más riesgo" accion={accion}
       descripcion={`${d.descripcion} De mayor a menor riesgo, ${num(limite)} niños por página, de ${num(total)} niños.`}>
       {!t.tabla_disponible || tabla.isError ? (
         <Aviso tono="teal">La tabla por niño ya no está disponible (se conserva una hora). Vuelva a calcular.</Aviso>
       ) : tabla.isPending ? <Cargando /> : (
         <>
-          <Tabla apilar>
+          <Tabla apilar densa className={ENCABEZADO_FIJO}>
             <thead>
               <tr><th>Niño</th><th>Desenlace</th><th className="text-right">Riesgo</th><th>Frente a los demás</th><th>Perfil</th><th>Primera alerta</th><th>Motivos</th></tr>
             </thead>
@@ -309,7 +356,8 @@ function TablaNinos({ t, total, accion }: { t: TrabajoPrediccion; total: number;
               {filas.map((f) => <FilaNino key={`${f.sujeto}-${f.clave}`} f={f} />)}
             </tbody>
           </Tabla>
-          <Paginador pagina={pagina} tamano={limite} total={total} cambiar={setPagina} />
+          {/* los botones de página quedan pegados al borde de abajo del panel mientras la tabla se desplaza */}
+          <div className="sticky -bottom-4 z-10 flow-root bg-papel pb-3"><Paginador pagina={pagina} tamano={limite} total={total} cambiar={cambiarPagina} /></div>
         </>
       )}
     </TablaDatos>
@@ -335,6 +383,11 @@ function FilaNino({ f }: { f: FilaPrediccion }) {
 
 // ------------------------------------------------------------------ niño nuevo desde un perfil
 
+type SeccionNino = 'perfil' | 'ejemplo' | 'resultado' | 'visitas' | 'guardar'
+
+/** Niño nuevo desde un perfil, en pestañas que siguen el camino: elegir visita y perfil, ajustar el niño de ejemplo,
+ *  ver el resultado (riesgos y riesgo por visita) y guardarlo. Elegir pasa a los datos y calcular pasa al resultado; todo queda montado, así que lo escrito
+ *  sobrevive al cambiar de pestaña. */
 function NinoNuevo({ modelo }: { modelo: string }) {
   const biblioteca = useBibliotecaEjemplos(modelo || null)
   const [visita, setVisita] = useState<string | null>(null)
@@ -343,72 +396,118 @@ function NinoNuevo({ modelo }: { modelo: string }) {
   const predecir = usePredecirNino()
   const [cambios, setCambios] = useState<Record<string, string>>({})
   const [todos, setTodos] = useState(false)
+  const [seccion, setSeccion] = useState<SeccionNino>('perfil')
   const usar = (n: NinoGuardado) => {
     setVisita(n.visita)
     setPerfil(n.perfil)
     setCambios(Object.fromEntries(Object.entries(n.cambios).map(([k, v]) => [k, v === null ? '' : String(v)])))
     predecir.reset()
+    setSeccion('ejemplo')
   }
 
   if (biblioteca.isPending) return <Cargando />
-  if (biblioteca.isError) return <Aviso>{biblioteca.error.message}</Aviso>
+  if (biblioteca.isError) {
+    return <ErrorConReintento error={biblioteca.error} que="los niños de ejemplo" reintentando={biblioteca.isFetching} reintentar={() => void biblioteca.refetch()} />
+  }
   const b = biblioteca.data
   const elegir = (v: string | null, p: string | null) => {
     setVisita(v)
     setPerfil(p)
     setCambios({})
     predecir.reset()
+    // con la visita y el perfil elegidos, lo que sigue es ajustar el niño de ejemplo
+    if (v && p) setSeccion('ejemplo')
   }
   const e = ejemplo.data
-  return (
-    <div className="space-y-4">
-      <Panel titulo={descripcionDe('biblioteca_ejemplos').titulo}
-        descripcion={descripcionDe('biblioteca_ejemplos').descripcion}>
-        <p className="mb-2 text-sm font-semibold">Visita</p>
-        <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Visita">
-          {b.visitas.map((v) => (
-            <button key={v.etapa} type="button" aria-pressed={visita === v.etapa} onClick={() => elegir(v.etapa, perfil)}
-              className={cn('rounded-control border px-3 py-1.5 text-sm', visita === v.etapa ? 'border-teal bg-teal-tinte font-semibold text-teal' : 'border-linea bg-papel')}>
-              {v.nombre}
-            </button>
-          ))}
-        </div>
-        <p className="mb-2 text-sm font-semibold">Perfil</p>
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-6" role="group" aria-label="Perfil">
-          {b.perfiles.map((p) => (
-            <button key={p.perfil} type="button" disabled={p.insuficiente} aria-pressed={perfil === p.perfil} onClick={() => elegir(visita, p.perfil)}
-              className={cn('rounded-panel border p-3 text-left text-sm disabled:opacity-50',
-                perfil === p.perfil ? 'border-teal bg-teal-tinte' : 'border-linea bg-papel')}>
-              <span className="block font-semibold">{p.etiqueta}</span>
-              <span className="text-xs text-salvia">{p.insuficiente ? 'Muy pocos niños' : `${num(p.n)} niños`}</span>
-            </button>
-          ))}
-        </div>
-      </Panel>
-      {!visita || !perfil ? (
+  const valores = e && !e.insuficiente ? valoresCambiados(e.campos, cambios) : {}
+  const secciones: { clave: SeccionNino; texto: string; contenido: ReactNode }[] = [
+    {
+      clave: 'perfil', texto: 'Perfil y visita',
+      contenido: (
+        <Panel titulo={descripcionDe('biblioteca_ejemplos').titulo}
+          descripcion={descripcionDe('biblioteca_ejemplos').descripcion}>
+          <p className="mb-2 text-sm font-semibold">Visita</p>
+          <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Visita">
+            {b.visitas.map((v) => (
+              <button key={v.etapa} type="button" aria-pressed={visita === v.etapa} onClick={() => elegir(v.etapa, perfil)}
+                className={cn('rounded-control border px-3 py-1.5 text-sm', visita === v.etapa ? 'border-teal bg-teal-tinte font-semibold text-teal' : 'border-linea bg-papel')}>
+                {v.nombre}
+              </button>
+            ))}
+          </div>
+          <p className="mb-2 text-sm font-semibold">Perfil</p>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-6" role="group" aria-label="Perfil">
+            {b.perfiles.map((p) => (
+              <button key={p.perfil} type="button" disabled={p.insuficiente} aria-pressed={perfil === p.perfil} onClick={() => elegir(visita, p.perfil)}
+                className={cn('rounded-panel border p-3 text-left text-sm disabled:opacity-50',
+                  perfil === p.perfil ? 'border-teal bg-teal-tinte' : 'border-linea bg-papel')}>
+                <span className="block font-semibold">{p.etiqueta}</span>
+                <span className="text-xs text-salvia">{p.insuficiente ? 'Muy pocos niños' : `${num(p.n)} niños`}</span>
+              </button>
+            ))}
+          </div>
+        </Panel>
+      ),
+    },
+    {
+      clave: 'ejemplo', texto: 'Niño de ejemplo',
+      contenido: !visita || !perfil ? (
         <Vacio titulo="Elija una visita y un perfil">Con las dos cosas aparece el niño de ejemplo para editar.</Vacio>
-      ) : ejemplo.isPending ? <Cargando /> : ejemplo.isError ? <Aviso>{ejemplo.error.message}</Aviso> : e?.insuficiente ? (
+      ) : ejemplo.isPending ? <Cargando /> : ejemplo.isError ? (
+        <ErrorConReintento error={ejemplo.error} que="el niño de ejemplo" reintentando={ejemplo.isFetching} reintentar={() => void ejemplo.refetch()} />
+      ) : e?.insuficiente ? (
         <Aviso tono="teal"><strong>Muy pocos niños.</strong> Con menos de {e.minimo} niños en ese grupo no se da un ejemplo típico.</Aviso>
       ) : e ? (
-        <>
+        <div className="flex flex-col gap-3 lg:h-full">
+          {predecir.isError && (
+            <ErrorConReintento error={predecir.error} verbo="calcular" que="el riesgo de este niño" reintentando={predecir.isPending}
+              reintentar={() => { if (predecir.variables) predecir.mutate(predecir.variables, { onSuccess: () => setSeccion('resultado') }) }} />
+          )}
           <EditorEjemplo campos={e.campos} visitas={e.visitas} cambios={cambios} todos={todos} verTodos={() => setTodos(!todos)}
             cambiar={(v, valor) => setCambios((c) => ({ ...c, [v]: valor }))}
-            etiqueta={`${e.perfil_etiqueta} · ${e.visita_nombre} · ${num(e.n)} niños`} />
-          <div>
-            <Boton disabled={predecir.isPending} onClick={() => predecir.mutate({
-              modelo: modelo || null, visita, perfil, cambios: valoresCambiados(e.campos, cambios),
-            })}>
-              {predecir.isPending ? 'Calculando…' : 'Calcular el riesgo'}
-            </Boton>
-          </div>
-        </>
-      ) : null}
-      {predecir.isError && <Aviso>{predecir.error.message}</Aviso>}
-      {predecir.data && <ResultadoNino r={predecir.data} />}
-      {e && !e.insuficiente && visita && perfil && (
-        <GuardarNino modelo={modelo} visita={visita} perfil={perfil} cambios={valoresCambiados(e.campos, cambios)} />
-      )}
-      <NinosGuardados usar={usar} />
+            etiqueta={`${e.perfil_etiqueta} · ${e.visita_nombre} · ${num(e.n)} niños`}
+            calcular={(
+              <Boton disabled={predecir.isPending} onClick={() => predecir.mutate({
+                modelo: modelo || null, visita, perfil, cambios: valores,
+              }, { onSuccess: () => setSeccion('resultado') })}>
+                {predecir.isPending ? 'Calculando…' : 'Calcular el riesgo'}
+              </Boton>
+            )} />
+        </div>
+      ) : null,
+    },
+    {
+      clave: 'resultado', texto: 'Resultado',
+      contenido: predecir.data ? <ResultadoNino r={predecir.data} parte="riesgos" /> : (
+        <Vacio titulo="Aquí aparecerá el resultado">Ajuste el niño de ejemplo y pulse «Calcular el riesgo».</Vacio>
+      ),
+    },
+    {
+      clave: 'visitas', texto: 'Riesgo por visita',
+      contenido: predecir.data ? <ResultadoNino r={predecir.data} parte="visitas" /> : (
+        <Vacio titulo="Aquí aparecerá el riesgo por visita">Ajuste el niño de ejemplo y pulse «Calcular el riesgo».</Vacio>
+      ),
+    },
+    {
+      clave: 'guardar', texto: 'Guardar y reutilizar',
+      contenido: (
+        <div className="grid grid-cols-1 gap-4 lg:h-full lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:grid-rows-[minmax(0,1fr)] lg:items-start">
+          {e && !e.insuficiente && visita && perfil ? (
+            <GuardarNino modelo={modelo} visita={visita} perfil={perfil} cambios={valores} />
+          ) : (
+            <Vacio titulo="Aún no hay un niño para guardar">Elija una visita y un perfil para guardar el niño de ejemplo.</Vacio>
+          )}
+          <NinosGuardados usar={usar} className="lg:max-h-full" />
+        </div>
+      ),
+    },
+  ]
+  return (
+    <div className="flex flex-col lg:h-full">
+      <Pestanas prefijo="nino-nuevo" etiqueta="Qué hacer con el niño nuevo" pestanas={secciones} activa={seccion} elegir={setSeccion} />
+      <div className="mt-3 lg:min-h-0 lg:flex-1">
+        <PanelesPestana prefijo="nino-nuevo" activa={seccion} paneles={secciones} className="lg:h-full lg:overflow-y-auto" />
+      </div>
     </div>
   )
 }
@@ -441,15 +540,15 @@ function GuardarNino({ modelo, visita, perfil, cambios }: {
   )
 }
 
-function NinosGuardados({ usar }: { usar: (n: NinoGuardado) => void }) {
+function NinosGuardados({ usar, className }: { usar: (n: NinoGuardado) => void; className?: string }) {
   const lista = useNinosGuardados()
   const borrar = useBorrarNinoGuardado()
   const filas = lista.data ?? []
   if (lista.isPending || filas.length === 0) return null
   return (
-    <TablaDatos titulo={descripcionDe('ninos_guardados').titulo}
+    <TablaDatos llenar className={className} titulo={descripcionDe('ninos_guardados').titulo}
       descripcion={descripcionDe('ninos_guardados').descripcion}>
-      <Tabla apilar>
+      <Tabla apilar className={ENCABEZADO_FIJO}>
         <thead><tr><th>Nombre</th><th>Clase</th><th>Perfil</th><th>Visita</th><th>De</th><th><span className="sr-only">Acciones</span></th></tr></thead>
         <tbody>
           {filas.map((n) => (
@@ -483,9 +582,11 @@ function valoresCambiados(campos: CampoEjemplo[], cambios: Record<string, string
   return salida
 }
 
-function EditorEjemplo({ campos, visitas, cambios, todos, verTodos, cambiar, etiqueta }: {
+function EditorEjemplo({ campos, visitas, cambios, todos, verTodos, cambiar, etiqueta, calcular }: {
   campos: CampoEjemplo[]; visitas: { etapa: string; nombre: string }[]; cambios: Record<string, string>; todos: boolean
   verTodos: () => void; cambiar: (variable: string, valor: string) => void; etiqueta: string
+  /** El botón que calcula: va junto al título del editor para estar a la vista aunque los datos se desplacen. */
+  calcular: ReactNode
 }) {
   const nombres = useMemo(() => Object.fromEntries(visitas.map((v) => [v.etapa, v.nombre])), [visitas])
   const grupos = useMemo(() => {
@@ -494,13 +595,18 @@ function EditorEjemplo({ campos, visitas, cambios, todos, verTodos, cambiar, eti
     return [...m.entries()]
   }, [campos, todos])
   return (
-    <Panel titulo="Niño de ejemplo" descripcion={`${etiqueta}. Cambie solo lo que sea distinto: lo demás queda con el valor típico.`}
-      accion={<Boton variante="secundario" chico onClick={verTodos}>{todos ? 'Solo los datos principales' : 'Ver todos los datos'}</Boton>}>
+    <Panel llenar titulo="Niño de ejemplo" descripcion={`${etiqueta}. Cambie solo lo que sea distinto: lo demás queda con el valor típico.`}
+      accion={(
+        <div className="flex flex-wrap items-center gap-2">
+          <Boton variante="secundario" chico onClick={verTodos}>{todos ? 'Solo los datos principales' : 'Ver todos los datos'}</Boton>
+          {calcular}
+        </div>
+      )}>
       <div className="space-y-5">
         {grupos.map(([etapa, lista]) => (
           <fieldset key={etapa}>
             <legend className="mb-2 text-sm font-semibold">{etapa ? nombres[etapa] ?? etapa : 'Datos generales'}</legend>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {lista.map((c) => {
                 const v = cambios[c.variable]
                 const cambiado = !igual(c, v)
@@ -532,7 +638,9 @@ function EditorEjemplo({ campos, visitas, cambios, todos, verTodos, cambiar, eti
   )
 }
 
-function ResultadoNino({ r }: { r: PrediccionNino }) {
+/** El resultado de un niño nuevo en dos partes, cada una en su pestaña: los riesgos con a qué perfil se parece, y cómo cambia el
+ *  riesgo de una visita a otra. */
+function ResultadoNino({ r, parte }: { r: PrediccionNino; parte: 'riesgos' | 'visitas' }) {
   const trayectoria = r.insuficiente ? [] : r.trayectoria
   const visitas = useMemo(() => {
     const orden = new Map<string, number>()
@@ -559,15 +667,30 @@ function ResultadoNino({ r }: { r: PrediccionNino }) {
     return fila
   })
   const d = descripcionDe('riesgo_visita')
+  if (parte === 'visitas') {
+    return filas.length === 0 ? (
+      <Vacio titulo="Sin riesgo que calcular">Con los datos de esta visita no hay un desenlace por predecir.</Vacio>
+    ) : (
+      <Grafica titulo={d.titulo} descripcion={d.descripcion}
+        exportar={{ nombre: 'riesgo-nino-nuevo', filas: trayectoria.map((t) => ({ Desenlace: t.desenlace, Visita: t.momento_nombre, Riesgo: t.riesgo, Percentil: t.percentil })) }}>
+        <LeyendaSeries series={series} />
+        <LineasSeries filas={filas} series={series} etiqueta={d.titulo} formatoY={(v) => String(Math.round(v))} dominioY={[0, 100]} />
+        <p className="mt-1 text-xs text-salvia">El eje es el <Termino id="percentil">percentil</Termino>: sobre la línea de alerta, el niño está entre el 10 % con más riesgo.</p>
+      </Grafica>
+    )
+  }
   return (
-    <div className="space-y-4">
-      <Panel titulo={perfil.titulo} descripcion={perfil.descripcion}>
-        <ul className="flex flex-wrap gap-2" aria-label={perfil.titulo}>
-          <li><Insignia tono="neutro">{r.perfil.eg_etiqueta ?? 'Edad gestacional sin clasificar'}</Insignia></li>
-          <li><Insignia tono="neutro">{r.perfil.lubchenco_etiqueta ?? 'Lubchenco sin clasificar'}</Insignia></li>
-          <li><Insignia tono="teal">Ejemplo de {num(r.n)} niños: {r.perfil_ejemplo}</Insignia></li>
-        </ul>
-        <p className="mt-2 text-sm text-salvia">{r.nota}</p>
+    <div className="space-y-3">
+      <Panel>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <h2 className="text-base">{perfil.titulo}</h2>
+          <ul className="flex flex-wrap gap-2" aria-label={perfil.titulo}>
+            <li><Insignia tono="neutro">{r.perfil.eg_etiqueta ?? 'Edad gestacional sin clasificar'}</Insignia></li>
+            <li><Insignia tono="neutro">{r.perfil.lubchenco_etiqueta ?? 'Lubchenco sin clasificar'}</Insignia></li>
+            <li><Insignia tono="teal">Ejemplo de {num(r.n)} niños: {r.perfil_ejemplo}</Insignia></li>
+          </ul>
+        </div>
+        <p className="mt-2 text-sm text-salvia">{perfil.descripcion} {r.nota}</p>
       </Panel>
       {r.riesgos.length === 0 ? (
         <Vacio titulo="Sin riesgo que calcular">Con los datos de esta visita no hay un desenlace por predecir.</Vacio>
@@ -575,14 +698,6 @@ function ResultadoNino({ r }: { r: PrediccionNino }) {
         <div className="grid gap-4 md:grid-cols-2">
           {r.riesgos.map((x) => <TarjetaRiesgo key={x.clave} r={x} nota={x.momento_nombre} />)}
         </div>
-      )}
-      {filas.length > 0 && (
-        <Grafica titulo={d.titulo} descripcion={d.descripcion}
-          exportar={{ nombre: 'riesgo-nino-nuevo', filas: trayectoria.map((t) => ({ Desenlace: t.desenlace, Visita: t.momento_nombre, Riesgo: t.riesgo, Percentil: t.percentil })) }}>
-          <LeyendaSeries series={series} />
-          <LineasSeries filas={filas} series={series} etiqueta={d.titulo} formatoY={(v) => String(Math.round(v))} dominioY={[0, 100]} />
-          <p className="mt-1 text-xs text-salvia">El eje es el <Termino id="percentil">percentil</Termino>: sobre la línea de alerta, el niño está entre el 10 % con más riesgo.</p>
-        </Grafica>
       )}
     </div>
   )

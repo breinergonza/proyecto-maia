@@ -16,6 +16,7 @@ from maia_api.rutas import (
     administracion,
     analitica,
     auth,
+    clinica,
     corridas,
     diccionario,
     entrenamientos,
@@ -74,7 +75,7 @@ def crear_app() -> FastAPI:
                            allow_methods=['*'], allow_headers=['*'])
     errores.registrar(app)
     for r in (salud, auth, usuarios, modelos, corridas, tablero, ninos, revision, inferencia, notificaciones,
-              administracion, entrenamientos, diccionario, analitica, muestras, exploracion, prediccion):
+              administracion, entrenamientos, diccionario, analitica, muestras, exploracion, prediccion, clinica):
         app.include_router(r.ruta, prefix='/api')
     return app
 

@@ -47,7 +47,7 @@ def test_trayectorias_por_riesgo_solo_agregados():
 
 
 def test_perfiles_con_tasa_observada_y_riesgo_alto():
-    eg = [26] * 10 + [30] * 30 + [34] * 18 + [38] * 2     # el grupo a término queda con menos de 5
+    eg = [26] * 10 + [30] * 30 + [34] * 18 + [38] * 2     # el grupo a término queda con 2 niños
     sev = SimpleNamespace(sujetos=pd.DataFrame({'sujeto': [f'S{i:03d}' for i in range(N)], 'eg_semanas': eg}),
                           mediciones=pd.DataFrame(columns=['sujeto', 'variable', 'valor']))
     p = AL.perfiles_desenlace(_preds(), sev)
@@ -55,5 +55,6 @@ def test_perfiles_con_tasa_observada_y_riesgo_alto():
     assert p['ninos'] == N and p['casos'] == 7
     extremo = filas['extremo']
     assert extremo['n'] == 10 and extremo['tasa_observada'] == 0.4 and extremo['tasa_riesgo_alto'] == 0.6
-    assert filas['a_termino']['oculto'] is True and filas['a_termino']['tasa_observada'] is None
+    assert filas['a_termino']['n'] == 2 and 'oculto' not in filas['a_termino']
+    assert filas['a_termino']['tasa_observada'] is not None and filas['a_termino']['tasa_riesgo_alto'] is not None
     assert 'tasa' not in extremo, 'la tasa se nombra según lo que mide'

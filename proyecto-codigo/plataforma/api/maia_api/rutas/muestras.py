@@ -108,8 +108,7 @@ def variables(s: Session = Depends(sesion), _: Usuario = Depends(EXPERTO)) -> di
 
 @ruta.post('/facetas')
 def facetas(cuerpo: dict = Body(...), s: Session = Depends(sesion), _: Usuario = Depends(EXPERTO)) -> dict:
-    """Niños por opción de cada variable con los demás filtros aplicados (el propio no). Opciones con menos de 5 niños
-    salen como «<5»."""
+    """Niños por opción de cada variable con los demás filtros aplicados (el propio no)."""
     corte = P.corte_actual(s)
     try:
         r = P.facetas(s, corte.id, _cuerpo(cuerpo), extra=_extra(cuerpo))

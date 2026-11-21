@@ -55,6 +55,20 @@ def por_defecto(tipo: str) -> dict[str, Any]:
     return {c.nombre: d[c.nombre] for c in CAMPOS[tipo]}
 
 
+def usados(tipo: str, cfg: Any) -> dict[str, Any]:
+    """Los valores ajustables con que se entrena (la configuración ya con lo guardado), para dejarlos con la analítica."""
+    return {c.nombre: getattr(cfg, c.nombre) for c in CAMPOS[tipo]}
+
+
+def rotulados(tipo: str | None, valores: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """Los valores guardados por un entrenamiento, con su nombre legible y en el orden de administración. Un entrenamiento
+    que no los guardó no trae ninguno."""
+    if not valores or tipo not in CAMPOS:
+        return []
+    return [{'nombre': c.nombre, 'etiqueta': c.etiqueta, 'valor': valores[c.nombre]} for c in CAMPOS[tipo]
+            if c.nombre in valores]
+
+
 def validar(tipo: str, valores: dict[str, Any]) -> dict[str, Any]:
     """Los valores limpios (solo campos conocidos, del tipo y dentro de los límites). Vacío o ``None`` quita el ajuste."""
     if tipo not in CAMPOS:

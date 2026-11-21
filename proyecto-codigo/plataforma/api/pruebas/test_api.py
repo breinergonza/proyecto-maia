@@ -267,6 +267,8 @@ def test_ninos_y_linea_temporal(cliente, admin, corrida):
     assert lt.status_code == 200, lt.text
     lt = lt.json()
     assert lt['sujeto'] == sujeto and lt['visitas']
+    # la versión del modelo clínico con que se calcularon sus riesgos (la de la corrida)
+    assert lt['modelo_clinico'] and lt['modelo_clinico'] == corrida['modelo_clinico']
     assert all(lt['visitas'][i]['orden'] <= lt['visitas'][i + 1]['orden'] for i in range(len(lt['visitas']) - 1))
     assert cliente.get('/api/ninos/no-existe/linea-temporal', headers=admin).status_code == 404
     if r['items'][0]['percentil_max'] is not None:
@@ -366,7 +368,13 @@ def test_perfil_un_valor_por_nino_y_sin_codigos_de_no_se_hizo(cliente, admin, co
             cx.execute(text("UPDATE sevarti.esquema SET datos = jsonb_set(datos, '{codigos_especiales}', to_jsonb(CAST(:cod AS text))) "
                             'WHERE corte_id = :c AND variable = :v'), {'c': corte, 'v': variable, 'cod': f'{fila["valor"]:g}'})
         con_codigo = perfil()[variable]
-        assert con_codigo['valor'] == 1234.5 and con_codigo['ninos'] == fila['ninos']
+        # the code applies to everyone: another child whose only value was that same number has no measure left
+        with motor.begin() as cx:
+            sin_medida = cx.execute(text(
+                r"SELECT count(*) FROM (SELECT sujeto FROM sevarti.mediciones WHERE corte_id = :c AND variable = :v "
+                r"AND sujeto <> :s AND valor ~ '^-?[0-9]+(\.[0-9]+)?$' GROUP BY sujeto HAVING bool_and(valor::float = :x)) t"),
+                {'c': corte, 'v': variable, 's': sujeto, 'x': fila['valor']}).scalar_one()
+        assert con_codigo['valor'] == 1234.5 and con_codigo['ninos'] == fila['ninos'] - sin_medida
     finally:
         with motor.begin() as cx:
             cx.execute(text('DELETE FROM sevarti.mediciones WHERE corte_id = :c AND id >= :d'), {'c': corte, 'd': desde})
@@ -481,6 +489,7 @@ def test_inferencia(cliente, admin, corrida):
     assert r.status_code == 200, r.text
     out = r.json()
     assert out['crecimiento'] and isinstance(out['riesgos'], list)
+    assert isinstance(out['modelo_clinico'], str) and out['modelo_clinico']
     assert all(isinstance(x['motivos'], list) for x in out['riesgos'])
     malo = dict(peticion, mediciones=[dict(peticion['mediciones'][0], sujeto='otro')])
     assert cliente.post('/api/inferencia', headers=admin, json=malo).status_code == 422
@@ -528,9 +537,11 @@ def test_el_nino_de_ejemplo_llena_las_variables_principales_del_paquete(cliente,
     f = cliente.get('/api/inferencia/formulario', headers=admin).json()
     ej = cliente.get('/api/inferencia/ejemplo', headers=admin).json()
     llenas = {m['variable'] for m in ej['mediciones']}
-    # cada visita va completa (un valor en cada campo principal) o vacía, y las llenas son las primeras
+    # cada visita va completa (un valor en cada campo principal) o vacía, y las llenas son las primeras; un campo se
+    # puede llenar si es una medida de crecimiento (mediana OMS), una lista, un sí/no o un número con rango
     principales = [{c['variable'] for c in v['campos'] if c['principal'] and (
-        c['opciones'] or c['tipo'] == 'si_no' or (c['minimo'] is not None and c['maximo'] is not None))}
+        c['crecimiento'] or c['opciones'] or c['tipo'] == 'si_no'
+        or (c['minimo'] is not None and c['maximo'] is not None))}
         for v in f['visitas']]
     principales = [p for p in principales if p]
     llena = [p <= llenas for p in principales]
@@ -621,7 +632,9 @@ def test_riesgo_por_visita_marca_la_primera_alerta_y_solo_lo_ve_el_experto(clien
     cuerpo = sin_pedir.json()
     assert cuerpo['elegidos_por'] == 'mayor_riesgo' and cuerpo['umbral_percentil'] == 90 and 1 <= len(cuerpo['ninos']) <= 2
     nino = cuerpo['ninos'][0]
-    assert nino['puntos'] and {p['clave'] for p in nino['puntos']} == {desenlace}
+    # una familia de anticipación junta la fila base y sus filas «_desde_» (encendida por defecto, D68)
+    assert nino['puntos'] and all(p['clave'] == desenlace or p['clave'].startswith(f'{desenlace}_desde_')
+                                  for p in nino['puntos'])
     ordenes = [p['orden'] for p in nino['puntos']]
     assert ordenes == sorted(ordenes)
     altos = [p for p in nino['puntos'] if p['percentil'] >= 90]

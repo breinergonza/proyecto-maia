@@ -8,8 +8,29 @@ import { CAPAS, dec2, fecha, frase, indicador, numero, RIESGO_ALTO } from './for
 /** El 5 % con más riesgo; es también el mínimo por defecto de los correos de alerta. */
 export const RIESGO_MUY_ALTO = 95
 
-export const AYUDA_RIESGO_ALTO = `Riesgo alto: estar entre el ${100 - RIESGO_ALTO} % de niños con más riesgo para ese desenlace. Es una ` +
-  'comparación entre los niños del programa, no un umbral clínico.'
+/** Por qué no hay riesgo estimado que mostrar: el paquete no calcula el desenlace, o lo calcula pero ningún niño elegido
+ *  lo tiene ahora (solo se calcula para quienes siguen en seguimiento). */
+export const sinRiesgoEstimado = (conModelo: boolean, quienes: string) => conModelo
+  ? `Ningún niño ${quienes} tiene riesgo estimado ahora: se calcula solo para los niños que siguen en seguimiento.`
+  : `El paquete de modelos activo aún no calcula este desenlace: no hay riesgo estimado ${quienes}.`
+
+/** Contra quiénes se ordena el riesgo de cada niño: los niños con que se calibró el modelo de ese desenlace (los más
+ *  recientes con desenlace conocido), no el grupo que se está mirando. Por eso un grupo puede tener más o menos del 10 %
+ *  en alerta. */
+export const REFERENCIA_RIESGO = 'los niños más recientes con desenlace conocido, con quienes se calibró el modelo'
+
+export const AYUDA_RIESGO_ALTO = `Riesgo alto: entre el ${100 - RIESGO_ALTO} % más alto de ${REFERENCIA_RIESGO}; en un grupo pueden ser ` +
+  `más o menos del ${100 - RIESGO_ALTO} %. Es una comparación, no un umbral clínico.`
+
+/** «En alerta» con su referencia, para el panel que cuenta los niños en alerta de un grupo. */
+export const definicionAlerta = (percentil: number) =>
+  `En alerta: riesgo entre el ${100 - percentil} % más alto de ${REFERENCIA_RIESGO}. ` +
+  `Por eso, en un grupo pueden ser más o menos del ${100 - percentil} %.`
+
+/** «Alto» (y «muy alto») en una línea, para listas que mezclan desenlaces: cada uno con su modelo. */
+export const definicionAlto = (alto: number, muyAlto?: number) =>
+  `Alto: entre el ${100 - alto} % más alto de los niños con que se calibró cada modelo` +
+  (muyAlto == null ? '' : `; muy alto: el ${100 - muyAlto} %`)
 
 export const esAlto = (p: number | null | undefined) => p != null && p >= RIESGO_ALTO
 
@@ -206,25 +227,13 @@ export const datosAl = (corte: string | null | undefined) => `Datos al ${fecha(c
 
 // ------------------------------------------------------------------ analítica de los modelos (entradas nuevas)
 
-/** Término técnico → cómo se dice en la pantalla clínica. El modo técnico muestra la jerga. */
-export const GLOSARIO_ANALITICA: Record<string, string> = {
-  AUC: 'Qué tan bien ordena a los niños',
-  ROC: 'Aciertos frente a falsas alarmas',
-  PR: 'Alertas acertadas frente a casos detectados',
-  sensibilidad: 'Casos detectados',
-  VPP: 'Alertas acertadas',
-  especificidad: 'Niños sin falsa alarma',
-  umbral: 'A cuántos niños se alerta',
-  calibración: 'Si el porcentaje de riesgo es el real',
-  Brier: 'Error del porcentaje de riesgo',
-  PSI: 'Cambio frente al entrenamiento',
-  lift: 'Qué tanto ayuda revisar a los primeros',
-}
+/** Lo que dice una celda sin cifra. Ningún conteo se oculta por ser de pocos niños (1 a 4 se dicen con su número): sin
+ *  cifra es lo que no se pudo calcular (un desvío o un intervalo pide 20 niños; el intervalo de un AUC, 5 de cada
+ *  clase) o lo que un entrenamiento anterior no guardó. */
+export const SIN_CIFRA = 'sin cifra'
 
-/** Jerga o palabra clínica según el modo técnico. */
-export const jerga = (tecnico: boolean, clinico: string, tecnicoTexto: string) => (tecnico ? tecnicoTexto : clinico)
-
-export const N_MENOR_QUE_5 = 'n menor que 5'
+/** Por qué un AUC puede venir sin intervalo: es un límite estadístico, no de privacidad. */
+export const SIN_INTERVALO = 'Sin intervalo: hacen falta al menos 5 niños con el desenlace y 5 sin él para estimarlo.'
 
 /** El nombre clínico del estado de un semáforo. */
 export const SEMAFORO: Record<string, string> = { verde: 'Confiable', ambar: 'Mirar con cuidado', rojo: 'No confiable', gris: 'Sin datos para decidir' }
@@ -232,8 +241,7 @@ export const SEMAFORO: Record<string, string> = { verde: 'Confiable', ambar: 'Mi
 // ------------------------------------------------------------------ nombres de variables del modelo
 // Los artefactos de analítica traen el código de cada variable; la pantalla muestra su nombre clínico. Mientras no
 // haya un servicio con las etiquetas del Diccionario para todas las variables del modelo, se traducen los códigos
-// conocidos y el resto se vuelve legible (guiones bajos a espacios, «z_» como «frente a la OMS»). El modo técnico
-// sigue mostrando el código.
+// conocidos y el resto se vuelve legible (guiones bajos a espacios, «z_» como «frente a la OMS»).
 const NOMBRES_VARIABLE: Record<string, string> = {
   ingreso_hogar: 'Ingreso del hogar', personas_hogar: 'Personas en el hogar', edad_madre: 'Edad de la madre',
   controles_prenatales: 'Controles prenatales', eg_semanas: 'Edad gestacional', sexo: 'Sexo', dias_uci: 'Días en UCI',
@@ -251,5 +259,3 @@ export function nombreVariable(codigo: string): string {
   const texto = base.charAt(0).toUpperCase() + base.slice(1)
   return oms ? `${texto} frente a la OMS` : texto
 }
-/** El nombre de la variable y, en modo técnico, su código entre paréntesis. */
-export const variable = (tecnico: boolean, codigo: string) => (tecnico ? `${nombreVariable(codigo)} (${codigo})` : nombreVariable(codigo))

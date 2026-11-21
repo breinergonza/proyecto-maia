@@ -1,9 +1,12 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { montar, simularApi, usuario } from './util'
 
 afterEach(() => vi.unstubAllGlobals())
+
+const Ubicacion = () => <p>dirección: {useLocation().search}</p>
 
 const caso = (id: number, extra = {}) => ({
   id, sujeto: `N-${id}`, clave: 'oxigeno', desenlace: 'Oxígeno a los 12 meses', momento: '40s', momento_nombre: '40 semanas',
@@ -55,16 +58,77 @@ describe('Revisión de riesgos simplificada', () => {
     expect(screen.queryByText('Lo que va de la revisión')).toBeNull()
   })
 
-  it('el admin ve además el resumen de lo que va de la revisión', async () => {
+  it('el admin ve además el resumen de lo que va de la revisión, en su propia pestaña', async () => {
     simularApi(api('admin', [caso(1)]))
     montar('/revision/riesgos')
-    expect(await screen.findByText('Lo que va de la revisión')).toBeInTheDocument()
     expect((await screen.findAllByText(/Niño 1 de 1/)).length).toBeGreaterThan(0)
+    expect(screen.queryByText('Lo que va de la revisión')).toBeNull()
+    await userEvent.click(screen.getByRole('tab', { name: 'Resultados' }))
+    expect(await screen.findByText('Lo que va de la revisión')).toBeInTheDocument()
+  })
+
+  it('el admin elige entre revisar niños y los resultados; la pestaña vive en la dirección y el motivo escrito sobrevive', async () => {
+    simularApi(api('admin', [caso(1)]))
+    montar('/revision/riesgos', <Ubicacion />)
+    const lista = await screen.findByRole('tablist', { name: 'Qué ver de la revisión' })
+    expect(Array.from(lista.querySelectorAll('[role="tab"]')).map((t) => t.textContent)).toEqual(['Revisar niños', 'Resultados'])
+    expect(screen.getByRole('tab', { name: 'Revisar niños' })).toHaveAttribute('aria-selected', 'true')
+    await userEvent.type(await screen.findByLabelText(/Motivo/), 'Se ve bien')
+    await userEvent.click(screen.getByRole('tab', { name: 'Resultados' }))
+    expect(screen.getByText(/^dirección:/)).toHaveTextContent('ver=resultados')
+    expect(screen.queryByRole('group', { name: '¿Le preocupa este niño?' })).toBeNull()
+    await userEvent.click(screen.getByRole('tab', { name: 'Revisar niños' }))
+    expect(await screen.findByLabelText(/Motivo/)).toHaveValue('Se ve bien')
+  })
+
+  it('la dirección ?ver=resultados abre los resultados, y el experto no tiene pestañas', async () => {
+    simularApi(api('admin', [caso(1)]))
+    const { unmount } = montar('/revision/riesgos?ver=resultados')
+    expect(await screen.findByText('Lo que va de la revisión')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Resultados' })).toHaveAttribute('aria-selected', 'true')
+    unmount()
+    simularApi(api('experto', [caso(1)]))
+    montar('/revision/riesgos?ver=resultados')
+    expect(await screen.findByRole('group', { name: '¿Le preocupa este niño?' })).toBeInTheDocument()
+    expect(screen.queryByRole('tablist', { name: 'Qué ver de la revisión' })).toBeNull()
   })
 
   it('el visualizador no entra', async () => {
     simularApi(api('visualizador'))
     montar('/revision/riesgos')
     expect(await screen.findByRole('heading', { name: 'Sin permiso' })).toBeInTheDocument()
+  })
+
+  it('no dice la visita dos veces: el encabezado del caso la trae y las líneas de datos no la repiten', async () => {
+    simularApi(api('experto', [caso(1, { resumen: ['Edad gestacional: 30 semanas', 'Peso a 40 sem (40 semanas): 3514 g'] })]))
+    montar('/revision/riesgos')
+    expect(await screen.findByText(/Niño 1 de 1 · N-1 · 40 semanas/)).toBeInTheDocument()
+    expect(screen.getByText('Peso a 40 sem: 3514 g')).toBeInTheDocument()
+    expect(screen.queryByText(/\(40 semanas\)/)).not.toBeInTheDocument()
+  })
+
+  it('las respuestas quedan a la vista mientras la evidencia se desplaza', async () => {
+    simularApi(api('experto'))
+    montar('/revision/riesgos')
+    const respuestas = await screen.findByRole('group', { name: '¿Le preocupa este niño?' })
+    expect(respuestas).toHaveClass('lg:sticky')
+    expect(respuestas.closest('section')?.firstElementChild).toHaveClass('lg:overflow-auto')   // la evidencia es la que se desplaza
+  })
+
+  it('una sola explicación sobre las gráficas de crecimiento', async () => {
+    const z = (edad: number, valor: number) => ({ etapa: '40s', indicador: 'talla', fecha: null, edad_corregida: edad, valor: 50, unidad: 'cm', z: valor, bajo_2de: false, caida_1de: false, improbable: false })
+    simularApi(api('experto', [caso(1, { crecimiento: { talla: [z(10, -0.5), z(40, -1)] } })]))
+    montar('/revision/riesgos')
+    expect(await screen.findByRole('heading', { name: 'Crecimiento frente a la OMS' })).toBeInTheDocument()
+    expect(screen.getAllByText(/Desviaciones estándar frente a la OMS/)).toHaveLength(1)
+    expect(screen.queryByText(/Un gráfico por medida/)).not.toBeInTheDocument()
+  })
+
+  it('la tarjeta del caso se ajusta a su contenido (no se estira para dejar un hueco vacío en pantallas grandes)', async () => {
+    simularApi(api('experto'))
+    montar('/revision/riesgos')
+    const caso = (await screen.findByRole('group', { name: '¿Le preocupa este niño?' })).closest('section')!
+    expect(caso).not.toHaveClass('lg:flex-1')
+    expect(caso).toHaveClass('lg:flex-initial')
   })
 })

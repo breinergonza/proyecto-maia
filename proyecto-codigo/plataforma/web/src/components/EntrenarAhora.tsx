@@ -9,6 +9,7 @@ import { cn } from '../lib/cn'
 import { fechaHora, FUENTES, MODELOS } from '../lib/formato'
 import { CampoHiperparametro } from './CampoHiperparametro'
 import { Aviso, Boton, Cargando, Insignia, Panel } from './ui'
+import { PanelPestana, Pestanas } from './ui/Pestanas'
 
 type Tipo = 'anomalias' | 'clinico'
 type Fuente = 'kmc' | 'simulado'
@@ -65,52 +66,66 @@ export function EntrenarAhora({ fuente }: { fuente: Fuente }) {
   }, [ultimo, fuente, cliente])
   const ocupado = enMarcha(ultimo)
   const ninguno = !TIPOS.some((t) => modelos[t])
+  const estado = ultimo && <EstadoEntrenamiento e={ultimo} />
+  // los hiperparámetros de un modelo por pestaña: lo escrito vive aquí, en el formulario, y no se pierde al cambiar
+  const elegibles = (hp.data ?? []).filter((h) => modelos[h.modelo])
+  const [verHp, setVerHp] = useState<Tipo>('clinico')
+  const mostrado = elegibles.find((h) => h.modelo === verHp) ?? elegibles[0]
 
   return (
     <Panel titulo="Entrenar ahora">
-      {ultimo && <EstadoEntrenamiento e={ultimo} />}
-      {hp.isPending ? <Cargando /> : hp.error ? <Aviso>{hp.error.message}</Aviso> : (
-        <form className="mt-4 space-y-4" onSubmit={(ev) => { ev.preventDefault(); entrenar.mutate() }}>
-          <p className="text-sm text-salvia">
-            Trae los datos de <strong>{FUENTES[fuente]}</strong> y entrena con los hiperparámetros de abajo (parten del
-            ajuste guardado o del núcleo). El modelo queda en MLflow como <em>candidato</em>; para usarlo en la solución,
-            apruébelo más abajo.
-          </p>
-          <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-            {TIPOS.map((t) => (
-              <label key={t} className="flex items-center gap-2">
-                <input type="checkbox" className="size-4 accent-teal" checked={modelos[t]}
-                  onChange={(ev) => setModelos({ ...modelos, [t]: ev.target.checked })} />
-                {MODELOS[t]}
+      {hp.isPending ? <>{estado}<Cargando /></> : hp.error ? <>{estado}<Aviso>{hp.error.message}</Aviso></> : (
+        // escritorio: a la izquierda qué entrenar y el avance; a la derecha los hiperparámetros del modelo elegido
+        <form className="grid grid-cols-1 gap-x-6 gap-y-4 xl:grid-cols-[minmax(0,21rem)_minmax(0,1fr)]" onSubmit={(ev) => { ev.preventDefault(); entrenar.mutate() }}>
+          <div className="space-y-4">
+            {estado}
+            <p className="text-sm text-salvia">
+              Trae los datos de <strong>{FUENTES[fuente]}</strong> y entrena con los hiperparámetros de abajo (parten del
+              ajuste guardado o de los valores por defecto). El modelo queda en MLflow como <em>candidato</em>; para usarlo en la solución,
+              apruébelo en la pestaña de sus versiones.
+            </p>
+            <div className="flex flex-col gap-2 text-sm">
+              {TIPOS.map((t) => (
+                <label key={t} className="flex items-center gap-2">
+                  <input type="checkbox" className="size-4 accent-teal" checked={modelos[t]}
+                    onChange={(ev) => setModelos({ ...modelos, [t]: ev.target.checked })} />
+                  {MODELOS[t]}
+                </label>
+              ))}
+              <label className="flex items-center gap-2">
+                <input type="checkbox" className="size-4 accent-teal" checked={extraer} onChange={(ev) => setExtraer(ev.target.checked)} />
+                <span>
+                  {fuente === 'kmc' ? 'Extraer datos nuevos de la base de la entidad' : 'Generar una cohorte simulada nueva'}
+                  {' '}<span className="text-salvia">(si no, usa el último corte)</span>
+                </span>
               </label>
-            ))}
-            <label className="flex items-center gap-2">
-              <input type="checkbox" className="size-4 accent-teal" checked={extraer} onChange={(ev) => setExtraer(ev.target.checked)} />
-              {fuente === 'kmc' ? 'Extraer datos nuevos de la base de la entidad' : 'Generar una cohorte simulada nueva'}
-              <span className="text-salvia">(si no, usa el último corte)</span>
-            </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" className="size-4 accent-teal" checked={guardar} onChange={(ev) => setGuardar(ev.target.checked)} />
+                Guardar también estos valores para las ejecuciones programadas
+              </label>
+            </div>
+            {entrenar.error && <Aviso>{entrenar.error.message}</Aviso>}
+            <Boton type="submit" disabled={ninguno || ocupado || entrenar.isPending}>
+              {ocupado ? 'Hay un entrenamiento en curso' : 'Entrenar ahora'}
+            </Boton>
           </div>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {hp.data.filter((h) => modelos[h.modelo]).map((h) => (
-              <fieldset key={h.modelo} className="rounded-control border border-linea p-3">
-                <legend className="px-1 text-sm font-semibold">Hiperparámetros · {MODELOS[h.modelo]}</legend>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {h.campos.map((c) => (
-                    <CampoHiperparametro key={c.nombre} c={c} id={`ea-${h.modelo}-${c.nombre}`} valor={valores[h.modelo]?.[c.nombre] ?? ''}
-                      cambiar={(x) => setValores({ ...valores, [h.modelo]: { ...valores[h.modelo], [c.nombre]: x } })} />
-                  ))}
-                </div>
-              </fieldset>
-            ))}
-          </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" className="size-4 accent-teal" checked={guardar} onChange={(ev) => setGuardar(ev.target.checked)} />
-            Guardar también estos valores para las ejecuciones programadas
-          </label>
-          {entrenar.error && <Aviso>{entrenar.error.message}</Aviso>}
-          <Boton type="submit" disabled={ninguno || ocupado || entrenar.isPending}>
-            {ocupado ? 'Hay un entrenamiento en curso' : 'Entrenar ahora'}
-          </Boton>
+          {mostrado && (
+            <div>
+              <Pestanas prefijo="hp-entrenar" etiqueta="Hiperparámetros por modelo" activa={mostrado.modelo} elegir={setVerHp}
+                pestanas={elegibles.map((h) => ({ clave: h.modelo, texto: MODELOS[h.modelo] }))} />
+              <PanelPestana prefijo="hp-entrenar" activa={mostrado.modelo} className="mt-3">
+                <fieldset className="rounded-control border border-linea p-3">
+                  <legend className="px-1 text-sm font-semibold">Hiperparámetros · {MODELOS[mostrado.modelo]}</legend>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {mostrado.campos.map((c) => (
+                      <CampoHiperparametro key={c.nombre} c={c} id={`ea-${mostrado.modelo}-${c.nombre}`} valor={valores[mostrado.modelo]?.[c.nombre] ?? ''}
+                        cambiar={(x) => setValores({ ...valores, [mostrado.modelo]: { ...valores[mostrado.modelo], [c.nombre]: x } })} />
+                    ))}
+                  </div>
+                </fieldset>
+              </PanelPestana>
+            </div>
+          )}
         </form>
       )}
     </Panel>

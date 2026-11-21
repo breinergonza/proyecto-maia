@@ -37,8 +37,8 @@ MUESTRA_POR_GRUPO = 20
 
 @ruta.get('/datos')
 def datos(estado: str = Query('pendiente', pattern='^(pendiente|revisado|todos)$'), capa: str | None = None,
-          variable: str | None = None, pagina: int = Query(1, ge=1), tamano: int = Query(25, ge=1, le=200),
-          corrida_id: int | None = None, s: Session = Depends(sesion), u: Usuario = Depends(ADMIN)) -> dict:
+          variable: str | None = None, etapa: str | None = None, pagina: int = Query(1, ge=1),
+          tamano: int = Query(25, ge=1, le=200), corrida_id: int | None = None, s: Session = Depends(sesion), u: Usuario = Depends(ADMIN)) -> dict:
     c = corrida_de(s, corrida_id)
     mapa = etapas(s, c.corte_id)
     filtros = ['a.corrida_id = :c']
@@ -46,6 +46,8 @@ def datos(estado: str = Query('pendiente', pattern='^(pendiente|revisado|todos)$
         filtros.append(':capa = ANY(a.capas)')
     if variable:
         filtros.append('a.variable = :v')
+    if etapa:
+        filtros.append('a.etapa = :e')
     if estado == 'pendiente':
         filtros.append('r.alerta_id IS NULL')
     elif estado == 'revisado':
@@ -53,7 +55,7 @@ def datos(estado: str = Query('pendiente', pattern='^(pendiente|revisado|todos)$
     base = f"""FROM resultados.alertas_dato a
                LEFT JOIN resultados.revision_datos r ON r.alerta_id = a.id AND r.usuario_id = :u
                WHERE {' AND '.join(filtros)}"""
-    p = {'c': c.id, 'u': u.id, 'capa': capa, 'v': variable}
+    p = {'c': c.id, 'u': u.id, 'capa': capa, 'v': variable, 'e': etapa}
     total = s.execute(text(f'SELECT count(*) {base}'), p).scalar_one()
     filas = s.execute(text(f"""SELECT a.id, a.prioridad, a.sujeto, a.variable, a.etiqueta, a.unidad, a.etapa, a.fecha,
                                       a.valor, a.esperado, a.rango_bajo, a.rango_alto, a.capas, a.motivo, a.fuerza,
@@ -68,11 +70,83 @@ def datos(estado: str = Query('pendiente', pattern='^(pendiente|revisado|todos)$
         items.append(d)
     for d, serie in zip(items, _series(s, c.corte_id, items, esquema(s, c.corte_id), mapa), strict=True):
         d['serie'] = serie
+    revisiones = _revisiones(s, [d['id'] for d in items], u)
+    for d in items:
+        d['revisiones'] = revisiones.get(d['id'], [])
     return {'total': total, 'pagina': pagina, 'tamano': tamano, 'items': items}
 
 
+def _revisiones(s: Session, ids: list[int], u: Usuario) -> dict[int, list[dict]]:
+    """Las respuestas de todo el equipo a cada dato: quién, qué respondió y cuándo, la más reciente primero. «Cuándo» es
+    la última vez que respondió (la auditoría guarda cada respuesta; la fila solo la primera hora), así un cambio de
+    opinión queda con su fecha."""
+    if not ids:
+        return {}
+    filas = s.execute(text("""
+        SELECT r.alerta_id, us.nombre AS usuario, r.usuario_id = :u AS propia, r.es_error,
+               coalesce((SELECT max(x.creado_en) FROM app.auditoria x
+                         WHERE x.accion = 'revisar_dato' AND x.recurso = r.alerta_id::text AND x.usuario_id = r.usuario_id),
+                        r.creado_en) AS cuando
+        FROM resultados.revision_datos r JOIN app.usuarios us ON us.id = r.usuario_id
+        WHERE r.alerta_id = ANY(:ids)
+        ORDER BY cuando DESC, us.nombre"""), {'ids': ids, 'u': u.id})
+    por_alerta: dict[int, list[dict]] = {}
+    for f in filas:
+        por_alerta.setdefault(f.alerta_id, []).append(
+            {'usuario': f.usuario, 'propia': f.propia, 'es_error': f.es_error, 'cuando': f.cuando})
+    return por_alerta
+
+
+INDICADOR_COMPLETITUD = ('talla', 'Talla para la edad')
+DIAS_12_MESES = 365
+
+
+@ruta.get('/datos/resumen')
+def resumen_datos(corrida_id: int | None = None, s: Session = Depends(sesion), u: Usuario = Depends(ADMIN)) -> dict:
+    """Lo que la pantalla de Calidad de datos pone sobre la cola: cuántas mediciones faltan por revisar (para quien
+    consulta), cuántas se revisaron este mes, las visitas y mediciones que tienen alertas (para filtrar la cola) y la
+    completitud de la talla por visita.
+
+    Completitud: de los niños con alguna medida de crecimiento en la visita (peso, talla o perímetro), el porcentaje que
+    tiene talla. No se compara con todos los niños del corte porque quien aún no llegó a la visita no tiene un dato
+    faltante. ``a_12_meses`` marca la visita cuya ventana de edad incluye los 12 meses (365 días)."""
+    c = corrida_de(s, corrida_id)
+    mapa = etapas(s, c.corte_id)
+    p = {'c': c.id, 'u': u.id}
+    por_revisar, revisadas, revisadas_mes = s.execute(text("""
+        SELECT count(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM resultados.revision_datos r
+                                                  WHERE r.alerta_id = a.id AND r.usuario_id = :u)),
+               count(*) FILTER (WHERE EXISTS (SELECT 1 FROM resultados.revision_datos r WHERE r.alerta_id = a.id)),
+               count(*) FILTER (WHERE EXISTS (SELECT 1 FROM resultados.revision_datos r WHERE r.alerta_id = a.id
+                                              AND r.creado_en >= date_trunc('month', now())))
+        FROM resultados.alertas_dato a WHERE a.corrida_id = :c"""), p).one()
+    por_etapa = {f.etapa: f.alertas for f in s.execute(text(
+        'SELECT etapa, count(*) AS alertas FROM resultados.alertas_dato WHERE corrida_id = :c AND etapa IS NOT NULL '
+        'GROUP BY etapa'), p)}
+    variables = [{'variable': f.variable, 'etiqueta': f.etiqueta, 'alertas': f.alertas} for f in s.execute(text(
+        'SELECT variable, max(etiqueta) AS etiqueta, count(*) AS alertas FROM resultados.alertas_dato '
+        'WHERE corrida_id = :c GROUP BY variable ORDER BY count(*) DESC, variable'), p)]
+    visitas = sorted(s.execute(text("""
+        SELECT etapa, count(DISTINCT sujeto) AS con_visita,
+               count(DISTINCT sujeto) FILTER (WHERE indicador = :i) AS con_dato
+        FROM resultados.crecimiento WHERE corrida_id = :c AND etapa IS NOT NULL AND valor IS NOT NULL
+        GROUP BY etapa"""), {**p, 'i': INDICADOR_COMPLETITUD[0]}).all(),
+                     key=lambda f: (mapa.get(f.etapa, {}).get('orden', 99), f.etapa))
+    ventanas = {f.etapa: (f.edad_min, f.edad_max) for f in s.execute(
+        text('SELECT etapa, edad_min, edad_max FROM sevarti.etapas WHERE corte_id = :k'), {'k': c.corte_id})}         if c.corte_id is not None else {}
+    doce = next((f.etapa for f in visitas if None not in ventanas.get(f.etapa, (None, None))
+                 and ventanas[f.etapa][0] <= DIAS_12_MESES <= ventanas[f.etapa][1]), None)
+    return {'corrida_id': c.id, 'por_revisar': por_revisar, 'revisadas': revisadas, 'revisadas_mes': revisadas_mes,
+            'etapas': [{'etapa': e, 'etapa_nombre': nombre_etapa(mapa, e), 'alertas': n}
+                       for e, n in sorted(por_etapa.items(), key=lambda x: (mapa.get(x[0], {}).get('orden', 99), x[0]))],
+            'variables': variables,
+            'completitud': {'indicador': INDICADOR_COMPLETITUD[0], 'nombre': INDICADOR_COMPLETITUD[1],
+                            'etapas': [{'etapa': f.etapa, 'etapa_nombre': nombre_etapa(mapa, f.etapa), 'con_dato': f.con_dato,
+                                        'con_visita': f.con_visita, 'pct': round(100 * f.con_dato / f.con_visita, 1),
+                                        'a_12_meses': f.etapa == doce} for f in visitas]}}
+
+
 PUNTOS_ACIERTOS = (50, 100, 200, 300, 400, 500)
-MINIMO_CELDA = 5   # D46/D4: una celda con menos alertas que esto no se muestra sola
 
 
 def _cortes_aciertos(maximo: int) -> list[int]:
@@ -110,7 +184,7 @@ def aciertos(corrida_id: int | None = None, s: Session = Depends(sesion), _: Usu
 @ruta.get('/datos/concentracion')
 def concentracion(corrida_id: int | None = None, s: Session = Depends(sesion), _: Usuario = Depends(ADMIN)) -> dict:
     """Dónde se acumulan las alertas: por variable y, si el corte trae más de un grupo o sede, por grupo y variable.
-    Lo que tenga menos de ``MINIMO_CELDA`` alertas no se muestra solo: se suma en «otras»."""
+    Cada variable y cada celda sale con su cifra, aunque tenga una sola alerta (D63)."""
     c = corrida_de(s, corrida_id)
     por_celda = s.execute(text("""SELECT su.grupo, a.variable, max(a.etiqueta) AS etiqueta, count(*) AS alertas
                                   FROM resultados.alertas_dato a
@@ -122,19 +196,10 @@ def concentracion(corrida_id: int | None = None, s: Session = Depends(sesion), _
     for f in por_celda:
         v = variables.setdefault(f.variable, {'variable': f.variable, 'etiqueta': f.etiqueta, 'alertas': 0})
         v['alertas'] += f.alertas
-    por_variable = sorted((v for v in variables.values() if v['alertas'] >= MINIMO_CELDA),
-                          key=lambda v: (-v['alertas'], v['variable']))
-    otras_variables = sum(v['alertas'] for v in variables.values() if v['alertas'] < MINIMO_CELDA)
-    celdas, otras_celdas = [], 0
-    if hay_sede:
-        for f in sorted(por_celda, key=lambda f: (-f.alertas, str(f.grupo), f.variable)):
-            if f.alertas >= MINIMO_CELDA:
-                celdas.append({'grupo': f.grupo or 'sin grupo', 'variable': f.variable, 'etiqueta': f.etiqueta,
-                               'alertas': f.alertas})
-            else:
-                otras_celdas += f.alertas
-    return {'corrida_id': c.id, 'hay_sede': hay_sede, 'minimo_celda': MINIMO_CELDA, 'por_variable': por_variable,
-            'otras_variables': otras_variables, 'celdas': celdas, 'otras_celdas': otras_celdas}
+    por_variable = sorted(variables.values(), key=lambda v: (-v['alertas'], v['variable']))
+    celdas = [{'grupo': f.grupo or 'sin grupo', 'variable': f.variable, 'etiqueta': f.etiqueta, 'alertas': f.alertas}
+              for f in sorted(por_celda, key=lambda f: (-f.alertas, str(f.grupo), f.variable))] if hay_sede else []
+    return {'corrida_id': c.id, 'hay_sede': hay_sede, 'por_variable': por_variable, 'celdas': celdas}
 
 
 def _factor(unidad: object) -> tuple[str, float] | None:

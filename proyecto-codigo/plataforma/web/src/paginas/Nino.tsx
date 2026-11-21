@@ -1,16 +1,25 @@
-// La historia de un niño: sus visitas en orden, lo que se midió en cada una, los datos por revisar, el riesgo
-// calculado (y cómo fue cambiando visita a visita), su crecimiento frente a la OMS y cómo nació frente a los demás.
-import { useQuery } from '@tanstack/react-query'
+// La historia de un niño: su identidad arriba y, debajo, una pestaña por pregunta: todos sus desenlaces (los de 12 meses visita
+// por visita y los demás con su riesgo calculado), su crecimiento frente a la OMS, cómo nació frente a los demás niños y sus
+// visitas con lo que se midió en cada una. Abre en «Desenlaces» si el niño tiene algún riesgo y, si no, en la primera pestaña
+// con algo que mostrar; ninguna pestaña ni rótulo sale vacío. Cada pestaña cabe en una pantalla de escritorio; al imprimir
+// salen todas.
+import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import { ArrowLeft, Printer } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useParams, useSearchParams } from 'react-router'
 import { pedir } from '../api/cliente'
-import type { AlertaDato, LineaTemporal, Visita } from '../api/tipos'
-import { CrecimientoOms, PerfilCohorte, PerfilDelNino, TarjetaRiesgo, TrayectoriaRiesgo } from '../components/ficha'
-import { Aviso, Boton, Cargando, Insignia, Panel, Tabla, Vacio } from '../components/ui'
+import { historiaPorCorte, type RiesgoPorCorte } from '../api/ninos'
+import type { AlertaDato, HistoriaRiesgo, LineaTemporal, PerfilNino, Visita } from '../api/tipos'
+import { CrecimientoOms, PerfilCohorte, PerfilDelNino, useHistoriaRiesgo, usePerfilCohorte } from '../components/ficha'
+import { Desenlaces, desenlacesDelNino, hayRiesgo, type TarjetaConVisita } from '../components/ficha/Desenlaces'
+import { PanelesPestana, Pestanas, usePestanaEnUrl } from '../components/ui/Pestanas'
+import { Boton, Cargando, Insignia, Panel, Tabla, Vacio } from '../components/ui'
+import { Termino } from '../components/Termino'
+import { ErrorConReintento } from '../components/ErrorConReintento'
 import { cn } from '../lib/cn'
+import { desenlaceDeUrlAntigua } from '../lib/familias'
 import { aproximado, dec, edad, fecha, indicador, RIESGO_ALTO } from '../lib/formato'
-import { alerta, AYUDA_DOS_CIFRAS, AYUDA_OMS, ayudaAlerta, ayudaZ, datosAl, frenteOms, motivo } from '../lib/lenguaje'
+import { alerta, ayudaAlerta, ayudaZ, datosAl, frenteOms, motivo } from '../lib/lenguaje'
 
 export default function Nino() {
   const { sujeto = '' } = useParams()
@@ -18,68 +27,99 @@ export default function Nino() {
     queryKey: ['nino', sujeto],
     queryFn: () => pedir<LineaTemporal>(`/ninos/${encodeURIComponent(sujeto)}/linea-temporal`),
   })
-  const [elegida, setElegida] = useState<string | null>(null)
-
-  const inicial = useMemo(() => {
-    const v = q.data?.visitas ?? []
-    return (v.find((x) => x.riesgos.length) ?? v.find((x) => x.alertas_dato.length) ?? v[v.length - 1])?.etapa ?? null
-  }, [q.data])
+  // se piden junto con la línea de tiempo, no después: de ellas depende qué pestañas hay
+  const historia = useQuery(historiaPorCorte(sujeto))
+  const trayectoria = useHistoriaRiesgo(sujeto)
+  const perfil = usePerfilCohorte(sujeto)
 
   if (q.isPending) return <Cargando />
-  if (q.error) return <Aviso>{q.error.message}</Aviso>
-  const n = q.data
+  if (q.error) return <ErrorConReintento error={q.error} que="la ficha de este niño" reintentando={q.isFetching} reintentar={() => void q.refetch()} />
+  return <Ficha n={q.data} historia={historia} trayectoria={trayectoria.data} perfil={perfil.data} />
+}
+
+function Ficha({ n, historia, trayectoria, perfil }: {
+  n: LineaTemporal; historia: UseQueryResult<RiesgoPorCorte>; trayectoria: HistoriaRiesgo | undefined; perfil: PerfilNino | undefined
+}) {
+  const [elegida, setElegida] = useState<string | null>(null)
+  const inicial = (n.visitas.find((x) => x.riesgos.length) ?? n.visitas.find((x) => x.alertas_dato.length) ?? n.visitas[n.visitas.length - 1])?.etapa ?? null
   const visita = n.visitas.find((v) => v.etapa === (elegida ?? inicial))
-  const riesgos = n.visitas.flatMap((v) => v.riesgos.map((r) => ({ ...r, visita: v.nombre })))
+  // todos los desenlaces del niño: los de 12 meses visita por visita y los demás con su tarjeta de la última visita y su evolución
+  const tarjetas: TarjetaConVisita[] = n.visitas.flatMap((v) => v.riesgos.map((r) => ({ ...r, visita: v.nombre })))
+  const desenlaces = desenlacesDelNino({ historia: historia.data, trayectoria, riesgos: tarjetas })
+  const conCrecimiento = Object.values(n.crecimiento).some((ps) => ps.length > 0)
+  const conPerfil = n.perfil != null || (perfil?.variables?.length ?? 0) > 0
+
+  // mientras se piden o si fallan, la pestaña dice qué pasa; con una API anterior (sin las familias) y sin otros riesgos, no hay
+  const conDesenlaces = historia.isPending || historia.error != null || desenlaces.length > 0
+  const secciones = [
+    ...(conDesenlaces ? [{ clave: 'desenlaces', texto: 'Desenlaces', contenido: (
+      <Desenlaces sujeto={n.sujeto} historia={historia} desenlaces={desenlaces} modeloClinico={n.modelo_clinico} />
+    ) }] : []),
+    ...(conCrecimiento ? [{ clave: 'crecimiento', texto: 'Crecimiento', contenido: <CrecimientoOms crecimiento={n.crecimiento} grilla="sm:grid-cols-3" /> }] : []),
+    ...(conPerfil ? [{ clave: 'perfil', texto: 'Frente a los demás niños', contenido: (
+      <div className="space-y-4">
+        <PerfilDelNino perfil={n.perfil} />
+        <PerfilCohorte sujeto={n.sujeto} grilla="sm:grid-cols-2" />
+      </div>
+    ) }] : []),
+    { clave: 'visitas', texto: 'Visitas', contenido: <PanelVisitas n={n} visita={visita} elegir={setElegida} /> },
+  ]
+  // abre en la primera pestaña con algo que mostrar: «Desenlaces» solo si hay riesgo (o se está pidiendo); si no, queda al final
+  // (sigue ahí para ver por qué no hay riesgo). Las direcciones de antes (`?ver=riesgo-…`, `?ver=otros`) también abren «Desenlaces».
+  const [params] = useSearchParams()
+  const sinRiesgo = !historia.isPending && historia.error == null && !hayRiesgo(desenlaces)
+  const esAntigua = desenlaceDeUrlAntigua(params.get('ver'), desenlaces.map((d) => d.resumen.clave), undefined) != null
+  const claves = secciones.map((s) => s.clave)
+  const [activa, elegirPestana] = usePestanaEnUrl('ver', conDesenlaces && sinRiesgo && !esAntigua ? [...claves.filter((c) => c !== 'desenlaces'), 'desenlaces'] : claves)
 
   return (
-    <>
-      <Link to="/ninos" className="no-imprimir mb-2 inline-flex items-center gap-1 text-sm text-teal hover:underline">
-        <ArrowLeft size={16} aria-hidden /> Todos los niños
-      </Link>
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
+    <div className="flex flex-col lg:h-full">
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
         <div>
           <h1>Niño {n.sujeto}</h1>
-          <p className="mt-1 text-salvia">
-            {n.eg_semanas != null && <>Nació a las {dec(n.eg_semanas)} semanas de gestación</>}
-            {n.anio_nacimiento && <>, en {n.anio_nacimiento}</>}
-            {n.grupo && <>. Grupo {n.grupo}</>}. {datosAl(n.corte)}.
-          </p>
+          <p className="mt-1 text-salvia">{subtitulo(n)}</p>
         </div>
-        <Boton variante="secundario" className="no-imprimir" onClick={() => window.print()}>
-          <Printer size={16} aria-hidden /> Imprimir ficha
-        </Boton>
+        <div className="no-imprimir flex flex-wrap items-center gap-x-4 gap-y-2">
+          <Link to="/ninos" className="inline-flex items-center gap-1 text-sm text-teal hover:underline">
+            <ArrowLeft size={16} aria-hidden /> Todos los niños
+          </Link>
+          <Boton variante="secundario" onClick={() => window.print()}>
+            <Printer size={16} aria-hidden /> Imprimir ficha
+          </Boton>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
-      <div className="space-y-4">
-      {riesgos.length > 0 && (
-        <section aria-label="Riesgo calculado" className="space-y-3">
-          <p className="text-sm">{AYUDA_DOS_CIFRAS}</p>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-1">
-            {riesgos.map((r) => <TarjetaRiesgo key={r.id} r={r} nota={`Calculado con lo medido hasta ${r.visita}`} />)}
-          </div>
-        </section>
-      )}
-
-      <PerfilDelNino perfil={n.perfil} />
-      <TrayectoriaRiesgo sujeto={n.sujeto} />
-      <CrecimientoOms crecimiento={n.crecimiento} />
-      <PerfilCohorte sujeto={n.sujeto} />
-      </div>
-
-      <Panel titulo="Visitas">
-        {n.visitas.length === 0 ? <Vacio titulo="Este niño no tiene visitas registradas" /> : (
-          <>
-            <Recorrido visitas={n.visitas} elegida={visita?.etapa ?? null} elegir={setElegida} />
-            {visita && <DetalleVisita visita={visita} />}
-          </>
-        )}
-      </Panel>
+      <Pestanas prefijo="ficha" etiqueta="Qué ver de este niño" pestanas={secciones} activa={activa} elegir={elegirPestana} className="no-imprimir" />
+      <div className="mt-3 lg:min-h-0 lg:flex-1">
+        <PanelesPestana prefijo="ficha" activa={activa} paneles={secciones} className="lg:h-full lg:overflow-y-auto print:h-auto print:overflow-visible" />
       </div>
       <p className="solo-imprimir">
         Impreso el {fecha(new Date().toISOString())} · Observatorio Canguro · Documento de apoyo clínico: no reemplaza el criterio médico
       </p>
-    </>
+    </div>
+  )
+}
+
+/** Cómo nació y dónde se atiende, en frases que no quedan sueltas cuando falta un dato. El grupo del niño es su sede. */
+function subtitulo(n: LineaTemporal) {
+  const nacio = n.eg_semanas != null ? `Nació a las ${dec(n.eg_semanas)} semanas de gestación` : null
+  const anio = n.anio_nacimiento ? (nacio ? `en ${n.anio_nacimiento}` : `Nació en ${n.anio_nacimiento}`) : null
+  const nacimiento = [nacio, anio].filter((x) => x != null).join(', ')
+  return `${[nacimiento || null, n.grupo ? `Sede ${n.grupo}` : null, datosAl(n.corte)].filter((f) => f != null).join('. ')}.`
+}
+
+/** Las visitas del niño y lo que se midió en la elegida. Con pocas mediciones la tarjeta mide lo que su contenido; con muchas se
+ * desplaza por dentro, con el encabezado de la lista fijo. */
+function PanelVisitas({ n, visita, elegir }: { n: LineaTemporal; visita: Visita | undefined; elegir: (etapa: string) => void }) {
+  return (
+    <Panel llenar titulo="Visitas" className="lg:max-h-full print:max-h-none">
+      {n.visitas.length === 0 ? <Vacio titulo="Este niño no tiene visitas registradas" /> : (
+        <>
+          <Recorrido visitas={n.visitas} elegida={visita?.etapa ?? null} elegir={elegir} />
+          {visita && <DetalleVisita visita={visita} />}
+        </>
+      )}
+    </Panel>
   )
 }
 
@@ -87,13 +127,21 @@ export default function Nino() {
 function Recorrido({ visitas, elegida, elegir }: { visitas: Visita[]; elegida: string | null; elegir: (e: string) => void }) {
   const caja = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    // en pantallas angostas, la visita elegida queda a la vista
+    // en pantallas angostas, la visita elegida queda a la vista; también al abrir la pestaña, que antes estaba oculta
     const c = caja.current
-    const b = c?.querySelector<HTMLElement>('[aria-current="step"]')
-    if (!c || !b) return
-    const rb = b.getBoundingClientRect()
-    const rc = c.getBoundingClientRect()
-    c.scrollLeft += rb.left + rb.width / 2 - (rc.left + rc.width / 2)
+    if (!c) return
+    const centrar = () => {
+      const b = c.querySelector<HTMLElement>('[aria-current="step"]')
+      if (!b || c.clientWidth === 0) return
+      const rb = b.getBoundingClientRect()
+      const rc = c.getBoundingClientRect()
+      c.scrollLeft += rb.left + rb.width / 2 - (rc.left + rc.width / 2)
+    }
+    centrar()
+    if (typeof ResizeObserver === 'undefined') return
+    const observador = new ResizeObserver(centrar)
+    observador.observe(c)
+    return () => observador.disconnect()
   }, [elegida])
   return (
     <div ref={caja} className="relative -mx-5 overflow-x-auto px-5 pb-2">
@@ -139,13 +187,16 @@ function rango(a: AlertaDato) {
 function DetalleVisita({ visita }: { visita: Visita }) {
   const alertas = new Map(visita.alertas_dato.map((a) => [a.variable, a]))
   const z = Object.entries(visita.z).filter(([, v]) => v != null)
+  // la columna de la derecha solo existe si tiene algo: sin ella, las mediciones usan todo el ancho
+  const conLado = z.length > 0 || visita.alertas_dato.length > 0
   return (
-    <div className="mt-4 grid grid-cols-1 gap-5 border-t border-linea pt-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] xl:grid-cols-1 2xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+    <div className={cn('mt-4 grid grid-cols-1 gap-5 border-t border-linea pt-4', conLado && 'lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]')}>
       <div>
         <h3>{visita.nombre}: lo que se midió</h3>
         <p className="mb-3 text-sm text-salvia">{fecha(visita.fecha)}{visita.edad_corregida != null && ` · ${edad(visita.edad_corregida)} de edad corregida`}</p>
         {visita.mediciones.length === 0 ? <p className="text-salvia">No hay mediciones de esta visita.</p> : (
-          <Tabla>
+          // el encabezado queda fijo mientras la tarjeta se desplaza
+          <Tabla className="lg:overflow-visible [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-papel">
             <thead><tr><th>Dato</th><th className="text-right">Valor</th><th>Revisión</th></tr></thead>
             <tbody>
               {visita.mediciones.map((m) => {
@@ -171,10 +222,10 @@ function DetalleVisita({ visita }: { visita: Visita }) {
           </Tabla>
         )}
       </div>
-      <div className="space-y-5">
+      {conLado && <div className="space-y-5">
         {z.length > 0 && (
           <div>
-            <h3 className="mb-2" title={AYUDA_OMS}>Frente a la OMS</h3>
+            <h3 className="mb-2">Frente a la <Termino id="oms">OMS</Termino></h3>
             <ul className="divide-y divide-linea">
               {z.map(([k, v]) => (
                 <li key={k} className="flex justify-between gap-3 py-1.5">
@@ -200,7 +251,7 @@ function DetalleVisita({ visita }: { visita: Visita }) {
             </ul>
           </div>
         )}
-      </div>
+      </div>}
     </div>
   )
 }

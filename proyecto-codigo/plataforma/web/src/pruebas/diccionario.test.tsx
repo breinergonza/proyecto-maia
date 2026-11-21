@@ -41,12 +41,12 @@ function api(extra?: (url: string, init?: RequestInit) => { estado?: number; cue
 describe('diccionario de variables', () => {
   it('la bandeja clasifica con un clic y el menú muestra cuántas faltan', async () => {
     const llamadas = api()
-    montar('/diccionario')
+    montar('/diccionario?ver=clasificar')
     expect(await screen.findByText('Variable simulada A')).toBeInTheDocument()
     expect(screen.getByText(/visita sugerida: 3 meses \(edad corregida\)/)).toBeInTheDocument()
     const enlace = screen.getAllByRole('link', { name: /Diccionario/ })[0]
     expect(within(enlace).getByText('3')).toBeInTheDocument()
-    expect(screen.getAllByRole('link', { name: 'Predicción' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('link', { name: 'Calcular un niño' }).length).toBeGreaterThan(0)
     // sin palabras técnicas para el equipo clínico
     expect(document.body.textContent).not.toMatch(/sha|corte|corrida/i)
     await userEvent.click(screen.getByRole('button', { name: 'Marcar var_simulada_a como Lista' }))
@@ -58,7 +58,7 @@ describe('diccionario de variables', () => {
 
   it('muestra la actualización con variables nuevas y permite agregarlas; el historial permite volver', async () => {
     const llamadas = api()
-    montar('/diccionario')
+    montar('/diccionario?ver=clasificar')
     expect(await screen.findByText('La última actualización trajo 2 variables nuevas')).toBeInTheDocument()
     expect(screen.getByText('Variable simulada B')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Agregarlas al diccionario' }))
@@ -70,7 +70,7 @@ describe('diccionario de variables', () => {
 
   it('al subir muestra los cambios antes de confirmar', async () => {
     const llamadas = api()
-    montar('/diccionario')
+    montar('/diccionario?ver=versiones')
     const entrada = await screen.findByLabelText('Archivo de Excel (.xlsx)')
     await userEvent.upload(entrada, new File(['xlsx'], 'diccionario.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
     await userEvent.click(screen.getByRole('button', { name: 'Revisar cambios' }))
@@ -97,7 +97,7 @@ describe('diccionario de variables', () => {
       ],
     }
     const llamadas = api((url) => url === '/api/diccionario/versiones/10/vista' ? { cuerpo: vista } : undefined)
-    montar('/diccionario')
+    montar('/diccionario?ver=versiones')
     await userEvent.click(await screen.findByRole('button', { name: 'Ver la versión 1' }))
     const dialogo = await screen.findByRole('dialog', { name: /versión 1/ })
     expect(await within(dialogo).findByText('var_simulada_a')).toBeInTheDocument()
@@ -114,7 +114,7 @@ describe('diccionario de variables', () => {
 
   it('en el teléfono el historial se apila: cada celda lleva el título de su columna', async () => {
     api()
-    montar('/diccionario')
+    montar('/diccionario?ver=versiones')
     const celda = (await screen.findByText('Subida por Experta')).closest('td')!
     const fila = celda.closest('tr')!
     expect(celda.closest('.tabla-apilada')).not.toBeNull()
@@ -125,7 +125,7 @@ describe('diccionario de variables', () => {
     api((url) => url === '/api/diccionario/comparar'
       ? { estado: 422, cuerpo: { detail: 'El diccionario mio.xlsx tiene 1 problema(s) por corregir:\n- hoja "Variables", fila 4: Tipo "Texto libre" no es válido.' } }
       : undefined)
-    montar('/diccionario')
+    montar('/diccionario?ver=versiones')
     await userEvent.upload(await screen.findByLabelText('Archivo de Excel (.xlsx)'), new File(['x'], 'mio.xlsx'))
     await userEvent.click(screen.getByRole('button', { name: 'Revisar cambios' }))
     expect(await screen.findByText(/hoja "Variables", fila 4/)).toBeInTheDocument()

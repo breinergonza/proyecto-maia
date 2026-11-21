@@ -1,8 +1,9 @@
 // Las pantallas del equipo clínico hablan como el equipo clínico: el glosario (lib/lenguaje) y una guardia que falla si
 // en el texto visible de esas pantallas vuelve a aparecer un término técnico. El término técnico puede seguir en title.
 import { screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { alerta, ayudaMinimo, cuantosMenos, desviaciones, familia, frenteDemas, frenteOms, motivo, motivoExtra, motivosRiesgo, nivelAlto, nivelCorto, nombreFamilia, peso, senal, trimestresSeguidos } from '../lib/lenguaje'
+import { alerta, AYUDA_RIESGO_ALTO, ayudaMinimo, definicionAlerta, cuantosMenos, desviaciones, familia, frenteDemas, frenteOms, motivo, motivoExtra, motivosRiesgo, nivelAlto, nivelCorto, nombreFamilia, peso, senal, trimestresSeguidos } from '../lib/lenguaje'
 import { montar, simularApi, usuario } from './util'
 import { fecha } from '../lib/formato'
 
@@ -18,6 +19,12 @@ describe('glosario clínico', () => {
     expect(nivelCorto(97)).toBe('Muy alto')
     expect(nivelAlto(50)).toBeNull()
     expect(nivelAlto(90)).toBe('Riesgo alto')
+  })
+
+  it('«en alerta» y «alto» dicen contra quién se compara el riesgo: los niños con que se calibró el modelo, no el grupo', () => {
+    expect(definicionAlerta(90)).toBe('En alerta: riesgo entre el 10 % más alto de los niños más recientes con desenlace conocido, con quienes se calibró el modelo. Por eso, en un grupo pueden ser más o menos del 10 %.')
+    expect(AYUDA_RIESGO_ALTO).toBe('Riesgo alto: entre el 10 % más alto de los niños más recientes con desenlace conocido, con quienes se calibró el modelo; en un grupo pueden ser más o menos del 10 %. ' +
+      'Es una comparación, no un umbral clínico.')
   })
 
   it('dice el mínimo de las notificaciones como la parte de niños con más riesgo', () => {
@@ -132,7 +139,7 @@ const sinDato = { ...fila, sujeto: 's3', percentil_max: 20, n_bajo_2de: 0, n_cai
 const notificaciones = [{ id: 1, nombre: 'readmisión a los 3 meses', percentil_minimo: 95, destinatarios: ['a@maia.prueba'], alertas: ['readm'], activo: true }]
 const aviso = { id: 1, destinatario: 'a@maia.prueba', estado: 'enviado', error: null, enviado_en: '2026-07-01T10:00:00Z', sujeto: 's1',
   desenlace: 'readmisión a los 3 meses', percentil: 93, corrida_id: 3, notificacion: null }
-const datoRevision = { ...alertaDato, sujeto: 's1', unidad: 'g', etapa_nombre: '3 meses', fecha: '2026-03-01', fuerza: 9, es_error: null, comentario: null, serie: [] }
+const datoRevision = { ...alertaDato, sujeto: 's1', unidad: 'g', etapa_nombre: '3 meses', fecha: '2026-03-01', fuerza: 9, es_error: null, comentario: null, serie: [], revisiones: [] }
 
 function api(rol: 'admin' | 'experto' = 'experto') {
   simularApi((url) => {
@@ -147,6 +154,7 @@ function api(rol: 'admin' | 'experto' = 'experto') {
     if (url === '/api/ninos/s1/historia-riesgo') return { cuerpo: historia }
     if (url === '/api/ninos/s1/perfil') return { cuerpo: perfil }
     if (url.startsWith('/api/revision/datos?')) return { cuerpo: { total: 1, pagina: 1, tamano: 10, items: [datoRevision] } }
+    if (url === '/api/revision/datos/resumen') return { cuerpo: { corrida_id: 3, por_revisar: 1, revisadas: 0, revisadas_mes: 0, etapas: [], variables: [], completitud: { indicador: 'talla', nombre: 'Talla para la edad', etapas: [] } } }
     if (url === '/api/revision/datos/aciertos') return { cuerpo: { corrida_id: 3, serie: [], respondidas: 0, confirmadas_error_pct: null } }
     if (url === '/api/revision/datos/concentracion') return { cuerpo: { corrida_id: 3, hay_sede: false, minimo_celda: 5, por_variable: [], otras_variables: 0, celdas: [], otras_celdas: 0 } }
     if (url === '/api/revision/riesgos') return { cuerpo: { corrida_id: 3, items: [] } }
@@ -155,12 +163,18 @@ function api(rol: 'admin' | 'experto' = 'experto') {
   })
 }
 
-const visible = () => document.body.textContent ?? ''
+// lo que se ve sin abrir nada: una definición a pedido (Termino, D66) puede nombrar el término estadístico
+const visible = () => {
+  const copia = document.body.cloneNode(true)
+  if (!(copia instanceof HTMLElement)) return ''
+  copia.querySelectorAll('[role="tooltip"][hidden]').forEach((n) => n.remove())
+  return copia.textContent ?? ''
+}
 
 describe('pantallas del equipo clínico sin términos técnicos', () => {
   it('tablero', async () => {
     api()
-    montar('/')
+    montar('/tablero')
     expect(await screen.findByText('niños con algún riesgo alto')).toBeInTheDocument()
     expect(await screen.findByText('subió de golpe en todo el programa')).toBeInTheDocument()
     expect(screen.getByText('No cuadra con el resto de sus datos')).toBeInTheDocument()
@@ -204,10 +218,10 @@ describe('pantallas del equipo clínico sin términos técnicos', () => {
     expect(screen.getByText(/Valor muy distinto al de los demás niños; la fecha no corresponde a esta visita/)).toBeInTheDocument()
     expect(screen.getByText('Peso al nacer: 769')).toBeInTheDocument()
     expect(screen.getByText('Nació después del cambio de sistema 2022')).toBeInTheDocument()
-    expect(screen.getByText(/También suben el riesgo: Talla a 40 sem\./)).toBeInTheDocument()   // no entre lo que sube por su valor
+    expect(screen.getByText(/Talla a 40 sem\. También suben el riesgo\./)).toBeInTheDocument()   // en su propia línea, no entre lo que sube por su valor
     expect(visible()).toMatch(/Probabilidad estimada: 41,0 % · promedio de los niños: 12,0 %/)
     expect(visible()).toMatch(/Nació a las 31 semanas de gestación/)   // sin «31,0»
-    expect(await screen.findByText('Readmisión', { selector: 'h3' })).toBeInTheDocument()   // riesgo en cada visita, por familia
+    expect(await screen.findByText('Readmisión entre los 3 y los 6 meses', { selector: 'h3' })).toBeInTheDocument()   // riesgo en cada visita, por desenlace
     expect(await screen.findByText(/40 de cada 100 niños tienen menos/)).toBeInTheDocument()   // perfil al nacer
     expect(screen.getByText('31 semanas', { selector: 'strong' })).toBeInTheDocument()
     expect(screen.getByText('Sin dato')).toBeInTheDocument()
@@ -218,8 +232,9 @@ describe('pantallas del equipo clínico sin términos técnicos', () => {
   it('calidad de datos', async () => {
     api('admin')
     montar('/admin/calidad-datos')
-    expect(await screen.findByText(/Para este niño se esperaba entre/)).toBeInTheDocument()
-    // sin serie (la variable no tiene concepto): el valor frente a su rango; del motivo queda solo lo que agrega
+    expect(await screen.findByText(/Esperado entre/)).toBeInTheDocument()
+    // sin serie (la variable no tiene concepto): el valor frente a su rango, que se abre aparte; del motivo queda solo lo que agrega
+    await userEvent.click(screen.getByRole('button', { name: /Ver detalle/ }))
     expect(screen.getByRole('img', { name: 'Peso a los 3 meses: 9.999 g; se esperaba entre 4.000 y 6.500' })).toBeInTheDocument()
     expect(screen.getByText('La fecha no corresponde a esta visita.')).toBeInTheDocument()
     expect(visible()).not.toMatch(/Valor muy distinto/)

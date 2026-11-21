@@ -125,7 +125,7 @@ describe('editar el diccionario con formularios', () => {
 
   it('«Completar» abre el formulario de una variable por clasificar; las variables no se agregan ni se borran', async () => {
     api()
-    montar('/diccionario')
+    montar('/diccionario?ver=clasificar')
     await userEvent.click(await screen.findByRole('button', { name: 'Completar var_simulada_a' }))
     const formulario = await screen.findByRole('dialog', { name: /var_simulada_a/ })
     expect(within(formulario).queryByRole('button', { name: 'Quitar la fila' })).not.toBeInTheDocument()

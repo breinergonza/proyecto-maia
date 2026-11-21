@@ -1,51 +1,21 @@
-// Piezas comunes de los submódulos de analítica: modo técnico, guía de lectura, estados vacíos y formatos.
+// Piezas comunes de los submódulos de analítica: guía de lectura, estados vacíos y formatos. No hay modo técnico: cada
+// palabra clínica explica su nombre estadístico (S22).
 import type { UseQueryResult } from '@tanstack/react-query'
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
 import type { RespuestaAnalitica } from '../../api/tipos'
 import { puede, useSesion } from '../../auth/sesion'
+import { ErrorConReintento } from '../../components/ErrorConReintento'
 import { Aviso, Boton, Cargando, Vacio } from '../../components/ui'
+import { PanelPestana, Pestanas, usePestanaEnUrl, type Pestana } from '../../components/ui/Pestanas'
 import { cn } from '../../lib/cn'
 import { dec2, pct } from '../../lib/formato'
-import { N_MENOR_QUE_5 } from '../../lib/lenguaje'
+import { SIN_CIFRA } from '../../lib/lenguaje'
 import { useContextoAnalitica } from './contexto'
-
-// ------------------------------------------------------------------ modo técnico (preferencia del navegador)
-const CLAVE_TECNICO = 'maia.analitica.tecnico'
-function leerTecnico(): boolean {
-  try { return localStorage.getItem(CLAVE_TECNICO) === '1' } catch { return false }
-}
-
-const Tecnico = createContext<{ tecnico: boolean; fijar: (v: boolean) => void }>({ tecnico: false, fijar: () => {} })
-export const useTecnico = () => useContext(Tecnico)
-
-export function ProveedorTecnico({ children }: { children: ReactNode }) {
-  const [tecnico, setTecnico] = useState(leerTecnico)
-  const fijar = useCallback((v: boolean) => {
-    setTecnico(v)
-    try { localStorage.setItem(CLAVE_TECNICO, v ? '1' : '0') } catch { /* sin almacenamiento: vale solo para esta vista */ }
-  }, [])
-  const valor = useMemo(() => ({ tecnico, fijar }), [tecnico, fijar])
-  return <Tecnico.Provider value={valor}>{children}</Tecnico.Provider>
-}
 
 /** El lugar del encabezado donde cada submódulo pone su «Guía de lectura» (lo fija `AnaliticaLayout`). */
 export const RanuraGuia = createContext<HTMLElement | null>(null)
-
-/** Interruptor del modo técnico: muestra la jerga y las cifras completas. */
-export function InterruptorTecnico() {
-  const { tecnico, fijar } = useTecnico()
-  return (
-    <label className="flex items-center gap-2 text-sm font-semibold text-salvia">
-      <button type="button" role="switch" aria-checked={tecnico} aria-label="Modo técnico" onClick={() => fijar(!tecnico)}
-        className={cn('relative h-6 w-11 shrink-0 rounded-full border transition-colors', tecnico ? 'border-teal bg-teal' : 'border-linea bg-fondo')}>
-        <span className={cn('absolute top-0.5 size-4.5 rounded-full bg-papel shadow-suave transition-all', tecnico ? 'left-5.5' : 'left-0.5')} />
-      </button>
-      Modo técnico
-    </label>
-  )
-}
 
 /** «Guía de lectura» de un submódulo: un botón en el encabezado que despliega una explicación breve. */
 export function Guia({ children }: { children: ReactNode }) {
@@ -76,6 +46,37 @@ export function Guia({ children }: { children: ReactNode }) {
   return ranura ? createPortal(guia, ranura) : <div className="mb-4">{guia}</div>
 }
 
+// ------------------------------------------------------------------ pestañas de una página
+/** El nombre del parámetro de la dirección con la pestaña elegida (`?ver=`). */
+export const PARAM_PESTANA = 'ver'
+const CONTENIDO_PESTANA = 'lg:flex lg:min-h-0 lg:flex-1 lg:flex-col'
+
+/** Reparte una página de Analítica en pestañas por la pregunta que contesta cada bloque. La elegida vive en `?ver=` (sin ella o
+ *  con una que no existe, la primera, que responde la pregunta de la página). `aparte` va a la derecha de las pestañas, en la
+ *  misma fila (un selector que vale para varias pestañas). Con una sola pestaña no se dibuja la lista: no hay qué elegir. */
+export function ConPestanas<K extends string>({ etiqueta, pestanas, aparte, children }: {
+  etiqueta: string
+  pestanas: readonly Pestana<K>[]
+  aparte?: ReactNode
+  children: (activa: K) => ReactNode
+}) {
+  const [activa, elegir] = usePestanaEnUrl(PARAM_PESTANA, pestanas.map((p) => p.clave))
+  const sola = pestanas.length < 2
+  return (
+    <>
+      {(!sola || aparte) && (
+        <div className="flex flex-wrap items-end gap-x-4 gap-y-1 border-b border-linea">
+          {!sola && <Pestanas className="min-w-0 flex-1 border-b-0" prefijo={PARAM_PESTANA} etiqueta={etiqueta} pestanas={pestanas} activa={activa} elegir={elegir} />}
+          {aparte && <div className="flex min-h-11 items-center pb-0.5">{aparte}</div>}
+        </div>
+      )}
+      {sola
+        ? <div className={CONTENIDO_PESTANA}>{children(activa)}</div>
+        : <PanelPestana prefijo={PARAM_PESTANA} activa={activa} className={CONTENIDO_PESTANA}>{children(activa)}</PanelPestana>}
+    </>
+  )
+}
+
 // ------------------------------------------------------------------ estados de la respuesta
 export function EstadoVacio({ estado, mensaje }: { estado: 'sin_artefactos' | 'pendiente'; mensaje?: string }) {
   const { usuario } = useSesion()
@@ -97,10 +98,13 @@ export function EstadoVacio({ estado, mensaje }: { estado: 'sin_artefactos' | 'p
   )
 }
 
-/** Carga, error, `sin_artefactos` y `pendiente`; con datos entrega la respuesta completa. */
+/** Carga, error (con su motivo y un botón para reintentar; lo elegido vive en la dirección y no se pierde), `sin_artefactos` y
+ *  `pendiente`; con datos entrega la respuesta completa. */
 export function Resultado<T>({ consulta, children }: { consulta: UseQueryResult<RespuestaAnalitica<T>>; children: (r: RespuestaAnalitica<T>) => ReactNode }) {
   if (consulta.isPending) return consulta.fetchStatus === 'idle' ? <Cargando texto="Buscando el entrenamiento…" /> : <Cargando />
-  if (consulta.isError) return <Aviso>No se pudo cargar este análisis. Intente de nuevo en un momento.</Aviso>
+  if (consulta.isError) {
+    return <ErrorConReintento error={consulta.error} que="este análisis" reintentando={consulta.isFetching} reintentar={() => void consulta.refetch()} />
+  }
   const r = consulta.data
   if (r.estado !== 'ok') return <EstadoVacio estado={r.estado} mensaje={r.estado === 'pendiente' ? r.mensaje : undefined} />
   return <>{children(r)}</>
@@ -127,8 +131,8 @@ export function PorDesenlace<T extends object>({ consulta, children }: {
 }
 
 // ------------------------------------------------------------------ formatos
-/** Texto de una cifra que puede venir omitida por tener menos de 5 niños. */
-export const omitida = (v: number | null | undefined, f: (x: number) => string) => (v == null ? N_MENOR_QUE_5 : f(v))
+/** Texto de una cifra que puede venir sin calcular (un entrenamiento anterior, o menos de 20 niños para un promedio). */
+export const omitida = (v: number | null | undefined, f: (x: number) => string) => (v == null ? SIN_CIFRA : f(v))
 export const pctN = (v: number | null | undefined) => omitida(v, pct)
 export const decN = (v: number | null | undefined) => omitida(v, dec2)
 /** Una fracción de 0 a 1 dicha como porcentaje. */
@@ -159,12 +163,12 @@ export type ModoMatriz = 'conteos' | 'fila' | 'total'
 interface Confusion { tp: number | null; fp: number | null; fn: number | null; tn: number | null }
 
 /** La matriz de aciertos y errores como un cuadro de 2×2: conteos, % por fila (de los que tuvieron o no el desenlace)
- *  o % del total. Las celdas con menos de 5 niños dicen «n menor que 5» y no entran en los porcentajes. */
+ *  o % del total. Una celda sin cifra (un entrenamiento anterior) dice «sin cifra» y no entra en los porcentajes. */
 export function MatrizAlerta({ c, modo = 'conteos', compacta }: { c: Confusion; modo?: ModoMatriz; compacta?: boolean }) {
   const suma = (...v: (number | null)[]) => (v.some((x) => x == null) ? null : v.reduce<number>((a, b) => a + (b ?? 0), 0))
   const total = suma(c.tp, c.fp, c.fn, c.tn), casos = suma(c.tp, c.fn), sanos = suma(c.fp, c.tn)
   const texto = (v: number | null, base: number | null) => {
-    if (v == null) return N_MENOR_QUE_5
+    if (v == null) return SIN_CIFRA
     if (modo === 'conteos') return v.toLocaleString('es-CO')
     const b = modo === 'fila' ? base : total
     return b ? pct((100 * v) / b) : '—'

@@ -41,7 +41,7 @@ def test_artefactos_completos_y_agregados():
     assert mot['n_alertas'] == 60 and mot['motivos'][0]['variable'] == 'peso'
     ix = a['interaccion']['pares'][0]
     assert ix['a'] == 'peso' and ix['etiqueta_a'] == 'Peso al nacer'
-    assert all(c['n'] is None or c['n'] >= 5 for p in a['interaccion']['pares'] for c in p['celdas'])
+    assert all(isinstance(c['n'], int) for p in a['interaccion']['pares'] for c in p['celdas'])
     texto = json.dumps(a)
     assert 'N1' not in texto and '"N' not in texto, 'sin códigos de niño'
 
@@ -80,39 +80,41 @@ def test_agregar_no_rompe_si_falla():
     assert 'shap_global' not in res['x']['interpretabilidad']
 
 
-def test_motivos_ocultan_menos_de_5():
+def test_motivos_dan_la_cifra_aunque_sean_pocos_ninos():
     contrib = np.zeros((40, 3))
     contrib[:, 0] = 1.0          # todos: variable a
-    contrib[:3, 1] = 2.0         # solo 3 niños: variable b (se oculta)
+    contrib[:3, 1] = 2.0         # solo 3 niños: variable b (sale con su cifra)
     mot = AI.motivos_frecuentes(contrib, ['a', 'b', 'c'], np.ones(40, dtype=bool), por_nino=2)
     por = {m['variable']: m for m in mot['motivos']}
-    assert por['a']['n'] == 40 and por['b']['n'] is None and por['b']['pct'] is None
+    assert por['a']['n'] == 40 and por['b']['n'] == 3 and por['b']['pct'] == 7.5
 
 
 def test_alertas_insuficientes():
     assert AI.motivos_frecuentes(np.ones((50, 2)), ['a', 'b'], np.arange(50) < 10) is None
 
 
-def test_interaccion_oculta_celdas_pequenas():
+def test_interaccion_da_la_cifra_de_las_celdas_pequenas():
     rng = np.random.default_rng(1)
     X = pd.DataFrame({'a': rng.normal(size=60), 'b': rng.normal(size=60)})
     ix = AI.interaccion(X, rng.random(60), [('a', 'b')], cajas=8)
     celdas = ix['pares'][0]['celdas']
-    assert any(c['n'] is None and c['riesgo_medio'] is None for c in celdas)
-    assert all(c['n'] is None or c['n'] >= 5 for c in celdas)
+    assert any(0 < c['n'] < 5 and c['riesgo_medio'] is not None for c in celdas)
+    assert all(c['n'] is not None for c in celdas) and sum(c['n'] for c in celdas) == 60
 
 
-def test_sanear_oculta_lo_pequeno_y_deja_pasar_lo_antiguo():
+def test_sanear_deja_pasar_las_celdas_pequenas_y_descarta_lo_que_no_llega_a_20():
     assert AI.sanear({'importancia': [1]}) == {'importancia': [1]}
     sucio = {'shap_global': {'n': 100, 'deciles': {'a': [{'tramo': 1, 'n': 3, 'valor_medio': 1, 'shap_medio': 1}]}},
              'motivos_frecuentes': {'n_alertas': 100, 'motivos': [{'variable': 'a', 'n': 2, 'pct': 2}]},
              'interaccion': {'pares': [{'celdas': [{'i': 0, 'j': 0, 'n': 4, 'riesgo_medio': 0.3}]}]},
              'pdp': {'n': 5, 'variables': []}}
     limpio = AI.sanear(sucio)
-    assert limpio['shap_global']['deciles']['a'][0]['shap_medio'] is None
-    assert limpio['motivos_frecuentes']['motivos'][0]['pct'] is None
-    assert limpio['interaccion']['pares'][0]['celdas'][0]['riesgo_medio'] is None
-    assert limpio['pdp'] is None
+    assert limpio['shap_global']['deciles']['a'][0]['shap_medio'] == 1
+    assert limpio['motivos_frecuentes']['motivos'][0]['pct'] == 2
+    assert limpio['interaccion']['pares'][0]['celdas'][0]['riesgo_medio'] == 0.3
+    assert limpio['pdp'] is None, 'con menos de 20 niños no hay dependencia parcial (D52)'
+    assert AI.sanear({'shap_global': {'n': 10}, 'motivos_frecuentes': {'n_alertas': 10}}) == {
+        'shap_global': None, 'motivos_frecuentes': None}
 
 
 def test_calcular_engancha_la_interpretabilidad(monkeypatch):

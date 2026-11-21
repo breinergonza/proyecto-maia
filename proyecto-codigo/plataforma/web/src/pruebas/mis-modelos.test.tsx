@@ -116,7 +116,7 @@ describe('Mis modelos: banco con medidas, filtros por dueño y límites del admi
 
   it('muestra otras medidas, el aviso de borrado y filtra por etiqueta y por dueño', async () => {
     simularApi(conBanco('experto'))
-    montar('/mis-modelos')
+    montar('/mis-modelos?ver=banco')
     expect(await screen.findByText('Precisión promedio: 0.32')).toBeInTheDocument()
     expect(screen.getByText('Se borra en 5 días si no se usa')).toBeInTheDocument()
     expect(screen.getByText('Oficial base')).toBeInTheDocument()
@@ -141,7 +141,7 @@ describe('Mis modelos: banco con medidas, filtros por dueño y límites del admi
 
   it('el admin guarda los límites', async () => {
     const llamadas = simularApi(conBanco('admin'))
-    montar('/mis-modelos')
+    montar('/mis-modelos?ver=limites')
     const dias = await screen.findByLabelText('Días sin uso antes de borrar')
     await userEvent.clear(dias)
     await userEvent.type(dias, '60')

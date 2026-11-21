@@ -6,10 +6,11 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { pedir } from '../api/cliente'
 import type { NinoFila, Pagina, ResumenTablero } from '../api/tipos'
-import { Aviso, Boton, Cargando, Encabezado, Entrada, Insignia, Paginador, Selector, Vacio } from '../components/ui'
+import { Boton, Cargando, Encabezado, Entrada, Insignia, Paginador, Selector, Vacio } from '../components/ui'
+import { ErrorConReintento } from '../components/ErrorConReintento'
 import { cn } from '../lib/cn'
 import { dec, edad, fecha, num, RIESGO_ALTO } from '../lib/formato'
-import { ayudaPosicion, AYUDA_OMS, BAJO_EDAD, CAYO, esAlto, nivelCorto, RIESGO_MUY_ALTO } from '../lib/lenguaje'
+import { ayudaPosicion, AYUDA_OMS, BAJO_EDAD, CAYO, definicionAlto, esAlto, nivelCorto, RIESGO_MUY_ALTO } from '../lib/lenguaje'
 
 const TAMANOS = [10, 25, 50, 100]
 const TAMANO = 25
@@ -38,7 +39,12 @@ const COLUMNAS: Columna[] = [
   },
   {
     id: 'desenlace_max', titulo: 'Riesgo más alto', primero: 'asc',
-    celda: (n) => <>{n.desenlace_max ?? <span className="text-salvia">Sin riesgo calculado</span>}{n.n_riesgos > 1 && <span className="text-salvia"> y {n.n_riesgos - 1} más</span>}</>,
+    celda: (n) => (n.desenlace_max == null ? <span className="text-salvia">Sin riesgo calculado</span> : (
+      // corto en la fila; la visita del cálculo y cuántos desenlaces más tiene el niño, al pasar el mouse
+      <span title={n.n_riesgos > 1 ? `${n.desenlace_max}; ${n.n_riesgos - 1} más` : n.desenlace_max}>
+        {sinVisita(n.desenlace_max)}{n.n_riesgos > 1 && <span className="ml-1 whitespace-nowrap font-semibold text-salvia">+{n.n_riesgos - 1}</span>}
+      </span>
+    )),
   },
   {
     id: 'n_alertas', titulo: 'Datos por revisar', derecha: true, primero: 'desc',
@@ -55,7 +61,7 @@ const COLUMNAS: Columna[] = [
         {n.n_bajo_2de > 0 && <span title={AYUDA_OMS}><Insignia tono="ocre">{BAJO_EDAD} ×{n.n_bajo_2de}</Insignia></span>}
         {n.n_caida_1de > 0 && <span title={`${CAYO}. ${AYUDA_OMS}`}><Insignia>Cayó ×{n.n_caida_1de}</Insignia></span>}
         {!n.n_bajo_2de && !n.n_caida_1de && (n.n_crecimiento > 0
-          ? <span className="text-teal" title={`${num(n.n_crecimiento)} medidas, ninguna baja para la edad ni con caída. ${AYUDA_OMS}`}>Sin alerta</span>
+          ? <span className="text-salvia" title={`${num(n.n_crecimiento)} medidas, ninguna baja para la edad ni con caída. ${AYUDA_OMS}`}>Sin alerta</span>
           : <span className="text-salvia" title="No hay peso, talla ni perímetro con que compararlo">Sin dato</span>)}
       </span>
     ),
@@ -73,6 +79,9 @@ const COLUMNAS: Columna[] = [
     )),
   },
 ]
+/** «… a los 6 meses (riesgo calculado a 40 sem)» → «… a los 6 meses»: la visita del cálculo queda en el title de la celda. */
+const sinVisita = (desenlace: string) => desenlace.replace(/\s*\(riesgo calculado a [^)]*\)\s*$/, '')
+
 const POR_ID = new Map(COLUMNAS.map((c) => [c.id, c]))
 const ORDEN_INICIAL = COLUMNAS.map((c) => c.id)
 
@@ -149,8 +158,7 @@ export default function Ninos() {
   return (
     <div className="flex flex-col lg:h-full">
       <Encabezado titulo="Niños">
-        Por defecto, ordenados por su riesgo más alto con los datos más recientes. Los códigos están seudonimizados: para saber quién es
-        un niño hay que consultar la base de la Fundación.
+        {definicionAlto(RIESGO_ALTO, RIESGO_MUY_ALTO)}. Los códigos están seudonimizados.
       </Encabezado>
 
       <div className="mb-4 grid grid-cols-1 shrink-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_16rem_14rem_auto]">
@@ -171,7 +179,7 @@ export default function Ninos() {
         <MenuColumnas columnas={columnas} reordenar={reordenar} />
       </div>
 
-      {q.isPending ? <Cargando /> : q.error ? <Aviso>{q.error.message}</Aviso> : q.data.items.length === 0 ? (
+      {q.isPending ? <Cargando /> : q.error ? <ErrorConReintento error={q.error} que="la lista de niños" conserva="Los filtros siguen en la dirección: al reintentar se pide la misma lista." reintentando={q.isFetching} reintentar={() => void q.refetch()} /> : q.data.items.length === 0 ? (
         <Vacio titulo="Ningún niño cumple estos filtros">Quite un filtro o busque otro código.</Vacio>
       ) : (
         <section className="flex animate-aparecer flex-col rounded-panel border border-linea/80 bg-papel shadow-suave lg:min-h-0 lg:flex-1">

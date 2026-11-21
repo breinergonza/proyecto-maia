@@ -1,5 +1,7 @@
 // Trayectorias: cómo crece cada grupo de niños frente a la curva de la OMS (z = 0). Se calcula al pedirlo, con el
-// indicador, la agrupación y el eje que se elijan. Grupos o visitas con menos de 5 niños no se muestran.
+// indicador, la agrupación y el eje que se elijan. Cada grupo y visita dice cuántos niños tiene, también si son pocos; el
+// desvío pide 20 o más. Los selectores valen
+// para todo; debajo, una pestaña por pregunta (?ver=): la trayectoria media, la distancia a la OMS y cada niño.
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { Area, CartesianGrid, ComposedChart, Line, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -8,9 +10,10 @@ import type { AgruparTrayectoria, EjeTrayectoria, GrupoTrayectoria, IndicadorTra
 import { COLOR, LeyendaSeries, SERIES_COLOR, type ColorSerie, type Serie } from '../../components/graficos'
 import { Grafica, TablaDatos } from '../../components/grafica'
 import { Aviso, Boton, Selector, Tabla, Vacio } from '../../components/ui'
+import { PanelPestana, Pestanas, usePestanaEnUrl } from '../../components/ui/Pestanas'
 import { descripcionDe } from '../../lib/descripciones'
 import { dec2, num } from '../../lib/formato'
-import { N_MENOR_QUE_5 } from '../../lib/lenguaje'
+import { SIN_CIFRA } from '../../lib/lenguaje'
 import { EnPrueba, Guia } from './comun'
 import { useContextoAnalitica } from './contexto'
 import { ResultadoVivo } from './vivo'
@@ -23,8 +26,19 @@ const AGRUPACIONES: [AgruparTrayectoria, string][] = [
 ]
 const EJES: [EjeTrayectoria, string][] = [['edad_corregida', 'Edad corregida'], ['cronologica', 'Edad cronológica']]
 
-const z = (v: number | null | undefined) => (v == null ? N_MENOR_QUE_5 : dec2(v))
-const valorUnidad = (v: number | null, u: string | null) => (v == null ? N_MENOR_QUE_5 : `${dec2(v)}${u ? ` ${u}` : ''}`)
+const PESTANAS = [
+  { clave: 'media', texto: 'Trayectoria media' },
+  { clave: 'oms', texto: 'Frente a la OMS' },
+  { clave: 'ninos', texto: 'Niños individuales' },
+] as const
+const CLAVES = PESTANAS.map((p) => p.clave)
+/** El contenido de una pestaña ocupa el alto que queda: las tarjetas con lista (`llenar`) se encogen y la desplazan por dentro. */
+const PANEL = 'flex flex-col gap-3 lg:min-h-0 lg:flex-1 lg:-mx-1 lg:overflow-y-auto lg:px-1 lg:pb-1'
+/** Encabezado de columna fijo mientras la tabla se desplaza dentro de su tarjeta. */
+const ENCABEZADO_FIJO = 'xl:overflow-visible [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-papel'
+
+const z = (v: number | null | undefined) => (v == null ? SIN_CIFRA : dec2(v))
+const valorUnidad = (v: number | null, u: string | null) => (v == null ? SIN_CIFRA : `${dec2(v)}${u ? ` ${u}` : ''}`)
 // el coral nunca es color de serie: hay cuatro colores y los grupos que pasan de cuatro se resumen en la tabla
 const colorDe = (i: number): ColorSerie => (i % 4) as ColorSerie
 
@@ -44,7 +58,7 @@ function GraficaZ({ grupos }: { grupos: GrupoTrayectoria[] }) {
   return (
     <>
       <LeyendaSeries series={series} />
-      <div style={{ height: 280 }} role="figure" aria-label="Puntaje z medio de cada grupo en cada visita, con su banda de variación y la franja de la OMS de −2 a +2">
+      <div style={{ height: 'clamp(200px, 30vh, 340px)' }} role="figure" aria-label="Puntaje z medio de cada grupo en cada visita, con su banda de variación y la franja de la OMS de −2 a +2">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={filas} margin={{ left: 0, right: 12, top: 8, bottom: 0 }}>
             <CartesianGrid stroke={COLOR.rejilla} vertical={false} />
@@ -72,7 +86,7 @@ function GraficaZ({ grupos }: { grupos: GrupoTrayectoria[] }) {
           </ComposedChart>
         </ResponsiveContainer>
       </div>
-      <p className="mt-2 text-xs text-salvia">Franja clara: de −2 a +2 de la OMS. Línea punteada: la OMS (0). Banda de cada grupo: un desvío arriba y abajo del promedio (con 20 niños o más por visita).</p>
+      <p className="mt-2 text-xs text-salvia">Franja clara: de −2 a +2 desviaciones estándar (DE) de la OMS, lo esperado. Línea punteada: la OMS (0). Banda de cada grupo: una DE arriba y abajo del promedio (con 20 niños o más por visita).</p>
       {grupos.length > 4 && <p className="mt-1 text-xs text-salvia">Se dibujan los cuatro grupos más grandes; la tabla los muestra todos.</p>}
     </>
   )
@@ -82,11 +96,12 @@ function Individuales({ ninos, grupos }: { ninos: NonNullable<ReturnType<typeof 
   if (!ninos?.length) return null
   const d = descripcionDe('tray_ninos')
   return (
-    <TablaDatos titulo={d.titulo} descripcion={d.descripcion} exportar={{
+    <TablaDatos llenar titulo={d.titulo} descripcion={d.descripcion} exportar={{
       nombre: 'trayectorias-ninos',
       filas: ninos.flatMap((n) => n.serie.map((s) => ({ codigo: n.codigo, grupo: n.grupo, visita: s.nombre, edad_meses: s.edad_meses, z: s.z }))),
     }}>
-      <Tabla densa>
+      <p className="mb-2 text-xs text-salvia">Hasta 30 niños de {grupos.length} {grupos.length === 1 ? 'grupo' : 'grupos'}; solo los ve el equipo experto.</p>
+      <Tabla densa className={ENCABEZADO_FIJO}>
         <thead><tr><th>Niño</th><th>Grupo</th><th>Visitas</th><th>Puntaje z por visita</th></tr></thead>
         <tbody>{ninos.map((n) => (
           <tr key={n.codigo}>
@@ -96,7 +111,6 @@ function Individuales({ ninos, grupos }: { ninos: NonNullable<ReturnType<typeof 
           </tr>
         ))}</tbody>
       </Tabla>
-      <p className="mt-2 text-xs text-salvia">Hasta 30 niños de {grupos.length} {grupos.length === 1 ? 'grupo' : 'grupos'}; solo los ve el equipo experto.</p>
     </TablaDatos>
   )
 }
@@ -106,27 +120,28 @@ export default function Trayectorias() {
   const [indicador, setIndicador] = useState<IndicadorTrayectoria>('peso')
   const [agrupar, setAgrupar] = useState<AgruparTrayectoria>('riesgo')
   const [eje, setEje] = useState<EjeTrayectoria>('edad_corregida')
+  const [ver, elegir] = usePestanaEnUrl('ver', CLAVES)
   const consulta = useTrayectorias(entrenamiento, { indicador, agrupar, eje }, desenlace)
   const dMedia = descripcionDe('tray_media'), dOms = descripcionDe('tray_oms')
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-3 lg:min-h-0 lg:flex-1">
       <Guia>
         <p>Muestra cómo crece cada grupo de niños frente a la curva de la OMS (puntaje z = 0). Sirve para ver en qué visita un grupo empieza a separarse de lo esperado.</p>
-        <p>Un puntaje z entre −2 y +2 es lo esperado; por debajo de −2 el niño está por debajo de lo esperado.</p>
+        <p>El puntaje z cuenta desviaciones estándar (DE) frente a la OMS. Entre −2 y +2 DE es lo esperado; por debajo de −2 DE el niño está bajo para la edad.</p>
       </Guia>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <label className="flex flex-col gap-1.5 text-sm font-semibold">Indicador
-          <Selector value={indicador} onChange={(e) => setIndicador(e.target.value as IndicadorTrayectoria)}>
+      <div className="grid shrink-0 gap-3 sm:grid-cols-3">
+        <label className="flex items-center gap-2 text-sm font-semibold"><span className="shrink-0">Indicador</span>
+          <Selector className="min-w-0" value={indicador} onChange={(e) => setIndicador(e.target.value as IndicadorTrayectoria)}>
             {INDICADORES.map(([v, t]) => <option key={v} value={v}>{t}{v === 'peso_para_talla' ? ' (en prueba)' : ''}</option>)}
           </Selector>
         </label>
-        <label className="flex flex-col gap-1.5 text-sm font-semibold">Agrupar por
-          <Selector value={agrupar} onChange={(e) => setAgrupar(e.target.value as AgruparTrayectoria)}>
+        <label className="flex items-center gap-2 text-sm font-semibold"><span className="shrink-0">Agrupar por</span>
+          <Selector className="min-w-0" value={agrupar} onChange={(e) => setAgrupar(e.target.value as AgruparTrayectoria)}>
             {AGRUPACIONES.map(([v, t]) => <option key={v} value={v}>{t}</option>)}
           </Selector>
         </label>
-        <label className="flex flex-col gap-1.5 text-sm font-semibold">Edad en el eje
-          <Selector value={eje} onChange={(e) => setEje(e.target.value as EjeTrayectoria)}>
+        <label className="flex items-center gap-2 text-sm font-semibold"><span className="shrink-0">Edad en el eje</span>
+          <Selector className="min-w-0" value={eje} onChange={(e) => setEje(e.target.value as EjeTrayectoria)}>
             {EJES.map(([v, t]) => <option key={v} value={v}>{t}</option>)}
           </Selector>
         </label>
@@ -149,40 +164,45 @@ export default function Trayectorias() {
             grupo: g.grupo, visita: e.nombre, ninos: e.n, edad_media_meses: e.edad_media_meses, diferencia_oms_z: e.diferencia_oms,
             valor_medio: e.valor_medio, unidad: e.unidad,
           })))
+          // «Niños individuales» solo existe si la respuesta los trae (solo los ve el equipo experto)
+          const hayNinos = (r.individuales?.length ?? 0) > 0
+          const pestanas = hayNinos ? PESTANAS : PESTANAS.filter((p) => p.clave !== 'ninos')
+          const activa = ver === 'ninos' && !hayNinos ? 'media' : ver
           return (
             <>
-              {r.fuente === 'validacion' && r.nota && <p className="text-sm text-salvia">{r.nota}</p>}
+              {r.fuente === 'validacion' && r.nota && <p className="shrink-0 text-sm text-salvia">{r.nota}</p>}
               {(r.etiqueta === 'En prueba' || indicador === 'peso_para_talla') && (
-                <p className="flex items-center gap-2 text-sm"><EnPrueba /> El peso para la talla aún se está validando.</p>
+                <p className="flex shrink-0 items-center gap-2 text-sm"><EnPrueba /> El peso para la talla aún se está validando.</p>
               )}
               {grupos.length === 0 ? (
-                <Aviso tono="teal">{r.mensaje ?? 'Ningún grupo reúne 5 o más niños con este indicador.'}</Aviso>
+                <Aviso tono="teal">{r.mensaje ?? 'Ningún grupo tiene niños con este indicador.'}</Aviso>
               ) : (
                 <>
-                  <Grafica titulo={dMedia.titulo} descripcion={dMedia.descripcion}
-                    exportar={{ nombre: base, muestra, filas: filasOms.map((f) => ({ ...f })) }}>
-                    <GraficaZ grupos={grupos} />
-                  </Grafica>
-                  <TablaDatos titulo={dOms.titulo} descripcion={dOms.descripcion} exportar={{ nombre: `${base}-oms`, muestra, filas: filasOms }}>
-                    <Tabla densa>
-                      <thead><tr><th>Grupo</th><th>Visita</th><th>Niños</th><th>Edad media (meses)</th><th>Diferencia con la OMS (z)</th><th>Valor medio</th></tr></thead>
-                      <tbody>{grupos.flatMap((g) => g.etapas.map((e) => (
-                        <tr key={`${g.grupo}-${e.etapa}`}>
-                          <td>{g.grupo}</td><td>{e.nombre}</td><td>{num(e.n)}</td>
-                          <td>{e.edad_media_meses == null ? '—' : dec2(e.edad_media_meses)}</td>
-                          <td>{z(e.diferencia_oms)}</td><td>{valorUnidad(e.valor_medio, e.unidad)}</td>
-                        </tr>
-                      )))}</tbody>
-                    </Tabla>
-                  </TablaDatos>
-                  <Individuales ninos={r.individuales} grupos={grupos} />
+                  <Pestanas prefijo="trayectorias" etiqueta="Qué ver" pestanas={pestanas} activa={activa} elegir={elegir} />
+                  <PanelPestana prefijo="trayectorias" activa={activa} className={PANEL}>
+                    {activa === 'media' && (
+                      <Grafica titulo={dMedia.titulo} descripcion={dMedia.descripcion}
+                        exportar={{ nombre: base, muestra, filas: filasOms.map((f) => ({ ...f })) }}>
+                        <GraficaZ grupos={grupos} />
+                      </Grafica>
+                    )}
+                    {activa === 'oms' && (
+                      <TablaDatos llenar titulo={dOms.titulo} descripcion={dOms.descripcion} exportar={{ nombre: `${base}-oms`, muestra, filas: filasOms }}>
+                        <Tabla densa className={ENCABEZADO_FIJO}>
+                          <thead><tr><th>Grupo</th><th>Visita</th><th>Niños</th><th>Edad media (meses)</th><th>Diferencia con la OMS (z)</th><th>Valor medio</th></tr></thead>
+                          <tbody>{grupos.flatMap((g) => g.etapas.map((e) => (
+                            <tr key={`${g.grupo}-${e.etapa}`}>
+                              <td>{g.grupo}</td><td>{e.nombre}</td><td>{num(e.n)}</td>
+                              <td>{e.edad_media_meses == null ? '—' : dec2(e.edad_media_meses)}</td>
+                              <td>{z(e.diferencia_oms)}</td><td>{valorUnidad(e.valor_medio, e.unidad)}</td>
+                            </tr>
+                          )))}</tbody>
+                        </Tabla>
+                      </TablaDatos>
+                    )}
+                    {activa === 'ninos' && <Individuales ninos={r.individuales} grupos={grupos} />}
+                  </PanelPestana>
                 </>
-              )}
-              {((r.celdas_omitidas ?? 0) > 0 || (r.grupos_omitidos ?? 0) > 0) && (
-                <p className="text-xs text-salvia">
-                  {r.grupos_omitidos ? `${r.grupos_omitidos} grupo(s): ${N_MENOR_QUE_5}. ` : ''}
-                  {r.celdas_omitidas ? `${r.celdas_omitidas} visita(s) de algún grupo: ${N_MENOR_QUE_5}.` : ''}
-                </p>
               )}
             </>
           )

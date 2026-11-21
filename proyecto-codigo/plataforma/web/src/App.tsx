@@ -3,7 +3,7 @@ import { lazy } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router'
 import { ErrorApi } from './api/cliente'
 import { ProveedorSesion, Requiere } from './auth/sesion'
-import { Marco } from './components/Marco'
+import { Marco, ROLES_ADMIN, ROLES_CLINICOS, ROLES_CONSULTA } from './components/Marco'
 
 import Ingresar from './paginas/Ingresar'
 
@@ -25,6 +25,8 @@ const Nino = lazy(() => import('./paginas/Nino'))
 const Ninos = lazy(() => import('./paginas/Ninos'))
 const RevisionRiesgos = lazy(() => import('./paginas/RevisionRiesgos'))
 const Tablero = lazy(() => import('./paginas/Tablero'))
+const VistaClinica = lazy(() => import('./paginas/VistaClinica'))
+const CompararGrupos = lazy(() => import('./components/clinica/CompararGrupos'))
 const AnaliticaLayout = lazy(() => import('./paginas/AnaliticaLayout'))
 const SubmoduloAnalitica = lazy(() => import('./paginas/analitica/Submodulo'))
 
@@ -52,32 +54,35 @@ export function Rutas() {
     <Routes>
       <Route path="/ingresar" element={<Ingresar />} />
       <Route element={<Requiere><Marco /></Requiere>}>
-        <Route index element={<Tablero />} />
-        <Route path="explorar" element={<Requiere roles={['admin', 'experto', 'visualizador']}><Explorar /></Requiere>} />
-        <Route path="ninos" element={<Ninos />} />
-        <Route path="ninos/:sujeto" element={<Nino />} />
-        <Route path="revision/datos" element={<Requiere roles={['admin']}><Navigate to="/admin/calidad-datos" replace /></Requiere>} />
-        <Route path="admin/calidad-datos" element={<Requiere roles={['admin']}><AdminCalidadDatos /></Requiere>} />
-        <Route path="revision/riesgos" element={<Requiere roles={['admin', 'experto']}><RevisionRiesgos /></Requiere>} />
+        <Route index element={<VistaClinica />} />
+        <Route path="tablero" element={<Tablero />} />
+        <Route path="comparar" element={<Requiere roles={ROLES_CONSULTA}><CompararGrupos /></Requiere>} />
+        <Route path="explorar" element={<Requiere roles={ROLES_CONSULTA}><Explorar /></Requiere>} />
+        <Route path="ninos" element={<Requiere roles={ROLES_CLINICOS}><Ninos /></Requiere>} />
+        <Route path="ninos/:sujeto" element={<Requiere roles={ROLES_CLINICOS}><Nino /></Requiere>} />
+        <Route path="revision/datos" element={<Requiere roles={ROLES_ADMIN}><Navigate to="/admin/calidad-datos" replace /></Requiere>} />
+        <Route path="admin/calidad-datos" element={<Requiere roles={ROLES_ADMIN}><AdminCalidadDatos /></Requiere>} />
+        <Route path="revision" element={<Requiere roles={ROLES_CLINICOS}><Navigate to="/revision/riesgos" replace /></Requiere>} />
+        <Route path="revision/riesgos" element={<Requiere roles={ROLES_CLINICOS}><RevisionRiesgos /></Requiere>} />
         <Route path="inferencia" element={<Navigate to="/prediccion" replace />} />
-        <Route path="prediccion" element={<Requiere roles={['admin', 'experto']}><PrediccionMarco /></Requiere>} />
-        <Route path="mis-modelos" element={<Requiere roles={['admin', 'experto']}><MisModelos /></Requiere>} />
-        <Route path="diccionario" element={<Requiere roles={['admin', 'experto']}><Diccionario /></Requiere>} />
-        <Route path="admin/configuracion" element={<Requiere roles={['admin']}><AdminConfiguracion /></Requiere>} />
-        <Route path="admin/programacion" element={<Requiere roles={['admin']}><AdminProgramacion /></Requiere>} />
-        <Route path="admin/entrenamientos" element={<Requiere roles={['admin']}><AdminEntrenamientos /></Requiere>} />
-        <Route path="admin/modelos" element={<Requiere roles={['admin']}><AdminModelos /></Requiere>} />
-        <Route path="admin/corridas" element={<Requiere roles={['admin']}><AdminCorridas /></Requiere>} />
-        <Route path="admin/usuarios" element={<Requiere roles={['admin']}><AdminUsuarios /></Requiere>} />
-        <Route path="notificaciones" element={<Requiere roles={['admin']}><Navigate to="/notificaciones/alertas" replace /></Requiere>} />
-        <Route path="notificaciones/servidor" element={<Requiere roles={['admin']}><NotifServidor /></Requiere>} />
-        <Route path="notificaciones/alertas" element={<Requiere roles={['admin']}><NotifAlertas /></Requiere>} />
-        <Route path="admin/notificaciones" element={<Requiere roles={['admin']}><Navigate to="/notificaciones/alertas" replace /></Requiere>} />
-        <Route path="analitica" element={<Requiere roles={['admin', 'experto', 'visualizador']}><AnaliticaLayout /></Requiere>}>
+        <Route path="prediccion" element={<Requiere roles={ROLES_CLINICOS}><PrediccionMarco /></Requiere>} />
+        <Route path="mis-modelos" element={<Requiere roles={ROLES_CLINICOS}><MisModelos /></Requiere>} />
+        <Route path="diccionario" element={<Requiere roles={ROLES_CLINICOS}><Diccionario /></Requiere>} />
+        <Route path="admin/configuracion" element={<Requiere roles={ROLES_ADMIN}><AdminConfiguracion /></Requiere>} />
+        <Route path="admin/programacion" element={<Requiere roles={ROLES_ADMIN}><AdminProgramacion /></Requiere>} />
+        <Route path="admin/entrenamientos" element={<Requiere roles={ROLES_ADMIN}><AdminEntrenamientos /></Requiere>} />
+        <Route path="admin/modelos" element={<Requiere roles={ROLES_ADMIN}><AdminModelos /></Requiere>} />
+        <Route path="admin/corridas" element={<Requiere roles={ROLES_ADMIN}><AdminCorridas /></Requiere>} />
+        <Route path="admin/usuarios" element={<Requiere roles={ROLES_ADMIN}><AdminUsuarios /></Requiere>} />
+        <Route path="notificaciones" element={<Requiere roles={ROLES_ADMIN}><Navigate to="/notificaciones/alertas" replace /></Requiere>} />
+        <Route path="notificaciones/servidor" element={<Requiere roles={ROLES_ADMIN}><NotifServidor /></Requiere>} />
+        <Route path="notificaciones/alertas" element={<Requiere roles={ROLES_ADMIN}><NotifAlertas /></Requiere>} />
+        <Route path="admin/notificaciones" element={<Requiere roles={ROLES_ADMIN}><Navigate to="/notificaciones/alertas" replace /></Requiere>} />
+        <Route path="analitica" element={<Requiere roles={ROLES_CONSULTA}><AnaliticaLayout /></Requiere>}>
           <Route index element={<ARresumen />} />
           <Route path=":submodulo" element={<SubmoduloAnalitica />} />
         </Route>
-        <Route path="*" element={<div><h1>No existe esa página</h1><p className="mt-2 text-salvia">Revise la dirección o vuelva al tablero.</p></div>} />
+        <Route path="*" element={<div><h1>No existe esa página</h1><p className="mt-2 text-salvia">Revise la dirección o vuelva a la vista clínica.</p></div>} />
       </Route>
     </Routes>
   )

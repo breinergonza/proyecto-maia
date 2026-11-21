@@ -34,25 +34,25 @@ const cifra = (texto: string) => screen.getByText(texto).previousElementSibling?
 describe('tablero', () => {
   it('no dice «Paquete —» ni «corrida» cuando la actualización no vino de un paquete', async () => {
     api('admin')
-    montar('/')
+    montar('/tablero')
     expect(await screen.findByText('niños con datos')).toBeInTheDocument()
-    const encabezado = screen.getByRole('heading', { name: 'Tablero' }).parentElement!.textContent ?? ''
+    const encabezado = screen.getByRole('heading', { name: 'Resumen' }).parentElement!.textContent ?? ''
     expect(encabezado).toMatch(/Datos al 30 de jun/)
     expect(encabezado).not.toMatch(/Paquete|corrida|—/i)
   })
 
   it('con paquete lo dice, sin la palabra «corrida»', async () => {
     api('admin', 'p1')
-    montar('/')
+    montar('/tablero')
     expect(await screen.findByText('niños con datos')).toBeInTheDocument()
-    const encabezado = screen.getByRole('heading', { name: 'Tablero' }).parentElement!.textContent ?? ''
+    const encabezado = screen.getByRole('heading', { name: 'Resumen' }).parentElement!.textContent ?? ''
     expect(encabezado).toMatch(/Paquete p1/)
     expect(encabezado).not.toMatch(/corrida/i)
   })
 
   it('«por revisar» y las respuestas de los expertos son cifras distintas', async () => {
     api('experto')
-    montar('/')
+    montar('/tablero')
     await screen.findByText('niños con datos')
     expect(cifra('datos por revisar · 12,5 por mil')).toBe('200')
     expect(cifra('datos ya respondidos por expertos')).toBe('12')
@@ -61,7 +61,7 @@ describe('tablero', () => {
 
   it('el contador de alarmas es el total y dice cuántas se listan', async () => {
     api('experto')
-    montar('/')
+    montar('/tablero')
     const panel = (await screen.findByRole('heading', { name: 'Alarmas de grupo' })).closest('section')!
     expect(await within(panel).findByText('789 · se muestran las 100 más recientes')).toBeInTheDocument()
     expect(within(panel).getAllByRole('listitem')).toHaveLength(100)
@@ -84,12 +84,14 @@ describe('tablero', () => {
       if (url === '/api/tablero/alarmas-por-trimestre') return { cuerpo: trimestres }
       return { cuerpo: {} }
     })
-    montar('/')
+    montar('/tablero')
     // visitas en orden (40 semanas antes que 3 meses) y una medida sin dato en una visita no corre a las demás
     expect(await screen.findByRole('figure', { name: 'Porcentaje de niños medidos con crecimiento bajo frente a la OMS en cada visita: '
       + 'Peso para la edad, 40 semanas 12,0 %, 3 meses EC 8,0 %; Talla para la edad, 40 semanas 15,0 %, 3 meses EC sin dato' }))
       .toBeInTheDocument()
-    expect(screen.getByText('Ver la tabla')).toBeInTheDocument()
+    // la tabla de la gráfica va en su botón, no en un desplegable aparte
+    expect(screen.getByRole('button', { name: 'Ver como tabla' })).toBeInTheDocument()
+    expect(screen.queryByText('Ver la tabla')).not.toBeInTheDocument()
     // el trimestre sin alarmas (2025 T3) cuenta en el eje; las señales se dicen en palabras del equipo clínico
     expect(await screen.findByRole('figure', { name: '3 alarmas de grupo entre 2025 T2 y 2025 T4: '
       + '2025 T2, 2 por más valores redondeados; 2025 T4, 1 por más datos faltantes' })).toBeInTheDocument()
@@ -113,23 +115,89 @@ describe('series de crecimiento del tablero', () => {
 describe('tablero: claridad y enlaces de revisión', () => {
   it('el experto ve la cifra de datos por revisar sin enlace a /revision/datos; el admin sí', async () => {
     api('experto')
-    const { unmount } = montar('/')
+    const { unmount } = montar('/tablero')
     await screen.findByText('niños con datos')
     expect(screen.getByText('datos por revisar · 12,5 por mil').closest('a')).toBeNull()
     expect(cifra('datos por revisar · 12,5 por mil')).toBe('200')
     unmount()
     api('admin')
-    montar('/')
+    montar('/tablero')
     await screen.findByText('niños con datos')
     expect(screen.getByText('datos por revisar · 12,5 por mil').closest('a')).toHaveAttribute('href', '/revision/datos')
   })
 
   it('los paneles llevan su descripción y botón PNG', async () => {
     api('admin')
-    montar('/')
+    montar('/tablero')
     await screen.findByText('niños con datos')
     expect(screen.getByText('Niños con riesgo alto en cada desenlace.')).toBeInTheDocument()
     expect(screen.getByText('Cambios de toda una sede o de todo un trimestre.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Descargar PNG: Crecimiento frente a la OMS' })).toBeInTheDocument()
+  })
+
+  it('sin «datos leídos»: la cifra no le sirve al clínico; el total queda en la ayuda de «por mil»', async () => {
+    api('experto')
+    montar('/tablero')
+    await screen.findByText('niños con datos')
+    expect(screen.queryByText('datos leídos')).not.toBeInTheDocument()
+    expect(screen.getByText('datos por revisar · 12,5 por mil').closest('div, a')).toHaveAttribute('title', expect.stringContaining('16.000 datos'))
+  })
+
+  it('quien solo consulta ve las cifras de riesgo alto sin enlace a la lista de niños; el experto sí lo tiene', async () => {
+    const conDesenlace = (rol: Usuario['rol']) => simularApi((url) => {
+      if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario(rol) } }
+      if (url === '/api/tablero/resumen') {
+        return { cuerpo: { ...resumen, riesgos_por_desenlace: [{ clave: 'readm_3m', desenlace: 'readmisión',
+          momento: '40 sem', momento_nombre: '40 semanas', ninos: 95, altos: 10, riesgo_medio: 0.087 }] } }
+      }
+      return { cuerpo: [] }
+    })
+    conDesenlace('visualizador')
+    const { unmount } = montar('/tablero')
+    await screen.findByText('niños con algún riesgo alto')
+    expect(cifra('niños con algún riesgo alto')).toBe('40')
+    expect(screen.getByText('niños con algún riesgo alto').closest('a')).toBeNull()
+    expect(within(screen.getByRole('table')).getByText('10').closest('a')).toBeNull()
+    expect(document.querySelector('a[href^="/ninos"]')).toBeNull()
+    unmount()
+    conDesenlace('experto')
+    montar('/tablero')
+    await screen.findByText('niños con algún riesgo alto')
+    expect(screen.getByText('niños con algún riesgo alto').closest('a')).toHaveAttribute('href', '/ninos?percentil_min=90')
+    expect(within(screen.getByRole('table')).getByText('10').closest('a')).toHaveAttribute('href', '/ninos?desenlace=readm_3m&percentil_min=90')
+  })
+
+  it('«Riesgo por desenlace»: un nombre por desenlace con su visita aparte, y dice qué es «alto»', async () => {
+    simularApi((url) => {
+      if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('experto') } }
+      if (url === '/api/tablero/resumen') {
+        return { cuerpo: { ...resumen, riesgos_por_desenlace: [{ clave: 'des12_desde_3', desenlace: 'desarrollo psicomotor bajo a los 12 meses (riesgo calculado a 3 m EC)',
+          momento: '3 m EC', momento_nombre: '3 meses (edad corregida)', ninos: 95, altos: 10, riesgo_medio: 0.087 }] } }
+      }
+      return { cuerpo: [] }
+    })
+    montar('/tablero')
+    const panel = (await screen.findByRole('heading', { name: 'Riesgo por desenlace' })).closest('section')!
+    // la visita ya se dice en su línea: no se repite entre paréntesis en el nombre
+    expect(within(panel).getByText('desarrollo psicomotor bajo a los 12 meses')).toBeInTheDocument()
+    expect(within(panel).getByText('Visita: 3 meses EC')).toBeInTheDocument()
+    expect(within(panel).queryByText(/riesgo calculado a/)).not.toBeInTheDocument()
+    // «alto» dicho una vez, con el mismo 10 % que usa el resto de la web
+    expect(within(panel).getByText('Alto: entre el 10 % más alto de los niños con que se calibró cada modelo')).toBeInTheDocument()
+  })
+
+  it('cada panel dice una sola vez qué muestra: sin la frase repetida de crecimiento ni la de alarmas', async () => {
+    simularApi((url) => {
+      if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('experto') } }
+      if (url === '/api/tablero/resumen') return { cuerpo: resumen }
+      if (url === '/api/tablero/alarmas-grupo') return { cuerpo: alarmas }
+      return { cuerpo: [] }
+    })
+    montar('/tablero')
+    await screen.findByText('niños con datos')
+    // la gráfica de crecimiento dice una vez qué cuenta (variable, población y denominador) y no repite el rótulo en otra línea
+    expect(screen.getAllByText(/con crecimiento bajo frente a la OMS/)).toHaveLength(1)
+    expect(await screen.findByText('Cambios de toda una sede o de todo un trimestre.')).toBeInTheDocument()
+    expect(screen.queryByText(/suelen venir de un cambio en la forma de medir/)).not.toBeInTheDocument()
   })
 })

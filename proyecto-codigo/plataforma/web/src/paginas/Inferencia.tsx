@@ -3,20 +3,24 @@
 // la vista y el resto plegado. Arma la misma petición que antes se pegaba como JSON, que queda como modo avanzado
 // (solo administración). Los resultados se dicen con el glosario clínico.
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { ChevronDown } from 'lucide-react'
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { ErrorApi, pedir } from '../api/cliente'
+import type { ResultadoConHistoria } from '../api/inferencia'
 import type { CampoFormulario, FormularioCalculo, PeticionInferencia, PuntoCrecimiento, ResultadoInferencia, VisitaFormulario } from '../api/tipos'
 import { puede, useSesion } from '../auth/sesion'
 import { descripcionDe } from '../lib/descripciones'
 import { Aviso, Boton, Cargando, Encabezado, Entrada, Insignia, Panel, Selector, Tabla, Texto, Vacio } from '../components/ui'
+import { Termino } from '../components/Termino'
 import { cn } from '../lib/cn'
 import { usePaqueteActivo } from '../lib/consultas'
 import { CrecimientoOms, TarjetaRiesgo } from '../components/ficha'
+import { PanelesPestana, Pestanas } from '../components/ui/Pestanas'
+import { seccionesDeRiesgo } from '../components/ficha/RiesgoA12Meses'
 import { RangoEsperado } from '../components/graficos'
+import { estadoDe, familiaDe, familiasConRiesgo } from '../lib/familias'
 import { aproximado, dec, edad, indicador, medida } from '../lib/formato'
-import { alerta, AYUDA_DOS_CIFRAS, AYUDA_OMS, ayudaAlerta, ayudaZ, CAYO, frenteOms, motivoExtra } from '../lib/lenguaje'
+import { alerta, AYUDA_DOS_CIFRAS, ayudaAlerta, ayudaZ, CAYO, frenteOms, motivoExtra } from '../lib/lenguaje'
 
 const SUJETO = 'calculo'
 const DIA = 86_400_000
@@ -67,12 +71,16 @@ export function armarPeticion(f: FormularioCalculo, nino: Nino, valores: Valores
   else if (!Number.isFinite(eg) || eg < 20 || eg > 45) errores.push('Las semanas de gestación deben estar entre 20 y 45.')
 
   const mediciones: PeticionInferencia['mediciones'] = []
-  const agregar = (campos: CampoFormulario[], fecha: string | null) => {
+  // las visitas con algo que corregir, para marcar su pestaña aunque no se vea
+  const visitasConError: string[] = []
+  const marcar = (etapa: string) => { if (!visitasConError.includes(etapa)) visitasConError.push(etapa) }
+  const agregar = (campos: CampoFormulario[], fecha: string | null, etapa?: string) => {
     for (const c of campos) {
       const v = valores[c.variable]?.trim()
       if (!v) continue
       if (c.tipo === 'numero' && !Number.isFinite(Number(v.replace(',', '.')))) {
         errores.push(`«${c.etiqueta}»: escriba un número.`)
+        if (etapa) marcar(etapa)
         continue
       }
       const dias = fecha && nacimiento ? Math.round((new Date(`${fecha}T00:00:00`).getTime() - nacimiento.getTime()) / DIA) : null
@@ -83,24 +91,31 @@ export function armarPeticion(f: FormularioCalculo, nino: Nino, valores: Valores
   for (const v of f.visitas) {
     if (!v.campos.some((c) => valores[c.variable]?.trim())) continue
     if (alNacer(v)) {
-      agregar(v.campos, nino.nacimiento || null)
+      agregar(v.campos, nino.nacimiento || null, v.etapa)
       continue
     }
     const fecha = fechas[v.etapa]
     if (!fecha) {
       errores.push(`Escriba la fecha de la visita «${v.nombre}».`)
+      marcar(v.etapa)
       continue
     }
-    if (nacimiento && new Date(`${fecha}T00:00:00`) < nacimiento) errores.push(`La visita «${v.nombre}» no puede ser antes del nacimiento.`)
-    agregar(v.campos, fecha)
+    if (nacimiento && new Date(`${fecha}T00:00:00`) < nacimiento) {
+      errores.push(`La visita «${v.nombre}» no puede ser antes del nacimiento.`)
+      marcar(v.etapa)
+    }
+    agregar(v.campos, fecha, v.etapa)
   }
   if (!mediciones.length && !errores.length) errores.push('Escriba al menos un dato del niño o de una visita.')
   const peticion: PeticionInferencia = {
     sujetos: [{ sujeto: SUJETO, fecha_nacimiento: nino.nacimiento || null, eg_semanas: Number.isFinite(eg) ? eg : null }],
     mediciones,
   }
-  return { peticion, errores }
+  return { peticion, errores, visitasConError }
 }
+
+/** Los desenlaces que calcula una visita, sin «(riesgo calculado a …)»: la visita ya es la que se está mirando, y sin repetidos. */
+const riesgosDe = (v: VisitaFormulario) => [...new Set(v.desenlaces.map((d) => d.replace(/\s*\(riesgo calculado a [^)]*\)\s*$/, '')))]
 
 /** Llena el formulario con el niño simulado de ejemplo, hasta la última visita en que se calcula un riesgo: el riesgo
  * sale de la última visita con datos, y una posterior sin desenlaces dejaría el ejemplo sin riesgo que mostrar. */
@@ -121,102 +136,162 @@ function desdeEjemplo(f: FormularioCalculo, p: PeticionInferencia) {
   return { nino, valores, fechas }
 }
 
+/** Quita «(edad corregida)» del nombre de una visita para su pestaña: la fecha y la ventana de edad ya lo dicen. */
+const nombreCorto = (nombre: string) => nombre.replace(' (edad corregida)', '')
+
+/** La clave de la pestaña de una visita: su etapa sin espacios, que no valen en los id de pestaña y panel. */
+const claveVisita = (etapa: string) => etapa.replace(/[^\w-]+/g, '-')
+
+/** El formulario es un solo `form`: su botón «Calcular el riesgo» vive junto al título para estar a la vista en cualquier pestaña. */
+const ID_FORMULARIO = 'formulario-calculo'
+
+type Seccion = { clave: string; texto: ReactNode; contenido: ReactNode }
+
 export default function Inferencia() {
   const { usuario } = useSesion()
   const activo = usePaqueteActivo()
   const [avanzado, setAvanzado] = useState(false)
-  const calcular = useMutation({ mutationFn: (p: unknown) => pedir<ResultadoInferencia>('/inferencia', { cuerpo: p }) })
-  // el botón queda al final de un formulario largo: al terminar, el resultado (o el error) se trae a la vista
-  const resultado = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (calcular.data || calcular.error) resultado.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
-  }, [calcular.data, calcular.error])
+  const [pestana, setPestana] = useState('datos')
+  const calcular = useMutation({ mutationFn: (p: unknown) => pedir<ResultadoConHistoria>('/inferencia', { cuerpo: p }) })
+  const formulario = useQuery({
+    queryKey: ['inferencia', 'formulario'], queryFn: () => pedir<FormularioCalculo>('/inferencia/formulario'), select: quitarEdadGestacional,
+  })
 
   if (activo.data === null) {
     return (
       <>
-        <Encabezado titulo="Predicción: un niño" />
+        <Encabezado titulo="Calcular un niño" />
         <Vacio titulo="No hay un paquete de modelos activo"><ActivarModelo admin={puede(usuario, ['admin'])} /></Vacio>
       </>
     )
   }
+  const admin = puede(usuario, ['admin'])
+  // al terminar el cálculo se abre la primera pestaña del resultado; al fallar, se queda donde estaba el error
+  const enviar = (p: unknown) => calcular.mutate(p, { onSuccess: (r) => setPestana(seccionesDeResultado(r, avanzado)[0].clave) })
+  const resultado = calcular.data
+  const secciones: Seccion[] = [
+    {
+      clave: 'datos', texto: 'Datos del niño',
+      contenido: avanzado ? <ModoAvanzado calcular={enviar} pendiente={calcular.isPending} />
+        : formulario.isPending ? <Cargando />
+          : formulario.error ? <Aviso>{formulario.error.message}</Aviso>
+            : <Formulario formulario={formulario.data} calcular={enviar} verDatos={() => setPestana('datos')} />,
+    },
+    ...(resultado ? seccionesDeResultado(resultado, avanzado) : [{
+      clave: 'resultado', texto: 'Resultado',
+      contenido: <Vacio titulo="Aquí aparecerá el resultado">Llene los datos y pulse «Calcular el riesgo». Para ver cómo se ve, cargue el niño de ejemplo.</Vacio>,
+    }]),
+  ]
+  const activa = secciones.find((s) => s.clave === pestana)?.clave ?? 'datos'
   return (
-    <>
-      <Encabezado titulo="Predicción: un niño"
-        accion={puede(usuario, ['admin']) && (
-          <Boton chico variante="fantasma" onClick={() => { setAvanzado((a) => !a); calcular.reset() }} aria-pressed={avanzado}>
-            {avanzado ? 'Volver al formulario' : 'Modo avanzado (JSON)'}
-          </Boton>
-        )}>
-        Escriba lo que tenga del niño, visita por visita, y vea qué riesgo calcula el modelo y qué datos parecen raros.
-        Lo que deje vacío se toma como dato faltante. No se guarda nada.
-      </Encabezado>
-      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-        {avanzado ? <ModoAvanzado calcular={calcular.mutate} pendiente={calcular.isPending} />
-          : <Formulario calcular={calcular.mutate} pendiente={calcular.isPending} />}
-        <div ref={resultado} className="scroll-mt-4 space-y-4">
-          {calcular.error && (
-            <Aviso>
-              {calcular.error.message}
-              {calcular.error instanceof ErrorApi && calcular.error.estado === 409 && <> <ActivarModelo admin={puede(usuario, ['admin'])} /></>}
-            </Aviso>
-          )}
-          {calcular.data ? <Resultado r={calcular.data} varios={avanzado} />
-            : <Vacio titulo="Aquí aparecerá el resultado">Llene los datos y pulse «Calcular el riesgo». Para ver cómo se ve, cargue el niño de ejemplo.</Vacio>}
+    <div className="flex flex-col lg:h-full">
+      <Encabezado titulo="Calcular un niño"
+        accion={
+          <div className="flex flex-wrap items-center gap-2">
+            {admin && (
+              <Boton chico variante="fantasma" onClick={() => { setAvanzado((a) => !a); setPestana('datos'); calcular.reset() }} aria-pressed={avanzado}>
+                {avanzado ? 'Volver al formulario' : 'Modo avanzado (JSON)'}
+              </Boton>
+            )}
+            {!avanzado && (
+              <Boton type="submit" form={ID_FORMULARIO} disabled={!formulario.data || calcular.isPending}>
+                {calcular.isPending ? 'Calculando…' : 'Calcular el riesgo'}
+              </Boton>
+            )}
+          </div>
+        } />
+      {calcular.error && (
+        <div className="mb-3">
+          <Aviso>
+            {calcular.error.message}
+            {calcular.error instanceof ErrorApi && calcular.error.estado === 409 && <> <ActivarModelo admin={admin} /></>}
+          </Aviso>
         </div>
+      )}
+      {resultado && resultado.variables_ignoradas.length > 0 && (
+        <div className="mb-3"><Aviso tono="teal">No se usaron estos datos porque el modelo no los conoce: {resultado.variables_ignoradas.join(', ')}.</Aviso></div>
+      )}
+      <Pestanas prefijo="calculo" etiqueta="Qué ver del cálculo" pestanas={secciones} activa={activa} elegir={setPestana} />
+      <div className="mt-3 lg:min-h-0 lg:flex-1">
+        <PanelesPestana prefijo="calculo" activa={activa} paneles={secciones} className="lg:h-full lg:overflow-y-auto" />
       </div>
-    </>
+    </div>
   )
 }
 
-function Formulario({ calcular, pendiente }: { calcular: (p: PeticionInferencia) => void; pendiente: boolean }) {
-  const f = useQuery({
-    queryKey: ['inferencia', 'formulario'], queryFn: () => pedir<FormularioCalculo>('/inferencia/formulario'), select: quitarEdadGestacional,
-  })
+function Formulario({ formulario, calcular, verDatos }: {
+  formulario: FormularioCalculo; calcular: (p: PeticionInferencia) => void; verDatos: () => void
+}) {
   const [nino, setNino] = useState<Nino>({ nacimiento: '', eg: '' })
   const [valores, setValores] = useState<Valores>({})
   const [fechas, setFechas] = useState<Valores>({})
   const [errores, setErrores] = useState<string[]>([])
-  const [abiertas, setAbiertas] = useState<Record<string, boolean>>({})
+  const [conError, setConError] = useState<string[]>([])
+  const [visita, setVisita] = useState(claveVisita(formulario.visitas[0]?.etapa ?? ''))
   const ejemplo = useMutation({
     mutationFn: () => pedir<PeticionInferencia & { nota: string }>('/inferencia/ejemplo'),
     onSuccess: (p) => {
-      if (!f.data) return
-      const e = desdeEjemplo(f.data, p)
+      const e = desdeEjemplo(formulario, p)
       setNino(e.nino)
       setValores(e.valores)
       setFechas(e.fechas)
       setErrores([])
-      setAbiertas(Object.fromEntries(f.data.visitas.map((v) => [v.etapa, v.campos.some((c) => e.valores[c.variable])])))
+      setConError([])
+      // la primera visita con datos, para que lo cargado se vea
+      setVisita(claveVisita(formulario.visitas.find((v) => v.campos.some((c) => e.valores[c.variable]))?.etapa ?? visita))
     },
   })
 
-  if (f.isPending) return <Panel titulo="Datos del niño"><Cargando /></Panel>
-  if (f.error) return <Aviso>{f.error.message}</Aviso>
-  const formulario = f.data
   const cambiar = (variable: string, v: string) => setValores((x) => ({ ...x, [variable]: v }))
   const enviar = (ev: FormEvent) => {
     ev.preventDefault()
-    const { peticion, errores } = armarPeticion(formulario, nino, valores, fechas)
-    setErrores(errores)
-    if (!errores.length) calcular(peticion)
+    const r = armarPeticion(formulario, nino, valores, fechas)
+    setErrores(r.errores)
+    setConError(r.visitasConError.map(claveVisita))
+    if (r.errores.length) {
+      // lo que falta está en los datos: se vuelve a ellos y, si es de una visita, se abre esa
+      verDatos()
+      if (r.visitasConError[0]) setVisita(claveVisita(r.visitasConError[0]))
+    } else calcular(r.peticion)
   }
   const limpiar = () => {
     setNino({ nacimiento: '', eg: '' })
     setValores({})
     setFechas({})
     setErrores([])
-    setAbiertas({})
+    setConError([])
   }
+  const llenosDe = (v: VisitaFormulario) => v.campos.filter((c) => valores[c.variable]?.trim()).length
+  const pestanasVisitas = formulario.visitas.map((v) => {
+    const llenos = llenosDe(v)
+    return {
+      clave: claveVisita(v.etapa),
+      texto: (
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1" title={v.nombre}>
+          {nombreCorto(v.nombre)}
+          {llenos > 0 && <Insignia tono="teal">{llenos} {llenos === 1 ? 'dato' : 'datos'}</Insignia>}
+          {conError.includes(claveVisita(v.etapa)) && <Insignia tono="coral">Revisar</Insignia>}
+        </span>
+      ),
+    }
+  })
+  const visitaActiva = formulario.visitas.some((v) => claveVisita(v.etapa) === visita) ? visita : claveVisita(formulario.visitas[0]?.etapa ?? '')
 
   return (
-    <form onSubmit={enviar} noValidate className="space-y-4">
+    <form id={ID_FORMULARIO} onSubmit={enviar} noValidate className="space-y-4">
+      <p className="text-sm text-salvia">
+        Escriba lo que tenga del niño, visita por visita, y vea qué riesgo calcula el modelo y qué datos parecen raros.
+        Lo que deje vacío se toma como dato faltante. No se guarda nada.
+      </p>
+      {errores.length > 0 && (
+        <Aviso>{errores.length === 1 ? errores[0] : <ul className="list-disc space-y-0.5 pl-4">{errores.map((e) => <li key={e}>{e}</li>)}</ul>}</Aviso>
+      )}
       <Panel titulo="Datos del niño"
         accion={<div className="flex flex-wrap gap-2">
           <Boton type="button" chico variante="secundario" onClick={() => ejemplo.mutate()} disabled={ejemplo.isPending}>{ejemplo.isPending ? 'Armando el ejemplo…' : 'Cargar un niño de ejemplo'}</Boton>
           <Boton type="button" chico variante="fantasma" onClick={limpiar}>Limpiar</Boton>
         </div>}>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <CampoSimple id="c-nacimiento" etiqueta="Fecha de nacimiento">
             <Entrada id="c-nacimiento" type="date" value={nino.nacimiento} onChange={(e) => setNino({ ...nino, nacimiento: e.target.value })} />
           </CampoSimple>
@@ -231,30 +306,26 @@ function Formulario({ calcular, pendiente }: { calcular: (p: PeticionInferencia)
         {ejemplo.isSuccess && <p className="mt-3 text-sm text-salvia">Se cargó un niño simulado: ningún dato es de un niño real.</p>}
       </Panel>
 
-      <section aria-label="Visitas" className="space-y-3">
-        <h2 className="text-base">Visitas <span className="text-sm font-normal text-salvia">· llene solo las que tenga</span></h2>
-        {formulario.visitas.map((v) => {
-          const llenos = v.campos.filter((c) => valores[c.variable]?.trim()).length
-          const abierta = abiertas[v.etapa] ?? false
-          return (
-            <div key={v.etapa} className={cn('rounded-panel border bg-papel shadow-suave', llenos ? 'border-teal/40' : 'border-linea')}>
-              <button type="button" onClick={() => setAbiertas({ ...abiertas, [v.etapa]: !abierta })} aria-expanded={abierta}
-                className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left sm:px-5">
-                <span className="min-w-0">
-                  <span className="block font-semibold">{v.nombre}</span>
-                  {v.desenlaces.length > 0 && <span className="mt-0.5 block text-xs text-salvia">Aquí se calcula: {v.desenlaces.join(' · ')}</span>}
-                </span>
-                <span className="flex shrink-0 items-center gap-2">
-                  {llenos > 0 && <Insignia tono="teal">{llenos} {llenos === 1 ? 'dato' : 'datos'}</Insignia>}
-                  <ChevronDown size={18} aria-hidden className={cn('text-salvia transition-transform', abierta && 'rotate-180')} />
-                </span>
-              </button>
-              {abierta && (
-                <div className="border-t border-linea px-4 pb-4 pt-3 sm:px-5">
+      {formulario.visitas.length > 0 && visitaActiva && (
+        <Panel titulo="Visitas" descripcion="Llene solo las que tenga.">
+          <Pestanas prefijo="visita" etiqueta="Visitas" pestanas={pestanasVisitas} activa={visitaActiva} elegir={setVisita} />
+          <PanelesPestana prefijo="visita" activa={visitaActiva} className="pt-4"
+            paneles={formulario.visitas.map((v) => ({
+              clave: claveVisita(v.etapa),
+              contenido: (
+                <>
+                  {v.desenlaces.length > 0 && (
+                    <div className="mb-3 text-sm">
+                      <p className="font-semibold" id={`riesgos-${v.etapa}`}>Con esta visita se calculan:</p>
+                      <ul aria-label="Riesgos que se calculan con esta visita" className="mt-0.5 list-disc space-y-0.5 pl-5 text-salvia">
+                        {riesgosDe(v).map((d) => <li key={d}>{d}</li>)}
+                      </ul>
+                    </div>
+                  )}
                   {alNacer(v) ? (
                     <p className="mb-3 text-sm text-salvia">Se toman con la fecha de nacimiento.</p>
                   ) : (
-                    <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                       <CampoSimple id={`f-${v.etapa}`} etiqueta="Fecha de la visita" ayuda={ventana(v)}>
                         <Entrada id={`f-${v.etapa}`} type="date" value={fechas[v.etapa] ?? ''}
                           onChange={(e) => setFechas({ ...fechas, [v.etapa]: e.target.value })} />
@@ -263,17 +334,11 @@ function Formulario({ calcular, pendiente }: { calcular: (p: PeticionInferencia)
                   )}
                   {v.campos.length > 0 ? <Campos campos={v.campos} valores={valores} cambiar={cambiar} masTexto="Más datos de esta visita" />
                     : <p className="text-sm text-salvia">Esta visita no tiene datos propios en el modelo.</p>}
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </section>
-
-      {errores.length > 0 && (
-        <Aviso>{errores.length === 1 ? errores[0] : <ul className="list-disc space-y-0.5 pl-4">{errores.map((e) => <li key={e}>{e}</li>)}</ul>}</Aviso>
+                </>
+              ),
+            }))} />
+        </Panel>
       )}
-      <Boton type="submit" className="w-full sm:w-auto" disabled={pendiente}>{pendiente ? 'Calculando…' : 'Calcular el riesgo'}</Boton>
     </form>
   )
 }
@@ -296,7 +361,7 @@ function Campos({ campos, valores, cambiar, masTexto }: {
   const resto = campos.filter((c) => !c.principal)
   const llenosResto = resto.filter((c) => valores[c.variable]?.trim()).length
   const grilla = (lista: CampoFormulario[]) => (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {lista.map((c) => <CampoDato key={c.variable} c={c} valor={valores[c.variable] ?? ''} cambiar={(x) => cambiar(c.variable, x)} />)}
     </div>
   )
@@ -375,65 +440,84 @@ function porIndicador(crecimiento: ResultadoInferencia['crecimiento']): Record<s
   return series
 }
 
-function Resultado({ r, varios }: { r: ResultadoInferencia; varios: boolean }) {
+/** Las pestañas del resultado: el riesgo a 12 meses de cada desenlace, el resto de riesgos, los datos que parecen raros y el
+ * crecimiento. Con varios niños (modo avanzado), cada fila dice de quién es. */
+function seccionesDeResultado(r: ResultadoConHistoria, varios: boolean): Seccion[] {
   const quien = (s: string) => (varios ? <span className="font-normal text-salvia"> · {s}</span> : null)
   // con un solo niño, el crecimiento se dibuja como en su ficha; con varios, una tabla deja comparar
   const grafica = !varios && r.crecimiento.some((c) => c.improbable || (c.z != null && c.edad_corregida != null))
-  return (
-    <>
-      {r.variables_ignoradas.length > 0 && (
-        <Aviso tono="teal">No se usaron estos datos porque el modelo no los conoce: {r.variables_ignoradas.join(', ')}.</Aviso>
-      )}
-      {r.riesgos.length === 0 ? (
+  // lo que «Riesgo a los 12 meses» ya cuenta visita por visita no se repite en una tarjeta de la última visita
+  const enSeccion = familiasConRiesgo(r.historia)
+  const riesgos = r.riesgos.filter((x) => !enSeccion.has(familiaDe(x.clave)))
+  const familias = seccionesDeRiesgo({ historia: r.historia })
+  const sinRiesgo = r.riesgos.length === 0 && familias.length === 0
+  return [
+    ...familias,
+    ...(sinRiesgo || riesgos.length > 0 ? [{
+      clave: 'riesgos', texto: familias.length > 0 ? 'Otros riesgos' : 'Riesgo calculado',
+      contenido: sinRiesgo ? (
         <Panel titulo={descripcionDe('riesgo').titulo} descripcion={descripcionDe('riesgo').descripcion}>
           <p className="text-sm text-salvia">
             No se calculó ningún riesgo. El riesgo se calcula en la <strong>última visita con datos</strong>: para verlo, esa
-            visita debe ser una de las que dicen «Aquí se calcula» (deje vacías las posteriores).
+            visita debe ser una de las que calculan riesgos, y lo dice bajo su nombre (deje vacías las posteriores).
           </p>
         </Panel>
       ) : (
         <section aria-label="Riesgo calculado" className="space-y-3">
           <p className="text-sm">{AYUDA_DOS_CIFRAS}</p>
-          {/* el resultado ocupa una columna angosta junto al formulario: una tarjeta por fila */}
-          <div className="grid grid-cols-1 gap-4">
-            {r.riesgos.map((x) => <TarjetaRiesgo key={`${x.sujeto}-${x.clave}`} r={x} nota={varios ? `Niño ${x.sujeto}` : undefined} />)}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {riesgos.map((x) => <TarjetaRiesgo key={`${x.sujeto}-${x.clave}`} r={x} nota={varios ? `Niño ${x.sujeto}` : undefined}
+              origen={{ estado: estadoDe(x.clave), version: r.modelo_clinico }} />)}
           </div>
         </section>
-      )}
-      <Panel titulo={descripcionDe('datos_raros').titulo} descripcion={descripcionDe('datos_raros').descripcion}>
-        {r.alertas_dato.length === 0 ? <p className="text-sm text-salvia">Ningún dato quedó marcado.</p> : (
-          <ul className="divide-y divide-linea/70 text-sm">
-            {r.alertas_dato.map((a, i) => {
-              const nombre = a.etiqueta ?? a.variable
-              const valor = Number(a.valor)
-              const extra = motivoExtra(a.motivo)
-              return (
-                <li key={i} className="py-3 first:pt-0 last:pb-0">
-                  <p>
-                    <span className="font-semibold">{nombre}</span>{quien(a.sujeto)}:{' '}
-                    <span className="font-semibold text-coral-hondo">{medida(a.valor)}</span>
-                    {a.rango_bajo != null && a.rango_alto != null && (
-                      <span> · se esperaba entre {aproximado(a.rango_bajo)} y {aproximado(a.rango_alto)}</span>
+      ),
+    }] : []),
+    {
+      clave: 'datos-raros',
+      texto: (
+        <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+          Datos que parecen raros{r.alertas_dato.length > 0 && <>{' '}<Insignia tono="coral">{r.alertas_dato.length}</Insignia></>}
+        </span>
+      ),
+      contenido: (
+        <Panel titulo={descripcionDe('datos_raros').titulo} descripcion={descripcionDe('datos_raros').descripcion}>
+          {r.alertas_dato.length === 0 ? <p className="text-sm text-salvia">Ningún dato quedó marcado.</p> : (
+            <ul className="divide-y divide-linea/70 text-sm">
+              {r.alertas_dato.map((a, i) => {
+                const nombre = a.etiqueta ?? a.variable
+                const valor = Number(a.valor)
+                const extra = motivoExtra(a.motivo)
+                return (
+                  <li key={i} className="py-3 first:pt-0 last:pb-0">
+                    <p>
+                      <span className="font-semibold">{nombre}</span>{quien(a.sujeto)}:{' '}
+                      <span className="font-semibold text-coral-hondo">{medida(a.valor)}</span>
+                      {a.rango_bajo != null && a.rango_alto != null && (
+                        <span> · se esperaba entre {aproximado(a.rango_bajo)} y {aproximado(a.rango_alto)}</span>
+                      )}
+                    </p>
+                    {extra && <p>{extra}.</p>}
+                    {a.rango_bajo != null && a.rango_alto != null && Number.isFinite(valor) && (
+                      <div className="mt-1 max-w-md">
+                        <RangoEsperado bajo={a.rango_bajo} alto={a.rango_alto} esperado={a.esperado} valor={valor}
+                          etiqueta={`${nombre}: ${medida(a.valor)}; se esperaba entre ${aproximado(a.rango_bajo)} y ${aproximado(a.rango_alto)}`} />
+                      </div>
                     )}
-                  </p>
-                  {extra && <p>{extra}.</p>}
-                  {a.rango_bajo != null && a.rango_alto != null && Number.isFinite(valor) && (
-                    <div className="mt-1 max-w-md">
-                      <RangoEsperado bajo={a.rango_bajo} alto={a.rango_alto} esperado={a.esperado} valor={valor}
-                        etiqueta={`${nombre}: ${medida(a.valor)}; se esperaba entre ${aproximado(a.rango_bajo)} y ${aproximado(a.rango_alto)}`} />
-                    </div>
-                  )}
-                  <p className="mt-1 flex flex-wrap gap-1">
-                    {a.capas.map((c) => <span key={c} title={ayudaAlerta(c)}><Insignia>{alerta(c)}</Insignia></span>)}
-                  </p>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </Panel>
-      {grafica ? <CrecimientoOms crecimiento={porIndicador(r.crecimiento)} /> : (
-        <Panel titulo={descripcionDe('crecimiento_ficha').titulo} descripcion={descripcionDe('crecimiento_ficha').descripcion} accion={<span className="text-xs text-salvia" title={AYUDA_OMS}>para la edad corregida</span>}>
+                    <p className="mt-1 flex flex-wrap gap-1">
+                      {a.capas.map((c) => <span key={c} title={ayudaAlerta(c)}><Insignia>{alerta(c)}</Insignia></span>)}
+                    </p>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </Panel>
+      ),
+    },
+    {
+      clave: 'crecimiento', texto: 'Crecimiento',
+      contenido: grafica ? <CrecimientoOms crecimiento={porIndicador(r.crecimiento)} grilla="sm:grid-cols-3" /> : (
+        <Panel titulo={descripcionDe('crecimiento_ficha').titulo} descripcion={descripcionDe('crecimiento_ficha').descripcion} accion={<span className="text-xs text-salvia">frente a la <Termino id="oms">OMS</Termino>, para la <Termino id="edad_corregida">edad corregida</Termino></span>}>
           {r.crecimiento.length === 0 ? <p className="text-sm text-salvia">Sin medidas de crecimiento.</p> : (
             <Tabla densa>
               <thead><tr><th>Medida</th><th className="text-right">Edad corregida</th><th>Frente a la OMS</th></tr></thead>
@@ -450,7 +534,7 @@ function Resultado({ r, varios }: { r: ResultadoInferencia; varios: boolean }) {
             </Tabla>
           )}
         </Panel>
-      )}
-    </>
-  )
+      ),
+    },
+  ]
 }

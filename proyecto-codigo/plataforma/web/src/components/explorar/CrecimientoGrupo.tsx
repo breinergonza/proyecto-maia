@@ -25,7 +25,7 @@ export function CrecimientoGrupo({ filas }: { filas: CrecimientoEtapa[] }) {
   return (
     <>
       <LeyendaSeries series={series} />
-      <LineasSeries filas={datos} series={series} alto={200} formatoY={(v) => `${num(v)} %`}
+      <LineasSeries filas={datos} series={series} alto={260} formatoY={(v) => `${num(v)} %`}
         etiqueta={`Porcentaje de niños del grupo con crecimiento bajo en cada visita: ${series.map((s) =>
           `${s.nombre}, ${datos.map((f) => `${f.x} ${typeof f[s.clave] === 'number' ? pct(f[s.clave] as number) : 'sin dato'}`).join(', ')}`).join('; ')}`}
         formatoTooltip={(v, f, s) => `${pct(v)} bajo · ${num(Number(f[`${s.clave}:datos`]))} datos`} />

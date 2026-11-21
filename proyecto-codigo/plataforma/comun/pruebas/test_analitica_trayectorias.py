@@ -1,4 +1,4 @@
-"""Trayectorias, perfiles y anticipación (funciones puras): solo agregados, celdas < 5 omitidas, desvío con 20 o más."""
+"""Trayectorias, perfiles y anticipación (funciones puras): solo agregados, celdas de 1 a 4 niños con su cifra, desvío con 20 o más."""
 from __future__ import annotations
 
 import numpy as np
@@ -26,23 +26,28 @@ def test_celdas_y_desvio():
     r = AN.trayectorias(_df(), ORDEN, {'40 sem': '40 semanas'}, lambda v, e: 'g')
     por = {g['grupo']: {e['etapa']: e for e in g['etapas']} for g in r['grupos']}
     assert por['alto']['40 sem']['n'] == 8 and por['alto']['40 sem']['z_desvio'] is None
-    assert '3 m EC' not in por['alto'], '3 niños: celda omitida'
-    assert r['celdas_omitidas'] == 1
+    assert por['alto']['3 m EC']['n'] == 3, '3 niños: la celda sale con su cifra'
+    assert por['alto']['3 m EC']['z_media'] is not None and por['alto']['3 m EC']['z_desvio'] is None
+    assert 'celdas_omitidas' not in r and 'grupos_omitidos' not in r
     assert por['resto']['40 sem']['z_desvio'] is not None and por['resto']['40 sem']['unidad'] == 'g'
     assert por['alto']['40 sem']['nombre'] == '40 semanas'
     assert por['alto']['40 sem']['diferencia_oms'] == por['alto']['40 sem']['z_media']
 
 
-def test_grupo_pequeno_no_sale_y_vacio():
+def test_grupo_pequeno_sale_con_sus_ninos_y_vacio():
     r = AN.trayectorias(_df(n_alto=4), ORDEN)
-    assert [g['grupo'] for g in r['grupos']] == ['resto'] and r['grupos_omitidos'] == 1
+    por = {g['grupo']: g for g in r['grupos']}
+    assert set(por) == {'alto', 'resto'} and por['alto']['ninos'] == 4
+    assert por['alto']['etapas'][0]['n'] == 4
     assert AN.trayectorias(pd.DataFrame(), ORDEN)['grupos'] == []
 
 
-def test_individuales_maximo_30_y_sin_grupos_pequenos():
+def test_individuales_maximo_30_de_cualquier_grupo():
     df = _df(n_alto=4, n_resto=60)
     ind = AN.trayectorias_individuales(df, ORDEN)
-    assert len(ind) == 30 and all(i['grupo'] == 'resto' for i in ind)
+    assert len(ind) == 30
+    pocos = AN.trayectorias_individuales(_df(n_alto=4, n_resto=0), ORDEN)
+    assert len(pocos) == 4 and {i['grupo'] for i in pocos} == {'alto'}
     assert {'codigo', 'serie'} <= set(ind[0])
     assert AN.trayectorias_individuales(pd.DataFrame(), ORDEN) == []
 
@@ -60,4 +65,5 @@ def test_anticipacion_visita():
     a = AN.anticipacion_visita(y, r)
     assert a['alertas'] == 30 and a['n'] == 300 and a['casos_detectados_pct'] > 10
     chico = AN.anticipacion_visita(y[:40], r[:40])
-    assert chico['alertas'] == 4 and chico['alertas_acertadas_pct'] is None, 'menos de 5 alertas: se omite'
+    assert chico['alertas'] == 4 and chico['alertas_acertadas_pct'] is not None, 'con 4 alertas se dice el porcentaje'
+    assert chico['casos_detectados_pct'] is not None and chico['n'] == 40

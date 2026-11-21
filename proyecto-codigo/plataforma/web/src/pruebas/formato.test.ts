@@ -20,6 +20,10 @@ describe('formatos', () => {
     expect(meses(91.3125)).toBe('3 m')
     expect(meses(15)).toBe('0,5 m')
     expect(meses(400)).toBe('13,1 m')
+    // un día antes del nacimiento corregido redondea a cero: «0 m», nunca «-0 m»
+    expect(meses(-1)).toBe('0 m')
+    expect(meses(-0.4)).toBe('0 m')
+    expect(meses(-20)).toBe('-0,7 m')
   })
   it('riesgo como porcentaje y posición entera', () => {
     expect(riesgo(0.857)).toBe('85,7 %')

@@ -17,6 +17,8 @@ export const parametro = (v: string | number | null | undefined) =>
   v == null ? '—' : typeof v === 'number' ? numero(v) : /^-?\d+(\.\d+)?(e-?\d+)?$/i.test(v.trim()) ? numero(Number(v)) : v
 export const dec = (v: number | null | undefined) => (v == null ? '—' : nf01.format(v))
 export const dec2 = (v: number | null | undefined) => (v == null ? '—' : nf2.format(v))
+/** Errores pequeños (Brier, ECE): con dos decimales 0,073 y 0,078 se leerían iguales. */
+export const dec3 = (v: number | null | undefined) => (v == null ? '—' : nf3.format(v))
 /** Un valor estimado (p. ej. el rango esperado de un peso) con los decimales que importan para su tamaño:
  * 2.185 g, 47,3 cm, 1,23. */
 export const aproximado = (v: number | null | undefined) => {
@@ -58,8 +60,9 @@ export function fechaHora(v: string | null | undefined): string {
 /** Cierra una frase que termina en un valor: «p. m.» ya trae su punto y no lleva otro. */
 export const conPunto = (texto: string) => (texto.endsWith('.') ? texto : `${texto}.`)
 
-/** Edad corregida (días) en meses, para un eje que no mezcle unidades: 0,5 m, 3 m, 13 m. */
-export const meses = (dias: number) => `${nf01.format(dias / 30.4375)} m`
+/** Edad corregida (días) en meses, para un eje que no mezcle unidades: 0,5 m, 3 m, 13 m. Redondea antes de formatear y
+ * suma 0 para que un valor que redondea a cero desde abajo (un día antes del nacimiento corregido) sea «0 m», no «-0 m». */
+export const meses = (dias: number) => `${nf01.format(Math.round((dias / 30.4375) * 10) / 10 + 0)} m`
 
 /** Edad corregida en días, en palabras cortas. */
 export function edad(dias: number | null | undefined): string {

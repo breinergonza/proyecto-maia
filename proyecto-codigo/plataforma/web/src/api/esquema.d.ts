@@ -311,6 +311,8 @@ export interface paths {
          * Historia Riesgo
          * @description El riesgo de cada desenlace en cada visita del niño, calculado ahora con el paquete activo: cada punto usa solo lo
          *     medido hasta su visita. La corrida guarda solo la última visita, así que esto no sale de ``resultados.riesgos``.
+         *     Con ``motivos`` cada punto trae también lo que más pesó en su riesgo (es lo caro: por eso es opcional). Trae además
+         *     las familias del paquete con sus cortes y el modelo con que se calculó (ver ``riesgo_por_corte``).
          */
         get: operations["historia_riesgo_api_ninos__sujeto__historia_riesgo_get"];
         put?: never;
@@ -359,6 +361,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/revision/datos/resumen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Resumen Datos
+         * @description Lo que la pantalla de Calidad de datos pone sobre la cola: cuántas mediciones faltan por revisar (para quien
+         *     consulta), cuántas se revisaron este mes, las visitas y mediciones que tienen alertas (para filtrar la cola) y la
+         *     completitud de la talla por visita.
+         *
+         *     Completitud: de los niños con alguna medida de crecimiento en la visita (peso, talla o perímetro), el porcentaje que
+         *     tiene talla. No se compara con todos los niños del corte porque quien aún no llegó a la visita no tiene un dato
+         *     faltante. ``a_12_meses`` marca la visita cuya ventana de edad incluye los 12 meses (365 días).
+         */
+        get: operations["resumen_datos_api_revision_datos_resumen_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/revision/datos/aciertos": {
         parameters: {
             query?: never;
@@ -391,7 +419,7 @@ export interface paths {
         /**
          * Concentracion
          * @description Dónde se acumulan las alertas: por variable y, si el corte trae más de un grupo o sede, por grupo y variable.
-         *     Lo que tenga menos de ``MINIMO_CELDA`` alertas no se muestra solo: se suma en «otras».
+         *     Cada variable y cada celda sale con su cifra, aunque tenga una sola alerta (D63).
          */
         get: operations["concentracion_api_revision_datos_concentracion_get"];
         put?: never;
@@ -1304,6 +1332,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/analitica/comparar/grupos/clinico": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Grupos Clinico */
+        post: operations["grupos_clinico_api_analitica_comparar_grupos_clinico_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/analitica/riesgo-por-visita": {
         parameters: {
             query?: never;
@@ -1376,7 +1421,7 @@ export interface paths {
         /**
          * Trayectorias
          * @description Puntaje z de crecimiento por grupo y visita frente a la OMS, de la corrida pedida o la más reciente. Solo
-         *     agregados (D7): celdas de menos de 5 niños omitidas, desvíos con 20 o más. Los niños individuales (hasta 30, con su
+         *     agregados (D7): cada celda con su cifra, desvíos con 20 o más. Los niños individuales (hasta 30, con su
          *     código seudonimizado) solo los ven el experto y el administrador.
          */
         get: operations["trayectorias_api_analitica__entrenamiento__trayectorias_get"];
@@ -1397,7 +1442,7 @@ export interface paths {
         };
         /**
          * Perfiles
-         * @description Perfiles provisionales (edad gestacional y Lubchenco): niños por categoría (oculta si hay menos de 5), la tasa de
+         * @description Perfiles provisionales (edad gestacional y Lubchenco): niños por categoría, la tasa de
          *     riesgo alto del desenlace elegido (percentil >= PERCENTIL_ALTO) y qué los distingue (edad gestacional y peso al nacer
          *     medios). No son perfiles reales: ningún experto los ha aprobado todavía.
          */
@@ -1462,8 +1507,7 @@ export interface paths {
         put?: never;
         /**
          * Facetas
-         * @description Niños por opción de cada variable con los demás filtros aplicados (el propio no). Opciones con menos de 5 niños
-         *     salen como «<5».
+         * @description Niños por opción de cada variable con los demás filtros aplicados (el propio no).
          */
         post: operations["facetas_api_muestras_facetas_post"];
         delete?: never;
@@ -1797,6 +1841,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/clinica/resumen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resumen */
+        post: operations["resumen_api_clinica_resumen_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2068,6 +2129,23 @@ export interface components {
             /** Variables */
             variables?: components["schemas"]["VariableExtra"][] | null;
         };
+        /** ConsultaClinica */
+        ConsultaClinica: {
+            /** Muestra */
+            muestra?: {
+                [key: string]: unknown;
+            } | null;
+            /** Muestra Id */
+            muestra_id?: number | null;
+            /** Corrida Id */
+            corrida_id?: number | null;
+            /** Variables */
+            variables?: components["schemas"]["VariableExtra"][] | null;
+            /** Familia */
+            familia?: string | null;
+            /** Indicador */
+            indicador?: string | null;
+        };
         /** CorridaNueva */
         CorridaNueva: {
             /**
@@ -2156,6 +2234,13 @@ export interface components {
             sin_cambios: boolean;
             /** Vigente */
             vigente?: number | null;
+        };
+        /** DosGrupos */
+        DosGrupos: {
+            a: components["schemas"]["LadoGrupo"];
+            b: components["schemas"]["LadoGrupo"];
+            /** Corrida Id */
+            corrida_id?: number | null;
         };
         /** Edicion */
         Edicion: {
@@ -3583,6 +3668,7 @@ export interface operations {
         parameters: {
             query?: {
                 corrida_id?: number | null;
+                motivos?: boolean;
             };
             header?: never;
             path: {
@@ -3655,8 +3741,42 @@ export interface operations {
                 estado?: string;
                 capa?: string | null;
                 variable?: string | null;
+                etapa?: string | null;
                 pagina?: number;
                 tamano?: number;
+                corrida_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resumen_datos_api_revision_datos_resumen_get: {
+        parameters: {
+            query?: {
                 corrida_id?: number | null;
             };
             header?: never;
@@ -5440,6 +5560,41 @@ export interface operations {
             };
         };
     };
+    grupos_clinico_api_analitica_comparar_grupos_clinico_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DosGrupos"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     riesgo_por_visita_api_analitica_riesgo_por_visita_get: {
         parameters: {
             query: {
@@ -6355,6 +6510,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resumen_api_clinica_resumen_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsultaClinica"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
             };
             /** @description Validation Error */
             422: {

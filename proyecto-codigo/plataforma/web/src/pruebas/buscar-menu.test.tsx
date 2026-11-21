@@ -55,11 +55,11 @@ describe('Buscar en el menú', () => {
   it('filtra el propio menú, sin tildes, y oculta lo que no coincide', async () => {
     api('experto')
     montar('/tablero')
-    expect((await screen.findAllByRole('link', { name: 'Explorar' })).length).toBeGreaterThan(0)
-    await userEvent.type(await campo(), 'predic')
+    expect((await screen.findAllByRole('link', { name: 'Vista clínica' })).length).toBeGreaterThan(0)
+    await userEvent.type(await campo(), 'calcul')
     expect(screen.queryAllByRole('listbox')).toHaveLength(0)   // no hay lista aparte: se filtra el menú
-    expect(enlaces('Predicción').length).toBeGreaterThan(0)
-    expect(enlaces('Explorar')).toHaveLength(0)
+    expect(enlaces('Calcular un niño').length).toBeGreaterThan(0)
+    expect(enlaces('Vista clínica')).toHaveLength(0)
     expect(enlaces('Mis modelos')).toHaveLength(0)
   })
 
@@ -67,10 +67,10 @@ describe('Buscar en el menú', () => {
     api('experto')
     montar('/tablero', <Ubicacion />)
     const entrada = await campo()
-    await userEvent.type(entrada, 'predic{Enter}')
+    await userEvent.type(entrada, 'calcul{Enter}')
     expect(await screen.findByTestId('ruta')).toHaveTextContent('/prediccion')
     expect(entrada).toHaveValue('')
-    expect((await screen.findAllByRole('link', { name: 'Explorar' })).length).toBeGreaterThan(0)
+    expect((await screen.findAllByRole('link', { name: 'Vista clínica' })).length).toBeGreaterThan(0)
   })
 
   it('abre los grupos con coincidencias y muestra solo esas', async () => {
@@ -101,11 +101,11 @@ describe('Buscar en el menú', () => {
     api('experto')
     montar('/tablero')
     const entrada = await campo()
-    await userEvent.type(entrada, 'ni')
-    expect(enlaces('Explorar')).toHaveLength(0)
+    await userEvent.type(entrada, 'revis')
+    expect(enlaces('Vista clínica')).toHaveLength(0)
     await userEvent.keyboard('{Escape}')
     expect(entrada).toHaveValue('')
-    expect(enlaces('Explorar').length).toBeGreaterThan(0)
+    expect(enlaces('Vista clínica').length).toBeGreaterThan(0)
   })
 })
 

@@ -37,7 +37,7 @@ const familiaReadm = {
   },
   primera_alerta: {
     familia: 'readm_6m', nombre: 'readmisión entre los 3 y los 6 meses', top_pct: 10, casos: 44, meta: 'D12',
-    distribucion: [{ desde: 'entrada PMC', ventaja_visitas: 3, casos: 11, pct: 25 }, { desde: '3 m EC', ventaja_visitas: 1, casos: null, pct: null }],
+    distribucion: [{ desde: 'entrada PMC', ventaja_visitas: 3, casos: 11, pct: 25 }, { desde: '3 m EC', ventaja_visitas: 1, casos: 3, pct: 7 }],
     sin_alerta: { casos: 22, pct: 50 }, ventaja_visitas: { media: null, mediana: null },
   },
 }
@@ -73,24 +73,29 @@ describe('anticipación', () => {
     expect(screen.getByText('50,0 %')).toBeInTheDocument()
     expect(llamadas.some((l) => l.url === '/api/analitica/7/anticipacion')).toBe(true)
     expect(screen.getByText('Cuántas visitas antes se avisó cada caso')).toBeInTheDocument()
-    expect(screen.getByText('El precio de avisar antes')).toBeInTheDocument()
-    const tabla = screen.getByText('Cada visita de cálculo').closest('section, div') as HTMLElement
+    expect(screen.queryByText(/se omiten|n menor que 5/)).not.toBeInTheDocument()
+    // el resto de los artefactos está en las otras pestañas
+    fireEvent.click(screen.getByRole('tab', { name: 'Qué cuesta avisar antes' }))
+    expect(await screen.findByText('El precio de avisar antes')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: 'Tabla y niños de ejemplo' }))
+    const tabla = (await screen.findByText('Cada visita de cálculo')).closest('section, div') as HTMLElement
     expect(within(tabla.parentElement as HTMLElement).getAllByText('0,72').length).toBeGreaterThan(0)
-    expect(screen.getByText(/Las partes con menos de 5 casos se omiten \(n menor que 5\)/)).toBeInTheDocument()
   })
 
   it('el porcentaje de alerta cambia los casos detectados de la tabla', async () => {
     api('experto')
-    montar('/analitica/anticipacion?entrenamiento=7')
+    montar('/analitica/anticipacion?entrenamiento=7&ver=tabla')
     await screen.findByText('Cada visita de cálculo')
     expect(screen.getAllByText('40,0 %').length).toBeGreaterThan(0)   // 3 m EC con el 10 %
-    fireEvent.change(screen.getByLabelText('Alertar a los niños con más riesgo'), { target: { value: '40' } })
+    // etiqueta corta junto a las pestañas: la opción completa la frase («Alertar al 10 % con más riesgo»)
+    expect(screen.getByRole('option', { name: '10 % con más riesgo' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Alertar al'), { target: { value: '40' } })
     await waitFor(() => expect(screen.getAllByText('80,0 %').length).toBeGreaterThan(0))
   })
 
   it('el experto ve niños de ejemplo con su primera alerta; el visualizador no los pide', async () => {
     const experto = api('experto')
-    montar('/analitica/anticipacion?entrenamiento=7')
+    montar('/analitica/anticipacion?entrenamiento=7&ver=tabla')
     expect(await screen.findByRole('link', { name: 'N-017' })).toBeInTheDocument()
     expect(screen.getByText('Primera alerta: Entrada al programa')).toBeInTheDocument()
     expect(experto.some((l) => l.url.startsWith('/api/analitica/riesgo-por-visita?desenlace=readm_6m'))).toBe(true)
@@ -104,9 +109,9 @@ describe('anticipación', () => {
 
   it('sin corrida o sin modelo activo avisa y no rompe la pantalla', async () => {
     api('experto', 'error')
-    montar('/analitica/anticipacion?entrenamiento=7')
+    montar('/analitica/anticipacion?entrenamiento=7&ver=tabla')
     expect(await screen.findByText(/Todavía no hay una corrida con un modelo activo/)).toBeInTheDocument()
-    expect(screen.getByText('Casos avisados al menos una visita antes')).toBeInTheDocument()
+    expect(screen.getByText('Cada visita de cálculo')).toBeInTheDocument()
   })
 })
 

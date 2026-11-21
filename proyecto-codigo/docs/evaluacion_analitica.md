@@ -32,7 +32,7 @@ Escala: ✅ como el plan · 🟡 parcial · ❌ falta o se ve mal.
 | 7 | Equidad | Selector «Subgrupo por», bosque, diferencias (marca < −0,05), mapa **grupo × desenlace** | Sin selector (mezcla sede, sexo y EG); mapa grupo × medida; «Sexo masculino −0,1» no se marca | 🟡 |
 | 8 | Estabilidad temporal | AUC por trimestre con banda y mínimo 0,80, casos reales vs esperado, PSI con semáforo, alertas por 1.000 | Sin banda ni línea de mínimo; el salto 2021-T4 → 2025-T2 se dibuja como continuo; falta reales vs esperado; PSI con códigos crudos | 🟡 |
 | 9 | Trayectorias | Media y banda por grupo, 30 niños, diferencia vs OMS por etapa, resumen | Estado vacío «ningún grupo reúne 5 niños» aunque hay crecimiento de 5.000 niños: **sospecha de error de datos** | ❌ |
-| 10 | Perfiles | Perfiles con tasa del desenlace, qué los distingue, mapa de puntos, confianza | Tarjetas con 4 cifras; «Con riesgo alto: n menor que 5» en todos (sospechoso con 2.815 niños); sin tasa del desenlace ni «qué los distingue» | 🟡 |
+| 10 | Perfiles | Perfiles con tasa del desenlace, qué los distingue, mapa de puntos, confianza | Tarjetas con 4 cifras; «Con riesgo alto: n menor que 5» en todos (sospechoso con 2.815 niños; desde D63 ya no existe esa regla); sin tasa del desenlace ni «qué los distingue» | 🟡 |
 | 11 | Comparar | A vs B con ROC superpuestas, métricas con diferencia e intervalo, mejora por grupo, diferencias de muestra, Aprobar/Mantener | A y B arrancan iguales y la página muestra todo con diferencia 0 y «Sin intervalo»; **Aprobar B** visible sin nada que comparar; sin mejora por grupo | 🟡 |
 
 ## Prioridades
@@ -41,7 +41,7 @@ Escala: ✅ como el plan · 🟡 parcial · ❌ falta o se ve mal.
    etiquetas del bosque y títulos de eje, nombres del Diccionario, mensajes claros.
 2. **Resumen y Rendimiento** como en el plan (son la puerta de entrada).
 3. **Calibración y decisión**: mover lift y «a cuántos revisar» desde Rendimiento, agregar capacidad y costo de equivocarse.
-4. Revisar los datos de **Trayectorias** y **Perfiles** (vacíos o «n < 5» que no cuadran con 5.000 niños).
+4. Revisar los datos de **Trayectorias** y **Perfiles** (vacíos o «sin cifra» que no cuadran con 5.000 niños).
 5. Equidad (selector y mapa por desenlace), Estabilidad (banda, mínimo, cortes de tiempo), Población (faltantes y eventos).
 6. Anticipación y la interpretabilidad completa dependen de artefactos que el entrenamiento aún no produce.
 

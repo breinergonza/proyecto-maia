@@ -1,9 +1,9 @@
 // Marco de la aplicación: navegación lateral en escritorio, barra superior con cajón deslizable en el teléfono,
 // aviso de demostración y contenido (que aparece con una transición corta al cambiar de página).
 import {
-  Baby, BookOpen, BrainCircuit, ClipboardCheck, HeartPulse, LayoutDashboard, LogOut, Menu,
+  Baby, BookOpen, ClipboardCheck, Gauge, GitCompare, HeartPulse, LayoutDashboard, LogOut, Menu,
   BellRing, Mail, Package, PanelLeftClose, PanelLeftOpen, Search, Settings, Users, X,
-  Activity, Compass, LineChart, type LucideIcon,
+  Activity, LineChart, type LucideIcon,
 } from 'lucide-react'
 import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router'
@@ -24,53 +24,65 @@ import { Cargando, Insignia } from './ui'
 
 type Enlace = { a: string; texto: string; icono: LucideIcon; roles?: Rol[]; hijos?: Hijo[] }
 
-const ANALITICA: Enlace = {
-  a: '/analitica', texto: 'Analítica', icono: Activity, roles: ['admin', 'experto', 'visualizador'],
-  hijos: SUBMODULOS.map((s) => ({ a: `/analitica/${s.id}`, texto: s.texto })),
+/** Quién entra a cada página. El menú y las rutas de App.tsx leen estas listas, para que no se desacuerden. */
+export const ROLES_ADMIN: Rol[] = ['admin']
+export const ROLES_CLINICOS: Rol[] = ['admin', 'experto']
+export const ROLES_CONSULTA: Rol[] = ['admin', 'experto', 'visualizador']
+
+const MODELOS: Enlace = {
+  a: '/analitica', texto: 'Modelos', icono: Activity, roles: ROLES_CONSULTA,
+  hijos: [
+    ...SUBMODULOS.map((s) => ({ a: `/analitica/${s.id}`, texto: s.texto })),
+    { a: '/mis-modelos', texto: 'Mis modelos', roles: ROLES_CLINICOS },
+  ],
 }
 
 const SECCIONES: { titulo: string; enlaces: Enlace[] }[] = [
   {
-    titulo: 'Seguimiento',
-    enlaces: [{ a: '/', texto: 'Tablero', icono: LayoutDashboard },
-      { a: '/explorar', texto: 'Explorar', icono: Compass, roles: ['admin', 'experto', 'visualizador'] }, { a: '/ninos', texto: 'Niños', icono: Baby }, ANALITICA],
+    titulo: 'Clínica',
+    enlaces: [
+      { a: '/', texto: 'Vista clínica', icono: LayoutDashboard },
+      { a: '/ninos', texto: 'Niños', icono: Baby, roles: ROLES_CLINICOS },   // niños uno por uno: D65
+      { a: '/comparar', texto: 'Comparar grupos', icono: GitCompare, roles: ROLES_CONSULTA },
+      { a: '/revision/riesgos', texto: 'Revisión de riesgos', icono: HeartPulse, roles: ROLES_CLINICOS },
+      { a: '/prediccion', texto: 'Calcular un niño', icono: LineChart, roles: ROLES_CLINICOS },
+    ],
   },
   {
-    titulo: 'Revisión clínica',
+    titulo: 'Técnica',
     enlaces: [
-      { a: '/revision/riesgos', texto: 'Revisión de riesgos', icono: HeartPulse, roles: ['admin', 'experto'] },
-      { a: '/prediccion', texto: 'Predicción', icono: LineChart, roles: ['admin', 'experto'] },
-      { a: '/mis-modelos', texto: 'Mis modelos', icono: BrainCircuit, roles: ['admin', 'experto'] },
-      { a: '/diccionario', texto: 'Diccionario', icono: BookOpen, roles: ['admin', 'experto'] },
+      MODELOS,
+      { a: '/admin/calidad-datos', texto: 'Calidad de datos', icono: ClipboardCheck, roles: ROLES_ADMIN },
+      { a: '/diccionario', texto: 'Diccionario', icono: BookOpen, roles: ROLES_CLINICOS },
+      { a: '/tablero', texto: 'Resumen', icono: Gauge, roles: ROLES_CONSULTA },
     ],
   },
   {
     titulo: 'Notificaciones',
     enlaces: [
-      { a: '/notificaciones/servidor', texto: 'Servidor de correo', icono: Mail, roles: ['admin'] },
-      { a: '/notificaciones/alertas', texto: 'Alertas', icono: BellRing, roles: ['admin'] },
+      { a: '/notificaciones/servidor', texto: 'Servidor de correo', icono: Mail, roles: ROLES_ADMIN },
+      { a: '/notificaciones/alertas', texto: 'Alertas', icono: BellRing, roles: ROLES_ADMIN },
     ],
   },
   {
     titulo: 'Administración',
     enlaces: [
-      { a: '/admin/calidad-datos', texto: 'Calidad de datos', icono: ClipboardCheck, roles: ['admin'] },
       {
-        a: '/admin/configuracion', texto: 'Configuración', icono: Settings, roles: ['admin'],
+        a: '/admin/configuracion', texto: 'Configuración', icono: Settings, roles: ROLES_ADMIN,
         hijos: [
           { a: '/admin/configuracion', texto: 'General' },
           { a: '/admin/programacion', texto: 'Programación' },
         ],
       },
       {
-        a: '/admin/modelos-y-corridas', texto: 'Modelos y corridas', icono: Package, roles: ['admin'],
+        a: '/admin/modelos-y-corridas', texto: 'Modelos y corridas', icono: Package, roles: ROLES_ADMIN,
         hijos: [
           { a: '/admin/entrenamientos', texto: 'Entrenamientos' },
           { a: '/admin/modelos', texto: 'Modelos' },
           { a: '/admin/corridas', texto: 'Corridas' },
         ],
       },
-      { a: '/admin/usuarios', texto: 'Usuarios', icono: Users, roles: ['admin'] },
+      { a: '/admin/usuarios', texto: 'Usuarios', icono: Users, roles: ROLES_ADMIN },
     ],
   },
 ]
@@ -80,7 +92,9 @@ function useDestinos(): Destino[] {
   const { usuario } = useSesion()
   return SECCIONES.flatMap((s) => s.enlaces)
     .filter((e) => !e.roles || puede(usuario, e.roles))
-    .flatMap((e) => e.hijos ? e.hijos.map((h) => ({ a: h.a, texto: h.texto, grupo: e.texto })) : [{ a: e.a, texto: e.texto }])
+    .flatMap((e) => e.hijos
+      ? e.hijos.filter((h) => !h.roles || puede(usuario, h.roles)).map((h) => ({ a: h.a, texto: h.texto, grupo: e.texto }))
+      : [{ a: e.a, texto: e.texto }])
 }
 
 function Navegacion({ alElegir, compacto, filtro = '' }: { alElegir?: () => void; compacto?: boolean; filtro?: string }) {
@@ -91,6 +105,7 @@ function Navegacion({ alElegir, compacto, filtro = '' }: { alElegir?: () => void
     <nav aria-label="Secciones" className={cn('flex flex-col', compacto ? 'gap-3' : 'gap-4')}>
       {SECCIONES.map((s) => {
         const visibles = s.enlaces.filter((e) => !e.roles || puede(usuario, e.roles))
+          .map((e) => e.hijos ? { ...e, hijos: e.hijos.filter((h) => !h.roles || puede(usuario, h.roles)) } : e)
           .map((e) => {   // con filtro: la opción debe coincidir; en un grupo, él o alguno de sus hijos (si coincide el grupo, todos)
             if (!filtro) return e
             if (!e.hijos) return coincide(e.texto, filtro) ? e : null
@@ -144,7 +159,7 @@ function Navegacion({ alElegir, compacto, filtro = '' }: { alElegir?: () => void
           </div>
         )
       })}
-      {filtro && !SECCIONES.some((s) => s.enlaces.some((e) => (!e.roles || puede(usuario, e.roles)) && (coincide(e.texto, filtro) || e.hijos?.some((h) => coincide(h.texto, filtro))))) && (
+      {filtro && !SECCIONES.some((s) => s.enlaces.some((e) => (!e.roles || puede(usuario, e.roles)) && (coincide(e.texto, filtro) || e.hijos?.some((h) => (!h.roles || puede(usuario, h.roles)) && coincide(h.texto, filtro))))) && (
         <p role="status" className="px-3 text-sm text-salvia">Ninguna opción coincide.</p>
       )}
     </nav>

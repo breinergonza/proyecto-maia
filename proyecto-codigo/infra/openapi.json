@@ -969,7 +969,7 @@
      "niños"
     ],
     "summary": "Historia Riesgo",
-    "description": "El riesgo de cada desenlace en cada visita del niño, calculado ahora con el paquete activo: cada punto usa solo lo\nmedido hasta su visita. La corrida guarda solo la última visita, así que esto no sale de ``resultados.riesgos``.",
+    "description": "El riesgo de cada desenlace en cada visita del niño, calculado ahora con el paquete activo: cada punto usa solo lo\nmedido hasta su visita. La corrida guarda solo la última visita, así que esto no sale de ``resultados.riesgos``.\nCon ``motivos`` cada punto trae también lo que más pesó en su riesgo (es lo caro: por eso es opcional). Trae además\nlas familias del paquete con sus cortes y el modelo con que se calculó (ver ``riesgo_por_corte``).",
     "operationId": "historia_riesgo_api_ninos__sujeto__historia_riesgo_get",
     "security": [
      {
@@ -1000,6 +1000,16 @@
         }
        ],
        "title": "Corrida Id"
+      }
+     },
+     {
+      "name": "motivos",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "default": false,
+       "title": "Motivos"
       }
      }
     ],
@@ -1152,6 +1162,22 @@
       }
      },
      {
+      "name": "etapa",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Etapa"
+      }
+     },
+     {
       "name": "pagina",
       "in": "query",
       "required": false,
@@ -1200,6 +1226,63 @@
          "type": "object",
          "additionalProperties": true,
          "title": "Response Datos Api Revision Datos Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/revision/datos/resumen": {
+   "get": {
+    "tags": [
+     "revisión"
+    ],
+    "summary": "Resumen Datos",
+    "description": "Lo que la pantalla de Calidad de datos pone sobre la cola: cuántas mediciones faltan por revisar (para quien\nconsulta), cuántas se revisaron este mes, las visitas y mediciones que tienen alertas (para filtrar la cola) y la\ncompletitud de la talla por visita.\n\nCompletitud: de los niños con alguna medida de crecimiento en la visita (peso, talla o perímetro), el porcentaje que\ntiene talla. No se compara con todos los niños del corte porque quien aún no llegó a la visita no tiene un dato\nfaltante. ``a_12_meses`` marca la visita cuya ventana de edad incluye los 12 meses (365 días).",
+    "operationId": "resumen_datos_api_revision_datos_resumen_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "corrida_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Corrida Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Resumen Datos Api Revision Datos Resumen Get"
         }
        }
       }
@@ -1280,7 +1363,7 @@
      "revisión"
     ],
     "summary": "Concentracion",
-    "description": "Dónde se acumulan las alertas: por variable y, si el corte trae más de un grupo o sede, por grupo y variable.\nLo que tenga menos de ``MINIMO_CELDA`` alertas no se muestra solo: se suma en «otras».",
+    "description": "Dónde se acumulan las alertas: por variable y, si el corte trae más de un grupo o sede, por grupo y variable.\nCada variable y cada celda sale con su cifra, aunque tenga una sola alerta (D63).",
     "operationId": "concentracion_api_revision_datos_concentracion_get",
     "security": [
      {
@@ -3943,6 +4026,55 @@
     ]
    }
   },
+  "/api/analitica/comparar/grupos/clinico": {
+   "post": {
+    "tags": [
+     "analitica",
+     "analitica"
+    ],
+    "summary": "Grupos Clinico",
+    "operationId": "grupos_clinico_api_analitica_comparar_grupos_clinico_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DosGrupos"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Grupos Clinico Api Analitica Comparar Grupos Clinico Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
   "/api/analitica/riesgo-por-visita": {
    "get": {
     "tags": [
@@ -4158,7 +4290,7 @@
      "analitica"
     ],
     "summary": "Trayectorias",
-    "description": "Puntaje z de crecimiento por grupo y visita frente a la OMS, de la corrida pedida o la más reciente. Solo\nagregados (D7): celdas de menos de 5 niños omitidas, desvíos con 20 o más. Los niños individuales (hasta 30, con su\ncódigo seudonimizado) solo los ven el experto y el administrador.",
+    "description": "Puntaje z de crecimiento por grupo y visita frente a la OMS, de la corrida pedida o la más reciente. Solo\nagregados (D7): cada celda con su cifra, desvíos con 20 o más. Los niños individuales (hasta 30, con su\ncódigo seudonimizado) solo los ven el experto y el administrador.",
     "operationId": "trayectorias_api_analitica__entrenamiento__trayectorias_get",
     "security": [
      {
@@ -4286,7 +4418,7 @@
      "analitica"
     ],
     "summary": "Perfiles",
-    "description": "Perfiles provisionales (edad gestacional y Lubchenco): niños por categoría (oculta si hay menos de 5), la tasa de\nriesgo alto del desenlace elegido (percentil >= PERCENTIL_ALTO) y qué los distingue (edad gestacional y peso al nacer\nmedios). No son perfiles reales: ningún experto los ha aprobado todavía.",
+    "description": "Perfiles provisionales (edad gestacional y Lubchenco): niños por categoría, la tasa de\nriesgo alto del desenlace elegido (percentil >= PERCENTIL_ALTO) y qué los distingue (edad gestacional y peso al nacer\nmedios). No son perfiles reales: ningún experto los ha aprobado todavía.",
     "operationId": "perfiles_api_analitica__entrenamiento__perfiles_get",
     "security": [
      {
@@ -4472,7 +4604,7 @@
      "muestras"
     ],
     "summary": "Facetas",
-    "description": "Niños por opción de cada variable con los demás filtros aplicados (el propio no). Opciones con menos de 5 niños\nsalen como «<5».",
+    "description": "Niños por opción de cada variable con los demás filtros aplicados (el propio no).",
     "operationId": "facetas_api_muestras_facetas_post",
     "requestBody": {
      "content": {
@@ -5603,6 +5735,54 @@
      }
     }
    }
+  },
+  "/api/clinica/resumen": {
+   "post": {
+    "tags": [
+     "clinica"
+    ],
+    "summary": "Resumen",
+    "operationId": "resumen_api_clinica_resumen_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ConsultaClinica"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Resumen Api Clinica Resumen Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
   }
  },
  "components": {
@@ -6395,6 +6575,82 @@
     "type": "object",
     "title": "Consulta"
    },
+   "ConsultaClinica": {
+    "properties": {
+     "muestra": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Muestra"
+     },
+     "muestra_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Muestra Id"
+     },
+     "corrida_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Corrida Id"
+     },
+     "variables": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/VariableExtra"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Variables"
+     },
+     "familia": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Familia"
+     },
+     "indicador": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Indicador"
+     }
+    },
+    "type": "object",
+    "title": "ConsultaClinica"
+   },
    "CorridaNueva": {
     "properties": {
      "tipo": {
@@ -6704,6 +6960,33 @@
      "sin_cambios"
     ],
     "title": "DiferenciasDiccionario"
+   },
+   "DosGrupos": {
+    "properties": {
+     "a": {
+      "$ref": "#/components/schemas/LadoGrupo"
+     },
+     "b": {
+      "$ref": "#/components/schemas/LadoGrupo"
+     },
+     "corrida_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Corrida Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "a",
+     "b"
+    ],
+    "title": "DosGrupos"
    },
    "Edicion": {
     "properties": {

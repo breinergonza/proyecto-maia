@@ -87,6 +87,16 @@ def test_la_semilla_se_lee_con_las_escalas_validadas():
     assert len(DIC.leer(DIC.SEMILLA.read_bytes()).desenlaces)
 
 
+def test_la_semilla_usa_solo_los_desenlaces_a_12_meses():
+    """El asesor pidió uno o dos desenlaces (D68): desarrollo psicomotor 12 m «En uso» y talla baja 12 m «En prueba»
+    (sin alertas hasta validarla). Los demás siguen en el archivo como «No usar» para que un experto los reactive."""
+    des = D.leer(DIC.SEMILLA).desenlaces
+    por_estado = {e: set(des.clave[des.estado == e]) for e in (D.EN_USO, D.EN_PRUEBA, D.APAGADO)}
+    assert por_estado[D.EN_USO] == {'desarrollo_12m'}
+    assert por_estado[D.EN_PRUEBA] == {f'talla_baja_12m_desde_{v}' for v in ('40', '3', '6', '9')}
+    assert len(des) == 52 and len(por_estado[D.APAGADO]) == 47
+
+
 def test_diferencias_entre_versiones():
     base = D.leer(DIC.SEMILLA)
     nuevo = DIC.leer(con_nuevas(('var_simulada_a', 'medicion')))

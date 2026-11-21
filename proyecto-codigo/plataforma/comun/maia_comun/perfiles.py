@@ -1,7 +1,7 @@
 """Perfiles provisionales al nacer (D15): edad gestacional y clasificación de Lubchenco.
 
-Son etiquetas para chips y correos. Nunca llevan valores clínicos numéricos (D10) y los resúmenes
-agregados ocultan los grupos de menos de 5 niños (D4).
+Son etiquetas para chips y correos. Nunca llevan valores clínicos numéricos (D10). Los resúmenes agregados dan
+la cifra de cada grupo, también cuando son de 1 a 4 niños.
 """
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ import re
 
 import pandas as pd
 
-MIN_GRUPO = 5  # D4: no se muestra un grupo con menos niños
 VARIABLE_LUBCHENCO = 'ern_lubchencofenton'
 
 ETIQUETAS_EG = {
@@ -129,7 +128,7 @@ def perfiles_por_ninos(sev, visita: str | None = None) -> dict[str, dict]:
 def resumen_perfiles(sev, riesgos: pd.DataFrame | None = None) -> dict:
     """Conteo agregado por categoría y, si se pasa `riesgos` (columnas `sujeto` y `evento` 0/1), tasa de eventos.
 
-    Los grupos con menos de 5 niños salen con `n=None`, `tasa=None` y `oculto=True` (D4).
+    Cada grupo sale con su `n`, también si son pocos niños; la `tasa` es `None` si ninguno tiene el dato.
     """
     perfiles = pd.DataFrame.from_dict(perfiles_por_ninos(sev), orient='index', columns=['eg', 'lubchenco'])
     if riesgos is not None and len(riesgos):
@@ -140,13 +139,8 @@ def resumen_perfiles(sev, riesgos: pd.DataFrame | None = None) -> dict:
         filas = []
         for cat, etiqueta in etiquetas.items():
             g = perfiles[perfiles[col] == cat] if len(perfiles) else perfiles
-            n = len(g)
-            oculto = n < MIN_GRUPO
-            tasa = None
-            if not oculto and 'evento' in g and g.evento.notna().sum() >= MIN_GRUPO:
-                tasa = float(g.evento.mean())
-            filas.append({'categoria': cat, 'etiqueta': etiqueta, 'n': None if oculto else n,
-                          'tasa': tasa, 'oculto': oculto})
+            tasa = float(g.evento.mean()) if 'evento' in g and g.evento.notna().any() else None
+            filas.append({'categoria': cat, 'etiqueta': etiqueta, 'n': len(g), 'tasa': tasa})
         return filas
 
     return {'eg': bloque('eg', ETIQUETAS_EG), 'lubchenco': bloque('lubchenco', ETIQUETAS_LUBCHENCO)}

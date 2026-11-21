@@ -7,7 +7,8 @@
 * **Grupos de niños.** Aquí sí hay un valor por niño en memoria (se descarta al responder): se remuestrea cada grupo con
   ``REPLICAS_GRUPOS`` réplicas, sobre a lo sumo ``MAX_FILAS`` niños por lado.
 
-Privacidad: un conteo menor de 5 se oculta (D4); intervalos y comparaciones piden 20 niños o más por lado (D52).
+Un conteo de 1 a 4 niños se da con su cifra; intervalos y comparaciones piden 20 niños o más por lado (D52) y el
+intervalo de un AUC pide 5 niños de cada clase (``MIN_CASOS_IC``, un límite estadístico).
 """
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ from collections.abc import Mapping, Sequence
 
 import numpy as np
 
-from maia_comun.analitica import MIN_CELDA, MIN_DISTRIBUCION, _r, limpio
+from maia_comun.analitica import MIN_CASOS_IC, MIN_DISTRIBUCION, _r, limpio
 
 REPLICAS = 500           # réplicas por medida al comparar entrenamientos
 REPLICAS_GRUPOS = 300    # réplicas al comparar grupos de niños
@@ -61,7 +62,7 @@ def _se_auc(auc: float, casos: int, n: int) -> float | None:
 def _replicas_auc(rng: np.random.Generator, d: Mapping) -> np.ndarray | None:
     a = d.get('auc')
     n, casos = d.get('n'), d.get('casos')
-    if a is None or n is None or casos is None or n < MIN_DISTRIBUCION or casos < MIN_CELDA or n - casos < MIN_CELDA:
+    if a is None or n is None or casos is None or n < MIN_DISTRIBUCION or casos < MIN_CASOS_IC or n - casos < MIN_CASOS_IC:
         return None
     se = _se_auc(float(a), int(casos), int(n))
     if se is None:
@@ -141,12 +142,11 @@ def comparar_valores(a: np.ndarray, b: np.ndarray, *, escala: float = 1.0, semil
                      replicas: int = REPLICAS_GRUPOS, unidad: str = 'pp') -> dict:
     """Media (o proporción, si los valores son 0 y 1) de un valor por niño en dos grupos, con la diferencia de B frente
     a A y su intervalo por réplicas. ``escala`` multiplica los valores (100 para pasar una proporción a %). Cada lado
-    pide 20 niños o más; con menos no se da ninguna cifra, solo el conteo si es de 5 o más."""
+    pide 20 niños o más; con menos no se da ninguna cifra, solo el conteo."""
     rng = np.random.default_rng(semilla)
     a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
     a, b = a[np.isfinite(a)], b[np.isfinite(b)]
-    sal = {'unidad': unidad, 'n_a': int(len(a)) if len(a) >= MIN_CELDA else None,
-           'n_b': int(len(b)) if len(b) >= MIN_CELDA else None, 'a': None, 'b': None, 'ic_a': None, 'ic_b': None,
+    sal = {'unidad': unidad, 'n_a': int(len(a)), 'n_b': int(len(b)), 'a': None, 'b': None, 'ic_a': None, 'ic_b': None,
            'diferencia': None, 'ic_bajo': None, 'ic_alto': None, 'clara': None}
     if len(a) < MIN_DISTRIBUCION or len(b) < MIN_DISTRIBUCION:
         return sal

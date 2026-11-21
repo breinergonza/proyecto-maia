@@ -1,6 +1,6 @@
 """Analítica de los modelos (cualquier perfil): lee los artefactos agregados que el entrenamiento dejó en
 ``resultados.analitica``. No recalcula nada (D32): un entrenamiento anterior, sin artefactos, da ``sin_artefactos``.
-Solo agregados (D7); las celdas con menos de 5 niños ya vienen omitidas (D4)."""
+Solo agregados (D7); las celdas de 1 a 4 niños salen con su cifra."""
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from maia_api.consultas import corrida_de, esquema, etapas, medidas_numericas
+from maia_api.consultas import INDICADORES, corrida_de, esquema, etapas, medidas_numericas
 from maia_api.dependencias import CUALQUIERA, sesion
 from maia_api.poblacion import VARIABLES_SEXO
 from maia_api.rutas import analitica_anticipacion as anticipacion
@@ -19,6 +19,7 @@ from maia_api.rutas import analitica_comparar as comparar
 from maia_api.rutas.ninos import _variables_perfil, unidad_crecimiento
 from maia_comun import analitica as AN
 from maia_comun import analitica_interpretabilidad as AI
+from maia_comun import hiperparametros as HP
 from maia_comun import perfiles as PF
 from maia_comun.modelos_analitica import Analitica
 from maia_comun.modelos_db import PERCENTIL_ALTO, Usuario
@@ -36,15 +37,13 @@ ORDEN = tuple(TIPOS)
 EXTRAS = {'calibracion': ('hist_riesgo',), 'poblacion': ('distribuciones_muestra_universo',),
           'anticipacion': ('metricas_por_visita', 'primera_alerta')}
 EN_VIVO = ('trayectorias', 'perfiles')   # se calculan al pedirlos (de crecimiento y riesgos), no son artefactos guardados
-INDICADORES = {'peso': 'Peso para la edad', 'talla': 'Talla para la edad',
-               'perimetro_cefalico': 'Perímetro cefálico para la edad', 'peso_para_talla': 'Peso para la talla'}
 # el sexo viene como 1/2 en la base de la Fundación (ern_sexo) y como M/F en los datos simulados (sexo)
 SEXOS = {'1': 'masculino', '2': 'femenino', 'm': 'masculino', 'f': 'femenino', 'masculino': 'masculino', 'femenino': 'femenino'}
 MSG_SIN_RIESGO = ('La última corrida no calculó el riesgo de este desenlace: el riesgo se calcula solo para los niños que '
                   'siguen en seguimiento. Agrupe por sexo o por perfil, o elija otro desenlace.')
 AL_TOP = 10   # el grupo «Riesgo alto» guardado por el entrenamiento (TOP_RIESGO_ALTO de analitica_clinica)
 MSG_SIN_ANTICIPACION = ('Este entrenamiento no incluye desenlaces predichos desde varias visitas, que son los que permiten medir '
-                        'con cuánta ventaja avisa la alerta. Vuelva a entrenar con la anticipación activada para verlos.')
+                        'con cuánta ventaja avisa la alerta. Los entrenamientos nuevos los incluyen: vuelva a entrenar para verlos.')
 
 
 def _metas(s: Session, entrenamiento: int | None = None) -> list[Analitica]:
@@ -64,7 +63,8 @@ def _resumen_meta(a: Analitica) -> dict:
     return {'entrenamiento': a.entrenamiento_id, 'ejecucion': a.ejecucion_id, 'modelo': a.modelo,
             'fuente': m.get('fuente'), 'registro': m.get('registro'), 'version_registro': m.get('version_registro'),
             'version_modelo': m.get('version_modelo'), 'corte': m.get('corte'), 'creada': a.creada,
-            'desenlaces': m.get('desenlaces', []), 'submodulos': _submodulos(m)}
+            'desenlaces': m.get('desenlaces', []), 'submodulos': _submodulos(m),
+            'hiperparametros': HP.rotulados(a.modelo, m.get('hiperparametros'))}
 
 
 @ruta.get('/entrenamientos')
@@ -148,14 +148,14 @@ def trayectorias(entrenamiento: int, indicador: Literal['peso', 'talla', 'perime
                  corrida_id: int | None = Query(None), s: Session = Depends(sesion),
                  u: Usuario = Depends(CUALQUIERA)) -> dict:
     """Puntaje z de crecimiento por grupo y visita frente a la OMS, de la corrida pedida o la más reciente. Solo
-    agregados (D7): celdas de menos de 5 niños omitidas, desvíos con 20 o más. Los niños individuales (hasta 30, con su
+    agregados (D7): cada celda con su cifra, desvíos con 20 o más. Los niños individuales (hasta 30, con su
     código seudonimizado) solo los ven el experto y el administrador."""
     if not _metas(s, entrenamiento):
         return {'estado': 'sin_artefactos', 'entrenamiento': entrenamiento, 'submodulo': 'trayectorias'}
     base = {'entrenamiento': entrenamiento, 'submodulo': 'trayectorias', 'indicador': indicador, 'agrupar': agrupar,
             'eje': eje, 'etiqueta_indicador': INDICADORES[indicador],
             'etiqueta': 'En prueba' if indicador == 'peso_para_talla' else 'En uso',
-            'referencia': 'OMS (z = 0)', 'minimo_ninos': AN.MIN_CELDA}
+            'referencia': 'OMS (z = 0)'}
     # por riesgo, lo guardado por el entrenamiento con los niños de validación (la corrida solo tiene el riesgo de los
     # niños en seguimiento); con el eje de edad cronológica o sin ese artefacto, se calcula en vivo como antes
     if agrupar == 'riesgo' and eje == 'edad_corregida':
@@ -214,19 +214,19 @@ def trayectorias(entrenamiento: int, indicador: Literal['peso', 'talla', 'perime
            'individuales_visibles': ver_ninos,
            'individuales': AN.trayectorias_individuales(df, orden, nombres) if ver_ninos else []}
     if not r['grupos']:
-        out['mensaje'] = 'Ningún grupo reúne 5 o más niños con este indicador.'
+        out['mensaje'] = 'Ningún grupo tiene niños con este indicador.'
     return out
 
 
 @ruta.get('/{entrenamiento}/perfiles')
 def perfiles(entrenamiento: int, desenlace: str | None = Query(None), corrida_id: int | None = Query(None),
              s: Session = Depends(sesion), _: Usuario = Depends(CUALQUIERA)) -> dict:
-    """Perfiles provisionales (edad gestacional y Lubchenco): niños por categoría (oculta si hay menos de 5), la tasa de
+    """Perfiles provisionales (edad gestacional y Lubchenco): niños por categoría, la tasa de
     riesgo alto del desenlace elegido (percentil >= PERCENTIL_ALTO) y qué los distingue (edad gestacional y peso al nacer
     medios). No son perfiles reales: ningún experto los ha aprobado todavía."""
     if not _metas(s, entrenamiento):
         return {'estado': 'sin_artefactos', 'entrenamiento': entrenamiento, 'submodulo': 'perfiles'}
-    confianza = {'minimo_ninos': AN.MIN_CELDA, 'aprobacion': 'pendiente',
+    confianza = {'aprobacion': 'pendiente',
                  'texto': 'Perfiles provisionales por edad gestacional y Lubchenco. Aún no hay perfiles reales '
                           'aprobados por expertos.'}
     base = {'entrenamiento': entrenamiento, 'submodulo': 'perfiles', 'desenlace': desenlace, 'confianza': confianza,
@@ -234,9 +234,11 @@ def perfiles(entrenamiento: int, desenlace: str | None = Query(None), corrida_id
     guardado = _guardado(s, entrenamiento, desenlace, 'perfiles')
     if guardado:
         # de los niños de validación: tasa observada del desenlace y proporción en riesgo alto, guardadas al entrenar
-        filas = {k: [{**f, 'tasa': f.get('tasa_riesgo_alto')} for f in guardado.get(k, [])] for k in ('eg', 'lubchenco')}
+        # un entrenamiento anterior a D4 abandonada guardó ``oculto`` (y ``n`` nulo en las categorías pequeñas): no se sirve
+        filas = {k: [{**{c: v for c, v in f.items() if c != 'oculto'}, 'tasa': f.get('tasa_riesgo_alto')}
+                     for f in guardado.get(k, [])] for k in ('eg', 'lubchenco')}
         return {'estado': 'ok', **base, 'fuente': 'validacion', 'ninos': guardado.get('ninos'), 'casos': guardado.get('casos'),
-                'categorias_ocultas': sum(1 for k in filas for f in filas[k] if f.get('oculto')), 'unidad_peso': None,
+                'unidad_peso': None,
                 'riesgo_disponible': True, 'n_con_riesgo': guardado.get('ninos'), **filas,
                 'tasa_significa': f'proporción de niños de validación en el {AL_TOP} % con más riesgo'}
     try:
@@ -259,12 +261,11 @@ def perfiles(entrenamiento: int, desenlace: str | None = Query(None), corrida_id
         unidad = str(esq[pesos[0]].get('unidad') or '').strip() or None
         medidas = {suj: x for suj, _, x in medidas_numericas(s, c.corte_id, pesos[:1], esq)}
     res = AN.resumen_perfiles_ampliado(sev, riesgos if len(riesgos) else None, medidas)
-    ocultos = sum(1 for k in ('eg', 'lubchenco') for f in res[k] if f['oculto'])
-    # sin riesgo calculado para el desenlace, la tasa no es «n < 5»: no existe; la web lo dice así
+    # sin riesgo calculado para el desenlace, la tasa no existe; la web lo dice así
     sin_riesgo = {'riesgo_disponible': len(riesgos) > 0, 'n_con_riesgo': int(len(riesgos))}
     if not len(riesgos):
         sin_riesgo['mensaje_riesgo'] = MSG_SIN_RIESGO.replace(' Agrupe por sexo o por perfil, o elija otro desenlace.', '')
-    return {'estado': 'ok', **base, 'corrida_id': c.id, 'ninos': int(len(ninos)), 'categorias_ocultas': ocultos,
+    return {'estado': 'ok', **base, 'corrida_id': c.id, 'ninos': int(len(ninos)),
             'unidad_peso': unidad, **sin_riesgo, **res}
 
 

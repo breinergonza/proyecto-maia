@@ -25,7 +25,7 @@ const formulario = {
   ],
 }
 const resultado = {
-  paquete: 'p1', fuente: 'simulado', variables_ignoradas: [],
+  paquete: 'p1', fuente: 'simulado', variables_ignoradas: [], modelo_clinico: 'a1b2c3d4e5',
   riesgos: [{ sujeto: 'calculo', clave: 'des6', desenlace: 'desarrollo psicomotor bajo a los 6 meses', momento: '3 m EC', riesgo: 0.31,
     percentil: 96, motivos: ['Peso al nacer (peso_nacer) = 900'], fecha_visita: '2026-05-10' }],
   alertas_dato: [{ sujeto: 'calculo', variable: 'peso_3m', etiqueta: 'Peso a 3 m EC', etapa: '3 m EC', valor: '9999', esperado: 5000,
@@ -56,8 +56,10 @@ describe('calcular el riesgo de un niño', () => {
     montar('/prediccion')
     await userEvent.type(await screen.findByLabelText('Fecha de nacimiento'), '2026-01-10')
     await userEvent.type(screen.getByLabelText('Semanas de gestación al nacer'), '30,5')
-    await userEvent.click(screen.getByRole('button', { name: /3 meses \(edad corregida\)/ }))
-    expect(screen.getByText(/Aquí se calcula: desarrollo psicomotor bajo/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: /^3 meses/ }))
+    // la visita dice qué riesgos calcula, en una lista (no una frase corrida bajo el nombre)
+    expect(within(screen.getByRole('list', { name: 'Riesgos que se calculan con esta visita' })).getByText('desarrollo psicomotor bajo a los 6 meses')).toBeInTheDocument()
+    expect(screen.queryByText(/Aquí se calcula/)).not.toBeInTheDocument()
     await userEvent.type(screen.getByLabelText('Peso a 3 m EC (g)'), '9999')
     await userEvent.selectOptions(screen.getByLabelText('Oxígeno a los 3 meses'), '9')
 
@@ -78,6 +80,8 @@ describe('calcular el riesgo de un niño', () => {
     })
 
     const riesgo = (await screen.findByText('desarrollo psicomotor bajo a los 6 meses', { selector: 'h2' })).closest('article')!
+    expect(within(riesgo).getByText('En uso')).toBeInTheDocument()
+    expect(within(riesgo).getByText('Modelo clínico a1b2c3d4e5')).toBeInTheDocument()
     expect(within(riesgo).getByText('Riesgo muy alto')).toBeInTheDocument()
     expect(within(riesgo).getByText('9 de 10')).toBeInTheDocument()
     expect(within(riesgo).getByText('Peso al nacer: 900')).toBeInTheDocument()
@@ -88,6 +92,19 @@ describe('calcular el riesgo de un niño', () => {
     expect(screen.getByText('1 medida improbable (revisar) no se grafica')).toBeInTheDocument()
     expect(document.querySelector('main')?.textContent).not.toMatch(/posici[oó]n|puntaje z|capa \d|[−-]2 DE|\(peso_nacer\)/i)
     expect(screen.queryByRole('button', { name: 'Modo avanzado (JSON)' })).not.toBeInTheDocument()
+  })
+
+  it('la página se llama «Calcular un niño» (como el menú y la pestaña del navegador) y «Calcular el riesgo» queda a la vista junto al título', async () => {
+    api('experto')
+    montar('/prediccion')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Calcular un niño' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /Predicción: un niño/ })).not.toBeInTheDocument()
+    // el botón está fuera del formulario, que es largo, y lo envía por su id
+    const boton = await screen.findByRole('button', { name: 'Calcular el riesgo' })
+    expect(boton.closest('form')).toBeNull()
+    expect(boton).toHaveAttribute('form', 'formulario-calculo')
+    expect(document.getElementById('formulario-calculo')).not.toBeNull()
+    expect(screen.getByRole('tab', { name: 'Resultado' })).toBeInTheDocument()
   })
 
   it('los datos generales van plegados y la administración tiene el modo avanzado', async () => {
@@ -106,7 +123,7 @@ describe('calcular el riesgo de un niño', () => {
     await userEvent.type(await screen.findByLabelText('Fecha de nacimiento'), '2026-01-10')
     expect(screen.getAllByLabelText(/gestación/i)).toHaveLength(1)
     await userEvent.type(screen.getByLabelText('Semanas de gestación al nacer'), '30')
-    await userEvent.click(screen.getByRole('button', { name: /3 meses \(edad corregida\)/ }))
+    await userEvent.click(screen.getByRole('tab', { name: /^3 meses/ }))
     await userEvent.type(screen.getByLabelText('Peso a 3 m EC (g)'), '5000')
     await userEvent.type(screen.getByLabelText('Fecha de la visita'), '2026-05-10')
     await userEvent.click(screen.getByRole('button', { name: 'Calcular el riesgo' }))
@@ -127,7 +144,6 @@ describe('cuando no se puede calcular, cada rol sabe a quién acudir', () => {
     montar('/prediccion')
     await userEvent.type(await screen.findByLabelText('Fecha de nacimiento'), '2026-01-10')
     await userEvent.type(screen.getByLabelText('Semanas de gestación al nacer'), '30')
-    await userEvent.click(screen.getByRole('button', { name: /Nacimiento/ }))
     await userEvent.type(screen.getByLabelText('Peso al nacer (g)'), '900')
     await userEvent.click(screen.getByRole('button', { name: 'Calcular el riesgo' }))
     return screen.findByRole('alert')

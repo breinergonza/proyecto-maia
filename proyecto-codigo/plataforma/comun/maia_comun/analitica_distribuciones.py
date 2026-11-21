@@ -5,8 +5,8 @@
   niños del corte de validación (el universo) en sexo, edad gestacional, sede, trimestre y edad gestacional en semanas
   (Población), para ver sesgos de selección.
 
-Solo agregados (D7). Un conteo con menos de ``MIN_CELDA`` niños queda ``None`` (D4) y un porcentaje, una mediana o un
-cuantil exigen ``MIN_DISTRIBUCION`` niños o más (D52).
+Solo agregados (D7). Un conteo de 1 a 4 niños se da con su cifra; una mediana o un cuantil exigen
+``MIN_DISTRIBUCION`` niños o más (D52).
 """
 from __future__ import annotations
 
@@ -15,26 +15,22 @@ from collections.abc import Mapping
 import numpy as np
 import pandas as pd
 
-from maia_comun.analitica import MIN_CELDA, MIN_DISTRIBUCION, _r, limpio
+from maia_comun.analitica import MIN_DISTRIBUCION, _r, limpio
 
 TRAMOS = 20
 CUANTILES = (('p5', 5), ('p25', 25), ('p50', 50), ('p75', 75), ('p95', 95))
 MAX_CATEGORIAS = 12      # una variable con más categorías es texto libre, no un reparto que se pueda leer
 
 
-def _cuenta(c: int) -> int | None:
-    return int(c) if c >= MIN_CELDA else None
-
-
 def hist_riesgo(y: np.ndarray, r: np.ndarray, tramos: int = TRAMOS) -> dict:
     """Histograma del riesgo en tramos iguales, aparte para los niños con el desenlace (``con``) y sin él (``sin``).
-    Un tramo con menos de 5 niños queda ``None``. Con menos de 20 niños no hay gráfica."""
+    Con menos de 20 niños no hay gráfica."""
     y = np.asarray(y, dtype=bool)
     r = np.asarray(r, dtype=float)
     ok = np.isfinite(r)
     y, r = y[ok], r[ok]
     n, casos = int(len(y)), int(y.sum())
-    base = {'n': n, 'casos': _cuenta(casos), 'tramos': [], 'riesgo_medio_con': None, 'riesgo_medio_sin': None,
+    base = {'n': n, 'casos': casos, 'tramos': [], 'riesgo_medio_con': None, 'riesgo_medio_sin': None,
             'mediana_con': None, 'mediana_sin': None}
     if n < MIN_DISTRIBUCION:
         return {**base, 'estado': 'insuficiente'}
@@ -45,7 +41,7 @@ def hist_riesgo(y: np.ndarray, r: np.ndarray, tramos: int = TRAMOS) -> dict:
     sin = np.histogram(r[~y], bordes)[0]
     for i in range(tramos):
         base['tramos'].append({'desde': _r(bordes[i]), 'hasta': _r(bordes[i + 1]),
-                               'con': _cuenta(con[i]), 'sin': _cuenta(sin[i])})
+                               'con': int(con[i]), 'sin': int(sin[i])})
     for clave, m in (('con', y), ('sin', ~y)):
         v = r[m]
         if len(v) >= MIN_DISTRIBUCION:      # D52: promedio y mediana solo con una cohorte de 20 o más
@@ -65,9 +61,8 @@ def _reparto(universo: pd.Series, muestra: pd.Series) -> dict | None:
     filas, brecha = [], []
     for c in cats:
         cu, cm = int((u == c).sum()), int((m == c).sum())
-        fila = {'categoria': c, 'n_universo': _cuenta(cu), 'n_muestra': _cuenta(cm),
-                'pct_universo': _r(100 * cu / len(u), 1) if cu >= MIN_CELDA else None,
-                'pct_muestra': _r(100 * cm / len(m), 1) if cm >= MIN_CELDA else None, 'diferencia_pp': None}
+        fila = {'categoria': c, 'n_universo': cu, 'n_muestra': cm,
+                'pct_universo': _r(100 * cu / len(u), 1), 'pct_muestra': _r(100 * cm / len(m), 1), 'diferencia_pp': None}
         if fila['pct_universo'] is not None and fila['pct_muestra'] is not None:
             fila['diferencia_pp'] = _r(fila['pct_muestra'] - fila['pct_universo'], 1)
             brecha.append(abs(fila['diferencia_pp']))

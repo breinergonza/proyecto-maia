@@ -1,5 +1,5 @@
-"""Analítica: trayectorias de crecimiento, perfiles provisionales y anticipación. Solo agregados; celdas de menos de
-5 niños omitidas; los niños individuales solo para experto y administrador."""
+"""Analítica: trayectorias de crecimiento, perfiles provisionales y anticipación. Solo agregados; cada celda con su
+cifra aunque sean 1 a 4 niños; los niños individuales solo para experto y administrador."""
 from __future__ import annotations
 
 from datetime import date, timedelta
@@ -62,7 +62,7 @@ def tokens(cliente):
     return {'admin': admin, 'experto': _login(cliente, *EXPERTO), 'visualizador': _login(cliente, *VISOR)}
 
 
-N = 40          # niños; los 8 primeros con riesgo alto; las 3 últimas son niñas (grupo de menos de 5)
+N = 40          # niños; los 8 primeros con riesgo alto; las 3 últimas son niñas (grupo de 3)
 
 
 @pytest.fixture(scope='module')
@@ -88,7 +88,8 @@ def datos(cliente):
         mid = 1
         for i in range(N):
             suj = f'N{i:03d}'
-            s.add(M.Sujeto(corte_id=c, sujeto=suj, grupo='sede A', fecha_nacimiento=date(2026, 1, 1), eg_semanas=26 + i % 8))
+            s.add(M.Sujeto(corte_id=c, sujeto=suj, grupo='sede A', fecha_nacimiento=date(2026, 1, 1),
+                         eg_semanas=38 if i >= N - 3 else 26 + i % 8))   # las 3 niñas nacen a término
             s.add(M.Medicion(corte_id=c, id=mid, sujeto=suj, variable='ern_sexo', valor='2' if i >= N - 3 else '1'))
             mid += 1
             s.add(M.Riesgo(corrida_id=corrida.id, sujeto=suj, clave='readm_3m', desenlace='readmisión', momento='40 sem',
@@ -138,8 +139,8 @@ def test_trayectorias_por_riesgo(cliente, tokens, datos):
     assert alto['40 sem']['diferencia_oms'] < resto['40 sem']['diferencia_oms']
     assert alto['40 sem']['unidad'] == 'g' and alto['3 m EC']['unidad'] == 'kg'
     assert alto['3 m EC']['edad_media_meses'] == pytest.approx(90 / 30.4375, abs=0.01)
-    assert '6 m EC' not in alto, 'a los 6 meses hay 4 niños de riesgo alto: celda omitida'
-    assert j['celdas_omitidas'] >= 1
+    assert alto['6 m EC']['n'] == 4, 'a los 6 meses hay 4 niños de riesgo alto: la celda sale con su cifra'
+    assert 'celdas_omitidas' not in j and 'grupos_omitidos' not in j and 'minimo_ninos' not in j
 
 
 def test_visualizador_no_ve_ninos_individuales(cliente, tokens, datos):
@@ -153,10 +154,14 @@ def test_visualizador_no_ve_ninos_individuales(cliente, tokens, datos):
         assert n['codigo'].startswith('N') and n['serie'] and {'etapa', 'z', 'edad_meses'} <= set(n['serie'][0])
 
 
-def test_grupo_de_menos_de_5_ninos_se_omite(cliente, tokens, datos):
+def test_grupo_de_menos_de_5_ninos_sale_con_su_cifra(cliente, tokens, datos):
     j = _get(cliente, tokens, 'experto', f'{datos["con"]}/trayectorias', agrupar='sexo').json()
-    assert [g['grupo'] for g in j['grupos']] == ['masculino'] and j['grupos_omitidos'] == 1
-    assert all(n['codigo'] not in {f'N{i:03d}' for i in range(N - 3, N)} for n in j['individuales'])
+    por = {g['grupo']: g for g in j['grupos']}
+    assert set(por) == {'masculino', 'femenino'} and por['femenino']['ninos'] == 3
+    assert por['femenino']['etapas'][0]['n'] == 3 and por['femenino']['etapas'][0]['z_media'] is not None
+    assert 0 < len(j['individuales']) <= 30
+    v = _get(cliente, tokens, 'visualizador', f'{datos["con"]}/trayectorias', agrupar='sexo').json()
+    assert v['individuales'] == [] and {g['grupo'] for g in v['grupos']} == {'masculino', 'femenino'}
 
 
 def test_otros_agrupamientos_y_ejes(cliente, tokens, datos):
@@ -180,7 +185,7 @@ def test_sexo_de_ambas_fuentes():
 
 
 def test_sin_riesgo_para_el_desenlace_se_explica(cliente, tokens, datos):
-    """La corrida solo calcula el riesgo de los niños en seguimiento: sin riesgo del desenlace no es «n < 5»."""
+    """La corrida solo calcula el riesgo de los niños en seguimiento: sin riesgo del desenlace no hay tasa."""
     t = _get(cliente, tokens, 'visualizador', f'{datos["con"]}/trayectorias', agrupar='riesgo', desenlace='otro').json()
     assert t['estado'] == 'pendiente' and t['motivo'] == 'sin_riesgo' and 'seguimiento' in t['mensaje']
     p = _get(cliente, tokens, 'visualizador', f'{datos["con"]}/perfiles', desenlace='otro').json()
@@ -197,6 +202,7 @@ def test_usa_lo_guardado_por_el_entrenamiento(cliente, tokens, datos):
                                 {'grupo': 'Resto', 'ninos': 450, 'etapas': [{'etapa': '40 sem', 'nombre': '40 semanas',
                                                                         'orden': 0, 'n': 450, 'z_media': 0.1}]}],
                      'grupos_omitidos': 0, 'celdas_omitidas': 0}}
+    # lo guardado antes de abandonar D4 trae ``oculto``: no sale en la respuesta
     perf = {'eg': [{'categoria': 'extremo', 'etiqueta': 'Prematuro extremo', 'n': 40, 'oculto': False,
                     'tasa_observada': 0.3, 'tasa_riesgo_alto': 0.4, 'eg_media': 26.0, 'peso_medio': None}],
             'lubchenco': [], 'ninos': 500, 'casos': 80, 'top_riesgo_alto': 10}
@@ -210,18 +216,19 @@ def test_usa_lo_guardado_por_el_entrenamiento(cliente, tokens, datos):
     assert cron.get('fuente') != 'validacion', 'lo guardado es por edad corregida'
     p = _get(cliente, tokens, 'visualizador', f'{ent}/perfiles', desenlace='otro_3m').json()
     assert p['fuente'] == 'validacion' and p['riesgo_disponible'] is True and p['ninos'] == 500
-    assert p['eg'][0]['tasa_observada'] == 0.3 and p['eg'][0]['tasa'] == 0.4
+    assert p['eg'][0]['tasa_observada'] == 0.3 and p['eg'][0]['tasa'] == 0.4 and 'oculto' not in p['eg'][0]
+    assert 'categorias_ocultas' not in p
 
 
 def test_perfiles(cliente, tokens, datos):
     j = _get(cliente, tokens, 'visualizador', f'{datos["con"]}/perfiles', desenlace='readm_3m').json()
-    assert j['estado'] == 'ok' and j['confianza']['aprobacion'] == 'pendiente' and j['confianza']['minimo_ninos'] == 5
+    assert j['estado'] == 'ok' and j['confianza']['aprobacion'] == 'pendiente' and 'minimo_ninos' not in j['confianza']
     eg = {f['categoria']: f for f in j['eg']}
-    assert eg['extremo']['n'] is not None and eg['extremo']['oculto'] is False
-    assert eg['a_termino']['oculto'] is True and eg['a_termino']['n'] is None and eg['a_termino']['tasa'] is None
-    assert any(f['tasa'] is not None for f in j['eg'])
+    assert eg['extremo']['n'] is not None and 'oculto' not in eg['extremo']
+    assert 0 < eg['a_termino']['n'] < 5 and eg['a_termino']['tasa'] is not None, 'un grupo de 1 a 4 niños dice su cifra'
+    assert eg['a_termino']['eg_media'] is not None
     assert eg['muy_prematuro']['eg_media'] is not None
-    assert j['categorias_ocultas'] >= 1
+    assert 'categorias_ocultas' not in j
 
 
 def test_entrenamiento_sin_artefactos(cliente, tokens, datos):

@@ -6,8 +6,9 @@ temprano avisa el modelo.
 * En el simulador no hay Diccionario: ``con_anticipacion`` las arma con ``variantes`` a partir de los desenlaces de la
   configuración de demostración.
 
-Las filas «En prueba» no se entrenan salvo que se pida (``MAIA_ANTICIPACION=1``): así no cambian los modelos ni las
-alertas que ya se usan. Todo ocurre al entrenar; nada se calcula por niño aquí.
+Desde D68 se entrenan por defecto: así la talla baja a 12 meses, que solo tiene filas ``_desde_``, se entrena sin
+pedirla. Siguen «En prueba» (no dan alertas) y ``MAIA_ANTICIPACION=0`` las apaga. El Diccionario decide cuáles hay:
+las que estén en «No usar» no se entrenan. Todo ocurre al entrenar; nada se calcula por niño aquí.
 """
 from __future__ import annotations
 
@@ -19,16 +20,17 @@ from clinico.modelo import ConfigClinica, Desenlace
 from maia_comun import analitica as AN
 
 VARIABLE_ENTORNO = 'MAIA_ANTICIPACION'
-_SI = ('1', 'true', 'si', 'sí', 'yes', 'on')
+_NO = ('0', 'false', 'no', 'off')
 
 # Simulador (pocas visitas): dónde se registra cada desenlace de demostración, y las visitas desde las que se predice.
 # «hospitalización» hace de entrada al programa (la primera visita de la lista).
-EVENTOS_SIMULADO = {'readm_3m': '3 m EC', 'oxigeno_3m': '3 m EC', 'desarrollo_6m': '6 m EC'}
+EVENTOS_SIMULADO = {'readm_3m': '3 m EC', 'oxigeno_3m': '3 m EC', 'desarrollo_6m': '6 m EC', 'desarrollo_12m': '12 m EC'}
 VISITAS_SIMULADO = ('hospitalización', '40 sem', '3 m EC', '6 m EC', '12 m EC')
 
 
 def activa() -> bool:
-    return os.environ.get(VARIABLE_ENTORNO, '').strip().lower() in _SI
+    """Encendida salvo que ``MAIA_ANTICIPACION`` diga que no (D68)."""
+    return os.environ.get(VARIABLE_ENTORNO, '').strip().lower() not in _NO
 
 
 def etiqueta_visita(momento: str, primera: str) -> str:
@@ -53,9 +55,10 @@ def variantes(cfg: ConfigClinica, eventos: Mapping[str, str], visitas: Sequence[
 
 
 def con_anticipacion(cfg: ConfigClinica, eventos: Mapping[str, str] = EVENTOS_SIMULADO,
-                     visitas: Sequence[str] = VISITAS_SIMULADO) -> ConfigClinica:
-    """``cfg`` con las variantes de anticipación de sus desenlaces."""
-    return replace(cfg, desenlaces=cfg.desenlaces + variantes(cfg, eventos, visitas))
+                     visitas: Sequence[str] = VISITAS_SIMULADO, en_prueba: Sequence[Desenlace] = ()) -> ConfigClinica:
+    """``cfg`` con las variantes de anticipación de sus desenlaces y las filas «En prueba» que ya vienen como
+    ``_desde_`` (``en_prueba``, como la talla baja a los 12 meses del Diccionario)."""
+    return replace(cfg, desenlaces=cfg.desenlaces + variantes(cfg, eventos, visitas) + tuple(en_prueba))
 
 
 def con_anticipacion_del_diccionario(en_uso: ConfigClinica, con_prueba: ConfigClinica) -> ConfigClinica:

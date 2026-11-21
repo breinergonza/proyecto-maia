@@ -47,16 +47,21 @@ describe('interpretabilidad', () => {
     expect(await screen.findByText('Qué datos pesan más')).toBeInTheDocument()
     expect(screen.getAllByText('Peso al nacer').length).toBeGreaterThan(0)
     expect(screen.getByText(/no prueban causa/)).toBeInTheDocument()
-    expect(screen.getByText('Cómo cambia el riesgo con un dato')).toBeInTheDocument()
+    expect(screen.getByText('Motivos frecuentes')).toBeInTheDocument()
+    expect(screen.getByText('87,5 %')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /CSV/ }).length).toBeGreaterThanOrEqual(2)
+    expect(screen.getAllByRole('button', { name: /PNG/ }).length).toBeGreaterThanOrEqual(1)
+    // la curva de un dato y la combinación de dos están en sus pestañas
+    fireEvent.click(screen.getByRole('tab', { name: 'Cómo cambia el riesgo' }))
+    expect(await screen.findByText('Cómo cambia el riesgo con un dato')).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: 'Dato que cambia' })).toBeInTheDocument()
     fireEvent.change(screen.getByRole('combobox', { name: 'Dato que cambia' }), { target: { value: 'eg' } })
     expect(screen.getByRole('figure', { name: 'Riesgo medio según Edad gestacional' })).toBeInTheDocument()
-    expect(screen.getByText('Motivos frecuentes')).toBeInTheDocument()
-    expect(screen.getByText('87,5 %')).toBeInTheDocument()
-    expect(screen.getByText('Combinación de dos datos')).toBeInTheDocument()
-    expect(screen.getAllByText(/n menor que 5/).length).toBeGreaterThan(1)
-    expect(screen.getAllByRole('button', { name: /CSV/ }).length).toBeGreaterThanOrEqual(4)
-    expect(screen.getAllByRole('button', { name: /PNG/ }).length).toBeGreaterThanOrEqual(3)
+    fireEvent.click(screen.getByRole('tab', { name: 'Combinación' }))
+    expect(await screen.findByText('Combinación de dos datos')).toBeInTheDocument()
+    expect(screen.queryByText(/n menor que 5/)).not.toBeInTheDocument()
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0)   // una celda que el entrenamiento no guardó queda sin color
+    expect(screen.getAllByRole('button', { name: /CSV/ }).length).toBeGreaterThanOrEqual(1)
   })
 
   it('un entrenamiento anterior dice que no trae el detalle y ofrece reentrenar', async () => {

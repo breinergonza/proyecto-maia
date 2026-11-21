@@ -51,10 +51,10 @@ describe('exportar', () => {
   it('respeta el orden de columnas indicado', () => {
     expect(aCsv([{ a: 1, b: 2 }], ['b', 'a']).slice(1)).toBe('b,a\r\n2,1\r\n')
   })
-  it('oculta las filas con menos de 5 niños', () => {
-    const r = ocultarCeldasPequenas([{ g: 'A', n: 3, v: 0.5 }, { g: 'B', n: 5, v: 0.4 }], 'n')
-    expect(r[0]).toEqual({ g: 'n<5', n: 'n<5', v: 'n<5' })
-    expect(r[1]).toEqual({ g: 'B', n: 5, v: 0.4 })
+  it('una fila de 1 a 4 niños se exporta con su cifra: solo el mínimo de 20 de las distribuciones oculta', () => {
+    const r = ocultarCeldasPequenas([{ g: 'A', n: 3, v: 0.5 }, { g: 'B', n: 20, v: 0.4 }], 'n', 3)
+    expect(r[0]).toEqual({ g: 'A', n: 3, v: 0.5 })
+    expect(r[1]).toEqual({ g: 'B', n: 20, v: 0.4 })
   })
   it('con mínimo 20 para distribuciones', () => {
     expect(ocultarCeldasPequenas([{ n: 19, v: 1 }], 'n', 20)[0]).toEqual({ n: 'n<20', v: 'n<20' })

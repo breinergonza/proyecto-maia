@@ -6,6 +6,10 @@ import pandas as pd
 import pytest
 from sqlalchemy import select
 
+# la corrida con desenlaces observados, talla por visita y riesgos por corte, de las pruebas de la Vista clínica
+from test_clinica_api import ETAPAS, datos  # noqa: F401
+from test_clinica_api import corrida as corrida_clinica  # noqa: F401
+
 # la API, los usuarios, el corte simulado y la corrida sintética son los de las pruebas de Explorar
 from test_exploracion_api import _corrida, cliente, corte, sev, tokens  # noqa: F401
 from test_muestras_api import _muestra, _y
@@ -49,7 +53,7 @@ def test_calibracion_y_poblacion_traen_los_nuevos_artefactos(cliente, tokens, en
     cal = cliente.get(f'/api/analitica/{entrenamientos["a"]}/calibracion', headers=h).json()['desenlaces']['readm_3m']
     hist = cal['hist_riesgo']
     assert {'bins', 'histograma', 'decision'} <= set(cal) and hist['estado'] == 'ok'
-    assert all(t['con'] is None or t['con'] >= 5 for t in hist['tramos'])
+    assert all(isinstance(t['con'], int) and isinstance(t['sin'], int) for t in hist['tramos'])
     pob = cliente.get(f'/api/analitica/{entrenamientos["a"]}/poblacion', headers=h).json()['desenlaces']['readm_3m']
     sexo = pob['distribuciones_muestra_universo']['categoricas']['sexo']
     assert sexo['n_universo'] == 1500 and sexo['n_muestra'] == 1000 and {'embudo', 'eventos', 'nulos'} <= set(pob)
@@ -115,6 +119,15 @@ def test_comparar_grupos(cliente, tokens, corrida):  # noqa: F811
     assert [f['clave'] for f in solo['riesgo']] == ['readm_3m']
 
 
+def test_comparar_grupos_el_visualizador_ve_las_mismas_cifras_que_el_experto(cliente, tokens, corrida):  # noqa: F811
+    a, b = {'muestra': _muestra(_y('sexo', 'lista', ['M']))}, {'muestra': _muestra(_y('sexo', 'lista', ['F']))}
+    e = _grupos(cliente, tokens, 'experto', a=a, b=b, corrida_id=corrida).json()
+    v = _grupos(cliente, tokens, 'visualizador', a=a, b=b, corrida_id=corrida).json()
+    sueltos = [f['b']['faltan'] for f in e['faltantes']] + [f['n_b'] for c in e['composicion'].values() for f in c['categorias']]
+    assert any(x is not None and x < 100 and x % 5 for x in sueltos)   # el caso trae conteos que no son múltiplos de 5
+    assert v == e   # ninguna cifra se redondea ni se altera para quien solo consulta (D64)
+
+
 def test_comparar_grupos_con_pocos_ninos_no_da_cifras_y_queda_en_auditoria(cliente, tokens, corrida):  # noqa: F811
     from maia_comun import db
     from maia_comun.modelos_db import Auditoria
@@ -122,10 +135,149 @@ def test_comparar_grupos_con_pocos_ninos_no_da_cifras_y_queda_en_auditoria(clien
     todos = {'muestra': _muestra(_y('sexo', 'lista', ['M']))}
     r = _grupos(cliente, tokens, 'visualizador', a=pocos, b=todos, corrida_id=corrida).json()
     assert r['estado'] == 'insuficiente' and 'riesgo' not in r and r['minimo_ninos'] == 20
-    assert r['a']['n'] is None or r['a']['n'] >= 5
+    e = _grupos(cliente, tokens, 'experto', a=pocos, b=todos, corrida_id=corrida).json()
+    assert 1 <= r['a']['n'] < 20 and r['a']['n'] == e['a']['n'], 'un grupo de 1 a 19 niños se dice con su cifra exacta (D64)'
     with db.fabrica()() as s:
         n = len(s.scalars(select(Auditoria).where(Auditoria.accion == 'analitica.comparar_grupos')).all())
     assert n >= 1
     assert _grupos(cliente, tokens, a={'muestra_id': 99999}, b=todos, corrida_id=corrida).status_code == 404
     assert _grupos(cliente, tokens, a={'muestra': _muestra(_y('no_existe', 'lista', ['x']))}, b=todos,
                    corrida_id=corrida).status_code == 422
+
+
+# ------------------------------------------------------------------------ comparar grupos, por pregunta clínica
+
+def _clinico(cliente, tokens, rol='experto', **cuerpo):  # noqa: F811
+    return cliente.post('/api/analitica/comparar/grupos/clinico', headers=tokens[rol], json=cuerpo)
+
+
+@pytest.fixture(scope='module')
+def lados(sev):  # noqa: F811
+    from maia_comun import muestra as M
+    a, b = _muestra(_y('sexo', 'lista', ['M'])), _muestra(_y('sexo', 'lista', ['F']))
+    return {'a': {'muestra': a, 'nombre': 'Varones'}, 'b': {'muestra': b, 'nombre': 'Mujeres'},
+            'ids_a': set(M.ids(sev, a)), 'ids_b': set(M.ids(sev, b))}
+
+
+def _p(x: float) -> float:
+    return round(100 * x, 1)
+
+
+def test_clinico_roles_y_encabezado_de_cada_lado(cliente, tokens, corrida_clinica, lados, datos):  # noqa: F811
+    assert cliente.post('/api/analitica/comparar/grupos/clinico', json={'a': {}, 'b': {}}).status_code == 401
+    for rol in ('admin', 'experto', 'visualizador'):
+        assert _clinico(cliente, tokens, rol, a=lados['a'], b=lados['b'], corrida_id=corrida_clinica).status_code == 200
+    d = _clinico(cliente, tokens, a=lados['a'], b={'muestra': lados['b']['muestra']}, corrida_id=corrida_clinica).json()
+    total = len(datos['todos'])
+    assert d['estado'] == 'ok' and d['corrida_id'] == corrida_clinica and d['alerta_percentil'] == 90
+    assert d['a'] == {'nombre': 'Varones', 'n': len(lados['ids_a']), 'n_total': total}
+    assert d['b'] == {'nombre': 'Grupo B', 'n': len(lados['ids_b']), 'n_total': total}   # sin nombre, «Grupo B»
+    assert [f['clave'] for f in d['desenlaces']] == ['talla_baja_12m', 'desarrollo_12m']
+    talla = d['desenlaces'][0]
+    assert set(talla) >= {'clave', 'nombre', 'definicion', 'estado', 'a', 'b', 'dif', 'riesgo'} and talla['estado'] == 'en_prueba'
+
+
+def test_clinico_observado_a_los_12_meses_por_lado_con_diferencia(cliente, tokens, corrida_clinica, lados, datos):  # noqa: F811
+    d = _clinico(cliente, tokens, a=lados['a'], b=lados['b'], corrida_id=corrida_clinica).json()
+    obs = datos['observados']
+    obs = obs[obs.familia == 'talla_baja_12m']
+    talla = d['desenlaces'][0]
+    for lado, ids in (('a', lados['ids_a']), ('b', lados['ids_b'])):
+        v = obs[obs.sujeto.isin(ids)]
+        assert talla[lado]['casos'] == int(v.valor.sum()) and talla[lado]['con_dato'] == len(v)
+        assert talla[lado]['sin_dato'] == len(ids) - len(v)
+        # el porcentaje sin dato es sobre todos los niños del lado
+        assert talla[lado]['pct_sin_dato'] == round(100 * (len(ids) - len(v)) / len(ids), 1)
+        assert talla[lado]['pct'] == pytest.approx(_p(v.valor.mean()), abs=0.06)   # entre quienes tienen dato
+    dif = talla['dif']
+    assert dif['valor'] == pytest.approx(talla['b']['pct'] - talla['a']['pct'], abs=0.01)
+    assert dif['ic_bajo'] <= dif['valor'] <= dif['ic_alto'] and isinstance(dif['clara'], bool)
+    assert dif['valor'] < 0   # en lo simulado las mujeres tienen menos talla baja que los varones: B frente a A baja
+
+
+def test_clinico_talla_por_visita_de_cada_lado_con_umbral_y_referencia(cliente, tokens, corrida_clinica, lados, datos):  # noqa: F811
+    d = _clinico(cliente, tokens, a=lados['a'], b=lados['b'], corrida_id=corrida_clinica).json()
+    tr = d['trayectoria']
+    assert tr['indicador'] == 'talla' and tr['unidad'] and tr['referencia'] == 'OMS' and tr['umbral'] == -2
+    assert [e['etapa'] for e in tr['etapas']] == ETAPAS
+    z = datos['crecimiento']
+    z = z[(z.indicador == 'talla') & ~z.improbable]
+    for e in tr['etapas']:
+        for lado, ids in (('a', lados['ids_a']), ('b', lados['ids_b'])):
+            v = z[(z.etapa == e['etapa']) & z.sujeto.isin(ids)].z
+            if len(v) == 0:   # ningún niño con dato en esa visita: no hay celda (un cero verdadero)
+                assert e[lado] is None
+                continue
+            assert e[lado]['n'] == len(v) and e[lado]['mediana'] == pytest.approx(v.median())
+
+
+def test_clinico_datos_faltantes_por_visita_con_su_denominador(cliente, tokens, corrida_clinica, lados):  # noqa: F811
+    d = _clinico(cliente, tokens, a=lados['a'], b=lados['b'], corrida_id=corrida_clinica).json()
+    for e in d['trayectoria']['etapas']:
+        for lado, n in (('a', d['a']['n']), ('b', d['b']['n'])):
+            celda = e[lado]
+            if celda is None:
+                continue
+            assert celda['sin_dato'] == n - celda['n']
+            assert celda['pct_sin_dato'] == pytest.approx(100 * (n - celda['n']) / n, abs=0.05)
+    doce = next(e for e in d['trayectoria']['etapas'] if e['etapa'] == '12 m EC')
+    assert doce['a']['n'] == 3 and doce['a']['sin_dato'] == d['a']['n'] - 3   # varones: 3 con dato, y se dice
+    assert doce['b']['pct_sin_dato'] < 5   # mujeres: casi todas con dato
+
+
+def test_clinico_riesgo_estimado_por_corte_de_cada_lado(cliente, tokens, corrida_clinica, lados, datos):  # noqa: F811
+    d = _clinico(cliente, tokens, a=lados['a'], b=lados['b'], corrida_id=corrida_clinica).json()
+    talla, desarrollo = d['desenlaces']
+    assert [(f['momento'], f['clave'], f['estado']) for f in talla['riesgo']] == [
+        ('3 m EC', 'talla_baja_12m_desde_3', 'en_prueba'), ('6 m EC', 'talla_baja_12m_desde_6', 'en_prueba')]
+    ri = datos['riesgos']
+    for f in talla['riesgo']:
+        for lado, ids in (('a', lados['ids_a']), ('b', lados['ids_b'])):
+            filas = ri[(ri.clave == f['clave']) & ri.sujeto.isin(ids)]
+            alerta = int((filas.percentil >= 90).sum())
+            assert f[lado] == {'calculados': len(filas), 'en_alerta': alerta, 'pct_en_alerta': round(100 * alerta / len(filas), 1)}
+    # desarrollo: solo 3 varones tienen riesgo de esa familia: el lado A da su cifra (3), no la oculta
+    assert [f['clave'] for f in desarrollo['riesgo']] == ['desarrollo_12m']
+    assert desarrollo['riesgo'][0]['a']['calculados'] == 3 and desarrollo['riesgo'][0]['b']['calculados'] > 5
+    assert talla['riesgo_con_modelo'] is True and desarrollo['riesgo_con_modelo'] is True
+    assert 0 < desarrollo['a']['con_dato'] < 5 and desarrollo['a']['pct'] is None   # con su cifra, sin porcentaje (pide 20)
+    assert desarrollo['b']['con_dato'] > 5 and desarrollo['dif']['valor'] is None
+
+
+def test_clinico_con_menos_de_20_ninos_en_un_lado_no_da_cifras(cliente, tokens, corrida_clinica, lados):  # noqa: F811
+    pocos = {'muestra': _muestra(_y('eg_semanas', 'numero', [None, 24]), _y('sexo', 'lista', ['F']))}
+    r = _clinico(cliente, tokens, 'visualizador', a=pocos, b=lados['b'], corrida_id=corrida_clinica).json()
+    e = _clinico(cliente, tokens, 'experto', a=pocos, b=lados['b'], corrida_id=corrida_clinica).json()
+    assert r['estado'] == 'insuficiente' and r['minimo_ninos'] == 20 and 'mensaje' in r
+    assert not {'desenlaces', 'trayectoria'} & set(r) and 1 <= r['a']['n'] < 20 and r == e   # cifra exacta (D64)
+
+
+def test_clinico_el_visualizador_ve_las_mismas_cifras_que_el_experto(cliente, tokens, corrida_clinica, sev):  # noqa: F811
+    from maia_comun import muestra as M
+    grupo = None
+    for tope in range(25, 36):   # un grupo de 20 a 99 niños con un conteo que no es múltiplo de 5
+        m = _muestra(_y('eg_semanas', 'numero', [None, tope]))
+        n = len(M.ids(sev, m))
+        if 20 <= n < 100 and n % 5:
+            grupo = {'muestra': m}
+            break
+    assert grupo, 'el corte de prueba no tiene un grupo de 20 a 99 niños para esta prueba'
+    todos = {'muestra': _muestra()}
+    exacto = _clinico(cliente, tokens, 'experto', a=grupo, b=todos, corrida_id=corrida_clinica).json()
+    r = _clinico(cliente, tokens, 'visualizador', a=grupo, b=todos, corrida_id=corrida_clinica).json()
+    assert r['a']['n'] == n and r == exacto   # ninguna cifra se redondea para quien solo consulta (D64)
+
+
+def test_clinico_errores_y_auditoria(cliente, tokens, corrida_clinica, lados):  # noqa: F811
+    from maia_comun import db
+    from maia_comun.modelos_db import Auditoria
+    assert _clinico(cliente, tokens, a={'muestra_id': 99999}, b=lados['b'], corrida_id=corrida_clinica).status_code == 404
+    assert _clinico(cliente, tokens, a=lados['a'], b=lados['b'], corrida_id=99999).status_code == 404
+    assert _clinico(cliente, tokens, a={'muestra': _muestra(_y('no_existe', 'lista', ['x']))}, b=lados['b'],
+                    corrida_id=corrida_clinica).status_code == 422
+    with db.fabrica()() as s:
+        antes = len(s.scalars(select(Auditoria).where(Auditoria.accion == 'analitica.comparar_grupos')).all())
+    _clinico(cliente, tokens, a=lados['a'], b=lados['b'], corrida_id=corrida_clinica)
+    with db.fabrica()() as s:
+        filas = s.scalars(select(Auditoria).where(Auditoria.accion == 'analitica.comparar_grupos')).all()
+    assert len(filas) == antes + 1 and set(filas[-1].detalle) == {'huella_a', 'huella_b', 'n_a', 'n_b'}

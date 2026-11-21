@@ -1,6 +1,6 @@
 """Lo que comparten /muestras y /exploracion: el corte con el que se trabaja, los niños de una muestra, las facetas
-(conteos por opción) y la reserva de cifras pequeñas (D4, D46). Todo se calcula en Postgres sobre
-``sevarti.atributos_sujeto``; no se leen las mediciones."""
+(conteos por opción) y el mínimo de 20 niños (D46). Las cifras son exactas para todos los perfiles (D64). Todo se
+calcula en Postgres sobre ``sevarti.atributos_sujeto``; no se leen las mediciones."""
 from __future__ import annotations
 
 import time
@@ -29,9 +29,7 @@ from sevarti import contrato as SV
 FACETAS_POR_DEFECTO = ('sede', 'ern_sexo', 'eg_categoria', 'eg_semanas', 'ern_lubchencofenton')
 VARIABLES_SEXO = ('ern_sexo', 'sexo')
 MIN_NINOS = 20          # D46: con menos niños no se muestran cifras ni se guarda un filtro
-MIN_OPCION = PF.MIN_GRUPO   # D4: una opción con menos niños se muestra como «<5»
 MAX_OPCIONES = 30       # una variable con más opciones distintas es texto libre, no una faceta
-TOPE_REDONDEO = 100     # D46: para el rol visualizador, los conteos menores se redondean a múltiplos de 5
 TIPOS_FILTRABLES = {'categorical': 'lista', 'boolean': 'si_no', 'numeric': 'numero'}
 # categorías por semanas de gestación: (categoría, desde incluido, hasta excluido); cada una es una opción por sí sola
 CATEGORIAS_EG = M.CATEGORIAS_EG
@@ -63,17 +61,9 @@ def sin_filtros(muestra: dict | None) -> bool:
     return not m['y'] and not m['tiempo']
 
 
-def proteger(n: int, redondear: bool = False) -> int:
-    """D46: un conteo menor de 100 se redondea a múltiplos de 5 para quien solo consulta."""
-    return int(n / 5 + 0.5) * 5 if redondear and n < TOPE_REDONDEO else int(n)
-
-
-def cifra(n: int, redondear: bool = False, ocultar: bool = True) -> dict:
-    """Un conteo de opción: ``n`` y ``texto``. D4: de 1 a 4 niños no se da la cifra (``n`` nulo, texto «<5»)."""
-    if ocultar and 0 < n < MIN_OPCION:
-        return {'n': None, 'texto': f'<{MIN_OPCION}'}
-    v = proteger(n, redondear)
-    return {'n': v, 'texto': str(v)}
+def cifra(n: int) -> dict:
+    """Un conteo de opción o de tramo: ``n``, exacto para todos los perfiles (D64)."""
+    return {'n': int(n)}
 
 
 # ---------------------------------------------------------------- qué variables se ofrecen
@@ -109,6 +99,40 @@ def elegir_facetas(esquema: pd.DataFrame, hay_sedes: bool, extra: Sequence[str] 
                      and (f['rol'] == 'basal' or _marcada(f))]
     elegidas += [v for v in dict.fromkeys(extra) if v not in elegidas and (v != 'sede' or hay_sedes) and _filtrable(filas, v)]
     return elegidas
+
+SEXO_RESPALDO = {'F': 'Femenino', 'M': 'Masculino'}
+
+
+def etiqueta_sede(valor: str, etiquetas: dict) -> str:
+    """Cómo se lee una sede: el nombre del Diccionario si lo trae; si no, «Sede 1» para un código numérico. Un nombre que ya
+    es texto («Norte») se deja como está."""
+    num = M.texto_numerico(valor)
+    propia = etiquetas.get('sede', {}).get(num) if num is not None else None
+    if propia:
+        return propia
+    return f'Sede {valor}' if num is not None else valor
+
+
+def etiqueta_sexo(valor: str, del_diccionario: str | None = None) -> str:
+    """El texto de un código de sexo: el del Diccionario si lo trae; si no, F → «Femenino» y M → «Masculino»."""
+    return del_diccionario or SEXO_RESPALDO.get(valor.strip().upper(), valor)
+
+
+def etiqueta_eg(categoria: str, desde: float | None, hasta: float | None) -> str:
+    """«Muy prematuro (28 a 31 sem)»: el nombre de la categoría con sus semanas, calculadas de ``CATEGORIAS_EG``
+    (el límite superior no entra, por eso la última semana de la categoría es una menos)."""
+    nombre = PF.ETIQUETAS_EG[categoria]
+    if desde is None and hasta is not None:
+        return f'{nombre} (menos de {num_semanas(hasta)} sem)'
+    if hasta is None and desde is not None:
+        return f'{nombre} ({num_semanas(desde)} sem o más)'
+    if desde is not None and hasta is not None:
+        return f'{nombre} ({num_semanas(desde)} a {num_semanas(hasta - 1)} sem)'
+    return nombre
+
+
+def num_semanas(v: float) -> str:
+    return str(int(v)) if float(v).is_integer() else str(v).replace('.', ',')
 
 
 def etiqueta_de(filas: dict, v: str) -> str:
@@ -147,9 +171,9 @@ def reglas_de(filas: dict, v: str) -> list[str]:
 
 def _opciones_de(s: Session, corte_id: int, filas: dict, etiquetas: dict, v: str, tipo: str) -> list[dict]:
     if v == 'sede':
-        return [{'valor': g, 'etiqueta': g} for g in sedes(s, corte_id)]
+        return [{'valor': g, 'etiqueta': etiqueta_sede(g, etiquetas)} for g in sedes(s, corte_id)]
     if v == 'eg_categoria':
-        return [{'valor': c, 'etiqueta': PF.ETIQUETAS_EG[c], 'rango': [lo, hi]} for c, lo, hi in CATEGORIAS_EG]
+        return [{'valor': c, 'etiqueta': etiqueta_eg(c, lo, hi), 'rango': [lo, hi]} for c, lo, hi in CATEGORIAS_EG]
     if tipo == 'si_no':
         return [{'valor': True, 'etiqueta': 'Sí'}, {'valor': False, 'etiqueta': 'No'}]
     if v in etiquetas:
@@ -247,13 +271,13 @@ class _Grupo:
             return self.s.execute(text(f'SELECT count(*) FROM ({self.frag.sql}) q'), self.frag.params).scalar_one()
         return len(self.ids())
 
-def _lista_sede(s: Session, c: int, g: _Grupo) -> dict:
+def _lista_sede(s: Session, c: int, g: _Grupo, etiquetas: dict) -> dict:
     union, p = g.union('u.sujeto')
     cuentan = dict(s.execute(text(f'SELECT u.grupo, count(*) FROM sevarti.sujetos u {union} '
                                   'WHERE u.corte_id = :c AND u.grupo IS NOT NULL GROUP BY u.grupo'), {'c': c, **p}).all())
     todas = [x for (x,) in s.execute(text('SELECT DISTINCT grupo FROM sevarti.sujetos WHERE corte_id = :c AND grupo IS NOT NULL'),
                                      {'c': c})]
-    return {'opciones': sorted(({'valor': M.canonico(x), 'etiqueta': M.canonico(x), 'n': cuentan.get(x, 0)} for x in todas),
+    return {'opciones': sorted(({'valor': M.canonico(x), 'etiqueta': etiqueta_sede(M.canonico(x), etiquetas), 'n': cuentan.get(x, 0)} for x in todas),
                                key=lambda o: (len(o['valor']), o['valor']))}
 
 
@@ -268,7 +292,7 @@ def _lista_eg(s: Session, c: int, g: _Grupo) -> dict:
     for eg in _semanas(s, c, g):
         cat = M.categoria_eg(eg)
         cuenta[cat] = cuenta.get(cat, 0) + 1
-    return {'opciones': [{'valor': cat, 'etiqueta': PF.ETIQUETAS_EG[cat], 'rango': [lo, hi], 'n': cuenta.get(cat, 0)}
+    return {'opciones': [{'valor': cat, 'etiqueta': etiqueta_eg(cat, lo, hi), 'rango': [lo, hi], 'n': cuenta.get(cat, 0)}
                          for cat, lo, hi in CATEGORIAS_EG]}
 
 
@@ -372,32 +396,34 @@ def _lista_atributo(s: Session, c: int, v: str, nombre: str, g: _Grupo, tipo: st
     for k in sorted(cuenta, key=lambda x: (len(x), x)):
         num = M.texto_numerico(k)
         entero = num is not None and num.is_integer()
+        del_diccionario = etiquetas.get(v, {}).get(num) if num is not None else None
         opciones.append({'valor': int(num) if entero else (num if num is not None else k),
-                         'etiqueta': etiquetas.get(v, {}).get(num, k) if num is not None else k, 'n': cuenta[k]})
+                         'etiqueta': etiqueta_sexo(k, del_diccionario) if v in VARIABLES_SEXO else del_diccionario or k,
+                         'n': cuenta[k]})
     return {'opciones': opciones}
 
 
-def _resumen_de(r: dict, ninos: int, redondear: bool) -> dict:
-    return {'cifra': cifra(ninos, redondear), 'min': r['min'], 'max': r['max'],
-            'bins': [{'desde': b['desde'], 'hasta': b['hasta'], **cifra(b['n'], redondear)} for b in r['bins']]}
+def _resumen_de(r: dict, ninos: int) -> dict:
+    return {'cifra': cifra(ninos), 'min': r['min'], 'max': r['max'],
+            'bins': [{'desde': b['desde'], 'hasta': b['hasta'], **cifra(b['n'])} for b in r['bins']]}
 
 
-def _resumen_numerico(valores: list[float], ninos: int, redondear: bool) -> dict:
-    return _resumen_de(M._numerica(pd.Series(valores, dtype=float)), ninos, redondear)
+def _resumen_numerico(valores: list[float], ninos: int) -> dict:
+    return _resumen_de(M._numerica(pd.Series(valores, dtype=float)), ninos)
 
 
-def _numerica(s: Session, c: int, nombre: str, g: _Grupo, redondear: bool, lect: pd.DataFrame | None = None,
+def _numerica(s: Session, c: int, nombre: str, g: _Grupo, lect: pd.DataFrame | None = None,
               pre: dict | None = None) -> dict:
     if lect is not None:
         v = lect.dropna(subset=['num'])
-        return _resumen_numerico(list(v.num.astype(float)), int(v.sujeto.nunique()), redondear)
+        return _resumen_numerico(list(v.num.astype(float)), int(v.sujeto.nunique()))
     if pre is not None:
-        return _resumen_de(pre, pre['n'], redondear)
+        return _resumen_de(pre, pre['n'])
     cond, p = g.cond('sujeto')
     valores = [x for (x,) in s.execute(text('SELECT valor_num FROM sevarti.atributos_sujeto WHERE corte_id = :c '
                                             f'AND variable = :v AND valor_num IS NOT NULL AND {cond}'),
                                        {'c': c, 'v': nombre, **p})]
-    return _resumen_numerico(valores, len(valores), redondear)
+    return _resumen_numerico(valores, len(valores))
 
 
 def _regla_de(filas: dict, v: str, entrada: dict | None, pedidas: dict[str, str]) -> str | None:
@@ -407,11 +433,11 @@ def _regla_de(filas: dict, v: str, entrada: dict | None, pedidas: dict[str, str]
     return (entrada or {}).get('cuando') or pedidas.get(v) or regla_por_defecto(filas, v)
 
 
-def facetas(s: Session, corte_id: int, muestra: dict | None, redondear: bool = False,
+def facetas(s: Session, corte_id: int, muestra: dict | None,
             extra: Sequence[dict] | None = None, tiempos: dict[str, float] | None = None) -> dict:
-    """Conteos por opción de cada faceta aplicando los demás filtros pero no el propio (D35). D4: opciones con 1 a 4
-    niños salen como «<5»; con ``redondear`` (visualizador) los conteos menores de 100 van de 5 en 5 (D46). Una opción
-    sin niños sale con ``n`` 0 y texto «0»: es un cero real, no un dato oculto. ``extra``: variables que se pidieron
+    """Conteos por opción de cada faceta aplicando los demás filtros pero no el propio (D35). Una opción con 1 a 4
+    niños sale con su cifra, igual para todos los perfiles (D64). Una
+    opción sin niños sale con ``n`` 0: es un cero real. ``extra``: variables que se pidieron
     además de las de siempre, ``[{"variable", "cuando"}]``; las que ya están en el filtro se agregan solas."""
     marca = _Reloj(tiempos)
     _FASES.set(tiempos)
@@ -472,14 +498,14 @@ def facetas(s: Session, corte_id: int, muestra: dict | None, redondear: bool = F
             except M.MuestraInvalida as e:
                 raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, ' '.join(e.errores)) from None
         if v == 'sede':
-            r = _lista_sede(s, corte_id, ids)
+            r = _lista_sede(s, corte_id, ids, etiquetas)
         elif v == 'eg_categoria':
             r = _lista_eg(s, corte_id, ids)
         elif v == 'eg_semanas':
             sem = _semanas(s, corte_id, ids)
-            r = _resumen_numerico(sem, len(sem), redondear)
+            r = _resumen_numerico(sem, len(sem))
         elif tipo == 'numero':
-            r = _numerica(s, corte_id, nombre, ids, redondear, lect, precargado_num.get(excluidas_de(v), {}).get(nombre))
+            r = _numerica(s, corte_id, nombre, ids, lect, precargado_num.get(excluidas_de(v), {}).get(nombre))
         else:
             pre = precargado.get(excluidas_de(v), {}).get(nombre) if lect is None else None
             if lect is None and pre is None:   # texto libre o sin datos: no es una faceta
@@ -488,7 +514,7 @@ def facetas(s: Session, corte_id: int, muestra: dict | None, redondear: bool = F
             if r is None:
                 continue
         for o in r.get('opciones', []):
-            o.update(cifra(o['n'], redondear))
+            o.update(cifra(o['n']))
         salida[v] = {'etiqueta': etiqueta_de(filas, v), 'tipo': tipo, 'cuando': cuando, 'reglas': reglas_de(filas, v),
                      'destacada': v in FACETAS_POR_DEFECTO or (v in filas and _marcada(filas[v])), **r}
     marca('variables')
@@ -578,12 +604,12 @@ def distribuciones(cat: pd.DataFrame, ids: list[str]) -> dict:
 
 
 def resumen_poblacion(cat: pd.DataFrame, ids: list[str]) -> dict:
-    """Cuántos niños de la muestra hay en cada categoría, para guardar con ella; D4: de 1 a 4 niños no se anota."""
+    """Cuántos niños de la muestra hay en cada categoría, para guardar con ella."""
     grupo = cat[cat.index.isin(ids)]
     salida: dict[str, dict] = {}
     for col in _TITULOS:
         cuenta = grupo[col].dropna().value_counts()
         if cuenta.empty or (col == 'sede' and cat[col].dropna().nunique() < 2):
             continue
-        salida[col] = {str(k): (int(n) if n >= MIN_OPCION else None) for k, n in cuenta.items()}
+        salida[col] = {str(k): int(n) for k, n in cuenta.items()}
     return salida

@@ -1,6 +1,7 @@
-// Calibración (riesgo con y sin el desenlace), Población (muestra frente a todos los niños) y Comparar con intervalos,
-// «Aprobar B» solo para administración y grupos de niños. Siempre con celdas de menos de 5 niños ocultas.
-import { configure, fireEvent, screen, waitFor, within } from '@testing-library/react'
+// Calibración (riesgo con y sin el desenlace), Población (muestra frente a todos los niños, en su pestaña) y Comparar con
+// intervalos (en pestañas), «Aprobar B» solo para administración. Con cada celda y su cifra, también de 1 a 4 niños. Los grupos de niños se comparan en
+// Comparar grupos (/comparar), no aquí.
+import { configure, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Usuario } from '../api/tipos'
@@ -24,7 +25,7 @@ const contexto = {
   entrenamientos: [{ entrenamiento: 7, creada: '2026-07-01T10:00:00Z' }, { entrenamiento: 6, creada: '2026-06-01T10:00:00Z' }],
 }
 
-const tramos = Array.from({ length: 20 }, (_, i) => ({ desde: i * 0.05, hasta: (i + 1) * 0.05, con: i < 14 ? null : 12 + i, sin: i > 17 ? null : 100 - i * 3 }))
+const tramos = Array.from({ length: 20 }, (_, i) => ({ desde: i * 0.05, hasta: (i + 1) * 0.05, con: i < 14 ? 1 + (i % 4) : 12 + i, sin: i > 17 ? 2 : 100 - i * 3 }))
 const calibracion = {
   n: 1500, brier: 0.05, ece: 0.01, riesgo_medio: 0.06, observado: 0.06, razon_riesgo_observado: 1,
   bins: [{ bin: 1, n: 150, riesgo_medio: 0.02, observado: 0.02 }],
@@ -89,22 +90,22 @@ function api(rol: Usuario['rol'], extra?: Extra) {
 }
 
 describe('calibración: riesgo con y sin el desenlace', () => {
-  it('muestra la gráfica con descripción, PNG y CSV, y los tramos pequeños quedan vacíos', async () => {
+  it('muestra la gráfica con descripción, PNG y CSV, y los tramos de 1 a 4 niños salen con su cifra', async () => {
     api('experto')
-    montar('/analitica/calibracion?entrenamiento=7&desenlace=des_a')
+    montar('/analitica/calibracion?entrenamiento=7&desenlace=des_a&ver=reparto')
     expect(await screen.findByText('Riesgo de los niños con y sin el desenlace', { selector: 'h2, h3' })).toBeInTheDocument()
     expect(screen.getByText(/Cómo se reparte el riesgo en quienes tuvieron el desenlace/)).toBeInTheDocument()
     expect(screen.getByRole('figure', { name: 'Riesgo de los niños con y sin el desenlace' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Descargar PNG: Riesgo de los niños con y sin el desenlace' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Descargar CSV: Riesgo de los niños con y sin el desenlace' })).toBeInTheDocument()
     expect(screen.getByText(/con el desenlace 38,0 %/)).toBeInTheDocument()
-    expect(screen.getByText(/Los tramos con menos de 5 niños quedan sin barra/)).toBeInTheDocument()
+    expect(screen.queryByText(/menos de 5 niños|N menor que 5|n menor que 5/)).not.toBeInTheDocument()
   })
 
   it('un entrenamiento anterior sin hist_riesgo sigue mostrando el histograma de siempre', async () => {
     api('experto', (url) => (/\/analitica\/7\/calibracion/.test(url)
       ? { cuerpo: { estado: 'ok', entrenamiento: 7, submodulo: 'calibracion', desenlaces: { des_a: { ...calibracion, hist_riesgo: undefined } } } } : undefined))
-    montar('/analitica/calibracion?entrenamiento=7&desenlace=des_a')
+    montar('/analitica/calibracion?entrenamiento=7&desenlace=des_a&ver=reparto')
     expect(await screen.findByRole('figure', { name: 'Cómo se reparte el riesgo' })).toBeInTheDocument()
     expect(screen.queryByRole('figure', { name: 'Riesgo de los niños con y sin el desenlace' })).not.toBeInTheDocument()
   })
@@ -113,19 +114,20 @@ describe('calibración: riesgo con y sin el desenlace', () => {
 describe('población: muestra frente a todos los niños', () => {
   it('dibuja el reparto por categoría y la tabla de valores típicos con su descripción', async () => {
     api('visualizador')
-    montar('/analitica/poblacion?entrenamiento=7&desenlace=des_a')
+    montar('/analitica/poblacion?entrenamiento=7&desenlace=des_a&ver=categorias')   // el reparto y los valores típicos tienen cada uno su pestaña
     expect(await screen.findByRole('figure', { name: 'sexo: la muestra frente a todos los niños' })).toBeInTheDocument()
     expect(screen.getAllByText('Si la muestra se parece a todos los niños del programa.').length).toBeGreaterThan(0)
     expect(screen.getByText(/La mayor diferencia es de 1,2 puntos/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Descargar PNG: Muestra frente a todos los niños: sexo/ })).toBeInTheDocument()
-    expect(screen.getByText('Edad gestacional: muestra frente a todos')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: 'Valores típicos' }))
+    expect(await screen.findByText('Edad gestacional: muestra frente a todos')).toBeInTheDocument()
     expect(screen.getByText('Mediana')).toBeInTheDocument()
   })
 
   it('un entrenamiento anterior lo explica y no inventa cifras', async () => {
     api('experto', (url) => (/\/analitica\/7\/poblacion/.test(url)
       ? { cuerpo: { estado: 'ok', entrenamiento: 7, submodulo: 'poblacion', desenlaces: { des_a: { ...poblacion, distribuciones_muestra_universo: undefined } } } } : undefined))
-    montar('/analitica/poblacion?entrenamiento=7&desenlace=des_a')
+    montar('/analitica/poblacion?entrenamiento=7&desenlace=des_a&ver=categorias')
     expect(await screen.findByText(/no trae la comparación de la muestra con todos los niños/)).toBeInTheDocument()
   })
 })
@@ -135,13 +137,24 @@ describe('comparar entrenamientos: intervalos y Aprobar B', () => {
     const llamadas = api('experto')
     montar('/analitica/comparar?entrenamiento=7&desenlace=des_a')
     expect(await screen.findByText('Diferencia clara *')).toBeInTheDocument()
-    expect(screen.getByText(/A: 1\.500 niños y 90 casos/)).toBeInTheDocument()
+    expect(screen.getByText(/A: 1\.500 niños, 90 casos/)).toBeInTheDocument()
     expect(screen.getAllByText('No es clara').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Sin intervalo').length).toBeGreaterThan(0)
     expect(screen.getByText(/el intervalo de la diferencia es aproximado/)).toBeInTheDocument()
     expect(llamadas.some((l) => l.url === '/api/analitica/comparar?a=6&b=7&desenlace=des_a')).toBe(true)
-    expect(await screen.findByText('sexo: femenino')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Aprobar B/ })).not.toBeInTheDocument()
+    // en el teléfono cada fila de métricas, grupos y muestra se vuelve una tarjeta: B y la diferencia no quedan fuera de la vista
+    const apiladas = () => {
+      const tablas = screen.getAllByRole('table').filter((t) => !t.closest('figure'))
+      for (const t of tablas) expect(t.parentElement).toHaveClass('tabla-apilada')
+      return tablas.length
+    }
+    expect(apiladas()).toBe(1)
+    await userEvent.click(screen.getByRole('tab', { name: 'Niños y grupos' }))
+    expect(await screen.findByText('sexo: femenino')).toBeInTheDocument()
+    // «sin cifra» en un grupo es un límite estadístico, y la tabla dice cuál (no es privacidad: D63)
+    expect(screen.getByText(/el AUC pide al menos 20 niños, 5 con el desenlace y 5 sin él/)).toBeInTheDocument()
+    expect(apiladas()).toBe(2)
   })
 
   const registro = {
@@ -193,57 +206,15 @@ describe('comparar entrenamientos: intervalos y Aprobar B', () => {
   })
 })
 
-describe('comparar grupos de niños', () => {
-  const facetas = {
-    n: 400, n_base: 400, minimo: 20, insuficiente: false,
-    facetas: {
-      ern_sexo: { etiqueta: 'Sexo', tipo: 'lista', cuando: 'primera', opciones: [{ valor: 'M', etiqueta: 'Masculino', n: 200, texto: '200' }, { valor: 'F', etiqueta: 'Femenino', n: 200, texto: '200' }] },
-    },
-  }
-  const valor = (a: number, b: number, clara: boolean) => ({ unidad: 'pp', n_a: 200, n_b: 200, a, b, ic_a: [a - 2, a + 2], ic_b: [b - 2, b + 2], diferencia: b - a, ic_bajo: b - a - 3, ic_alto: b - a + 3, clara })
-  const resultado = {
-    estado: 'ok', corrida_id: 1, minimo_ninos: 20, replicas: 300, a: { nombre: 'Masculino', n: 200 }, b: { nombre: 'Femenino', n: 200 }, percentil_alto: 90,
-    riesgo: [{ clave: 'des_a', desenlace: 'x', ...valor(10, 18, true) }],
-    crecimiento: { indicador: 'peso', etiqueta: 'Peso para la edad (puntaje z frente a la OMS)', ...valor(-0.4, -0.5, false), unidad: 'z' },
-    composicion: { sede: { etiqueta: 'Sede', categorias: [{ categoria: 'S1', etiqueta: 'S1', n_a: 100, n_b: null, pct_a: 50, pct_b: null }] } },
-    aviso: 'Las diferencias son asociaciones entre grupos, no causas.',
-  }
-
-  it('envía cada lado como combinación de facetas y muestra la diferencia con su intervalo y la marca', async () => {
-    const llamadas = api('experto', (url, init) => {
-      if (url === '/api/exploracion/facetas') return { cuerpo: facetas }
-      if (url === '/api/muestras') return { cuerpo: [] }
-      if (url === '/api/analitica/comparar/grupos') return { cuerpo: resultado, estado: init?.method === 'POST' ? 200 : 405 }
-      return undefined
-    })
+describe('comparar: solo entrenamientos', () => {
+  it('no mezcla grupos de niños con entrenamientos: ninguna pestaña es de grupos y una línea lleva a Comparar grupos', async () => {
+    api('experto')
     montar('/analitica/comparar?entrenamiento=7&desenlace=des_a')
-    await userEvent.click(await screen.findByRole('tab', { name: 'Grupos de niños' }))
-    fireEvent.change(await screen.findByLabelText('Grupo A: Sexo'), { target: { value: 'M' } })
-    fireEvent.change(screen.getByLabelText('Grupo B: Sexo'), { target: { value: 'F' } })
-    await userEvent.click(screen.getByRole('button', { name: 'Comparar grupos' }))
-    const tabla = (await screen.findByText('Diferencia de B frente a A', { selector: 'th' })).closest('table')!
-    expect(within(tabla).getByText(/\+8 puntos \*/)).toBeInTheDocument()
-    expect(within(tabla).getByText(/IC 95 %: \+5 puntos a \+11 puntos/)).toBeInTheDocument()
-    const cuerpo = JSON.parse(String(llamadas.find((l) => l.url === '/api/analitica/comparar/grupos')!.init!.body))
-    expect(cuerpo.a.muestra.y[0]).toMatchObject({ variable: 'ern_sexo', tipo: 'lista', valores: ['M'] })
-    expect(cuerpo.b.nombre).toBe('Femenino')
-    expect(cuerpo.desenlace).toBe('des_a')
-    expect(screen.getAllByText(/n menor que 5/).length).toBeGreaterThan(0)    // el lado con menos de 5 niños en la sede
-    expect(screen.getByText(/asociaciones entre grupos, no causas/)).toBeInTheDocument()
-  })
-
-  it('con menos de 20 niños en un lado dice que no hay cifras', async () => {
-    api('visualizador', (url) => {
-      if (url === '/api/exploracion/facetas') return { cuerpo: facetas }
-      if (url === '/api/analitica/comparar/grupos') {
-        return { cuerpo: { estado: 'insuficiente', mensaje: 'Cada grupo necesita al menos 20 niños para compararse.', corrida_id: 1, minimo_ninos: 20, replicas: 300, a: { nombre: 'Grupo A', n: null }, b: { nombre: 'Grupo B', n: 200 } } }
-      }
-      return undefined
-    })
-    montar('/analitica/comparar?entrenamiento=7&desenlace=des_a')
-    await userEvent.click(await screen.findByRole('tab', { name: 'Grupos de niños' }))
-    await userEvent.click(await screen.findByRole('button', { name: 'Comparar grupos' }))
-    expect(await screen.findByText(/Cada grupo necesita al menos 20 niños/)).toBeInTheDocument()
-    expect(screen.queryByText('Diferencia de B frente a A', { selector: 'th' })).not.toBeInTheDocument()
+    expect(await screen.findByText('Entrenamiento B')).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: 'Grupos de niños' })).not.toBeInTheDocument()
+    expect(within(await screen.findByRole('tablist', { name: 'Qué ver' })).getAllByRole('tab').map((t) => t.textContent)).toEqual(['Medidas', 'Curva ROC', 'Niños y grupos'])
+    const linea = screen.getByText(/Aquí se comparan entrenamientos/).closest('p')!
+    expect(linea).toHaveTextContent('Aquí se comparan entrenamientos. Para comparar dos grupos de niños, use Comparar grupos.')
+    expect(within(linea).getByRole('link', { name: 'Comparar grupos' })).toHaveAttribute('href', '/comparar')
   })
 })

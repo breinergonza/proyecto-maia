@@ -31,9 +31,9 @@ const percentiles = Array.from({ length: 100 }, (_, i) => {
   const q = i + 1
   return {
     percentil: q, k: q * 10, alertas: q * 10,
-    casos_detectados_pct: q >= 5 ? Math.min(100, q * 4) : null,
-    alertas_acertadas_pct: q >= 5 ? 30 : null,
-    sin_falsa_alarma_pct: q >= 5 ? 90 - q / 10 : null,
+    casos_detectados_pct: Math.min(100, q * 4),
+    alertas_acertadas_pct: 30,
+    sin_falsa_alarma_pct: 90 - q / 10,
     alertas_por_1000: q * 10,
   }
 })
@@ -42,9 +42,9 @@ const rendimiento = {
   roc: { puntos: [[0, 0], [0.2, 0.6], [1, 1]] }, pr: { puntos: [[0, 1], [0.5, 0.4], [1, 0.06]], prevalencia: 0.06 }, pr_auc: 0.31,
   metricas_por_top: [{ top_pct: 10, k: 100, alertas: 100, casos_detectados_pct: 40, alertas_acertadas_pct: 24, sin_falsa_alarma_pct: 92, alertas_por_1000: 100 }],
   metricas_por_percentil: percentiles,
-  confusion_por_top: [{ top_pct: 10, tp: 24, fp: 76, fn: 36, tn: null }],
+  confusion_por_top: [{ top_pct: 10, tp: 24, fp: 76, fn: 36, tn: 2 }],
   lift: { tasa_general: 0.06, deciles: [{ decil: 1, niños: 100, tasa: 0.24, lift: 4 }], acumulado: [] },
-  top_k: [{ k: 10, casos: null, acertadas_pct: 50, detectados_pct: 8 }],
+  top_k: [{ k: 10, casos: 3, acertadas_pct: 50, detectados_pct: 8 }],
 }
 
 function api(rol: Usuario['rol'], extra?: (url: string) => { estado?: number; cuerpo?: unknown } | undefined) {
@@ -129,7 +129,7 @@ describe('analítica: anticipación sin datos', () => {
 describe('analítica: a cuántos niños se alerta', () => {
   it('empieza en 10 % y el control deslizante recalcula las cifras en el navegador', async () => {
     const llamadas = api('experto')
-    montar('/analitica/rendimiento?entrenamiento=7&desenlace=des_a')
+    montar('/analitica/rendimiento?entrenamiento=7&desenlace=des_a&ver=linea')
     const control = await screen.findByRole('slider')
     expect(control).toHaveValue('10')
     expect(screen.getByTestId('cifra-detectados').textContent).toContain('40')
@@ -140,43 +140,47 @@ describe('analítica: a cuántos niños se alerta', () => {
     expect(llamadas.length).toBe(antes)   // sin pedir nada a la API
   })
 
-  it('con menos de 5 niños la cifra dice «n menor que 5»', async () => {
+  it('con 2 de cada 100 niños alertados la cifra sale con su número, no oculta', async () => {
     api('experto')
-    montar('/analitica/rendimiento?entrenamiento=7&desenlace=des_a')
+    montar('/analitica/rendimiento?entrenamiento=7&desenlace=des_a&ver=linea')
     const control = await screen.findByRole('slider')
     fireEvent.change(control, { target: { value: '2' } })
-    expect(screen.getByTestId('cifra-detectados').textContent).toBe('n menor que 5')
-    expect(screen.getAllByText('n menor que 5').length).toBeGreaterThan(1)
+    expect(screen.getByTestId('cifra-detectados').textContent).toContain('8')
+    expect(screen.queryByText(/sin cifra|n menor que 5/)).not.toBeInTheDocument()
   })
 
-  it('el modo técnico (interruptor del encabezado) muestra la jerga y se recuerda', async () => {
+  it('una sola palabra: sin interruptor técnico, «Casos detectados» explica que en estadística es la sensibilidad', async () => {
     api('experto')
-    montar('/analitica/rendimiento?entrenamiento=7&desenlace=des_a')
+    montar('/analitica/rendimiento?entrenamiento=7&desenlace=des_a&ver=linea')
     await screen.findByRole('slider')
+    expect(screen.queryByRole('switch', { name: 'Modo técnico' })).not.toBeInTheDocument()
+    const termino = screen.getByRole('button', { name: /^Casos detectados/ })
+    fireEvent.focus(termino)
+    expect(document.getElementById(termino.getAttribute('aria-describedby') ?? '')).toHaveTextContent(/En estadística: sensibilidad/)
     expect(screen.queryByText('Sensibilidad')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('switch', { name: 'Modo técnico' }))
-    expect(screen.getAllByText('Sensibilidad').length).toBeGreaterThan(0)
-    expect(localStorage.getItem('maia.analitica.tecnico')).toBe('1')
   })
 })
 
-describe('analítica: privacidad (n<5) en equidad', () => {
-  it('un grupo con menos de 5 niños no enseña cifras', async () => {
+describe('analítica: equidad con grupos pequeños', () => {
+  it('un grupo de 3 niños dice cuántos son y su AUC pide 20, sin decir «n menor que 5»', async () => {
     api('experto', (url) => {
       if (url.startsWith('/api/analitica/7/equidad')) {
         return { cuerpo: { estado: 'ok', entrenamiento: 7, submodulo: 'equidad', desenlaces: { des_a: { subgrupos: { sexo: [
           { grupo: 'Niñas', n: 500, casos: 30, auc: 0.8, ic_bajo: 0.7, ic_alto: 0.9, riesgo_medio: 0.06, observado: 0.06, tasa_alerta_top10: 0.1, sensibilidad_top10: 0.4 },
-          { grupo: 'Otro', n: 3, casos: 0, auc: 0.5, ic_bajo: null, ic_alto: null, riesgo_medio: 0.5, observado: 0.5, tasa_alerta_top10: null, sensibilidad_top10: null },
+          { grupo: 'Otro', n: 3, casos: 1, auc: null, ic_bajo: null, ic_alto: null, riesgo_medio: 0.5, observado: 0.33, tasa_alerta_top10: 0.33, sensibilidad_top10: 1 },
         ] } } } } }
       }
       return undefined
     })
-    montar('/analitica/equidad?entrenamiento=7&desenlace=des_a')
-    // el mapa ahora es grupo × desenlace para el «Subgrupo por» elegido (aquí, un solo desenlace)
+    montar('/analitica/equidad?entrenamiento=7&desenlace=des_a&ver=desenlace')
+    // el mapa (pestaña «Por desenlace») es grupo × desenlace para el «Subgrupo por» elegido (aquí, un solo desenlace)
     const mapa = await screen.findByRole('table', { name: 'Qué tan bien ordena por grupo y desenlace' })
-    expect(within(mapa).getAllByText('n menor que 5')).toHaveLength(1)
+    // un desenlace por fila: el encabezado de la primera columna lo dice
+    expect(within(mapa).getAllByRole('columnheader')[0]).toHaveTextContent('Desenlace')
+    expect(within(mapa).queryByText('n menor que 5')).not.toBeInTheDocument()
     expect(within(mapa).getByText('0,8')).toBeInTheDocument()
-    expect(within(mapa).queryByText('0,5')).not.toBeInTheDocument()
+    expect(within(mapa).getByText('—')).toBeInTheDocument()   // el AUC de 3 niños no se estima: pide 20
+    expect(screen.queryByText('n menor que 5')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Sexo', pressed: true })).toBeInTheDocument()
   })
 })
@@ -185,22 +189,22 @@ describe('analítica: acceso y menú', () => {
   it('el perfil de consulta (visualizador) entra a la analítica', async () => {
     api('visualizador')
     montar('/analitica/resumen?entrenamiento=7')
-    expect(await screen.findByRole('heading', { level: 1, name: 'Resumen' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Modelos' })).toBeInTheDocument()
     expect(screen.queryByText('Sin permiso')).not.toBeInTheDocument()
   })
 
-  it('el menú tiene el grupo «Analítica» con sus submódulos para todos los perfiles', async () => {
+  it('el menú tiene el grupo «Modelos» con sus submódulos para todos los perfiles', async () => {
     api('visualizador')
-    montar('/')
-    const enlaces = await screen.findAllByRole('link', { name: 'Analítica' })
+    montar('/tablero')
+    const enlaces = await screen.findAllByRole('link', { name: 'Modelos' })
     expect(enlaces[0]).toHaveAttribute('href', '/analitica/resumen')
-    expect(screen.getAllByRole('button', { name: /Desplegar Analítica/ }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: /Desplegar Modelos/ }).length).toBeGreaterThan(0)
   })
 
   it('en la analítica el grupo del menú se abre solo y lista los submódulos', async () => {
     api('experto')
     montar('/analitica/resumen?entrenamiento=7')
-    await screen.findByRole('heading', { level: 1, name: 'Resumen' })
+    await screen.findByRole('heading', { level: 1, name: 'Modelos' })
     for (const s of SUBMODULOS) expect(screen.getAllByRole('link', { name: s.texto }).length).toBeGreaterThan(0)
   })
 })

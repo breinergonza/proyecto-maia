@@ -1,10 +1,9 @@
-// Mapa de calor y bosque (forest plot) hechos con tarjetas y SVG propios: sin librerías. Toda celda con menos de 5 niños
-// dice «n menor que 5» en vez de una cifra (D4).
+// Mapa de calor y bosque (forest plot) hechos con tarjetas y SVG propios: sin librerías. Una celda sin valor (un AUC
+// que pide 20 niños, o un grupo que no está en ese desenlace) queda con borde punteado y con su texto.
 import { cn } from '../../lib/cn'
-import { N_MENOR_QUE_5 } from '../../lib/lenguaje'
 import { GraficaNavegable, resumenDe } from './navegacion'
 
-export interface CeldaMapa { valor: number | null; texto: string; pequena?: boolean }
+export interface CeldaMapa { valor: number | null; texto: string }
 export interface FilaMapa { etiqueta: string; celdas: CeldaMapa[] }
 
 /** Tono de una celda: más oscuro (teal) es mejor, entre `bajo` y `alto`. */
@@ -14,23 +13,25 @@ function tono(v: number | null, [bajo, alto]: [number, number]): string {
   return `color-mix(in srgb, var(--color-teal-medio) ${Math.round(8 + t * 62)}%, var(--color-papel))`
 }
 
-export function MapaCalor({ columnas, filas, escala = [0.5, 1], etiqueta }: {
+export function MapaCalor({ columnas, filas, escala = [0.5, 1], etiqueta, primeraColumna = 'Grupo' }: {
   columnas: string[]; filas: FilaMapa[]; escala?: [number, number]; etiqueta: string
+  /** Qué nombran las filas (el encabezado de la primera columna). */
+  primeraColumna?: string
 }) {
   return (
     <div role="table" aria-label={etiqueta} className="overflow-x-auto">
       <div role="row" className="grid min-w-[34rem] gap-1 text-xs font-semibold text-salvia" style={{ gridTemplateColumns: `minmax(9rem,1.4fr) repeat(${columnas.length}, minmax(5rem,1fr))` }}>
-        <span role="columnheader">Grupo</span>
+        <span role="columnheader">{primeraColumna}</span>
         {columnas.map((c) => <span key={c} role="columnheader">{c}</span>)}
       </div>
       {filas.map((f) => (
         <div key={f.etiqueta} role="row" className="mt-1 grid min-w-[34rem] gap-1" style={{ gridTemplateColumns: `minmax(9rem,1.4fr) repeat(${columnas.length}, minmax(5rem,1fr))` }}>
           <span role="rowheader" className="self-center text-sm">{f.etiqueta}</span>
           {f.celdas.map((c, i) => (
-            <span key={i} role="cell" style={{ background: c.pequena ? undefined : tono(c.valor, escala) }}
-              className={cn('rounded-control px-2 py-2 text-center text-sm', c.pequena && 'border border-dashed border-linea text-xs text-salvia',
-                !c.pequena && c.valor != null && (c.valor - escala[0]) / (escala[1] - escala[0]) > 0.6 && 'text-white')}>
-              {c.pequena ? N_MENOR_QUE_5 : c.texto}
+            <span key={i} role="cell" style={{ background: c.valor == null ? undefined : tono(c.valor, escala) }}
+              className={cn('rounded-control px-2 py-2 text-center text-sm', c.valor == null && 'border border-dashed border-linea text-xs text-salvia',
+                c.valor != null && (c.valor - escala[0]) / (escala[1] - escala[0]) > 0.6 && 'text-white')}>
+              {c.texto}
             </span>
           ))}
         </div>
@@ -40,7 +41,7 @@ export function MapaCalor({ columnas, filas, escala = [0.5, 1], etiqueta }: {
 }
 
 export interface PuntoBosque {
-  etiqueta: string; valor: number | null; bajo: number | null; alto: number | null; pequena?: boolean; nota?: string
+  etiqueta: string; valor: number | null; bajo: number | null; alto: number | null; nota?: string
   /** El valor de la regla de referencia para esta fila: se dibuja como círculo vacío y se escribe junto a la cifra. */
   ref?: number | null
 }
@@ -53,7 +54,7 @@ export function Bosque({ puntos, referencia, dominio = [0.4, 1], etiqueta, nombr
   const pos = (v: number) => `${((Math.max(dominio[0], Math.min(dominio[1], v)) - dominio[0]) / (dominio[1] - dominio[0])) * 100}%`
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => dominio[0] + t * (dominio[1] - dominio[0]))
   const fmt = (v: number) => v.toFixed(2).replace('.', ',')
-  const items = puntos.map((p) => `${p.etiqueta}. ` + (p.pequena ? N_MENOR_QUE_5 : p.valor == null ? (p.nota ?? 'Muy pocos niños para calcularlo')
+  const items = puntos.map((p) => `${p.etiqueta}. ` + (p.valor == null ? (p.nota ?? 'Muy pocos niños para calcularlo')
     : `${nombreValor} ${fmt(p.valor)}` + (p.bajo != null && p.alto != null ? `, entre ${fmt(p.bajo)} y ${fmt(p.alto)}` : '')
       + (p.ref != null ? `; referencia ${fmt(p.ref)}` : '')))
   const marcas = [dominio[0], (dominio[0] + dominio[1]) / 2, dominio[1]]
@@ -66,16 +67,16 @@ export function Bosque({ puntos, referencia, dominio = [0.4, 1], etiqueta, nombr
             <div className="flex items-baseline justify-between gap-3 text-sm leading-tight">
               <span>{p.etiqueta}</span>
               <span className="shrink-0 font-semibold tabular-nums">
-                {p.pequena || p.valor == null ? '' : fmt(p.valor)}
-                {!p.pequena && p.ref != null && <span className="ml-2 font-normal text-salvia">referencia {fmt(p.ref)}</span>}
+                {p.valor == null ? '' : fmt(p.valor)}
+                {p.ref != null && <span className="ml-2 font-normal text-salvia">referencia {fmt(p.ref)}</span>}
               </span>
             </div>
             <div className="relative mt-1 h-4">
               <span className="absolute inset-x-0 top-1/2 h-px bg-linea" />
               {ticks.map((t) => <span key={t} className="absolute inset-y-0.5 w-px bg-linea" style={{ left: pos(t) }} />)}
               {referencia != null && <span className="absolute -inset-y-1 border-l-2 border-dashed border-referencia" style={{ left: pos(referencia) }} />}
-              {p.pequena || p.valor == null ? (
-                <span className="absolute inset-y-0 left-1 flex items-center bg-papel pr-1 text-xs text-salvia">{p.pequena ? N_MENOR_QUE_5 : (p.nota ?? 'Muy pocos niños para calcularlo')}</span>
+              {p.valor == null ? (
+                <span className="absolute inset-y-0 left-1 flex items-center bg-papel pr-1 text-xs text-salvia">{p.nota ?? 'Muy pocos niños para calcularlo'}</span>
               ) : (
                 <>
                   {p.bajo != null && p.alto != null && (

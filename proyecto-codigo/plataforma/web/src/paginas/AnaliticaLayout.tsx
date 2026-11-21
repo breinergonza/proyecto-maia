@@ -4,69 +4,26 @@
 import { ChevronDown } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, Outlet, useParams } from 'react-router'
-import { useEntrenamientosAnalitica } from '../api/analitica'
-import { Aviso, Cargando, Insignia, Selector } from '../components/ui'
+import { ErrorConReintento } from '../components/ErrorConReintento'
+import { SelectoresModelo } from '../components/modelos/SelectoresModelo'
+import { Cargando } from '../components/ui'
 import { cn } from '../lib/cn'
-import { fechaHora } from '../lib/formato'
 import { datosAl } from '../lib/lenguaje'
-import { EnPrueba, InterruptorTecnico, ProveedorTecnico, RanuraGuia } from './analitica/comun'
+import { RanuraGuia } from './analitica/comun'
 import { useContextoAnalitica } from './analitica/contexto'
 import { SUBMODULOS } from './analitica/submodulos'
 
 const NOMBRE_MODELO: Record<string, string> = { clinico: 'Clínico', anomalias: 'Anomalías', crecimiento: 'Crecimiento' }
 
-function Contexto() {
-  const { entrenamiento, desenlace, desenlaces, contexto, modelo, fijar } = useContextoAnalitica()
-  const lista = useEntrenamientosAnalitica().data?.entrenamientos ?? []
-  const elegido = desenlaces.find((d) => d.clave === desenlace)
-  return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))]">
-      <label className="block text-sm">
-        <span className="mb-1 block font-semibold">Entrenamiento</span>
-        <Selector value={entrenamiento ?? ''} onChange={(e) => fijar({ entrenamiento: Number(e.target.value) })}>
-          {entrenamiento != null && !lista.some((m) => m.entrenamiento === entrenamiento) && <option value={entrenamiento}>Entrenamiento {entrenamiento}</option>}
-          {lista.map((m) => (
-            <option key={m.entrenamiento} value={m.entrenamiento}>
-              N.º {m.entrenamiento}{m.creada ? ` · ${fechaHora(m.creada)}` : ''}
-            </option>
-          ))}
-        </Selector>
-      </label>
-      <label className="block text-sm">
-        <span className="mb-1 block font-semibold">Modelo y versión</span>
-        <Selector value="0" disabled={(contexto?.modelos.length ?? 0) < 2} onChange={() => {}}>
-          {(contexto?.modelos.length ? contexto.modelos : [null]).map((m, i) => (
-            <option key={i} value={String(i)}>
-              {m?.modelo ? (NOMBRE_MODELO[m.modelo] ?? `${m.modelo.charAt(0).toUpperCase()}${m.modelo.slice(1)}`) : '—'}{m?.version_registro != null ? ` · versión ${m.version_registro}` : ''}
-            </option>
-          ))}
-        </Selector>
-      </label>
-      <div className="text-sm">
-        <label className="block">
-          <span className="mb-1 block font-semibold">Desenlace</span>
-          <Selector value={desenlace ?? ''} disabled={!desenlaces.length} onChange={(e) => fijar({ desenlace: e.target.value })}>
-            {desenlaces.map((d) => <option key={d.clave} value={d.clave}>{d.nombre ?? d.clave}{d.etiqueta === 'En prueba' ? ' (En prueba)' : ''}</option>)}
-          </Selector>
-        </label>
-        {elegido?.etiqueta === 'En prueba' && <span className="mt-1 inline-block"><EnPrueba /></span>}
-      </div>
-      <label className="block text-sm">
-        <span className="mb-1 block font-semibold">Evaluación</span>
-        <Selector value="0" disabled onChange={() => {}}>
-          <option value="0">Validación temporal</option>
-        </Selector>
-      </label>
-      <p className="flex flex-wrap items-center gap-2 text-xs text-salvia sm:col-span-2 lg:col-span-4">
-        {modelo?.corte && <span className="rounded-full bg-teal-tinte px-2.5 py-1 font-semibold text-teal">{datosAl(modelo.corte)}</span>}
-        {modelo?.fuente && <span className="rounded-full bg-teal-tinte px-2.5 py-1 font-semibold text-teal">{modelo.fuente === 'simulado' ? 'Datos simulados' : 'Base de la Fundación'}</span>}
-        <span>El contexto vive en el enlace y se conserva al cambiar de submódulo.</span>
-      </p>
-      {contexto?.estado === 'sin_artefactos' && entrenamiento != null && (
-        <p className="sm:col-span-2 lg:col-span-4"><Insignia tono="ocre">Sin analítica</Insignia></p>
-      )}
-    </div>
-  )
+/** El contexto de análisis: desenlace, visita desde la que se calcula y entrenamiento (en la dirección), el estado del desenlace
+ *  y de dónde salen los datos, todo en la misma tarjeta. El Resumen ya dice de dónde salen en Configuración y Trazabilidad:
+ *  allí la línea de origen sobra. */
+function Contexto({ conOrigen }: { conOrigen: boolean }) {
+  const { modelo } = useContextoAnalitica()
+  const modeloTexto = modelo?.modelo ? `${NOMBRE_MODELO[modelo.modelo] ?? `${modelo.modelo.charAt(0).toUpperCase()}${modelo.modelo.slice(1)}`}${modelo.version_registro != null ? ` · versión ${modelo.version_registro}` : ''}` : null
+  const fuente = modelo?.fuente ? (modelo.fuente === 'simulado' ? 'Datos simulados' : 'Base de la Fundación') : null
+  const origen = conOrigen ? [fuente, modelo?.corte ? datosAl(modelo.corte) : null, modeloTexto].filter(Boolean).join(' · ') : null
+  return <SelectoresModelo origen={origen} />
 }
 
 export default function AnaliticaLayout() {
@@ -79,21 +36,19 @@ export default function AnaliticaLayout() {
   const [ranura, setRanura] = useState<HTMLElement | null>(null)
 
   return (
-    <ProveedorTecnico>
-      <RanuraGuia.Provider value={ranura}>
-      <header className="mb-4 flex animate-aparecer flex-wrap items-end justify-between gap-3 lg:mb-3">
-        <div className="max-w-[110ch]">
+    <RanuraGuia.Provider value={ranura}>
+      {/* en escritorio la página ocupa justo la ventana: el título, el contexto y la pregunta en pocas líneas dejan el alto a los datos */}
+      <div className="flex flex-col lg:h-full">
+      <header className="mb-3 flex animate-aparecer flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
           <p className="text-sm font-semibold text-teal-medio">Analítica ›</p>
           <h1>{actual?.titulo ?? 'Analítica de los modelos'}</h1>
-          <p className="mt-1 text-sm text-salvia">{actual?.pregunta ?? 'Cómo se comporta el modelo: qué tan bien ordena, si su riesgo es fiable y si funciona igual para todos.'}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-4">
-          <div ref={setRanura} />
-          <InterruptorTecnico />
-        </div>
+        <p className="min-w-0 max-w-[110ch] basis-72 text-sm text-salvia lg:flex-1">{actual?.pregunta ?? 'Cómo se comporta el modelo: qué tan bien ordena, si su riesgo es fiable y si funciona igual para todos.'}</p>
+        <div ref={setRanura} />
       </header>
 
-      <section aria-label="Contexto de análisis" className="mb-4 rounded-panel border border-linea/80 bg-papel p-4 shadow-suave">
+      <section aria-label="Contexto de análisis" className="mb-3 rounded-panel border border-linea/80 bg-papel p-3 shadow-suave">
         <button type="button" className="flex w-full items-center justify-between gap-2 text-left lg:hidden" aria-expanded={!plegado}
           aria-controls="contexto-analisis" onClick={() => setPlegado(!plegado)}>
           <span className="min-w-0">
@@ -106,7 +61,9 @@ export default function AnaliticaLayout() {
           <ChevronDown size={18} aria-hidden className={cn('shrink-0 transition-transform', !plegado && 'rotate-180')} />
         </button>
         <div id="contexto-analisis" className={cn('mt-3 lg:mt-0', plegado && 'hidden lg:block')}>
-          {consulta.isPending ? <Cargando /> : consulta.isError ? <Aviso>No se pudo cargar el contexto de análisis.</Aviso> : <Contexto />}
+          {consulta.isPending ? <Cargando /> : consulta.isError ? (
+            <ErrorConReintento error={consulta.error} que="el contexto de análisis" reintentando={consulta.isFetching} reintentar={() => void consulta.refetch()} />
+          ) : <Contexto conOrigen={submodulo !== 'resumen'} />}
         </div>
       </section>
 
@@ -125,8 +82,8 @@ export default function AnaliticaLayout() {
         </ul>
       </nav>
 
-      <Outlet />
-      </RanuraGuia.Provider>
-    </ProveedorTecnico>
+      <div className="flex flex-col lg:min-h-0 lg:flex-1"><Outlet /></div>
+      </div>
+    </RanuraGuia.Provider>
   )
 }

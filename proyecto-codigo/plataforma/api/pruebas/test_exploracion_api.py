@@ -6,7 +6,7 @@ from datetime import date
 
 import numpy as np
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
 # la API, los usuarios y el corte simulado son los de las pruebas de muestras
 from test_muestras_api import _muestra, _y, cliente, corte, sev, tokens  # noqa: F401
@@ -114,7 +114,7 @@ def test_con_menos_de_20_ninos_no_hay_cifras(cliente, tokens, corrida):  # noqa:
     assert all(o['n'] is None for fa in f['facetas'].values() for o in fa.get('opciones', []))
 
 
-def test_el_visualizador_ve_conteos_pequenos_redondeados(cliente, tokens, corrida, sev):  # noqa: F811
+def test_el_visualizador_ve_las_mismas_cifras_que_el_admin(cliente, tokens, corrida, sev):  # noqa: F811
     from maia_comun import muestra as M
     elegida = None
     for tope in range(25, 36):
@@ -127,16 +127,7 @@ def test_el_visualizador_ve_conteos_pequenos_redondeados(cliente, tokens, corrid
     m, n = elegida
     adm = _resumen(cliente, tokens, 'admin', corrida_id=corrida, muestra=m).json()
     vis = _resumen(cliente, tokens, 'visualizador', corrida_id=corrida, muestra=m).json()
-    assert adm['ninos'] == n and vis['ninos'] == int(n / 5 + 0.5) * 5 != n
-    for f in vis['riesgos_por_desenlace']:
-        assert f['ninos'] % 5 == 0 and f['altos'] % 5 == 0
-    assert all(f['datos'] % 5 == 0 for f in vis['crecimiento_por_etapa'] if f['datos'] < 100)
-    # las facetas también: nada menor de 100 que no sea múltiplo de 5
-    fv = cliente.post('/api/exploracion/facetas', headers=tokens['visualizador'], json={'muestra': m}).json()
-    assert fv['n'] % 5 == 0
-    assert all(o['n'] is None or o['n'] >= 100 or o['n'] % 5 == 0 for fa in fv['facetas'].values() for o in fa.get('opciones', []))
-    # el experto ve el número exacto
-    assert _resumen(cliente, tokens, 'experto', corrida_id=corrida, muestra=m).json()['ninos'] == n
+    assert vis['ninos'] == n and vis == adm   # ninguna cifra se redondea para quien solo consulta (D64)
 
 
 def _contar_auditoria() -> int:
@@ -197,14 +188,62 @@ def test_ningun_nino_cumple_es_un_cero_y_no_un_dato_oculto(cliente, tokens, corr
         assert r == {'insuficiente': True, 'vacio': True, 'ninos': 0, 'minimo': 20}
         f = _facetas(cliente, tokens, rol, muestra=nadie)
         assert f['vacio'] is True and f['insuficiente'] is True and f['n'] == 0   # 0, no null
-    # con pocos (1 a 19) sí es un dato oculto: ni cifra ni «vacío»
+    # con pocos (1 a 19) no hay cifras (D46): ni cifra ni «vacío»
     pocos = _resumen(cliente, tokens, corrida_id=corrida, muestra=_muestra(
         _y('eg_semanas', 'numero', [None, 24]), _y('sexo', 'lista', ['F']))).json()
     assert pocos['vacio'] is False and pocos['ninos'] is None
 
 
+def _opcion_de_pocos(cliente, tokens, sev):  # noqa: F811
+    """Un grupo de 20 niños o más con una opción de 1 a 4 niños: (muestra, variable, valor, niños de esa opción)."""
+    from maia_comun import muestra as M
+    for peso in range(1000, 4000, 100):
+        m = _muestra(_y('peso_nacer', 'numero', [peso, None]))
+        if M.contar(sev, m) < 20:
+            continue
+        for clave, fa in _facetas(cliente, tokens, muestra=m)['facetas'].items():
+            for o in fa.get('opciones', []):
+                if 1 <= o['n'] <= 4:
+                    return m, clave, o['valor'], o['n']
+    return None
+
+
+def test_una_opcion_de_1_a_4_ninos_dice_cuantos_son_para_todos(cliente, tokens, corte, sev):  # noqa: F811
+    elegida = _opcion_de_pocos(cliente, tokens, sev)
+    assert elegida, 'el corte de prueba no tiene un grupo con una opción de 1 a 4 niños'
+    m, clave, valor, n = elegida
+    assert 1 <= n <= 4
+    for rol in ('experto', 'admin', 'visualizador'):
+        opciones = _facetas(cliente, tokens, rol, muestra=m)['facetas'][clave]['opciones']
+        o = next(o for o in opciones if o['valor'] == valor)
+        assert o['n'] == n and 'texto' not in o, rol
+
+
+def test_el_resumen_de_un_grupo_da_cada_desenlace_aunque_tenga_pocos_ninos(cliente, tokens, corte, sev):  # noqa: F811
+    from maia_comun import db
+    from maia_comun import muestra as M
+    from maia_comun.modelos_db import Riesgo
+    m = _muestra(_y('sexo', 'lista', ['M']))
+    ids = M.ids(sev, m)
+    assert len(ids) >= 20
+    c = _corrida(corte, list(sev.sujetos.sujeto), semilla=7)
+    with db.fabrica()() as s:   # solo 3 niños del grupo con riesgo de oxigenodependencia
+        s.execute(delete(Riesgo).where(Riesgo.corrida_id == c, Riesgo.clave == 'oxigeno_3m', Riesgo.sujeto.in_(ids)))
+        s.add_all(Riesgo(corrida_id=c, sujeto=x, clave='oxigeno_3m', desenlace='oxigenodependencia', momento='40 sem',
+                         riesgo=0.2, percentil=60.0, motivos=[]) for x in ids[:3])
+        s.commit()
+        esperado = dict(s.execute(select(Riesgo.clave, func.count()).where(
+            Riesgo.corrida_id == c, Riesgo.sujeto.in_(ids), Riesgo.silencio.is_(False)).group_by(Riesgo.clave)).all())
+    assert esperado['oxigeno_3m'] == 3
+    e = _resumen(cliente, tokens, 'experto', corrida_id=c, muestra=m).json()
+    assert {f['clave']: f['ninos'] for f in e['riesgos_por_desenlace']} == esperado, 'el desenlace de 3 niños sale con su cifra'
+    v = _resumen(cliente, tokens, 'visualizador', corrida_id=c, muestra=m).json()
+    assert {f['clave'] for f in v['riesgos_por_desenlace']} == set(esperado)
+    assert next(f['ninos'] for f in v['riesgos_por_desenlace'] if f['clave'] == 'oxigeno_3m') == 3, 'el visualizador ve la cifra exacta (D64)'
+
+
 def test_una_opcion_sin_ninos_sale_con_cero(cliente, tokens, corte, sev):  # noqa: F811
-    """Con 20 niños o más en el grupo, una opción que ningún niño tiene dice «0» (n=0), no «<5» ni «—»."""
+    """Con 20 niños o más en el grupo, una opción que ningún niño tiene dice «0» (n=0), no «—»."""
     from maia_comun import muestra as M
     elegida = None
     for peso in range(1000, 3500, 100):   # un peso mínimo que deje a todos los extremos fuera
@@ -217,7 +256,7 @@ def test_una_opcion_sin_ninos_sale_con_cero(cliente, tokens, corte, sev):  # noq
     assert elegida, 'el corte de prueba no tiene un grupo con una categoría de edad gestacional vacía'
     m, n, cuenta = elegida
     ceros = [o for o in cuenta if o['n'] == 0]
-    assert all(o['texto'] == '0' for o in ceros)
+    assert all('texto' not in o for o in ceros)
     # y es un cero verdadero: ningún niño del grupo tiene esa categoría
     grupo = set(M.ids(sev, m))
     eg = sev.sujetos.set_index('sujeto').eg_semanas
@@ -334,8 +373,9 @@ def test_variables_de_medicion_con_su_regla_de_lectura(cliente, tokens, corrida,
         if esperado is not None:
             assert {str(o['valor']): o['n'] for o in fa['opciones']} == {k: v for k, v in esperado.items()}
         assert sum(o['n'] for o in fa['opciones']) > 0
-    # filtrada con «alguna»: el filtro, el conteo del grupo y la faceta usan la misma regla
-    m = _muestra(_y('oxigeno_3m', 'lista', ['1'], 'alguna'))
+    # filtrada con «alguna»: el filtro, el conteo del grupo y la faceta usan la misma regla (con el código frecuente,
+    # para que el grupo pase el mínimo de niños que se muestran)
+    m = _muestra(_y('oxigeno_3m', 'lista', ['9'], 'alguna'))
     ids = M.ids(sev, m)
     f = _facetas(cliente, tokens, muestra=m)
     assert f['n'] == len(ids) > 0 and f['facetas']['oxigeno_3m']['cuando'] == 'alguna'
@@ -344,3 +384,27 @@ def test_variables_de_medicion_con_su_regla_de_lectura(cliente, tokens, corrida,
     r = cliente.post('/api/exploracion/facetas', headers=tokens['experto'], json={
         'muestra': _muestra(), 'variables': [{'variable': 'oxigeno_3m', 'cuando': 'etapa:no_hay'}]})
     assert r.status_code == 422 and 'no_hay' in r.json()['detail']
+
+
+def test_las_opciones_se_leen_sin_codigos(cliente, tokens, corte):  # noqa: F811
+    """Sede, sexo y edad gestacional salen con texto legible; los valores (los códigos del filtro) no cambian."""
+    f = _facetas(cliente, tokens, muestra=_muestra())['facetas']
+    assert [(o['valor'], o['etiqueta']) for o in f['sede']['opciones']] == [('1', 'Sede 1'), ('2', 'Sede 2'), ('3', 'Sede 3')]
+    assert {o['valor']: o['etiqueta'] for o in f['sexo']['opciones']} == {'F': 'Femenino', 'M': 'Masculino'}
+    assert [(o['valor'], o['etiqueta']) for o in f['eg_categoria']['opciones']] == [
+        ('extremo', 'Prematuro extremo (menos de 28 sem)'), ('muy_prematuro', 'Muy prematuro (28 a 31 sem)'),
+        ('moderado_tardio', 'Prematuro moderado a tardío (32 a 36 sem)'), ('a_termino', 'A término (37 sem o más)')]
+    # la lista de variables ofrecidas dice lo mismo
+    ofrecidas = {v['variable']: v for v in cliente.get('/api/muestras/variables', headers=tokens['experto']).json()['variables']}
+    assert [o['etiqueta'] for o in ofrecidas['sede']['opciones']] == ['Sede 1', 'Sede 2', 'Sede 3']
+    assert [o['etiqueta'] for o in ofrecidas['eg_categoria']['opciones']][1] == 'Muy prematuro (28 a 31 sem)'
+
+
+def test_la_etiqueta_del_diccionario_manda_sobre_la_de_respaldo():
+    from maia_api import poblacion as P
+    assert P.etiqueta_sede('1', {}) == 'Sede 1'
+    assert P.etiqueta_sede('1', {'sede': {1.0: 'Hospital Central'}}) == 'Hospital Central'
+    assert P.etiqueta_sede('Norte', {}) == 'Norte'   # un nombre que ya es texto no se reescribe
+    assert P.etiqueta_sexo('F') == 'Femenino' and P.etiqueta_sexo('m') == 'Masculino'
+    assert P.etiqueta_sexo('F', 'Mujer') == 'Mujer'
+    assert P.etiqueta_sexo('X') == 'X'   # un código que no se conoce se deja como está

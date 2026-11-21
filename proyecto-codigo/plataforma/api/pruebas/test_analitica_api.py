@@ -74,7 +74,9 @@ def entrenamiento(cliente):
     return AL.guardar({'readm_3m': res}, [{'clave': 'readm_3m', 'nombre': 'readmisión', 'momento': '40 sem',
                                          'etiqueta': 'En uso'}],
                       {'fuente': 'simulado', 'registro': 'maia-clinico-demo', 'version_registro': '3',
-                       'version_modelo': 'abc', 'corte': '2026-06-30'})
+                       'version_modelo': 'abc', 'corte': '2026-06-30',
+                       'hiperparametros': {'rondas': 400, 'tasa': 0.05, 'hojas': 31, 'min_hoja': 20, 'semilla': 7,
+                                           'min_casos': 30}})
 
 
 def test_sin_sesion_no_entra(cliente):
@@ -92,6 +94,20 @@ def test_todos_los_perfiles_leen(cliente, tokens, entrenamiento, rol):
     c = cliente.get('/api/analitica/contexto', params={'entrenamiento': entrenamiento}, headers=h).json()
     assert c['estado'] == 'ok' and c['desenlaces'][0]['etiqueta'] == 'En uso' and c['modelos'][0]['modelo'] == 'clinico'
     assert cliente.get(f'/api/analitica/{entrenamiento}/rendimiento', headers=h).status_code == 200
+
+
+def test_la_configuracion_trae_los_hiperparametros_con_que_se_entreno(cliente, tokens, entrenamiento):
+    """Todos los perfiles ven con qué valores se entrenó, con su nombre legible y en el orden de administración."""
+    for rol in ('admin', 'experto', 'visualizador'):
+        lista = cliente.get('/api/analitica/entrenamientos', headers=tokens[rol]).json()['entrenamientos']
+        e = next(x for x in lista if x['entrenamiento'] == entrenamiento)
+        assert e['hiperparametros'] == [
+            {'nombre': 'rondas', 'etiqueta': 'Rondas de boosting (máximo)', 'valor': 400},
+            {'nombre': 'tasa', 'etiqueta': 'Tasa de aprendizaje', 'valor': 0.05},
+            {'nombre': 'hojas', 'etiqueta': 'Hojas por árbol', 'valor': 31},
+            {'nombre': 'min_hoja', 'etiqueta': 'Datos mínimos por hoja', 'valor': 20},
+            {'nombre': 'semilla', 'etiqueta': 'Semilla', 'valor': 7},
+            {'nombre': 'min_casos', 'etiqueta': 'Casos mínimos para modelar un desenlace', 'valor': 30}]
 
 
 def test_formas_por_submodulo(cliente, tokens, entrenamiento):

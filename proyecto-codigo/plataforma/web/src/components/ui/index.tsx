@@ -141,7 +141,7 @@ export function Tabla({ children, className, densa, apilar }: { children: ReactN
 }
 
 /** Cifra con su explicación debajo. */
-export function Cifra({ valor, texto, tono }: { valor: ReactNode; texto: string; tono?: 'coral' }) {
+export function Cifra({ valor, texto, tono }: { valor: ReactNode; texto: ReactNode; tono?: 'coral' }) {
   return (
     <div>
       <div className={cn('text-2xl font-bold leading-tight tracking-tight sm:text-3xl', tono === 'coral' ? 'text-coral-hondo' : 'text-teal')}>{valor}</div>

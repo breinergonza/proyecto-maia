@@ -1,20 +1,24 @@
 // Anticipación: con cuánta ventaja avisa el modelo (D12, D19, D20, D50). Un mismo desenlace se predice desde varias visitas:
 // cuántos casos se detectan y cuántas alertas aciertan según la visita de cálculo, a cuántos casos se avisó al menos una
 // visita antes, en qué visita entró cada caso por primera vez al grupo de más riesgo y, para quien puede verlos, el riesgo
-// de tres niños visita por visita.
-import { useState } from 'react'
+// de tres niños visita por visita. Tres pestañas: «Ventaja» (cuántos casos se avisaron antes y con cuántas visitas), «Qué cuesta
+// avisar antes» (casos detectados y alertas acertadas según la visita de cálculo) y la tabla por visita con los niños de ejemplo.
+import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { useSubmodulo } from '../../api/analitica'
+import { ErrorApi } from '../../api/cliente'
 import { useRiesgoPorVisita } from '../../api/anticipacion'
 import type { DatosAnticipacion, NinoRiesgoVisita } from '../../api/tipos'
 import { puede, useSesion } from '../../auth/sesion'
+import { ErrorConReintento } from '../../components/ErrorConReintento'
 import { BarrasApiladas, LineasSeries, MiniSerie, Muestra, type PuntoSerie } from '../../components/graficos'
 import { Grafica, TablaDatos } from '../../components/grafica'
 import { Aviso, Cargando, Cifra, Selector, Tabla, Vacio } from '../../components/ui'
+import type { Pestana } from '../../components/ui/Pestanas'
 import { descripcionDe } from '../../lib/descripciones'
 import { dec2, num, pct, RIESGO_ALTO } from '../../lib/formato'
-import { cuantosMenos, familia, N_MENOR_QUE_5 } from '../../lib/lenguaje'
-import { EnPrueba, Guia, pctN, Resultado } from './comun'
+import { cuantosMenos, familia, SIN_CIFRA } from '../../lib/lenguaje'
+import { ConPestanas, EnPrueba, Guia, pctN, Resultado } from './comun'
 import { useContextoAnalitica } from './contexto'
 
 const TOPS_PRECIO = [5, 10, 20, 40]
@@ -25,7 +29,7 @@ export default function Anticipacion() {
   // modelo, no las familias de anticipación)
   const consulta = useSubmodulo<DatosAnticipacion>(entrenamiento, 'anticipacion')
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-3 lg:min-h-0 lg:flex-1">
       <Guia>
         <p>Muestra qué tan temprano avisa el modelo: el mismo desenlace se calcula desde cada visita y se compara.</p>
         <p>Una alerta es entrar al grupo de niños con más riesgo en esa visita. Avisar antes da más ventaja al equipo, pero suele detectar menos casos.</p>
@@ -44,20 +48,20 @@ function Familias({ entrenamiento, desenlaces, preferida }: { entrenamiento: num
   const clave = (elegida && claves.includes(elegida) ? elegida : null)
     ?? claves.find((c) => c === preferida || (preferida != null && c === familia(preferida))) ?? claves[0]
   const nombre = (c: string) => desenlaces[c].nombre ?? c
-  return (
-    <>
-      <label className="flex flex-wrap items-center gap-2 text-sm font-semibold">
-        Desenlace
-        <Selector value={clave} onChange={(e) => setElegida(e.target.value)} className="max-w-full sm:w-96">
-          {claves.map((c) => <option key={c} value={c}>{nombre(c)}</option>)}
-        </Selector>
-      </label>
-      <Detalle key={clave} clave={clave} entrenamiento={entrenamiento} a={desenlaces[clave]} />
-    </>
+  const selector = (
+    <label className="flex items-center gap-2 text-sm font-semibold">
+      Desenlace
+      <Selector value={clave} onChange={(e) => setElegida(e.target.value)} className="min-w-0 max-w-full sm:w-72">
+        {claves.map((c) => <option key={c} value={c}>{nombre(c)}</option>)}
+      </Selector>
+    </label>
   )
+  return <Detalle key={clave} clave={clave} entrenamiento={entrenamiento} a={desenlaces[clave]} selector={selector} />
 }
 
-function Detalle({ clave, entrenamiento, a }: { clave: string; entrenamiento: number; a: DatosAnticipacion }) {
+type Ver = 'ventaja' | 'costo' | 'tabla'
+
+function Detalle({ clave, entrenamiento, a, selector }: { clave: string; entrenamiento: number; a: DatosAnticipacion; selector: ReactNode }) {
   const { usuario } = useSesion()
   const m = a.metricas_por_visita
   const tops = m?.tops ?? (a.top_pct ? [a.top_pct] : [10])
@@ -77,6 +81,28 @@ function Detalle({ clave, entrenamiento, a }: { clave: string; entrenamiento: nu
     alertas: v.alertas as number | null, detectados: v.casos_detectados_pct, acertadas: v.alertas_acertadas_pct }))
   const muestra = `Se alerta al ${top} % de mayor riesgo`
   const pa = a.primera_alerta
+  const verNinos = puede(usuario, ['admin', 'experto'])
+  const conVentaja = !!av || !!(pa && pa.distribucion.length > 0)
+  const pestanas: Pestana<Ver>[] = [
+    ...(conVentaja ? [{ clave: 'ventaja', texto: 'Ventaja' } satisfies Pestana<Ver>] : []),
+    ...(base.length > 0 ? [{ clave: 'costo', texto: 'Qué cuesta avisar antes' } satisfies Pestana<Ver>] : []),
+    ...(base.length > 0 || verNinos ? [{ clave: 'tabla', texto: verNinos ? 'Tabla y niños de ejemplo' : 'Tabla por visita' } satisfies Pestana<Ver>] : []),
+  ]
+  // el desenlace y el porcentaje de alerta valen para varias pestañas: van junto a ellas y no se pierden al cambiar de una a otra
+  const selectores = (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+      {selector}
+      {base.length > 0 && tops.length > 1 && (
+        <label className="flex items-center gap-2 text-sm font-semibold">
+          {/* etiqueta corta para que las pestañas quepan en una línea junto a los selectores; la opción completa la frase */}
+          Alertar al
+          <Selector value={top} onChange={(e) => setTop(Number(e.target.value))} className="w-52">
+            {tops.map((t) => <option key={t} value={t}>{t} % con más riesgo</option>)}
+          </Selector>
+        </label>
+      )}
+    </div>
+  )
 
   return (
     <>
@@ -84,87 +110,84 @@ function Detalle({ clave, entrenamiento, a }: { clave: string; entrenamiento: nu
       {clave.startsWith('desarrollo') && (
         <Aviso tono="teal">Desarrollo bajo es relativo: es el 10 % más bajo de los niños de entrenamiento. Mide «peor que sus pares», no un retraso clínico.</Aviso>
       )}
-      {av && (
-        <Grafica titulo={dAv.titulo} descripcion={dAv.descripcion}
-          exportar={{ nombre: 'anticipacion-avisados', muestra: a.top_pct ? `Se alerta al ${a.top_pct} % de mayor riesgo` : undefined,
-            filas: [{ desenlace: nombre, casos: av.casos, avisados: av.avisados, avisados_antes_pct: av.pct, meta: av.meta }] }}>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Cifra valor={av.pct == null ? N_MENOR_QUE_5 : pct(av.pct)} texto="Casos avisados al menos una visita antes" />
-            <Cifra valor={av.casos == null ? N_MENOR_QUE_5 : num(av.casos)} texto="Casos del desenlace" />
-            <Cifra valor={av.avisados == null ? N_MENOR_QUE_5 : num(av.avisados)} texto="Casos que recibieron aviso antes" />
+      {base.length === 0 && <Aviso tono="teal">Este desenlace no tiene visitas de cálculo para comparar.</Aviso>}
+      <ConPestanas etiqueta="Qué ver de la anticipación" pestanas={pestanas} aparte={selectores}>
+        {(ver) => ver === 'ventaja' ? (
+          <div className="grid gap-4 xl:grid-cols-2 [&>*]:min-w-0">
+            {av && (
+              <Grafica titulo={dAv.titulo} descripcion={dAv.descripcion}
+                exportar={{ nombre: 'anticipacion-avisados', muestra: a.top_pct ? `Se alerta al ${a.top_pct} % de mayor riesgo` : undefined,
+                  filas: [{ desenlace: nombre, casos: av.casos, avisados: av.avisados, avisados_antes_pct: av.pct, meta: av.meta }] }}>
+                <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-1">
+                  <Cifra valor={av.pct == null ? SIN_CIFRA : pct(av.pct)} texto="Casos avisados al menos una visita antes" />
+                  <Cifra valor={av.casos == null ? SIN_CIFRA : num(av.casos)} texto="Casos del desenlace" />
+                  <Cifra valor={av.avisados == null ? SIN_CIFRA : num(av.avisados)} texto="Casos que recibieron aviso antes" />
+                </div>
+                <p className="mt-2 text-sm text-salvia">Meta: {av.meta}.</p>
+              </Grafica>
+            )}
+            {pa && pa.distribucion.length > 0 && (
+              <Grafica titulo={dVen.titulo} descripcion={dVen.descripcion}
+                exportar={{ nombre: 'anticipacion-ventaja', muestra: `Se alerta al ${pa.top_pct} % de mayor riesgo`,
+                  filas: [...pa.distribucion.map((f) => ({ primera_alerta_en: f.desde, visitas_de_ventaja: f.ventaja_visitas, casos: f.casos, casos_pct: f.pct })),
+                    { primera_alerta_en: 'sin aviso previo', visitas_de_ventaja: null, casos: pa.sin_alerta.casos, casos_pct: pa.sin_alerta.pct }] }}>
+                <BarrasApiladas etiqueta="Porcentaje de casos según la visita en que entraron por primera vez al grupo de más riesgo" alto={200}
+                  series={[{ clave: 'pct', nombre: 'Porcentaje de los casos', color: 0 }]}
+                  filas={[...pa.distribucion.map((f) => ({ x: `${f.desde} (${f.ventaja_visitas} ${f.ventaja_visitas === 1 ? 'visita' : 'visitas'})`, pct: f.pct ?? 0 })),
+                    { x: 'Sin aviso previo', pct: pa.sin_alerta.pct ?? 0 }]} />
+                <p className="mt-2 text-sm">
+                  {pa.ventaja_visitas.mediana != null
+                    ? `Ventaja mediana: ${dec2(pa.ventaja_visitas.mediana)} visitas (media ${dec2(pa.ventaja_visitas.media)}), entre los casos que recibieron aviso.`
+                    : `Las visitas de ventaja se resumen con 20 o más casos con aviso; ${pctN(pa.sin_alerta.pct)} de los casos no recibió aviso antes.`}
+                </p>
+              </Grafica>
+            )}
           </div>
-          <p className="mt-2 text-sm text-salvia">Meta: {av.meta}.</p>
-        </Grafica>
-      )}
-
-      {pa && pa.distribucion.length > 0 && (
-        <Grafica titulo={dVen.titulo} descripcion={dVen.descripcion}
-          exportar={{ nombre: 'anticipacion-ventaja', muestra: `Se alerta al ${pa.top_pct} % de mayor riesgo`,
-            filas: [...pa.distribucion.map((f) => ({ primera_alerta_en: f.desde, visitas_de_ventaja: f.ventaja_visitas, casos: f.casos, casos_pct: f.pct })),
-              { primera_alerta_en: 'sin aviso previo', visitas_de_ventaja: null, casos: pa.sin_alerta.casos, casos_pct: pa.sin_alerta.pct }] }}>
-          <BarrasApiladas etiqueta="Porcentaje de casos según la visita en que entraron por primera vez al grupo de más riesgo" alto={200}
-            series={[{ clave: 'pct', nombre: 'Porcentaje de los casos', color: 0 }]}
-            filas={[...pa.distribucion.map((f) => ({ x: `${f.desde} (${f.ventaja_visitas} ${f.ventaja_visitas === 1 ? 'visita' : 'visitas'})`, pct: f.pct ?? 0 })),
-              { x: 'Sin aviso previo', pct: pa.sin_alerta.pct ?? 0 }]} />
-          <p className="mt-2 text-sm">
-            {pa.ventaja_visitas.mediana != null
-              ? `Ventaja mediana: ${dec2(pa.ventaja_visitas.mediana)} visitas (media ${dec2(pa.ventaja_visitas.media)}), entre los casos que recibieron aviso.`
-              : `Las visitas de ventaja se resumen con 20 o más casos con aviso; ${pctN(pa.sin_alerta.pct)} de los casos no recibió aviso antes.`}
-            {' '}Las partes con menos de 5 casos se omiten ({N_MENOR_QUE_5}).
-          </p>
-        </Grafica>
-      )}
-
-      {base.length === 0 ? <Aviso tono="teal">Este desenlace no tiene visitas de cálculo para comparar.</Aviso> : (
-        <>
-          {tops.length > 1 && (
-            <label className="flex flex-wrap items-center gap-2 text-sm font-semibold">
-              Alertar a los niños con más riesgo
-              <Selector value={top} onChange={(e) => setTop(Number(e.target.value))} className="w-28">
-                {tops.map((t) => <option key={t} value={t}>{t} %</option>)}
-              </Selector>
-            </label>
-          )}
-          <Grafica titulo={dTem.titulo} descripcion={dTem.descripcion}
-            exportar={{ nombre: 'anticipacion-visitas', muestra,
-              filas: base.map((v) => ({ calculado_en: v.desde, visitas_de_ventaja: v.ventaja, casos: v.casos, alertas: v.alertas,
-                casos_detectados_pct: v.detectados, alertas_acertadas_pct: v.acertadas })) }}>
-            <LineasSeries etiqueta="Casos detectados y alertas acertadas según la visita en que se calcula el riesgo" alto={240}
-              dominioY={[0, 100]} formatoY={(v) => `${Math.round(v)} %`}
-              series={[{ clave: 'det', nombre: 'Casos detectados', color: 0 }, { clave: 'ac', nombre: 'Alertas acertadas', color: 1 }]}
-              filas={base.map((v) => ({ x: v.desde, det: v.detectados, ac: v.acertadas }))} />
-            <p className="mt-2 text-sm">Avisar antes detecta menos casos y da más ventaja.</p>
-          </Grafica>
-
-          {m && m.visitas.length > 0 && (
-            <Grafica titulo={dPre.titulo} descripcion={dPre.descripcion}
-              exportar={{ nombre: 'anticipacion-precio',
-                filas: m.visitas.flatMap((v) => v.por_top.map((t) => ({ calculado_en: v.desde, visitas_de_ventaja: v.ventaja_visitas, alertar_al_pct: t.top_pct,
-                  casos_detectados_pct: t.casos_detectados_pct, alertas_acertadas_pct: t.alertas_acertadas_pct }))) }}>
-              <LineasSeries etiqueta="Casos detectados según la visita de cálculo, para distintos porcentajes de alerta" alto={240}
+        ) : ver === 'costo' ? (
+          <div className="grid gap-4 xl:grid-cols-2 [&>*]:min-w-0">
+            <Grafica titulo={dTem.titulo} descripcion={dTem.descripcion}
+              exportar={{ nombre: 'anticipacion-visitas', muestra,
+                filas: base.map((v) => ({ calculado_en: v.desde, visitas_de_ventaja: v.ventaja, casos: v.casos, alertas: v.alertas,
+                  casos_detectados_pct: v.detectados, alertas_acertadas_pct: v.acertadas })) }}>
+              <LineasSeries etiqueta="Casos detectados y alertas acertadas según la visita en que se calcula el riesgo" alto={240}
                 dominioY={[0, 100]} formatoY={(v) => `${Math.round(v)} %`}
-                series={TOPS_PRECIO.filter((t) => tops.includes(t)).map((t, i) => ({ clave: `t${t}`, nombre: `Alerta al ${t} %`, color: i as 0 | 1 | 2 | 3 }))}
-                filas={m.visitas.map((v) => ({ x: v.desde, ...Object.fromEntries(TOPS_PRECIO.map((t) => [`t${t}`, v.por_top.find((x) => x.top_pct === t)?.casos_detectados_pct ?? null])) }))} />
-              <p className="mt-2 text-sm">Alertar a más niños detecta más casos, pero gasta más alertas; avisar antes cuesta casos detectados.</p>
+                series={[{ clave: 'det', nombre: 'Casos detectados', color: 0 }, { clave: 'ac', nombre: 'Alertas acertadas', color: 1 }]}
+                filas={base.map((v) => ({ x: v.desde, det: v.detectados, ac: v.acertadas }))} />
+              <p className="mt-2 text-sm">Avisar antes detecta menos casos y da más ventaja.</p>
             </Grafica>
-          )}
-
-          <TablaDatos titulo={dTab.titulo} descripcion={dTab.descripcion}
-            exportar={{ nombre: 'anticipacion-tabla', muestra,
-              filas: base.map((v) => ({ visita: v.desde, ventaja_visitas: v.ventaja, casos: v.casos, alertas: v.alertas, auc: v.auc,
-                casos_detectados_pct: v.detectados, alertas_acertadas_pct: v.acertadas })) }}>
-            <Tabla densa>
-              <thead><tr><th>Se calcula en</th><th>Ventaja (visitas)</th><th>Casos</th><th>Alertas</th><th>AUC</th><th>Casos detectados</th><th>Alertas acertadas</th></tr></thead>
-              <tbody>{base.map((v) => (
-                <tr key={v.desde}><td>{v.desde}</td><td>{num(v.ventaja)}</td><td>{v.casos == null ? N_MENOR_QUE_5 : num(v.casos)}</td>
-                  <td>{num(v.alertas)}</td><td>{v.auc == null ? '—' : dec2(v.auc)}</td><td>{pctN(v.detectados)}</td><td>{pctN(v.acertadas)}</td></tr>
-              ))}</tbody>
-            </Tabla>
-          </TablaDatos>
-        </>
-      )}
-
-      {puede(usuario, ['admin', 'experto']) && <NinosDeEjemplo desenlace={clave} entrenamiento={entrenamiento} />}
+            {m && m.visitas.length > 0 && (
+              <Grafica titulo={dPre.titulo} descripcion={dPre.descripcion}
+                exportar={{ nombre: 'anticipacion-precio',
+                  filas: m.visitas.flatMap((v) => v.por_top.map((t) => ({ calculado_en: v.desde, visitas_de_ventaja: v.ventaja_visitas, alertar_al_pct: t.top_pct,
+                    casos_detectados_pct: t.casos_detectados_pct, alertas_acertadas_pct: t.alertas_acertadas_pct }))) }}>
+                <LineasSeries etiqueta="Casos detectados según la visita de cálculo, para distintos porcentajes de alerta" alto={240}
+                  dominioY={[0, 100]} formatoY={(v) => `${Math.round(v)} %`}
+                  series={TOPS_PRECIO.filter((t) => tops.includes(t)).map((t, i) => ({ clave: `t${t}`, nombre: `Alerta al ${t} %`, color: i as 0 | 1 | 2 | 3 }))}
+                  filas={m.visitas.map((v) => ({ x: v.desde, ...Object.fromEntries(TOPS_PRECIO.map((t) => [`t${t}`, v.por_top.find((x) => x.top_pct === t)?.casos_detectados_pct ?? null])) }))} />
+                <p className="mt-2 text-sm">Alertar a más niños detecta más casos, pero gasta más alertas; avisar antes cuesta casos detectados.</p>
+              </Grafica>
+            )}
+          </div>
+        ) : (
+          <div className="grid gap-4 [&>*]:min-w-0">
+            {base.length > 0 && (
+              <TablaDatos titulo={dTab.titulo} descripcion={dTab.descripcion}
+                exportar={{ nombre: 'anticipacion-tabla', muestra,
+                  filas: base.map((v) => ({ visita: v.desde, ventaja_visitas: v.ventaja, casos: v.casos, alertas: v.alertas, auc: v.auc,
+                    casos_detectados_pct: v.detectados, alertas_acertadas_pct: v.acertadas })) }}>
+                <Tabla densa>
+                  <thead><tr><th>Se calcula en</th><th>Ventaja (visitas)</th><th>Casos</th><th>Alertas</th><th>AUC</th><th>Casos detectados</th><th>Alertas acertadas</th></tr></thead>
+                  <tbody>{base.map((v) => (
+                    <tr key={v.desde}><td>{v.desde}</td><td>{num(v.ventaja)}</td><td>{v.casos == null ? SIN_CIFRA : num(v.casos)}</td>
+                      <td>{num(v.alertas)}</td><td>{v.auc == null ? '—' : dec2(v.auc)}</td><td>{pctN(v.detectados)}</td><td>{pctN(v.acertadas)}</td></tr>
+                  ))}</tbody>
+                </Tabla>
+              </TablaDatos>
+            )}
+            {verNinos && <NinosDeEjemplo desenlace={clave} entrenamiento={entrenamiento} />}
+          </div>
+        )}
+      </ConPestanas>
     </>
   )
 }
@@ -175,8 +198,11 @@ function NinosDeEjemplo({ desenlace, entrenamiento }: { desenlace: string; entre
   const q = useRiesgoPorVisita({ desenlace, n: 3 })
   if (q.isPending) return <Grafica titulo={d.titulo} descripcion={d.descripcion}><Cargando /></Grafica>
   if (q.isError) {
+    // 404 o 409: no hay corrida o paquete activo, no es una falla; lo demás (red, servidor) se puede reintentar
+    const sinCorrida = q.error instanceof ErrorApi && (q.error.estado === 404 || q.error.estado === 409)
     return <Grafica titulo={d.titulo} descripcion={d.descripcion}>
-      <Aviso tono="teal">Todavía no hay una corrida con un modelo activo para mostrar niños de ejemplo.</Aviso>
+      {sinCorrida ? <Aviso tono="teal">Todavía no hay una corrida con un modelo activo para mostrar niños de ejemplo.</Aviso>
+        : <ErrorConReintento error={q.error} que="los niños de ejemplo" reintentando={q.isFetching} reintentar={() => void q.refetch()} />}
     </Grafica>
   }
   const ninos = q.data.ninos.filter((n): n is NinoRiesgoVisita & { puntos: NonNullable<NinoRiesgoVisita['puntos']> } => !!n.puntos?.length)

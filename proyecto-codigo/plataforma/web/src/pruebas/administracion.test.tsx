@@ -39,8 +39,8 @@ describe('administración de las ejecuciones', () => {
             : url === '/api/administracion/conexion/probar'
               ? { cuerpo: { ok: true, mensaje: 'Conexión de solo lectura correcta.', version_servidor: '16.4', esquema: 'consumo', tablas: ['a', 'b'] } }
               : undefined))
-    montar('/admin/configuracion')
-    expect(await screen.findByText('2. Conexión a la base de la entidad')).toBeInTheDocument()
+    montar('/admin/configuracion?ver=base')
+    await screen.findByLabelText('Clave')
     const clave = await screen.findByLabelText('Clave')
     expect(clave).toHaveValue('')
     await waitFor(() => expect(screen.getByLabelText('Servidor')).toHaveValue('db.entidad'))
@@ -63,7 +63,7 @@ describe('administración de las ejecuciones', () => {
             : url.startsWith('/api/administracion/calendario')
               ? { cuerpo: { cron: '0 2 1 1,7 *', zona: 'America/Bogota', descripcion: 'El día 1 de enero y julio, a las 02:00', proximas: ['2027-01-01T07:00:00Z'] } }
               : undefined))
-    montar('/admin/programacion')
+    montar('/admin/programacion?ver=programar')
     expect(await screen.findByText('El día 1 de enero y julio, a las 02:00')).toBeInTheDocument()
     await userEvent.type(screen.getByLabelText('Nacidos desde (año)'), '2015')
     await userEvent.click(screen.getByRole('button', { name: 'Crear programación' }))
@@ -72,7 +72,7 @@ describe('administración de las ejecuciones', () => {
     expect(JSON.parse(String(post.init!.body))).toMatchObject({ fuente: 'kmc', cron: '0 2 1 1,7 *', solo_si_nuevo: true, parametros: { anio_desde: 2015 } })
   })
 
-  it('configuración: la meta de falsas alertas se lee en su unidad y avisa si se aleja 10 veces del núcleo', async () => {
+  it('configuración: la meta de falsas alertas se lee en su unidad y avisa si se aleja 10 veces del valor por defecto', async () => {
     const anomalias = [{ modelo: 'anomalias', actualizado_en: '2026-10-28T22:13:42Z', campos: [
       { nombre: 'alpha', etiqueta: 'Meta de falsas alertas por dato (capa 2)', tipo: 'float', minimo: 0.0005, maximo: 0.05,
         ayuda: 'Fracción de los datos sanos que la capa 2 puede marcar.', escala: 'por_mil', defecto: 0.05, valor: 0.005 },
@@ -83,18 +83,20 @@ describe('administración de las ejecuciones', () => {
         : url === '/api/administracion/conexion' ? { cuerpo: conexion }
           : url.startsWith('/api/administracion/hiperparametros') ? { cuerpo: anomalias }
             : undefined))
-    montar('/admin/configuracion')
+    montar('/admin/configuracion?ver=anomalias')
     const alpha = await screen.findByLabelText('Meta de falsas alertas por dato (capa 2)')
     expect(screen.getByText(/0,005 = 5 por cada 1\.000 datos/)).toBeInTheDocument()
-    expect(screen.getByText(/10 veces menos que el valor del núcleo \(0,05\)/)).toBeInTheDocument()
-    expect(screen.getByText(/De 0,0005 a 0,05 · núcleo: 0,05/)).toBeInTheDocument()
-    expect(screen.getByText('1 ajustado(s)')).toBeInTheDocument()        // 300 rondas es el valor del núcleo
+    expect(within(screen.getByRole('main')).queryByText(/núcleo/i)).not.toBeInTheDocument()   // el equipo clínico no conoce «el núcleo»
+    expect(screen.getByText(/Si lo deja vacío se usa el valor por defecto \(en gris\)/)).toBeInTheDocument()
+    expect(screen.getByText(/10 veces menos que el valor por defecto \(0,05\)/)).toBeInTheDocument()
+    expect(screen.getByText(/De 0,0005 a 0,05 · por defecto: 0,05/)).toBeInTheDocument()
+    expect(screen.getByText('1 ajustado(s)')).toBeInTheDocument()        // 300 rondas es el valor por defecto
     expect(screen.queryByText(/p\. m\.\./)).not.toBeInTheDocument()
     await userEvent.clear(alpha)
     await userEvent.type(alpha, '0.05')
     expect(screen.getByText(/0,05 = 50 por cada 1\.000 datos/)).toBeInTheDocument()
-    expect(screen.queryByText(/veces (más|menos) que el valor del núcleo/)).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Volver a los del núcleo' }))
+    expect(screen.queryByText(/veces (más|menos) que el valor por defecto/)).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Volver a los valores por defecto' }))
     const d = await screen.findByRole('alertdialog')
     expect(d).toHaveTextContent('No se puede deshacer')
     await userEvent.click(within(d).getByRole('button', { name: 'Cancelar' }))
@@ -148,6 +150,28 @@ describe('administración de las ejecuciones', () => {
     expect(within(screen.getByRole('main')).getByRole('link', { name: 'Programación' })).toHaveAttribute('href', '/admin/programacion')
   })
 
+  it('corridas: si todas son del mismo tipo se dice una vez y no en una columna que repite lo mismo', async () => {
+    const corrida = (id: number) => ({ id, tipo: 'demo', estado: 'ok', silencio: false, corte_id: 1, fuente: 'simulado', fecha_corte: '2026-06-30',
+      paquete: 'p', iniciada: '2026-10-30T23:36:00Z', terminada: null, resumen: { ninos: 10, datos_revisar: 3 }, paso: null, mensaje: null })
+    simularApi((url) => comoAdmin(url) ?? (url === '/api/corridas' ? { cuerpo: [corrida(2), corrida(1)] } : undefined))
+    montar('/admin/corridas')
+    const tabla = await screen.findByRole('table')
+    expect(within(tabla).queryByRole('columnheader', { name: 'Detalle' })).not.toBeInTheDocument()
+    expect(within(tabla).queryByText('Recálculo con el corte vigente')).not.toBeInTheDocument()
+    expect(screen.getAllByText(/Todas son: recálculo con el corte vigente/)).toHaveLength(1)
+  })
+
+  it('corridas: la columna Detalle aparece cuando una corrida tiene algo que decir (error o paso en curso)', async () => {
+    const corrida = (id: number, extra: object) => ({ id, tipo: 'demo', estado: 'ok', silencio: false, corte_id: 1, fuente: 'simulado',
+      fecha_corte: '2026-06-30', paquete: 'p', iniciada: '2026-10-30T23:36:00Z', terminada: null, resumen: { ninos: 10, datos_revisar: 3 }, paso: null, mensaje: null, ...extra })
+    simularApi((url) => comoAdmin(url) ?? (url === '/api/corridas'
+      ? { cuerpo: [corrida(2, { estado: 'error', mensaje: 'Falló la lectura' }), corrida(1, {})] } : undefined))
+    montar('/admin/corridas')
+    const tabla = await screen.findByRole('table')
+    expect(within(tabla).getByRole('columnheader', { name: 'Detalle' })).toBeInTheDocument()
+    expect(within(tabla).getByText('Falló la lectura')).toBeInTheDocument()
+  })
+
   it('entrenamientos: hiperparámetros, métricas, comparación y aprobación', async () => {
     const run = (id: string, version: string, rondas: string, auc: number, alias: string[]): Entrenamiento => ({
       run_id: id, experimento_id: '2', tipo: 'clinico', nombre: id, estado: 'FINISHED', inicio: '2026-10-01T10:00:00Z',
@@ -162,7 +186,7 @@ describe('administración de las ejecuciones', () => {
         : url === '/api/entrenamientos/aprobar' ? { estado: 202, cuerpo: { id: 9 } }
           : undefined))
     montar('/admin/entrenamientos')
-    const clinico = (await screen.findByText('Alertas clínicas')).closest('section')!
+    const clinico = (await screen.findByRole('heading', { name: 'Alertas clínicas' })).closest('section')!
     expect(within(clinico).getByText('produccion')).toBeInTheDocument()
     expect(within(clinico).getByText('ajustado')).toBeInTheDocument()
     expect(within(clinico).getByText('0,83')).toBeInTheDocument()
@@ -196,7 +220,7 @@ describe('administración de las ejecuciones', () => {
           : url === '/api/administracion/hiperparametros' ? { cuerpo: hiper }
             : url.startsWith('/api/entrenamientos?') ? { cuerpo: { mlflow_url: null, anomalias: [], clinico: [] } }
               : undefined))
-    montar('/admin/entrenamientos')
+    montar('/admin/entrenamientos?ver=entrenar')
     const rondas = await screen.findByLabelText('Rondas de boosting (máximo)')
     expect(rondas).toHaveValue(600)                       // parte del valor del núcleo
     await userEvent.click(screen.getByLabelText('Anomalías (revisión de datos)'))

@@ -11,6 +11,10 @@ from sqlalchemy.orm import Session
 from maia_comun.modelos_db import Corrida, Esquema, Etapa
 from sevarti import contrato as SV
 
+# los indicadores de crecimiento OMS que muestra la aplicación, con su nombre para la gente
+INDICADORES = {'peso': 'Peso para la edad', 'talla': 'Talla para la edad',
+               'perimetro_cefalico': 'Perímetro cefálico para la edad', 'peso_para_talla': 'Peso para la talla'}
+
 
 def corrida_de(s: Session, corrida_id: int | None = None) -> Corrida:
     """La corrida pedida, o la última terminada sin errores."""
