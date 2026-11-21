@@ -2,10 +2,10 @@
 // pregunta clínica (¿crecen distinto?, ¿les pasa algo distinto?, ¿faltan datos distintos?). El grupo A es el grupo activo
 // (vive en la dirección); el B lo elige la persona y se conserva en la página, así que una falla de red no lo pierde: el
 // reintento pide exactamente los mismos dos grupos. Dos grupos con los mismos criterios no se comparan (darían A = B). El
-// rendimiento del modelo no se compara aquí sino en Modelos, a donde lleva un enlace.
+// rendimiento del modelo es técnico y no se enlaza desde aquí: lo clínico y lo técnico van aparte.
 import { ArrowLeftRight } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { useSearchParams } from 'react-router'
 import { ErrorApi } from '../../api/cliente'
 import { useComparaGruposClinico, type GruposClinicoOk } from '../../api/comparar'
 import { cn } from '../../lib/cn'
@@ -99,8 +99,7 @@ export default function CompararGrupos() {
 
   return (
     <div className="flex flex-col gap-3">
-      <Encabezado titulo="Comparar grupos"
-        accion={<Link to="/analitica/comparar" className="text-sm text-teal underline underline-offset-2 hover:text-teal-medio">Rendimiento del modelo por grupo, en Modelos</Link>}>
+      <Encabezado titulo="Comparar grupos">
         Elija dos grupos de niños y vea en qué se parecen y en qué se diferencian.
       </Encabezado>
       <div className="grid items-start gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">

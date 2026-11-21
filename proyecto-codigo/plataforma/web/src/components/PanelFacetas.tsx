@@ -1,10 +1,9 @@
 // Panel de filtros de Explorar: casillas por variable con cuántos niños tendría cada opción (los demás filtros puestos),
 // los filtros activos como fichas, «+ Agregar variable», el tiempo y el muestreo, los filtros guardados y «Guardar este
-// filtro». Cada opción dice cuántos niños tendría, también si son 1 a 4; con menos de 20 en el grupo no hay cifras
+// filtro». No lleva a Modelos: comparar dos grupos es «Comparar grupos». Cada opción dice cuántos niños tendría, también si son 1 a 4; con menos de 20 en el grupo no hay cifras
 // (D46, «—»); una opción sin niños dice «0» y se atenúa: un cero es un dato. Cada categoría vale por sí sola: elegir
 // «muy prematuro» y «a término» no incluye a los moderados.
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router'
 import { ErrorApi } from '../api/cliente'
 import { useGuardarMuestra, useMuestras } from '../api/exploracion'
 import type { EntradaFiltro, Faceta, MuestreoJson, OpcionFaceta, RespuestaFacetas, TiempoJson } from '../api/tipos'
@@ -313,7 +312,6 @@ export function PanelFacetas({ facetas, cargando, filtros, esExperto, conTiempo 
     ...Object.keys(todas).filter((k) => !visibles.includes(k)).map((k) => ({ variable: k, etiqueta: todas[k].etiqueta, cuando: todas[k].cuando })),
     ...(facetas?.disponibles ?? []).filter((d) => !(d.variable in todas)).map((d) => ({ variable: d.variable, etiqueta: d.etiqueta, cuando: d.cuando })),
   ]
-  const otrosGuardados = (guardadas.data ?? []).filter((m) => m.id !== filtros.guardada)
   const criterios = criteriosActivos(filtros, facetas)
   const hayActivos = criterios.length > 0
 
@@ -390,24 +388,8 @@ export function PanelFacetas({ facetas, cargando, filtros, esExperto, conTiempo 
         {conTiempo && facetas?.muestreo && <Muestreo key={filtros.muestreo ? 'muestreo-con' : 'muestreo-sin'} info={facetas.muestreo} filtros={filtros} />}
 
         {esExperto && (
-          <div className="space-y-3 border-t border-linea pt-3">
+          <div className="border-t border-linea pt-3">
             <Guardar filtros={filtros} />
-            {otrosGuardados.length > 0 && (
-              <details className="text-sm">
-                <summary className="cursor-pointer font-semibold text-teal">Comparar con otro filtro</summary>
-                {filtros.guardada
-                  ? (
-                    <ul className="mt-2 space-y-1">
-                      {otrosGuardados.map((m) => (
-                        <li key={m.id}>
-                          <Link className="text-teal underline" to={`/analitica/comparar?a=${filtros.guardada}&b=${m.id}`}>{m.titulo}</Link>
-                        </li>
-                      ))}
-                    </ul>
-                  )
-                  : <p className="mt-2 text-salvia">Guarde este filtro para compararlo con otro.</p>}
-              </details>
-            )}
           </div>
         )}
       </div>

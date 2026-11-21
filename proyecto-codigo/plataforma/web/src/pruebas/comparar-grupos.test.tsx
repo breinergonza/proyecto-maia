@@ -274,13 +274,12 @@ describe('comparar grupos', () => {
     fichaVisible(doce)
   })
 
-  it('la pestaña queda en la dirección y el rendimiento del modelo es un enlace a Modelos, no otra pestaña', async () => {
+  it('la pestaña queda en la dirección y la página no lleva a Modelos: lo clínico y lo técnico van aparte', async () => {
     await compararConTodos()
     await userEvent.click(screen.getByRole('tab', { name: '¿Faltan datos distintos?' }))
     expect(screen.getByTestId('ubicacion').textContent).toContain('pregunta=faltan')
-    const enlace = screen.getByRole('link', { name: /Rendimiento del modelo por grupo/ })
-    expect(enlace).toHaveAttribute('href', '/analitica/comparar')
-    expect(screen.getByRole('tablist').contains(enlace)).toBe(false)
+    expect(screen.queryByRole('link', { name: /Rendimiento del modelo/ })).not.toBeInTheDocument()
+    expect(document.querySelector('main a[href^="/analitica"], main a[href^="/mis-modelos"]')).toBeNull()
     expect(screen.getAllByRole('tab')).toHaveLength(3)
   })
 

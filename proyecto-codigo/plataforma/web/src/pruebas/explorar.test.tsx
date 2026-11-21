@@ -42,7 +42,7 @@ function Ubicacion() {
   return <output data-testid="ubicacion">{decodeURIComponent(useLocation().search)}</output>
 }
 
-function api(rol: Usuario['rol'], respuesta: unknown = resumen) {
+function api(rol: Usuario['rol'], respuesta: unknown = resumen, guardadas: unknown[] = []) {
   return simularApi((url, init) => {
     if (url === '/api/muestras' && init?.method === 'POST') {
       return { estado: 201, cuerpo: { id: 7, titulo: 'Varones', n_ninos: 240, definicion: JSON.parse(String(init.body)).muestra } }
@@ -50,7 +50,7 @@ function api(rol: Usuario['rol'], respuesta: unknown = resumen) {
     if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario(rol) } }
     if (url === '/api/exploracion/resumen') return { cuerpo: respuesta }
     if (url === '/api/exploracion/facetas') return { cuerpo: facetas }
-    if (url === '/api/muestras') return rol === 'visualizador' ? { estado: 403, cuerpo: { detail: 'Sin permiso' } } : { cuerpo: [] }
+    if (url === '/api/muestras') return rol === 'visualizador' ? { estado: 403, cuerpo: { detail: 'Sin permiso' } } : { cuerpo: guardadas }
     return { cuerpo: {} }
   })
 }
@@ -261,6 +261,16 @@ describe('explorar', () => {
     expect(screen.queryByRole('button', { name: 'Guardar este filtro' })).not.toBeInTheDocument()
     expect(screen.queryByText(/aproxima/)).not.toBeInTheDocument()
     expect(llamadas.some((l) => l.url === '/api/muestras')).toBe(false)
+  })
+
+  it('los filtros guardados no llevan a Modelos: comparar dos grupos es «Comparar grupos»', async () => {
+    const muestra = (id: number, titulo: string) => ({ id, titulo, n_ninos: 120, definicion: { y: [{ variable: 'sede', tipo: 'lista', valores: [String(id)] }] } })
+    api('experto', resumen, [muestra(1, 'Sede 1'), muestra(2, 'Sede 2')])
+    montar('/explorar')
+    const elegir = await screen.findByRole('combobox', { name: 'Filtro guardado' })
+    fireEvent.change(elegir, { target: { value: '1' } })
+    expect(screen.queryByText('Comparar con otro filtro')).not.toBeInTheDocument()
+    expect(document.querySelector('main a[href^="/analitica"]')).toBeNull()
   })
 
   it('un experto guarda el filtro con su nombre', async () => {
