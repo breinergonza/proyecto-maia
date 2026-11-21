@@ -140,6 +140,37 @@ describe('vista clínica', () => {
     expect(within(panel).getByText(/Toda la población \(referencia\)/)).toBeInTheDocument()
   })
 
+  it('una visita con menos de 20 niños con dato tiene su mediana y su cuenta, pero no la mitad central', async () => {
+    const etapas = resumen.trayectoria.etapas.map((e) => e.etapa === '3 m EC' ? { ...e, grupo: { n: 3, p25: null, mediana: -1.5, p75: null } } : e)
+    api('experto', () => ({ ...resumen, trayectoria: { ...resumen.trayectoria, etapas } }))
+    montar('/')
+    const panel = (await screen.findByRole('heading', { name: 'Crecimiento: talla para la edad' })).closest('section')!
+    expect(within(panel).getByText('Sin mitad central: pide al menos 20 niños con dato en la visita.')).toBeInTheDocument()
+    expect(within(panel).getByRole('figure', { name: /3 m EC\. Mediana del grupo -1,5, 3 niños con dato, sin mitad central/ })).toBeInTheDocument()
+    await userEvent.click(within(panel).getByRole('button', { name: 'Ver como tabla' }))
+    const fila = within(within(panel).getByRole('table')).getByRole('row', { name: /3 m EC/ })
+    expect(fila).toHaveTextContent('3 m EC3-1,5sin cifra')
+    // la vista de tabla se recuerda: se deja como estaba
+    await userEvent.click(within(panel).getByRole('button', { name: 'Ver como tabla' }))
+  })
+
+  it('si ninguna visita llega a 20 niños, ni la leyenda ni la descripción prometen la mitad central', async () => {
+    const etapas = resumen.trayectoria.etapas.map((e) => e.grupo ? { ...e, grupo: { n: 6, p25: null, mediana: e.grupo.mediana, p75: null } } : e)
+    api('experto', () => ({ ...resumen, trayectoria: { ...resumen.trayectoria, etapas } }))
+    montar('/')
+    const panel = (await screen.findByRole('heading', { name: 'Crecimiento: talla para la edad' })).closest('section')!
+    expect(within(panel).getByText('Sin mitad central: pide al menos 20 niños con dato en la visita.')).toBeInTheDocument()
+    expect(within(panel).queryByText('Mitad central del grupo')).not.toBeInTheDocument()
+    expect(within(panel).getByText(/^Mediana del grupo por visita, frente a la mediana de toda la población/)).toBeInTheDocument()
+  })
+
+  it('sin visitas con menos de 20 niños no hay nota de la mitad central', async () => {
+    api('experto')
+    montar('/')
+    const panel = (await screen.findByRole('heading', { name: 'Crecimiento: talla para la edad' })).closest('section')!
+    expect(within(panel).queryByText(/Sin mitad central:/)).not.toBeInTheDocument()
+  })
+
   it('la trayectoria dice qué muestra, trae su leyenda y una vista de tabla con los niños con dato de cada visita', async () => {
     api('experto')
     montar('/')

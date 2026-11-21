@@ -7,6 +7,7 @@ import { Area, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveCont
 import { Termino } from '../Termino'
 import type { EtapaClinica } from '../../api/tipos'
 import { cn } from '../../lib/cn'
+import { MINIMO_NINOS_DISTRIBUCION } from '../../lib/exportar'
 import { dec2, indicador as nombreIndicador, num } from '../../lib/formato'
 import { Grafica } from '../grafica'
 import { COLOR, SERIES_COLOR } from '../graficos'
@@ -26,6 +27,8 @@ type Fila = {
   mediana: number | null
   /** Mitad central del grupo: del cuarto al tres cuartos de los niños. */
   banda: [number, number] | null
+  /** Hay mediana, pero menos de 20 niños con dato: la mitad central no se calcula (D52). */
+  sinBanda: boolean
   poblacion: number | null
   nPoblacion: number | null
 }
@@ -36,20 +39,24 @@ function filasDe(etapas: EtapaClinica[]): Fila[] {
     n: e.grupo?.n ?? null,
     mediana: e.grupo?.mediana ?? null,
     banda: e.grupo && e.grupo.p25 != null && e.grupo.p75 != null ? [e.grupo.p25, e.grupo.p75] : null,
+    sinBanda: e.grupo?.mediana != null && (e.grupo.p25 == null || e.grupo.p75 == null),
     poblacion: e.poblacion?.mediana ?? null,
     nPoblacion: e.poblacion?.n ?? null,
   }))
 }
 
-function Leyenda({ umbral, conPoblacion }: { umbral: string | null; conPoblacion: boolean }) {
+function Leyenda({ umbral, conPoblacion, conBanda, sinBanda }: { umbral: string | null; conPoblacion: boolean; conBanda: boolean; sinBanda: boolean }) {
   return (
+    <>
     <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
       <li className="inline-flex items-center gap-1.5">
         <span className="inline-block h-0.5 w-4 rounded-full" style={{ background: SERIES_COLOR[0] }} aria-hidden />Mediana del grupo
       </li>
-      <li className="inline-flex items-center gap-1.5">
-        <span className="inline-block h-3 w-4 rounded-sm opacity-25" style={{ background: SERIES_COLOR[0] }} aria-hidden />Mitad central del grupo
-      </li>
+      {conBanda && (
+        <li className="inline-flex items-center gap-1.5">
+          <span className="inline-block h-3 w-4 rounded-sm opacity-25" style={{ background: SERIES_COLOR[0] }} aria-hidden />Mitad central del grupo
+        </li>
+      )}
       {conPoblacion ? (
         <li className="inline-flex items-center gap-1.5">
           <span className="inline-block h-0.5 w-4 rounded-full" style={{ background: COLOR.referencia }} aria-hidden />Toda la población
@@ -62,6 +69,9 @@ function Leyenda({ umbral, conPoblacion }: { umbral: string | null; conPoblacion
         </li>
       )}
     </ul>
+    {/* solo si alguna visita tiene mediana sin mitad central: explica el hueco de la banda */}
+    {sinBanda && <p className="text-xs">Sin mitad central: pide al menos {MINIMO_NINOS_DISTRIBUCION} niños con dato en la visita.</p>}
+    </>
   )
 }
 
@@ -91,6 +101,7 @@ function Globo({ active, payload, unidad, conPoblacion }: {
           <>
             <p>Mediana del grupo: {dec2(f.mediana)} ({unidad}), {num(f.n)} niños con dato</p>
             {f.banda && <p>Mitad central: {dec2(f.banda[0])} a {dec2(f.banda[1])}</p>}
+            {f.sinBanda && <p>Sin mitad central: pide al menos {MINIMO_NINOS_DISTRIBUCION} niños con dato</p>}
           </>
         )}
       {conPoblacion && f.poblacion != null && <p>Toda la población: {dec2(f.poblacion)}</p>}
@@ -117,30 +128,35 @@ export function Trayectoria({ indicador, unidad, etapas, muestra, conPoblacion, 
   if (umbral) valores.push(UMBRAL_Z, 0)
   const dominio: [number, number] = valores.length ? [Math.floor(Math.min(...valores) - 0.3), Math.ceil(Math.max(...valores) + 0.3)] : [-3, 1]
   const hayDatos = filas.some((f) => f.mediana != null)
+  // la mitad central solo se nombra si alguna visita la tiene (20 niños o más con dato, D52)
+  const conBanda = filas.some((f) => f.banda != null)
+  const sinBanda = filas.some((f) => f.sinBanda)
+  const medidas = conBanda ? 'Mediana y mitad central del grupo' : 'Mediana del grupo'
 
-  const items = filas.map((f) => `${f.x}. ${f.mediana == null ? 'Sin dato del grupo' : `Mediana del grupo ${dec2(f.mediana)}, ${num(f.n)} niños con dato`}${
+  const items = filas.map((f) => `${f.x}. ${f.mediana == null ? 'Sin dato del grupo' : `Mediana del grupo ${dec2(f.mediana)}, ${num(f.n)} niños con dato${f.sinBanda ? ', sin mitad central' : ''}`}${
     f.poblacion == null ? '' : `. Toda la población ${dec2(f.poblacion)}`}`)
-  const etiqueta = `${titulo}: mediana del grupo${conPoblacion ? ', mitad central del grupo y mediana de toda la población' : ' y su mitad central'}, en ${unidad}. ${items.join('; ')}`
+  const partes = ['mediana del grupo', ...(conBanda ? ['mitad central del grupo'] : []), ...(conPoblacion ? ['mediana de toda la población'] : [])]
+  const etiqueta = `${titulo}: ${partes.length > 1 ? `${partes.slice(0, -1).join(', ')} y ${partes.at(-1)}` : partes[0]}, en ${unidad}. ${items.join('; ')}`
 
   const tabla = filas.map((f) => ({
     Visita: f.x,
     'Niños con dato': f.n,
     'Mediana del grupo': f.mediana == null ? null : dec2(f.mediana),
-    'Mitad central del grupo': f.banda ? `${dec2(f.banda[0])} a ${dec2(f.banda[1])}` : null,
+    'Mitad central del grupo': f.banda ? `${dec2(f.banda[0])} a ${dec2(f.banda[1])}` : f.sinBanda ? 'sin cifra' : null,
     ...(conPoblacion ? { 'Mediana de la población': f.poblacion == null ? null : dec2(f.poblacion) } : {}),
   }))
 
   return (
     // en escritorio el cuerpo del panel se reparte en columna: la gráfica crece y el pie (grupo, unidad) queda abajo
     <Grafica llenar titulo={titulo} className={cn('xl:[&>div:last-child]:flex xl:[&>div:last-child]:flex-col xl:[&>div:last-child>div:first-child]:min-h-0 xl:[&>div:last-child>div:first-child]:flex-1', className)}
-      descripcion={conPoblacion ? 'Mediana y mitad central del grupo por visita, frente a la mediana de toda la población; sin dato no hay punto.'
-        : 'Mediana y mitad central del grupo por visita; sin dato no hay punto.'}
+      descripcion={conPoblacion ? `${medidas} por visita, frente a la mediana de toda la población; sin dato no hay punto.`
+        : `${medidas} por visita; sin dato no hay punto.`}
       exportar={{ nombre: 'vista-clinica-trayectoria', filas: tabla, columnas: Object.keys(tabla[0] ?? {}), muestra,
         unidad: `Unidad: ${unidad}${z ? ' frente a la OMS' : ''} · EC: edad corregida · bajo cada visita, los niños del grupo con dato` }}>
       {hayDatos ? (
         // en escritorio la gráfica toma la altura que le deja el panel (el panel la toma de la pantalla)
         <div className="flex flex-col gap-2 xl:h-full">
-          <Leyenda umbral={umbral} conPoblacion={conPoblacion} />
+          <Leyenda umbral={umbral} conPoblacion={conPoblacion} conBanda={conBanda} sinBanda={sinBanda} />
           <GraficaNavegable etiqueta={etiqueta} resumen={resumenDe('Líneas', filas.length, ['visita', 'visitas'])} items={items}
             className="h-[280px] xl:h-auto xl:min-h-[11rem] xl:flex-1">
             <ResponsiveContainer width="100%" height="100%">

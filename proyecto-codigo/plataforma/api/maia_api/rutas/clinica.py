@@ -150,7 +150,9 @@ def observado_de(s: Session, corrida: int, familia: str, ids: list[str] | None, 
 def trayectoria_de(s: Session, corrida: int, corte_id: int, indicador: str, ids: list[str] | None,
                  dic: Dic) -> dict:
     """Por visita (en orden clínico), la mediana y la mitad central del puntaje z del grupo y la mediana de la
-    población, con los niños que tienen dato. Los datos improbables no cuentan."""
+    población, con los niños que tienen dato. Los datos improbables no cuentan. La mediana sale con cualquier número de
+    niños; la mitad central (cuartiles) pide al menos 20 con dato en la visita, como toda distribución (D52): con
+    menos, el cuarto y los tres cuartos dicen poco del grupo."""
     por = {'p': {'c': corrida, 'i': indicador}, 'g': {'c': corrida, 'i': indicador, 'ids': ids}}
     sql = """
         SELECT etapa, count(DISTINCT sujeto) AS n, percentile_cont(0.25) WITHIN GROUP (ORDER BY z) AS p25,
@@ -167,9 +169,12 @@ def trayectoria_de(s: Session, corrida: int, corte_id: int, indicador: str, ids:
     def celda(f: dict | None, completa: bool) -> dict | None:
         if f is None:
             return None
-        base = {'n': int(f['n']), 'mediana': float(f['mediana'])}
-        return {'n': base['n'], 'p25': float(f['p25']), 'mediana': base['mediana'], 'p75': float(f['p75'])} \
-            if completa else base
+        n = int(f['n'])
+        if not completa:
+            return {'n': n, 'mediana': float(f['mediana'])}
+        con_cuartiles = n >= P.MIN_NINOS
+        return {'n': n, 'p25': float(f['p25']) if con_cuartiles else None, 'mediana': float(f['mediana']),
+                'p75': float(f['p75']) if con_cuartiles else None}
 
     visitas = sorted(set(poblacion) | set(grupo), key=lambda e: (mapa.get(e, {}).get('orden', 99), str(e)))
     return {'indicador': indicador, 'nombre': INDICADORES[indicador], 'unidad': UNIDAD, 'referencia': 'OMS',

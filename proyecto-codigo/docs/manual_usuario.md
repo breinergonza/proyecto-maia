@@ -252,7 +252,10 @@ Tablero, pero para el grupo de niños que usted elija; el Tablero no cambia y si
   que cumplen o un tope por categoría): es propio de la muestra que se guarda para entrenar, así que no aparece en la
   Vista clínica, en Comparar grupos ni en Explorar, y el grupo guardado conserva el que traiga la dirección.
 * **Qué se ve:** niños en el grupo, datos leídos, niños con algún riesgo alto, crecimiento bajo frente a la OMS, y
-  tres gráficas: riesgo del grupo, crecimiento del grupo y quiénes son los niños.
+  tres gráficas: riesgo del grupo, crecimiento del grupo y quiénes son los niños. En el crecimiento del grupo, bajo cada
+  visita dice cuántos niños tienen dato. La mediana sale con cualquier número de niños; la mitad central pide 20 niños o
+  más con dato en esa visita (límite estadístico, no de privacidad): con menos, esa visita tiene su punto pero no su
+  banda, la leyenda dice «Sin mitad central» y la tabla, «sin cifra».
 * **Privacidad:** con menos de 20 niños no se muestran cifras; basta quitar algún filtro. Todos los perfiles ven las
   mismas cifras, exactas: nada se redondea ni se aproxima. Una opción con 1 a 4 niños dice su número.
 * **Cómo leer los símbolos:** una opción sin niños se ve **0**; una opción con 1 a 4 niños dice cuántos son; **—** es un grupo

@@ -189,6 +189,9 @@ def test_celdas_de_menos_de_5_dan_su_cifra(cliente, tokens, corrida, datos):  # 
     assert r['observado']['poblacion']['con_dato'] > POCOS
     doce = next(e for e in r['trayectoria']['etapas'] if e['etapa'] == '12 m EC')
     assert doce['grupo'] is not None and 1 <= doce['grupo']['n'] < 5 and doce['poblacion']['n'] > POCOS
+    # la mediana sale con cualquier número de niños; la mitad central pide 20 con dato en la visita (mínimo estadístico, D52)
+    assert doce['grupo']['mediana'] is not None and doce['grupo']['p25'] is None and doce['grupo']['p75'] is None
+    assert doce['poblacion']['mediana'] is not None
     assert r['riesgo'] and all(1 <= c['calculados'] < 5 for c in r['riesgo'])   # solo 3 varones tienen riesgo de esa familia
     assert r['riesgo_con_modelo'] is True   # la corrida sí calcula esa familia: la pantalla no dice «sin modelo»
     assert r['grupo']['n'] == len(datos['varones'])   # el grupo sí se cuenta: tiene 20 o más niños
