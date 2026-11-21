@@ -147,14 +147,16 @@ describe('explorar', () => {
       tiempo: { fecha: 'fecha_nacimiento', modo: 'periodo', desde: '2018', hasta: '2019-12' },
       muestreo: { modo: 'estratificado', por: 'sede', maximo_por_categoria: 300, semilla: 11 },
     })
-    expect(screen.getByText('Tiempo: 2018 a 2019-12')).toBeInTheDocument()
-    expect(screen.getByText('Muestreo: hasta 300 por categoría')).toBeInTheDocument()
-    expect(screen.getByRole('combobox', { name: 'Fecha que manda' })).toHaveValue('fecha_nacimiento')
+    const fichas = within(screen.getByRole('list', { name: 'Filtros activos' }))
+    expect(fichas.getByText('Período: 2018 a 2019-12')).toBeInTheDocument()
+    expect(fichas.getByText('Muestreo: hasta 300 por categoría')).toBeInTheDocument()   // el muestreo de la dirección no se pierde
+    expect(screen.getByRole('combobox', { name: 'Contar a los niños por' })).toHaveValue('fecha_nacimiento')
     expect(screen.getByRole('textbox', { name: 'Desde' })).toHaveValue('2018')
-    expect(screen.getByRole('textbox', { name: 'Máximo por categoría' })).toHaveValue('300')
+    // el muestreo ya no está en el panel: solo en el formulario de guardar (panel-grupo.test.tsx)
+    expect(screen.queryByRole('textbox', { name: 'Máximo por categoría' })).not.toBeInTheDocument()
   })
 
-  it('elegir el período y el muestreo en el panel escribe la dirección', async () => {
+  it('elegir el período en el panel y el muestreo al guardar escribe la dirección', async () => {
     api('admin')
     montar('/explorar?f=sexo|lista|F', <Ubicacion />)
     fireEvent.change(await screen.findByRole('combobox', { name: 'Período' }), { target: { value: 'periodo' } })
@@ -163,11 +165,12 @@ describe('explorar', () => {
     fireEvent.blur(desde)
     await waitFor(() => expect(screen.getByTestId('ubicacion')).toHaveTextContent('t=fecha_nacimiento|periodo|2018|'))
     expect(screen.getByTestId('ubicacion')).toHaveTextContent('f=sexo|lista|F')   // no pierde los demás filtros
-    fireEvent.change(screen.getByRole('combobox', { name: 'Fecha que manda' }), { target: { value: 'anio_nacimiento' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Contar a los niños por' }), { target: { value: 'anio_nacimiento' } })
     await waitFor(() => expect(screen.getByTestId('ubicacion')).toHaveTextContent('t=anio_nacimiento|periodo|2018|'))
-    fireEvent.change(screen.getByRole('combobox', { name: 'Muestreo' }), { target: { value: 'estratificado' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar este grupo' }))
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Muestreo' }), { target: { value: 'estratificado' } })
     await waitFor(() => expect(screen.getByTestId('ubicacion')).toHaveTextContent('m=sede|300|11'))
-    fireEvent.click(screen.getByRole('button', { name: 'Quitar el tiempo' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar el período' }))
     await waitFor(() => expect(screen.getByTestId('ubicacion')).not.toHaveTextContent('t='))
     expect(screen.getByTestId('ubicacion')).toHaveTextContent('m=sede|300|11')
   })
@@ -187,8 +190,8 @@ describe('explorar', () => {
     const llamadas = api('experto')
     montar('/explorar', <Ubicacion />)
     expect(await screen.findByRole('combobox', { name: 'Regla de lectura: Oxigenodependencia' })).toHaveValue('alguna')
-    // otra variable de las que se miden: se agrega con «+ Agregar variable» y la pide en las facetas
-    fireEvent.change(screen.getByRole('combobox', { name: 'Agregar variable' }), { target: { value: 'hematocrito' } })
+    // otra variable de las que se miden: se agrega con «Agregar otra característica» y la pide en las facetas
+    fireEvent.change(screen.getByRole('combobox', { name: 'Agregar otra característica' }), { target: { value: 'hematocrito' } })
     await waitFor(() => expect(screen.getByTestId('ubicacion')).toHaveTextContent('v=hematocrito|alguna'))
     await waitFor(() => {
       const cuerpos = llamadas.filter((l) => l.url === '/api/exploracion/facetas').map((l) => JSON.parse(String(l.init!.body)))
@@ -233,7 +236,7 @@ describe('explorar', () => {
     await waitFor(() => expect(screen.getByTestId('ubicacion')).toHaveTextContent(/^$/))
   })
 
-  it('una variable agregada con «+ Agregar variable» se puede retirar, con su filtro', async () => {
+  it('una característica agregada con «Agregar otra característica» se puede retirar, con su filtro', async () => {
     api('experto')
     montar('/explorar?f=peso_nacer|numero|1000|2000', <Ubicacion />)
     expect(await screen.findByRole('button', { name: 'Quitar variable Peso al nacer' })).toBeInTheDocument()
@@ -241,7 +244,7 @@ describe('explorar', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Quitar variable Peso al nacer' })).not.toBeInTheDocument())
     expect(screen.getByTestId('ubicacion')).not.toHaveTextContent('peso_nacer')
     // una variable agregada sin filtro también se retira
-    fireEvent.change(screen.getByLabelText('Agregar variable'), { target: { value: 'peso_nacer' } })
+    fireEvent.change(screen.getByLabelText('Agregar otra característica'), { target: { value: 'peso_nacer' } })
     fireEvent.click(await screen.findByRole('button', { name: 'Quitar variable Peso al nacer' }))
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Quitar variable Peso al nacer' })).not.toBeInTheDocument())
   })
@@ -258,7 +261,7 @@ describe('explorar', () => {
     const llamadas = api('visualizador')
     montar('/explorar')
     await screen.findByText('niños con algún riesgo alto')
-    expect(screen.queryByRole('button', { name: 'Guardar este filtro' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Guardar este grupo' })).not.toBeInTheDocument()
     expect(screen.queryByText(/aproxima/)).not.toBeInTheDocument()
     expect(llamadas.some((l) => l.url === '/api/muestras')).toBe(false)
   })
@@ -267,17 +270,17 @@ describe('explorar', () => {
     const muestra = (id: number, titulo: string) => ({ id, titulo, n_ninos: 120, definicion: { y: [{ variable: 'sede', tipo: 'lista', valores: [String(id)] }] } })
     api('experto', resumen, [muestra(1, 'Sede 1'), muestra(2, 'Sede 2')])
     montar('/explorar')
-    const elegir = await screen.findByRole('combobox', { name: 'Filtro guardado' })
+    const elegir = await screen.findByRole('combobox', { name: 'Grupo guardado' })
     fireEvent.change(elegir, { target: { value: '1' } })
     expect(screen.queryByText('Comparar con otro filtro')).not.toBeInTheDocument()
     expect(document.querySelector('main a[href^="/analitica"]')).toBeNull()
   })
 
-  it('un experto guarda el filtro con su nombre', async () => {
+  it('un experto guarda el grupo con su nombre', async () => {
     const llamadas = api('experto')
     montar('/explorar?f=sexo|lista|M')
-    fireEvent.click(await screen.findByRole('button', { name: 'Guardar este filtro' }))
-    fireEvent.change(screen.getByLabelText('Nombre del filtro'), { target: { value: 'Varones' } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Guardar este grupo' }))
+    fireEvent.change(screen.getByLabelText('Nombre del grupo'), { target: { value: 'Varones' } })
     fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
     await waitFor(() => expect(llamadas.some((l) => l.url === '/api/muestras' && l.init?.method === 'POST')).toBe(true))
     const envio = llamadas.find((l) => l.url === '/api/muestras' && l.init?.method === 'POST')!

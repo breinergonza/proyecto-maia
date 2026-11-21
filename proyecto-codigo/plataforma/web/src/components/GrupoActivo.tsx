@@ -1,15 +1,15 @@
 // Barra «Grupo activo»: el grupo de niños que mira la página (su nombre, sus criterios legibles y cuántos niños son frente
 // al total). El grupo vive en la dirección (useFiltros), así que la barra se actualiza sola cuando cambia el filtro y
-// «Cambiar grupo» abre el mismo panel de filtros de Explorar sin sacar a nadie de la página. Cabe en una línea en escritorio:
+// «Cambiar grupo» abre el mismo panel de filtros de Explorar como cajón lateral, sin sacar a nadie de la página. Cabe en una línea en escritorio:
 // sin criterios el nombre «Todos los niños» ya lo dice, y un grupo que es el total no lo repite («5.000 de 5.000»).
-import { useId, useState } from 'react'
+import { useState } from 'react'
 import { useFacetasExplorar, useMuestras } from '../api/exploracion'
 import type { CuerpoExplorar } from '../api/tipos'
 import { puede, useSesion } from '../auth/sesion'
 import { num } from '../lib/formato'
 import { SIN_CIFRA } from '../lib/lenguaje'
 import { useFiltros, type Filtros } from '../lib/useFiltros'
-import { criteriosActivos, PanelFacetas } from './PanelFacetas'
+import { CajonFacetas, criteriosActivos } from './PanelFacetas'
 import { Boton } from './ui'
 
 /** El grupo de la dirección como cuerpo de consulta: una muestra guardada sin cambios se pide por su número. */
@@ -48,10 +48,10 @@ export function GrupoActivo({ ninos, total, minimo, error, conDato, conPanel = t
   const filtros = useFiltros()
   const esExperto = puede(usuario, ['admin', 'experto'])
   const [abierto, setAbierto] = useState(false)
-  const idPanel = useId()
   const facetas = useFacetasExplorar(cuerpoDeFacetas(filtros))
   const guardadas = useMuestras(esExperto)
-  const criterios = criteriosActivos(filtros, facetas.data)
+  // el muestreo es de una muestra guardada para entrenar: no describe a los niños del grupo
+  const criterios = criteriosActivos(filtros, facetas.data).filter((c) => c.id !== 'muestreo')
   const guardado = filtros.guardada ? guardadas.data?.find((m) => m.id === filtros.guardada)?.titulo : undefined
 
   const cuantos = error ? 'No se pudo contar los niños del grupo.'
@@ -75,17 +75,16 @@ export function GrupoActivo({ ninos, total, minimo, error, conDato, conPanel = t
             </p>
           </div>
           {conPanel && (
-            <Boton variante="secundario" chico aria-expanded={abierto} aria-controls={idPanel} onClick={() => setAbierto(!abierto)}>
+            <Boton variante="secundario" chico aria-haspopup="dialog" onClick={() => setAbierto(true)}>
               Cambiar grupo
             </Boton>
           )}
         </div>
       </section>
-      {conPanel && abierto && (
-        <div id={idPanel} className="max-h-[70vh] overflow-y-auto rounded-panel">
-          <PanelFacetas facetas={facetas.data} cargando={facetas.isPending} filtros={filtros} esExperto={esExperto} conTiempo
-            error={facetas.isError} reintentar={() => facetas.refetch()} />
-        </div>
+      {conPanel && (
+        <CajonFacetas abierto={abierto} alCerrar={() => setAbierto(false)} facetas={facetas.data} cargando={facetas.isPending} filtros={filtros}
+          esExperto={esExperto} conTiempo error={facetas.isError} reintentar={() => facetas.refetch()}
+          conteo={{ ninos, total, minimo, error }} />
       )}
     </>
   )

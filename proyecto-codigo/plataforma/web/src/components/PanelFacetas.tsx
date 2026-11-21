@@ -1,9 +1,11 @@
-// Panel de filtros de Explorar: casillas por variable con cuántos niños tendría cada opción (los demás filtros puestos),
-// los filtros activos como fichas, «+ Agregar variable», el tiempo y el muestreo, los filtros guardados y «Guardar este
-// filtro». No lleva a Modelos: comparar dos grupos es «Comparar grupos». Cada opción dice cuántos niños tendría, también si son 1 a 4; con menos de 20 en el grupo no hay cifras
-// (D46, «—»); una opción sin niños dice «0» y se atenúa: un cero es un dato. Cada categoría vale por sí sola: elegir
-// «muy prematuro» y «a término» no incluye a los moderados.
-import { useEffect, useState } from 'react'
+// Panel «Elija el grupo»: casillas por variable con cuántos niños tendría cada opción (los demás filtros puestos), los
+// criterios activos como fichas, «Agregar otra característica», el período, el grupo guardado y «Guardar este grupo». Vive
+// acoplado a una columna (Explorar, Calcular un grupo, Mis modelos) o como cajón lateral (Vista clínica y Comparar grupos),
+// con el mismo contenido. El muestreo es de una muestra guardada para entrenar: solo está en el formulario de guardar. No
+// lleva a Modelos: comparar dos grupos es «Comparar grupos». Cada opción dice cuántos niños tendría, también si son 1 a 4;
+// con menos de 20 en el grupo no hay cifras (D46, «—»); una opción sin niños dice «0» y se atenúa: un cero es un dato.
+// Cada categoría vale por sí sola: elegir «muy prematuro» y «a término» no incluye a los moderados.
+import { useEffect, useId, useState } from 'react'
 import { ErrorApi } from '../api/cliente'
 import { useGuardarMuestra, useMuestras } from '../api/exploracion'
 import type { EntradaFiltro, Faceta, MuestreoJson, OpcionFaceta, RespuestaFacetas, TiempoJson } from '../api/tipos'
@@ -11,10 +13,17 @@ import { cn } from '../lib/cn'
 import { num } from '../lib/formato'
 import { nuevaEntrada, SEMILLA_POR_DEFECTO, TOPE_POR_DEFECTO, type Filtros } from '../lib/useFiltros'
 import { Aviso, Boton, Entrada, Panel, Selector } from './ui'
+import { Cajon, PieListo } from './ui/Cajon'
 
-/** Las variables que se muestran de entrada; las demás se agregan con «+ Agregar variable». */
+/** Las variables que se muestran de entrada; las demás se agregan con «Agregar otra característica». */
 const BASICAS = ['sede', 'ern_sexo', 'sexo', 'eg_categoria', 'ern_lubchencofenton']
 const FECHA_VALIDA = /^\d{4}(-\d{2}(-\d{2})?)?$/
+/** Lo más ancho que se estira una lista de opciones: la cifra queda cerca de su etiqueta, no en el borde de la página. */
+const ANCHO_OPCIONES = 'max-w-[25rem]'
+/** La unidad de las variables numéricas que el panel conoce sin el Diccionario. */
+const UNIDADES: Record<string, string> = { eg_semanas: 'semanas' }
+/** «Muy prematuro (28 a 31 sem)» se resume como «Muy prematuro» en los criterios del grupo. */
+const SEMANAS_DE_LA_ETIQUETA = /\s*\([^)]*\bsem\b[^)]*\)\s*$/
 
 const nf = (v: number) => String(Math.round(v * 10) / 10).replace('.', ',')
 
@@ -37,7 +46,10 @@ export function textoRegla(cuando: string | null | undefined, etapas: RespuestaF
 function resumenEntrada(e: EntradaFiltro, f?: Faceta): string {
   if (e.tipo === 'numero') return textoRango(e.valores[0], e.valores[1])
   if (e.tipo === 'si_no') return e.valores[0] ? 'Sí' : 'No'
-  return e.valores.map((v) => f?.opciones?.find((o) => String(o.valor) === String(v))?.etiqueta ?? String(v)).join(', ')
+  return e.valores.map((v) => {
+    const o = f?.opciones?.find((x) => String(x.valor) === String(v))
+    return o ? (o.rango ? o.etiqueta.replace(SEMANAS_DE_LA_ETIQUETA, '') : o.etiqueta) : String(v)
+  }).join(', ')
 }
 
 function estaMarcada(o: OpcionFaceta, e: EntradaFiltro | undefined): boolean {
@@ -60,17 +72,18 @@ function Casillas({ clave, faceta, entrada, cambiar }: { clave: string; faceta: 
     }
   }
   return (
-    <ul className="space-y-1">
+    <ul className={cn('space-y-0.5', ANCHO_OPCIONES)}>
       {opciones.map((o) => {
         const marcada = estaMarcada(o, entrada)
         const id = `faceta-${clave}-${String(o.valor)}`
         const sinNinos = o.n === 0   // un cero verdadero: la opción existe pero ningún niño la tiene con estos filtros
         return (
-          <li key={String(o.valor)} className={cn('flex items-center gap-2 text-sm', sinNinos && !marcada && 'opacity-60')}>
-            <input id={id} type="checkbox" className="size-4 accent-teal" checked={marcada} onChange={() => alternar(o, marcada)} />
-            <label htmlFor={id} className="flex flex-1 cursor-pointer items-baseline justify-between gap-2">
-              <span>{o.etiqueta}</span>
-              <span className="text-xs text-salvia">{o.n == null ? '—' : num(o.n)}</span>
+          <li key={String(o.valor)} className={sinNinos && !marcada ? 'opacity-60' : undefined}>
+            {/* la fila entera es la etiqueta: se marca con un clic en cualquier parte de ella */}
+            <label htmlFor={id} className="flex cursor-pointer items-center gap-2.5 rounded-control px-1.5 py-1.5 text-sm hover:bg-teal-tinte/60">
+              <input id={id} type="checkbox" className="size-4 accent-teal" checked={marcada} onChange={() => alternar(o, marcada)} />
+              <span className="flex-1">{o.etiqueta}</span>
+              <span className="tabular-nums text-salvia">{o.n == null ? '—' : num(o.n)}</span>
             </label>
           </li>
         )
@@ -92,13 +105,17 @@ function Rango({ clave, faceta, entrada, cambiar }: { clave: string; faceta: Fac
     cambiar(nuevaEntrada(clave, 'numero', [valido(a), valido(b)], faceta.cuando))
   }
   const alTeclear = (e: React.KeyboardEvent) => e.key === 'Enter' && aplicar()
+  const unidad = UNIDADES[clave]
+  // los límites del corte son sugerencias («mín. 24»), no valores escritos
   return (
-    <div className="flex items-center gap-2">
-      <Entrada aria-label={`${faceta.etiqueta}: desde`} inputMode="decimal" placeholder={faceta.min != null ? nf(faceta.min) : 'Desde'}
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+      <span className="text-salvia">de</span>
+      <Entrada aria-label={`${faceta.etiqueta}: desde`} inputMode="decimal" className="w-24" placeholder={faceta.min != null ? `mín. ${nf(faceta.min)}` : 'mínimo'}
         value={lo} onChange={(e) => setBorrador({ lo: e.target.value, hi })} onBlur={aplicar} onKeyDown={alTeclear} />
       <span className="text-salvia">a</span>
-      <Entrada aria-label={`${faceta.etiqueta}: hasta`} inputMode="decimal" placeholder={faceta.max != null ? nf(faceta.max) : 'Hasta'}
+      <Entrada aria-label={`${faceta.etiqueta}: hasta`} inputMode="decimal" className="w-24" placeholder={faceta.max != null ? `máx. ${nf(faceta.max)}` : 'máximo'}
         value={hi} onChange={(e) => setBorrador({ lo, hi: e.target.value })} onBlur={aplicar} onKeyDown={alTeclear} />
+      {unidad && <span className="text-salvia">{unidad}</span>}
     </div>
   )
 }
@@ -126,9 +143,10 @@ function ayudaFecha(t: string) {
 
 type ModoTiempo = 'todo' | 'periodo' | 'ultimos_meses'
 
-/** Qué fecha manda y el período (fechas fijas o los últimos N meses desde el corte). Vive en la dirección. */
+/** Por qué fecha se cuenta a los niños y el período (fechas fijas o los últimos N meses desde el corte). Vive en la dirección. */
 function Tiempo({ info, filtros }: { info: NonNullable<RespuestaFacetas['tiempo']>; filtros: Filtros }) {
   const t = filtros.tiempo
+  const idFecha = useId()
   const [modoLocal, setModoLocal] = useState<ModoTiempo>('todo')
   const [fechaLocal, setFechaLocal] = useState(info.defecto)
   const [borrador, setBorrador] = useState<{ desde?: string; hasta?: string }>({})
@@ -154,12 +172,17 @@ function Tiempo({ info, filtros }: { info: NonNullable<RespuestaFacetas['tiempo'
     return filtros.ponerTiempo(nuevoTiempo)
   }
   const alTeclear = (e: React.KeyboardEvent) => e.key === 'Enter' && aplicar()
-  const anios = info.desde && info.hasta ? ` Los niños del corte nacieron entre ${info.desde} y ${info.hasta}.` : ''
+  // lo que se sabe del corte, en palabras llanas: de cuándo son los niños y, si falta, que solo hay el año
+  const ayuda = [
+    info.desde && info.hasta ? `Hay niños nacidos entre ${info.desde} y ${info.hasta}.` : null,
+    info.hay_fecha_nacimiento ? null : 'Este corte solo trae el año de nacimiento.',
+  ].filter(Boolean).join(' ')
 
   return (
     <fieldset className="min-w-0 space-y-2">
-      <legend className="mb-1.5 text-sm font-semibold">Tiempo</legend>
-      <Selector aria-label="Fecha que manda" value={fecha} onChange={(e) => { setFechaLocal(e.target.value); aplicar({ fecha: e.target.value }) }}>
+      <legend className="mb-1 text-sm font-semibold">Período</legend>
+      <label htmlFor={idFecha} className="block text-sm">Contar a los niños por</label>
+      <Selector id={idFecha} value={fecha} onChange={(e) => { setFechaLocal(e.target.value); aplicar({ fecha: e.target.value }) }}>
         {info.campos.map((c) => <option key={c.valor} value={c.valor}>{c.etiqueta}</option>)}
       </Selector>
       <Selector aria-label="Período" value={modo} onChange={(e) => {
@@ -172,28 +195,30 @@ function Tiempo({ info, filtros }: { info: NonNullable<RespuestaFacetas['tiempo'
         <option value="ultimos_meses">Últimos meses antes del corte</option>
       </Selector>
       {modo === 'periodo' && (
-        <div className="flex items-center gap-2">
-          <Entrada aria-label="Desde" placeholder="Desde (2018)" value={desde} onChange={(e) => setBorrador({ desde: e.target.value, hasta })}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+          <span className="text-salvia">de</span>
+          <Entrada aria-label="Desde" className="w-32" placeholder="p. ej. 2018" value={desde} onChange={(e) => setBorrador({ desde: e.target.value, hasta })}
             onBlur={() => aplicar()} onKeyDown={alTeclear} />
           <span className="text-salvia">a</span>
-          <Entrada aria-label="Hasta" placeholder="Hasta (2019-12)" value={hasta} onChange={(e) => setBorrador({ desde, hasta: e.target.value })}
+          <Entrada aria-label="Hasta" className="w-32" placeholder="p. ej. 2019-12" value={hasta} onChange={(e) => setBorrador({ desde, hasta: e.target.value })}
             onBlur={() => aplicar()} onKeyDown={alTeclear} />
         </div>
       )}
       {modo === 'ultimos_meses' && (
-        <Entrada aria-label="Meses" inputMode="numeric" placeholder="Meses (por ejemplo 24)" value={desde}
-          onChange={(e) => setBorrador({ desde: e.target.value })} onBlur={() => aplicar()} onKeyDown={alTeclear} />
+        <div className="flex items-center gap-2 text-sm">
+          <Entrada aria-label="Meses" inputMode="numeric" className="w-24" placeholder="p. ej. 24" value={desde}
+            onChange={(e) => setBorrador({ desde: e.target.value })} onBlur={() => aplicar()} onKeyDown={alTeclear} />
+          <span className="text-salvia">meses antes del corte</span>
+        </div>
       )}
       {error && <p className="text-xs text-coral-hondo" role="alert">{error}</p>}
-      <p className="text-xs text-salvia">
-        {info.hay_fecha_nacimiento ? 'Con la fecha de parto se compara el día.' : 'Este corte no trae la fecha de parto: se usa el año de nacimiento.'}
-        {anios}
-      </p>
+      {ayuda && <p className="text-xs text-salvia">{ayuda}</p>}
     </fieldset>
   )
 }
 
-/** Todos los que cumplen, o un tope por categoría para que un grupo grande no domine (se aplica al entrenar). */
+/** Todos los que cumplen, o un tope por categoría para que un grupo grande no domine (se aplica al entrenar). Solo se
+ *  ofrece al guardar un grupo: es una propiedad de la muestra que se guarda, no de lo que se mira. */
 function Muestreo({ info, filtros }: { info: NonNullable<RespuestaFacetas['muestreo']>; filtros: Filtros }) {
   const m = filtros.muestreo
   const [abierto, setAbierto] = useState(false)
@@ -209,7 +234,7 @@ function Muestreo({ info, filtros }: { info: NonNullable<RespuestaFacetas['muest
   }
   return (
     <fieldset className="min-w-0 space-y-2">
-      <legend className="mb-1.5 text-sm font-semibold">Muestreo</legend>
+      <legend className="mb-1 text-sm font-semibold">Muestreo para entrenar</legend>
       <Selector aria-label="Muestreo" value={estratificado ? 'estratificado' : 'todos'} onChange={(e) => {
         if (e.target.value === 'todos') { setAbierto(false); filtros.ponerMuestreo(null) } else { setAbierto(true); aplicar() }
       }}>
@@ -230,20 +255,22 @@ function Muestreo({ info, filtros }: { info: NonNullable<RespuestaFacetas['muest
   )
 }
 
-function Guardar({ filtros }: { filtros: Filtros }) {
+function Guardar({ filtros, muestreo }: { filtros: Filtros; muestreo?: RespuestaFacetas['muestreo'] }) {
   const [abierto, setAbierto] = useState(false)
   const [titulo, setTitulo] = useState('')
   const guardar = useGuardarMuestra()
-  if (!abierto) return <Boton variante="secundario" chico onClick={() => setAbierto(true)}>Guardar este filtro</Boton>
+  if (!abierto) return <Boton variante="secundario" chico onClick={() => setAbierto(true)}>Guardar este grupo</Boton>
   return (
-    <form className="space-y-2" onSubmit={(e) => {
+    <form aria-label="Guardar este grupo" className="space-y-3" onSubmit={(e) => {
       e.preventDefault()
+      // la muestra lleva todo lo de la dirección, también el muestreo: nada se pierde al guardar
       guardar.mutate({ titulo: titulo.trim(), muestra: filtros.muestra }, {
         onSuccess: (m) => { setAbierto(false); setTitulo(''); filtros.ponerTodas(m.definicion.y, m.id, m.definicion) },
       })
     }}>
-      <Entrada aria-label="Nombre del filtro" placeholder="Nombre del filtro" maxLength={200} value={titulo}
+      <Entrada aria-label="Nombre del grupo" placeholder="Nombre del grupo" maxLength={200} value={titulo}
         onChange={(e) => setTitulo(e.target.value)} />
+      {muestreo && <Muestreo key={filtros.muestreo ? 'muestreo-con' : 'muestreo-sin'} info={muestreo} filtros={filtros} />}
       {guardar.error && <Aviso>{guardar.error instanceof ErrorApi ? guardar.error.message : 'No se pudo guardar.'}</Aviso>}
       <div className="flex gap-2">
         <Boton type="submit" chico disabled={!titulo.trim() || guardar.isPending}>Guardar</Boton>
@@ -268,7 +295,8 @@ function textoTiempo(t: TiempoJson): string {
 }
 
 /** Los criterios del grupo activo, uno por filtro, con su texto legible y cómo quitarlo. Las fichas del panel y la barra
- *  «Grupo activo» leen de aquí, para que el grupo se describa igual en todas partes. */
+ *  «Grupo activo» leen de aquí, para que el grupo se describa igual en todas partes. Una lista cuyas opciones ya empiezan
+ *  por el nombre de la variable («Sede 1, Sede 3») no lo repite. */
 export function criteriosActivos(filtros: Filtros, facetas?: RespuestaFacetas) {
   const todas = facetas?.facetas ?? {}
   const etapas = facetas?.etapas ?? []
@@ -276,10 +304,12 @@ export function criteriosActivos(filtros: Filtros, facetas?: RespuestaFacetas) {
     const f = todas[e.variable]
     const nombre = f?.etiqueta ?? e.variable
     const regla = f?.reglas?.length ? ` (${textoRegla(e.cuando, etapas).toLowerCase()})` : ''
-    return { id: e.variable, texto: `${nombre}${regla}: ${resumenEntrada(e, f)}`, etiqueta: `Quitar filtro ${nombre}`, quitar: () => filtros.poner(e.variable, null) }
+    const valores = resumenEntrada(e, f)
+    const repetido = !regla && e.tipo === 'lista' && valores.toLowerCase().startsWith(nombre.toLowerCase())
+    return { id: e.variable, texto: repetido ? valores : `${nombre}${regla}: ${valores}`, etiqueta: `Quitar filtro ${nombre}`, quitar: () => filtros.poner(e.variable, null) }
   })
   if (filtros.tiempo) {
-    lista.push({ id: 'tiempo', texto: `Tiempo: ${textoTiempo(filtros.tiempo)}`, etiqueta: 'Quitar el tiempo', quitar: () => filtros.ponerTiempo(null) })
+    lista.push({ id: 'tiempo', texto: `Período: ${textoTiempo(filtros.tiempo)}`, etiqueta: 'Quitar el período', quitar: () => filtros.ponerTiempo(null) })
   }
   if (filtros.muestreo) {
     lista.push({ id: 'muestreo', texto: `Muestreo: hasta ${filtros.muestreo.maximo_por_categoria} por categoría`, etiqueta: 'Quitar el muestreo', quitar: () => filtros.ponerMuestreo(null) })
@@ -287,16 +317,23 @@ export function criteriosActivos(filtros: Filtros, facetas?: RespuestaFacetas) {
   return lista
 }
 
-export function PanelFacetas({ facetas, cargando, filtros, esExperto, conTiempo = false, error = false, reintentar }: {
-  facetas?: RespuestaFacetas; cargando?: boolean; filtros: Filtros; esExperto: boolean
-  /** Muestra el tiempo y el muestreo (Explorar); el constructor de muestras los trae en su propio formulario. */
+interface PropiedadesFacetas {
+  facetas?: RespuestaFacetas
+  cargando?: boolean
+  filtros: Filtros
+  esExperto: boolean
+  /** Muestra el período (Explorar, la vista clínica y Comparar); el constructor de muestras lo trae en su propio formulario. */
   conTiempo?: boolean
   /** La consulta de opciones falló; con ``reintentar`` se ofrece volver a pedirla. */
   error?: boolean
   reintentar?: () => void
-}) {
+}
+
+/** El contenido del panel, igual acoplado a una columna que dentro de un cajón. */
+function ContenidoFacetas({ facetas, cargando, filtros, esExperto, conTiempo = false, error = false, reintentar }: PropiedadesFacetas) {
   const [extra, setExtra] = useState<string[]>([])
   const [lento, setLento] = useState(false)
+  const idAgregar = useId()
   useEffect(() => {   // si las opciones tardan, se dice (no se queda en «Cargando…» sin explicación)
     if (!(cargando && !facetas)) { setLento(false); return }
     const t = setTimeout(() => setLento(true), 20000)
@@ -313,7 +350,6 @@ export function PanelFacetas({ facetas, cargando, filtros, esExperto, conTiempo 
     ...(facetas?.disponibles ?? []).filter((d) => !(d.variable in todas)).map((d) => ({ variable: d.variable, etiqueta: d.etiqueta, cuando: d.cuando })),
   ]
   const criterios = criteriosActivos(filtros, facetas)
-  const hayActivos = criterios.length > 0
 
   const agregar = (variable: string) => {
     if (!variable) return
@@ -322,77 +358,131 @@ export function PanelFacetas({ facetas, cargando, filtros, esExperto, conTiempo 
   }
 
   return (
-    <Panel titulo="Elija el grupo" descripcion="Marque las opciones; los números son los niños que tendría cada una."
-      accion={hayActivos && <Boton variante="fantasma" chico onClick={filtros.limpiar}>Quitar todos</Boton>}>
-      <div className="space-y-4">
-        {esExperto && (guardadas.data?.length ?? 0) > 0 && (
-          <label className="block text-sm font-semibold">
-            Filtro guardado
-            <Selector className="mt-1 font-normal" value={filtros.guardada ?? ''} onChange={(e) => {
-              const m = guardadas.data?.find((x) => x.id === Number(e.target.value))
-              if (m) filtros.ponerTodas(m.definicion.y, m.id, m.definicion)
-              else filtros.limpiar()
-            }}>
-              <option value="">Ninguno</option>
-              {guardadas.data?.map((m) => <option key={m.id} value={m.id}>{m.titulo} · {num(m.n_ninos)} niños</option>)}
-            </Selector>
-          </label>
-        )}
+    <div className="space-y-4">
+      {esExperto && (guardadas.data?.length ?? 0) > 0 && (
+        <label className="block text-sm font-semibold">
+          Grupo guardado
+          <Selector className="mt-1 font-normal" value={filtros.guardada ?? ''} onChange={(e) => {
+            const m = guardadas.data?.find((x) => x.id === Number(e.target.value))
+            if (m) filtros.ponerTodas(m.definicion.y, m.id, m.definicion)
+            else filtros.limpiar()
+          }}>
+            <option value="">Ninguno</option>
+            {guardadas.data?.map((m) => <option key={m.id} value={m.id}>{m.titulo} · {num(m.n_ninos)} niños</option>)}
+          </Selector>
+        </label>
+      )}
 
-        {hayActivos && (
-          <ul className="flex flex-wrap gap-2" aria-label="Filtros activos">
-            {criterios.map((c) => <Ficha key={c.id} texto={c.texto} etiqueta={c.etiqueta} quitar={c.quitar} />)}
-          </ul>
-        )}
+      {criterios.length > 0 && (
+        <ul className="flex flex-wrap gap-2" aria-label="Filtros activos">
+          {criterios.map((c) => <Ficha key={c.id} texto={c.texto} etiqueta={c.etiqueta} quitar={c.quitar} />)}
+        </ul>
+      )}
 
-        {facetas?.vacio && (
-          <p className="rounded-control border border-dashed border-linea px-3 py-2 text-sm" role="status">
-            <strong>Ningún niño cumple estos filtros (0).</strong> Quite alguno para volver a ver las opciones.
-          </p>
-        )}
-        {cargando && !facetas && (
-          <p className="text-sm text-salvia" role="status">
-            Cargando opciones…{lento && ' Está tardando más de lo normal; las cifras de arriba ya están disponibles.'}
-          </p>
-        )}
-        {error && !facetas && (
-          <p className="rounded-control border border-dashed border-linea px-3 py-2 text-sm" role="alert">
-            <strong>No se pudieron cargar las opciones.</strong>{' '}
-            {reintentar && <button type="button" className="underline" onClick={reintentar}>Reintentar</button>}
-          </p>
-        )}
-        {visibles.map((k) => (
-          <fieldset key={k} className="min-w-0">
-            <legend className="mb-1.5 flex w-full items-center justify-between text-sm font-semibold">
-              <span>{todas[k].etiqueta}</span>
+      {facetas?.vacio && (
+        <p className="rounded-control border border-dashed border-linea px-3 py-2 text-sm" role="status">
+          <strong>Ningún niño cumple estos filtros (0).</strong> Quite alguno para volver a ver las opciones.
+        </p>
+      )}
+      {cargando && !facetas && (
+        <p className="text-sm text-salvia" role="status">
+          Cargando opciones…{lento && ' Está tardando más de lo normal; las cifras de arriba ya están disponibles.'}
+        </p>
+      )}
+      {error && !facetas && (
+        <p className="rounded-control border border-dashed border-linea px-3 py-2 text-sm" role="alert">
+          <strong>No se pudieron cargar las opciones.</strong>{' '}
+          {reintentar && <button type="button" className="underline" onClick={reintentar}>Reintentar</button>}
+        </p>
+      )}
+      {visibles.map((k) => (
+        <fieldset key={k} className="min-w-0">
+          <legend className={cn('mb-1 flex w-full items-baseline justify-between gap-3 text-sm font-semibold', todas[k].opciones && ANCHO_OPCIONES)}>
+            <span>
+              {todas[k].etiqueta}
               {!BASICAS.includes(k) && !todas[k].destacada && (   // las que se agregaron a mano se pueden retirar, con su filtro
-                <button type="button" aria-label={`Quitar variable ${todas[k].etiqueta}`} className="text-xs font-normal text-teal underline"
+                <button type="button" aria-label={`Quitar variable ${todas[k].etiqueta}`} className="ml-3 text-xs font-normal text-teal underline"
                   onClick={() => { setExtra((x) => x.filter((v) => v !== k)); filtros.quitarVariable(k) }}>Quitar</button>
               )}
-            </legend>
-            {!!todas[k].reglas?.length && <ReglaDeLectura faceta={todas[k]} etapas={etapas} cambiar={(c) => filtros.ponerRegla(k, c)} />}
-            {todas[k].opciones
-              ? <Casillas clave={k} faceta={todas[k]} entrada={porVariable.get(k)} cambiar={(e) => filtros.poner(k, e)} />
-              : <Rango clave={k} faceta={todas[k]} entrada={porVariable.get(k)} cambiar={(e) => filtros.poner(k, e)} />}
-          </fieldset>
-        ))}
+            </span>
+            {todas[k].opciones && <span className="text-xs font-normal text-salvia">Niños</span>}
+          </legend>
+          {!!todas[k].reglas?.length && <ReglaDeLectura faceta={todas[k]} etapas={etapas} cambiar={(c) => filtros.ponerRegla(k, c)} />}
+          {todas[k].opciones
+            ? <Casillas clave={k} faceta={todas[k]} entrada={porVariable.get(k)} cambiar={(e) => filtros.poner(k, e)} />
+            : <Rango clave={k} faceta={todas[k]} entrada={porVariable.get(k)} cambiar={(e) => filtros.poner(k, e)} />}
+        </fieldset>
+      ))}
 
-        {agregables.length > 0 && (
-          <Selector aria-label="Agregar variable" value="" onChange={(e) => agregar(e.target.value)}>
-            <option value="">+ Agregar variable</option>
+      {agregables.length > 0 && (
+        <div>
+          <label htmlFor={idAgregar} className="mb-1 block text-sm font-semibold">Agregar otra característica</label>
+          <Selector id={idAgregar} value="" onChange={(e) => agregar(e.target.value)}>
+            <option value="">Elegir una característica…</option>
             {agregables.map((a) => <option key={a.variable} value={a.variable}>{a.etiqueta}</option>)}
           </Selector>
-        )}
+        </div>
+      )}
 
-        {conTiempo && facetas?.tiempo && <Tiempo key={filtros.tiempo ? 'tiempo-con' : 'tiempo-sin'} info={facetas.tiempo} filtros={filtros} />}
-        {conTiempo && facetas?.muestreo && <Muestreo key={filtros.muestreo ? 'muestreo-con' : 'muestreo-sin'} info={facetas.muestreo} filtros={filtros} />}
+      {conTiempo && facetas?.tiempo && <Tiempo key={filtros.tiempo ? 'tiempo-con' : 'tiempo-sin'} info={facetas.tiempo} filtros={filtros} />}
 
-        {esExperto && (
-          <div className="border-t border-linea pt-3">
-            <Guardar filtros={filtros} />
-          </div>
-        )}
-      </div>
+      {esExperto && (
+        <div className="border-t border-linea pt-3">
+          <Guardar filtros={filtros} muestreo={facetas?.muestreo} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+const QuitarTodos = ({ filtros }: { filtros: Filtros }) =>
+  <Boton variante="fantasma" chico onClick={filtros.limpiar}>Quitar todos</Boton>
+
+/** El panel acoplado a una columna de la página (Explorar, Calcular un grupo, Mis modelos). */
+export function PanelFacetas(props: PropiedadesFacetas) {
+  const hayActivos = criteriosActivos(props.filtros, props.facetas).length > 0
+  return (
+    <Panel titulo="Elija el grupo" accion={hayActivos && <QuitarTodos filtros={props.filtros} />}>
+      <ContenidoFacetas {...props} />
     </Panel>
+  )
+}
+
+/** Cuántos niños tiene el grupo: lo mismo que cuenta la barra «Grupo activo» de la página. */
+export interface ConteoDelGrupo {
+  /** Sin valor mientras se cuenta; nulo si son muy pocos para mostrar la cifra. */
+  ninos?: number | null
+  total?: number
+  /** El mínimo de niños para mostrar cifras. */
+  minimo?: number
+  error?: boolean
+}
+
+function TextoConteo({ ninos, total, minimo = 20, error }: ConteoDelGrupo) {
+  if (error) return <>No se pudo contar los niños del grupo.</>
+  if (ninos === undefined) return <>Contando niños…</>
+  if (ninos === null) return <strong>Menos de {minimo} niños en el grupo</strong>
+  return (
+    <>
+      <strong className="text-teal">{num(ninos)} niños en el grupo</strong>
+      {total != null && total !== ninos && <span className="text-salvia"> de {num(total)}</span>}
+    </>
+  )
+}
+
+/** El panel como cajón lateral sobre la página (Vista clínica y Comparar grupos): el resultado vivo y «Listo» quedan a la
+ *  vista abajo, los filtros se aplican al instante y la página de atrás no se mueve. */
+export function CajonFacetas({ abierto, alCerrar, titulo = 'Elija el grupo', conteo, nota, ...contenido }: PropiedadesFacetas & {
+  abierto: boolean; alCerrar: () => void; titulo?: string; conteo: ConteoDelGrupo
+  /** Una aclaración encima de las opciones. */
+  nota?: string
+}) {
+  const hayActivos = criteriosActivos(contenido.filtros, contenido.facetas).length > 0
+  return (
+    <Cajon abierto={abierto} titulo={titulo} alCerrar={alCerrar} acciones={hayActivos && <QuitarTodos filtros={contenido.filtros} />}
+      pie={<PieListo resultado={<TextoConteo {...conteo} />} alCerrar={alCerrar} />}>
+      {nota && <p className="mb-3 text-sm">{nota}</p>}
+      <ContenidoFacetas {...contenido} />
+    </Cajon>
   )
 }

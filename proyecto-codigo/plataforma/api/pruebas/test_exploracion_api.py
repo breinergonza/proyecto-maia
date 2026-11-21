@@ -384,3 +384,27 @@ def test_variables_de_medicion_con_su_regla_de_lectura(cliente, tokens, corrida,
     r = cliente.post('/api/exploracion/facetas', headers=tokens['experto'], json={
         'muestra': _muestra(), 'variables': [{'variable': 'oxigeno_3m', 'cuando': 'etapa:no_hay'}]})
     assert r.status_code == 422 and 'no_hay' in r.json()['detail']
+
+
+def test_las_opciones_se_leen_sin_codigos(cliente, tokens, corte):  # noqa: F811
+    """Sede, sexo y edad gestacional salen con texto legible; los valores (los códigos del filtro) no cambian."""
+    f = _facetas(cliente, tokens, muestra=_muestra())['facetas']
+    assert [(o['valor'], o['etiqueta']) for o in f['sede']['opciones']] == [('1', 'Sede 1'), ('2', 'Sede 2'), ('3', 'Sede 3')]
+    assert {o['valor']: o['etiqueta'] for o in f['sexo']['opciones']} == {'F': 'Femenino', 'M': 'Masculino'}
+    assert [(o['valor'], o['etiqueta']) for o in f['eg_categoria']['opciones']] == [
+        ('extremo', 'Prematuro extremo (menos de 28 sem)'), ('muy_prematuro', 'Muy prematuro (28 a 31 sem)'),
+        ('moderado_tardio', 'Prematuro moderado a tardío (32 a 36 sem)'), ('a_termino', 'A término (37 sem o más)')]
+    # la lista de variables ofrecidas dice lo mismo
+    ofrecidas = {v['variable']: v for v in cliente.get('/api/muestras/variables', headers=tokens['experto']).json()['variables']}
+    assert [o['etiqueta'] for o in ofrecidas['sede']['opciones']] == ['Sede 1', 'Sede 2', 'Sede 3']
+    assert [o['etiqueta'] for o in ofrecidas['eg_categoria']['opciones']][1] == 'Muy prematuro (28 a 31 sem)'
+
+
+def test_la_etiqueta_del_diccionario_manda_sobre_la_de_respaldo():
+    from maia_api import poblacion as P
+    assert P.etiqueta_sede('1', {}) == 'Sede 1'
+    assert P.etiqueta_sede('1', {'sede': {1.0: 'Hospital Central'}}) == 'Hospital Central'
+    assert P.etiqueta_sede('Norte', {}) == 'Norte'   # un nombre que ya es texto no se reescribe
+    assert P.etiqueta_sexo('F') == 'Femenino' and P.etiqueta_sexo('m') == 'Masculino'
+    assert P.etiqueta_sexo('F', 'Mujer') == 'Mujer'
+    assert P.etiqueta_sexo('X') == 'X'   # un código que no se conoce se deja como está

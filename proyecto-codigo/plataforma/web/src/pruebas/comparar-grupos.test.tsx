@@ -97,6 +97,8 @@ function Ubicacion() {
 
 const ladoA = () => screen.getByRole('region', { name: 'Grupo A' })
 const ladoB = () => screen.getByRole('region', { name: 'Grupo B' })
+/** El panel de filtros de un lado es un cajón lateral, fuera de la tarjeta del grupo. */
+const cajon = (lado: 'A' | 'B') => screen.findByRole('dialog', { name: `Elija el grupo ${lado}` })
 
 /** La ficha del dato (S6: variable, unidad, momento, población y observaciones válidas) es un pie visible de cada gráfica,
  *  no un desplegable: se comprueba que cada campo está a la vista. */
@@ -134,7 +136,7 @@ describe('comparar grupos', () => {
     expect(await screen.findByText(/El grupo A ya son todos los niños/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Comparar con todos los niños' })).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Elegir los criterios del grupo B' }))
-    expect(await within(ladoB()).findByRole('checkbox', { name: /Masculino/ })).toBeInTheDocument()
+    expect(await within(await cajon('B')).findByRole('checkbox', { name: /Masculino/ })).toBeInTheDocument()
     expect(cuerpos(llamadas)).toHaveLength(0)
   })
 
@@ -142,7 +144,7 @@ describe('comparar grupos', () => {
     const llamadas = await compararConTodos()
     const antes = cuerpos(llamadas).length
     await userEvent.click(screen.getByRole('button', { name: 'Editar grupo A' }))
-    await userEvent.click(await within(ladoA()).findByRole('checkbox', { name: /Femenino/ }))   // A se queda sin filtros, como B
+    await userEvent.click(await within(await cajon('A')).findByRole('checkbox', { name: /Femenino/ }))   // A se queda sin filtros, como B
     expect(await screen.findByText(/Los grupos A y B tienen los mismos criterios/)).toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: '¿Crecen distinto?' })).toBeNull()
     expect(cuerpos(llamadas)).toHaveLength(antes)
@@ -303,7 +305,7 @@ describe('comparar grupos', () => {
     const llamadas = api()
     montar('/comparar?f=sexo|lista|F')
     await userEvent.click(await within(await screen.findByRole('region', { name: 'Grupo B' })).findByRole('button', { name: 'Elegir grupo B' }))
-    const casilla = await within(ladoB()).findByRole('checkbox', { name: /Masculino/ })
+    const casilla = await within(await cajon('B')).findByRole('checkbox', { name: /Masculino/ })
     await userEvent.click(casilla)
     expect((await within(ladoB()).findAllByText(/Sexo: Masculino/)).length).toBeGreaterThan(0)   // el encabezado y la ficha del panel
     await waitFor(() => expect(cuerpos(llamadas).at(-1)?.b).toMatchObject({ muestra: { y: [{ variable: 'sexo', valores: ['M'] }] } }))
@@ -311,12 +313,26 @@ describe('comparar grupos', () => {
     expect(await within(ladoA()).findByText(/Sexo: Femenino/)).toBeInTheDocument()
   })
 
+  it('el panel de cada lado es un cajón con su nombre: Escape lo cierra y el foco vuelve a su botón', async () => {
+    api()
+    montar('/comparar?f=sexo|lista|F')
+    const editar = await screen.findByRole('button', { name: 'Editar grupo A' })
+    await userEvent.click(editar)
+    const a = await cajon('A')
+    expect(a).toHaveAttribute('aria-modal', 'true')
+    expect(ladoA()).not.toContainElement(a)
+    expect(within(a).getByText(/niños en el grupo/)).toBeInTheDocument()
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Elija el grupo A' })).not.toBeInTheDocument())
+    expect(editar).toHaveFocus()
+  })
+
   it('«Editar» A cambia el grupo activo de la dirección, sin tocar B', async () => {
     api()
     montar('/comparar?f=sexo|lista|F', <Ubicacion />)
     await userEvent.click(await screen.findByRole('button', { name: 'Comparar con todos los niños' }))
     await userEvent.click(await screen.findByRole('button', { name: 'Editar grupo A' }))
-    const panel = await within(ladoA()).findByRole('checkbox', { name: /Masculino/ })
+    const panel = await within(await cajon('A')).findByRole('checkbox', { name: /Masculino/ })
     await userEvent.click(panel)
     await waitFor(() => expect(screen.getByTestId('ubicacion').textContent).toContain('sexo|lista|F;M'))
     expect(within(ladoB()).getByText('Sin filtros: están todos los niños del programa.')).toBeInTheDocument()

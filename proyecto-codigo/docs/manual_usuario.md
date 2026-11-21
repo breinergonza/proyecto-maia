@@ -216,20 +216,30 @@ niños** vuelve a la lista.
 Está en **Seguimiento**, justo debajo de **Tablero**, y lo ven todos los perfiles. Muestra las mismas cifras del
 Tablero, pero para el grupo de niños que usted elija; el Tablero no cambia y sigue mostrando a todos.
 
-* **Filtros (panel de la izquierda):** casillas por variable (por ejemplo sexo o categoría al nacer), con cuántos niños
-  tendría cada opción. Lo elegido aparece como fichas que se quitan con la **x**. Con **+ Agregar variable** suma otras.
-  Si una variable se mide muchas veces, elija si cuenta la primera, la última, en alguna visita o en una visita concreta.
-  La **edad gestacional (categoría)** es una lista (extremo, muy prematuro, moderado o tardío, a término): cada casilla
-  es su propio tramo. Las secciones **Tiempo** y **Muestreo** acotan por fecha y fijan un tope por grupo; todo viaja en
-  la dirección, así que un enlace copiado abre el mismo filtro.
-* **Guardar este filtro:** queda en la lista de filtros guardados para volver a usarlo (por ejemplo en Predicción).
+* **Elija el grupo (panel de la izquierda):** casillas por variable (por ejemplo sexo, sede o edad gestacional), con
+  cuántos niños tendría cada opción en la columna **Niños**; un clic en cualquier parte de la fila la marca, y las
+  opciones se leen sin códigos («Sede 1», «Femenino», «Muy prematuro (28 a 31 sem)»). Lo elegido aparece como fichas
+  que se quitan con la **x**. Con **Agregar otra característica** suma otras. Si una variable se mide muchas veces,
+  elija si cuenta la primera, la última, en alguna visita o en una visita concreta. La **edad gestacional (categoría)**
+  es una lista (extremo, muy prematuro, moderado o tardío, a término): cada casilla es su propio tramo. Un rango se
+  escribe en dos campos cortos («de … a … semanas»); lo que se ve gris dentro de ellos («mín. 24», «máx. 41») es solo
+  una pista de lo que hay, no un valor puesto. La sección **Período** dice por qué fecha se cuenta a los niños
+  («Contar a los niños por: fecha de nacimiento») y si se toma todo el período, entre dos fechas o los últimos meses
+  antes del corte; debajo dice entre qué años nacieron los niños del corte. Todo viaja en la dirección, así que un
+  enlace copiado abre el mismo grupo. El mismo panel se abre como cajón al lado derecho con **Cambiar grupo** (Vista
+  clínica) y con **Editar** o **Elegir grupo B** (Comparar grupos): los filtros se aplican al instante, abajo se ve
+  cuántos niños quedan en el grupo, **Listo** o **Esc** lo cierran y la página de atrás no se mueve.
+* **Grupo guardado y Guardar este grupo (experto y administración):** el grupo guardado se elige arriba del panel para
+  volver a usarlo (por ejemplo en Predicción). Al guardar, el formulario ofrece el **Muestreo para entrenar** (todos los
+  que cumplen o un tope por categoría): es propio de la muestra que se guarda para entrenar, así que no aparece en la
+  Vista clínica, en Comparar grupos ni en Explorar, y el grupo guardado conserva el que traiga la dirección.
 * **Qué se ve:** niños en el grupo, datos leídos, niños con algún riesgo alto, crecimiento bajo frente a la OMS, y
   tres gráficas: riesgo del grupo, crecimiento del grupo y quiénes son los niños.
 * **Privacidad:** con menos de 20 niños no se muestran cifras; basta quitar algún filtro. Todos los perfiles ven las
   mismas cifras, exactas: nada se redondea ni se aproxima. Una opción con 1 a 4 niños dice su número.
 * **Cómo leer los símbolos:** una opción sin niños se ve **0**; una opción con 1 a 4 niños dice cuántos son; **—** es un grupo
   de menos de 20 niños. Si ningún niño cumple, aparece «Ningún niño cumple estos filtros» con el botón para quitarlos.
-  El muestreo no cambia las cifras de Explorar: solo dice con cuántos niños se entrenaría.
+  El muestreo de un grupo guardado no cambia las cifras de Explorar: solo dice con cuántos niños se entrenaría.
 
 ### Analítica de los modelos
 

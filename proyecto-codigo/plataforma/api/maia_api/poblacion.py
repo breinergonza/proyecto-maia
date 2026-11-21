@@ -100,6 +100,40 @@ def elegir_facetas(esquema: pd.DataFrame, hay_sedes: bool, extra: Sequence[str] 
     elegidas += [v for v in dict.fromkeys(extra) if v not in elegidas and (v != 'sede' or hay_sedes) and _filtrable(filas, v)]
     return elegidas
 
+SEXO_RESPALDO = {'F': 'Femenino', 'M': 'Masculino'}
+
+
+def etiqueta_sede(valor: str, etiquetas: dict) -> str:
+    """Cómo se lee una sede: el nombre del Diccionario si lo trae; si no, «Sede 1» para un código numérico. Un nombre que ya
+    es texto («Norte») se deja como está."""
+    num = M.texto_numerico(valor)
+    propia = etiquetas.get('sede', {}).get(num) if num is not None else None
+    if propia:
+        return propia
+    return f'Sede {valor}' if num is not None else valor
+
+
+def etiqueta_sexo(valor: str, del_diccionario: str | None = None) -> str:
+    """El texto de un código de sexo: el del Diccionario si lo trae; si no, F → «Femenino» y M → «Masculino»."""
+    return del_diccionario or SEXO_RESPALDO.get(valor.strip().upper(), valor)
+
+
+def etiqueta_eg(categoria: str, desde: float | None, hasta: float | None) -> str:
+    """«Muy prematuro (28 a 31 sem)»: el nombre de la categoría con sus semanas, calculadas de ``CATEGORIAS_EG``
+    (el límite superior no entra, por eso la última semana de la categoría es una menos)."""
+    nombre = PF.ETIQUETAS_EG[categoria]
+    if desde is None and hasta is not None:
+        return f'{nombre} (menos de {num_semanas(hasta)} sem)'
+    if hasta is None and desde is not None:
+        return f'{nombre} ({num_semanas(desde)} sem o más)'
+    if desde is not None and hasta is not None:
+        return f'{nombre} ({num_semanas(desde)} a {num_semanas(hasta - 1)} sem)'
+    return nombre
+
+
+def num_semanas(v: float) -> str:
+    return str(int(v)) if float(v).is_integer() else str(v).replace('.', ',')
+
 
 def etiqueta_de(filas: dict, v: str) -> str:
     if v in M.VIRTUALES:
@@ -137,9 +171,9 @@ def reglas_de(filas: dict, v: str) -> list[str]:
 
 def _opciones_de(s: Session, corte_id: int, filas: dict, etiquetas: dict, v: str, tipo: str) -> list[dict]:
     if v == 'sede':
-        return [{'valor': g, 'etiqueta': g} for g in sedes(s, corte_id)]
+        return [{'valor': g, 'etiqueta': etiqueta_sede(g, etiquetas)} for g in sedes(s, corte_id)]
     if v == 'eg_categoria':
-        return [{'valor': c, 'etiqueta': PF.ETIQUETAS_EG[c], 'rango': [lo, hi]} for c, lo, hi in CATEGORIAS_EG]
+        return [{'valor': c, 'etiqueta': etiqueta_eg(c, lo, hi), 'rango': [lo, hi]} for c, lo, hi in CATEGORIAS_EG]
     if tipo == 'si_no':
         return [{'valor': True, 'etiqueta': 'Sí'}, {'valor': False, 'etiqueta': 'No'}]
     if v in etiquetas:
@@ -237,13 +271,13 @@ class _Grupo:
             return self.s.execute(text(f'SELECT count(*) FROM ({self.frag.sql}) q'), self.frag.params).scalar_one()
         return len(self.ids())
 
-def _lista_sede(s: Session, c: int, g: _Grupo) -> dict:
+def _lista_sede(s: Session, c: int, g: _Grupo, etiquetas: dict) -> dict:
     union, p = g.union('u.sujeto')
     cuentan = dict(s.execute(text(f'SELECT u.grupo, count(*) FROM sevarti.sujetos u {union} '
                                   'WHERE u.corte_id = :c AND u.grupo IS NOT NULL GROUP BY u.grupo'), {'c': c, **p}).all())
     todas = [x for (x,) in s.execute(text('SELECT DISTINCT grupo FROM sevarti.sujetos WHERE corte_id = :c AND grupo IS NOT NULL'),
                                      {'c': c})]
-    return {'opciones': sorted(({'valor': M.canonico(x), 'etiqueta': M.canonico(x), 'n': cuentan.get(x, 0)} for x in todas),
+    return {'opciones': sorted(({'valor': M.canonico(x), 'etiqueta': etiqueta_sede(M.canonico(x), etiquetas), 'n': cuentan.get(x, 0)} for x in todas),
                                key=lambda o: (len(o['valor']), o['valor']))}
 
 
@@ -258,7 +292,7 @@ def _lista_eg(s: Session, c: int, g: _Grupo) -> dict:
     for eg in _semanas(s, c, g):
         cat = M.categoria_eg(eg)
         cuenta[cat] = cuenta.get(cat, 0) + 1
-    return {'opciones': [{'valor': cat, 'etiqueta': PF.ETIQUETAS_EG[cat], 'rango': [lo, hi], 'n': cuenta.get(cat, 0)}
+    return {'opciones': [{'valor': cat, 'etiqueta': etiqueta_eg(cat, lo, hi), 'rango': [lo, hi], 'n': cuenta.get(cat, 0)}
                          for cat, lo, hi in CATEGORIAS_EG]}
 
 
@@ -362,8 +396,10 @@ def _lista_atributo(s: Session, c: int, v: str, nombre: str, g: _Grupo, tipo: st
     for k in sorted(cuenta, key=lambda x: (len(x), x)):
         num = M.texto_numerico(k)
         entero = num is not None and num.is_integer()
+        del_diccionario = etiquetas.get(v, {}).get(num) if num is not None else None
         opciones.append({'valor': int(num) if entero else (num if num is not None else k),
-                         'etiqueta': etiquetas.get(v, {}).get(num, k) if num is not None else k, 'n': cuenta[k]})
+                         'etiqueta': etiqueta_sexo(k, del_diccionario) if v in VARIABLES_SEXO else del_diccionario or k,
+                         'n': cuenta[k]})
     return {'opciones': opciones}
 
 
@@ -462,7 +498,7 @@ def facetas(s: Session, corte_id: int, muestra: dict | None,
             except M.MuestraInvalida as e:
                 raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, ' '.join(e.errores)) from None
         if v == 'sede':
-            r = _lista_sede(s, corte_id, ids)
+            r = _lista_sede(s, corte_id, ids, etiquetas)
         elif v == 'eg_categoria':
             r = _lista_eg(s, corte_id, ids)
         elif v == 'eg_semanas':
