@@ -14,7 +14,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from maia_api import poblacion as P
-from maia_api.consultas import corrida_de, etapas, nombre_etapa
+from maia_api.consultas import corrida_de, crecimiento_por_nino, crecimiento_por_visita, etapas, nombre_etapa
 from maia_api.dependencias import CUALQUIERA, auditar, sesion
 from maia_api.esquemas import CorridaSalida
 from maia_comun import muestra as M
@@ -97,27 +97,18 @@ def resumen(consulta: Consulta, s: Session = Depends(sesion), u: Usuario = Depen
     ninos_alto = s.execute(text(f"""
         SELECT count(DISTINCT sujeto) FROM resultados.riesgos
         WHERE corrida_id = :c AND NOT silencio AND percentil >= :alto{de}"""), {**p, 'alto': PERCENTIL_ALTO}).scalar_one()
-    crec = _filas(s, f"""
-        SELECT etapa, indicador, count(*) AS datos,
-               100.0 * avg(CASE WHEN bajo_2de THEN 1 ELSE 0 END) AS pct_bajo,
-               100.0 * avg(CASE WHEN caida_1de THEN 1 ELSE 0 END) AS pct_caida,
-               percentile_cont(0.5) WITHIN GROUP (ORDER BY z) AS z_mediano
-        FROM resultados.crecimiento WHERE corrida_id = :c AND NOT improbable{de}
-        GROUP BY etapa, indicador""", **p)
-    pct_bajo = s.execute(text(f"""
-        SELECT 100.0 * avg(CASE WHEN bajo_2de THEN 1 ELSE 0 END) FROM resultados.crecimiento
-        WHERE corrida_id = :c AND NOT improbable{de}"""), p).scalar_one()
+    crec = crecimiento_por_visita(s, corrida.id, mapa, ids if filtrado else None)
+    # de los niños con algún dato de crecimiento válido, cuántos tuvieron crecimiento bajo en alguna visita o medida
+    ninos_crec, ninos_bajo = s.execute(text(f"""
+        SELECT count(DISTINCT sujeto), count(DISTINCT sujeto) FILTER (WHERE bajo_2de)
+        FROM {crecimiento_por_nino(de)}"""), p).one()
+    pct_bajo = 100.0 * ninos_bajo / ninos_crec if ninos_crec else None
     datos = _datos(s, corrida, ids if filtrado else None)
 
     altos_total = sum(f['altos'] for f in riesgos)
     for f in riesgos:
         f['momento_nombre'] = nombre_etapa(mapa, f['momento'])
         f['ninos'], f['altos'] = int(f['ninos']), int(f['altos'])
-    for f in crec:
-        f['etapa_nombre'] = nombre_etapa(mapa, f['etapa'])
-        f['orden'] = mapa.get(f['etapa'], {}).get('orden', 99)
-        f['datos'] = int(f['datos'])
-    crec.sort(key=lambda f: (f['orden'], f['indicador']))
     cat = P.categorias_por_nino(s, corrida.corte_id)
     return {
         'insuficiente': False, 'minimo': P.MIN_NINOS,
@@ -130,6 +121,7 @@ def resumen(consulta: Consulta, s: Session = Depends(sesion), u: Usuario = Depen
         'percentil_alto': PERCENTIL_ALTO,
         'riesgos_por_desenlace': riesgos, 'crecimiento_por_etapa': crec,
         'pct_crecimiento_bajo': float(pct_bajo) if pct_bajo is not None else None,
+        'ninos_crecimiento': int(ninos_crec),
         'distribuciones': P.distribuciones(cat, ids),
         'muestreo': _muestreo(s, corrida.corte_id, defn),
     }

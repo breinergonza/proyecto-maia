@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from maia_api.consultas import corrida_de, etapas, nombre_etapa
+from maia_api.consultas import corrida_de, crecimiento_por_visita, etapas, nombre_etapa
 from maia_api.dependencias import CUALQUIERA, sesion
 from maia_api.esquemas import CorridaSalida
 from maia_comun.modelos_db import PERCENTIL_ALTO, Usuario
@@ -36,17 +36,7 @@ def resumen(corrida_id: int | None = None, s: Session = Depends(sesion), _: Usua
         WHERE corrida_id = :c AND NOT silencio AND percentil >= :alto"""), {'c': c.id, 'alto': PERCENTIL_ALTO}).scalar_one()
     for f in riesgos:
         f['momento_nombre'] = nombre_etapa(mapa, f['momento'])
-    crec = _filas(s, """
-        SELECT etapa, indicador, count(*) AS datos,
-               100.0 * avg(CASE WHEN bajo_2de THEN 1 ELSE 0 END) AS pct_bajo,
-               100.0 * avg(CASE WHEN caida_1de THEN 1 ELSE 0 END) AS pct_caida,
-               percentile_cont(0.5) WITHIN GROUP (ORDER BY z) AS z_mediano
-        FROM resultados.crecimiento WHERE corrida_id = :c AND NOT improbable
-        GROUP BY etapa, indicador""", c=c.id)
-    for f in crec:
-        f['etapa_nombre'] = nombre_etapa(mapa, f['etapa'])
-        f['orden'] = mapa.get(f['etapa'], {}).get('orden', 99)
-    crec.sort(key=lambda f: (f['orden'], f['indicador']))
+    crec = crecimiento_por_visita(s, c.id, mapa)   # porcentajes de niños evaluados, no de mediciones
     revisados = s.execute(text("""
         SELECT count(DISTINCT r.alerta_id) FROM resultados.revision_datos r
         JOIN resultados.alertas_dato a ON a.id = r.alerta_id WHERE a.corrida_id = :c"""), {'c': c.id}).scalar_one()

@@ -54,7 +54,10 @@ export interface CrecimientoEtapa {
   etapa: string
   etapa_nombre: string | null
   indicador: string
+  /** Mediciones válidas de la visita (un niño puede tener más de una). */
   datos: number
+  /** Niños evaluados: una medida por niño, visita y medida; los porcentajes son de ellos. */
+  ninos: number
   pct_bajo: number
   pct_caida: number
   z_mediano: number | null
@@ -623,7 +626,9 @@ export interface ExplorarResumen {
   percentil_alto: number
   riesgos_por_desenlace: RiesgoDesenlace[]
   crecimiento_por_etapa: CrecimientoEtapa[]
+  /** De los niños con algún dato de crecimiento válido (``ninos_crecimiento``), el % con crecimiento bajo en alguna visita. */
   pct_crecimiento_bajo: number | null
+  ninos_crecimiento: number
   distribuciones: Record<string, DistribucionGrupo>
   /** Si la muestra trae tope por categoría: con cuántos niños se entrenaría (las cifras de arriba son del grupo completo). */
   muestreo?: { modo: 'estratificado'; por: string | null; maximo_por_categoria: number | null; ninos: number | null } | null
@@ -639,7 +644,8 @@ export type CuerpoClinica = CuerpoExplorar & { familia?: string | null; indicado
 export interface FamiliaClinica { clave: string; nombre: string; definicion: string; estado: 'en_uso' | 'en_prueba'; indicador: string | null }
 /** Niños con el desenlace entre los que tienen dato a los 12 meses; sin niños con dato, nada. */
 /** ``pct``: casos entre quienes tienen dato. */
-export interface ObservadoClinico { casos: number | null; con_dato: number | null; sin_dato: number | null; pct: number; pct_sin_dato: number | null }
+/** ``desde``: la visita entre cuyos asistentes se cuenta lo observado (la primera en que se calcula el riesgo). */
+export interface ObservadoClinico { casos: number | null; con_dato: number | null; sin_dato: number | null; pct: number; pct_sin_dato: number | null; desde?: string | null }
 export interface EtapaClinica {
   etapa: string
   grupo: { n: number; p25: number | null; mediana: number | null; p75: number | null } | null
@@ -656,7 +662,7 @@ export interface ClinicaResumen {
   familia: string
   indicador: string | null
   grupo: { n: number; n_total: number }
-  observado: { grupo: ObservadoClinico | null; poblacion: ObservadoClinico | null }
+  observado: { grupo: ObservadoClinico | null; poblacion: ObservadoClinico | null; desde?: string | null }
   trayectoria: { indicador: string; unidad: string; etapas: EtapaClinica[] }
   riesgo: RiesgoCorte[]
   /** La corrida calcula el riesgo de este desenlace para algún niño (aunque ninguno del grupo lo tenga ahora). */

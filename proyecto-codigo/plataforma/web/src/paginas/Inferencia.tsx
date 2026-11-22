@@ -3,7 +3,7 @@
 // la vista y el resto plegado. Arma la misma petición que antes se pegaba como JSON, que queda como modo avanzado
 // (solo administración). Los resultados se dicen con el glosario clínico.
 import { useIsMutating, useMutation, useQuery } from '@tanstack/react-query'
-import { useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { ErrorApi, pedir } from '../api/cliente'
 import type { ResultadoConHistoria } from '../api/inferencia'
@@ -153,6 +153,8 @@ export default function Inferencia() {
   const activo = usePaqueteActivo()
   const [avanzado, setAvanzado] = useState(false)
   const [pestana, setPestana] = useState('datos')
+  // el resultado se queda a la vista mientras se editan los datos: si cambian después de calcular, se dice
+  const [desactualizado, setDesactualizado] = useState(false)
   const cargandoEjemplo = useIsMutating({ mutationKey: CLAVE_EJEMPLO, exact: true }) > 0
   const calcular = useMutation({ mutationFn: (p: unknown) => pedir<ResultadoConHistoria>('/inferencia', { cuerpo: p }) })
   const formulario = useQuery({
@@ -169,7 +171,7 @@ export default function Inferencia() {
   }
   const admin = puede(usuario, ['admin'])
   // al terminar el cálculo se abre la primera pestaña del resultado; al fallar, se queda donde estaba el error
-  const enviar = (p: unknown) => calcular.mutate(p, { onSuccess: (r) => setPestana(seccionesDeResultado(r, avanzado)[0].clave) })
+  const enviar = (p: unknown) => calcular.mutate(p, { onSuccess: (r) => { setDesactualizado(false); setPestana(seccionesDeResultado(r, avanzado)[0].clave) } })
   const resultado = calcular.data
   const secciones: Seccion[] = [
     {
@@ -177,7 +179,8 @@ export default function Inferencia() {
       contenido: avanzado ? <ModoAvanzado calcular={enviar} pendiente={calcular.isPending} />
         : formulario.isPending ? <Cargando />
           : formulario.error ? <Aviso>{formulario.error.message}</Aviso>
-            : <Formulario formulario={formulario.data} calcular={enviar} verDatos={() => setPestana('datos')} />,
+            : <Formulario formulario={formulario.data} calcular={enviar} verDatos={() => setPestana('datos')}
+              alCambiar={() => { if (calcular.data) setDesactualizado(true) }} />,
     },
     ...(resultado ? seccionesDeResultado(resultado, avanzado) : [{
       clave: 'resultado', texto: 'Riesgo estimado',
@@ -210,6 +213,9 @@ export default function Inferencia() {
           </Aviso>
         </div>
       )}
+      {resultado && desactualizado && (
+        <div className="mb-3"><Aviso tono="coral">Este resultado es de datos que ya cambiaron en el formulario. Vuelva a calcular el riesgo.</Aviso></div>
+      )}
       {resultado && resultado.variables_ignoradas.length > 0 && (
         <div className="mb-3"><Aviso tono="teal">No se usaron estos datos porque el modelo no los conoce: {resultado.variables_ignoradas.join(', ')}.</Aviso></div>
       )}
@@ -221,12 +227,20 @@ export default function Inferencia() {
   )
 }
 
-function Formulario({ formulario, calcular, verDatos }: {
+function Formulario({ formulario, calcular, verDatos, alCambiar }: {
   formulario: FormularioCalculo; calcular: (p: PeticionInferencia) => void; verDatos: () => void
+  /** Algo de los datos cambió (no se llama al montar). */
+  alCambiar?: () => void
 }) {
   const [nino, setNino] = useState<Nino>({ nacimiento: '', eg: '' })
   const [valores, setValores] = useState<Valores>({})
   const [fechas, setFechas] = useState<Valores>({})
+  const montado = useRef(false)
+  useEffect(() => {
+    if (!montado.current) { montado.current = true; return }
+    alCambiar?.()
+    // solo los datos: la función cambia en cada dibujo de la página, y no debe disparar el aviso
+  }, [nino, valores, fechas])
   const [errores, setErrores] = useState<string[]>([])
   const [conError, setConError] = useState<string[]>([])
   const [visita, setVisita] = useState(claveVisita(formulario.visitas[0]?.etapa ?? ''))

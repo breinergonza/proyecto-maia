@@ -123,6 +123,25 @@ describe('predicción', () => {
     expect(JSON.parse(String(lanzado.init!.body)).muestra.y[0]).toMatchObject({ variable: 'sexo', valores: ['M'] })
   })
 
+  it('al cambiar la visita o la exclusión, el resultado anterior se marca como de otra selección hasta volver a calcular', async () => {
+    api('experto')
+    montar('/prediccion?vista=grupo')
+    await userEvent.click(await screen.findByRole('tab', { name: 'Usar todos los niños disponibles' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Estimar riesgo' }))
+    expect(await screen.findByText('niños con el riesgo calculado')).toBeInTheDocument()
+    expect(screen.queryByText(/Resultado de la selección anterior/)).not.toBeInTheDocument()
+    await userEvent.selectOptions(screen.getByLabelText('Visita usada para estimar el riesgo'), 'nacimiento')
+    expect(screen.getByText(/Resultado de la selección anterior/)).toBeInTheDocument()
+    // volver a lo calculado lo quita, y otro cambio lo pone de nuevo
+    await userEvent.selectOptions(screen.getByLabelText('Visita usada para estimar el riesgo'), '')
+    expect(screen.queryByText(/Resultado de la selección anterior/)).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('checkbox', { name: /Excluir a los niños usados para entrenar/ }))
+    expect(screen.getByText(/Resultado de la selección anterior/)).toBeInTheDocument()
+    // al calcular con la selección nueva, el aviso se va
+    await userEvent.click(screen.getByRole('button', { name: 'Estimar riesgo' }))
+    await waitFor(() => expect(screen.queryByText(/Resultado de la selección anterior/)).not.toBeInTheDocument())
+  })
+
   it('muestra el avance mientras el cálculo corre', async () => {
     api('experto', { ...trabajoOk, estado: 'en_curso', progreso: 40, paso: 'Calculando el riesgo: 1500 de 3000 niños', resultado: null })
     montar('/prediccion?vista=grupo')

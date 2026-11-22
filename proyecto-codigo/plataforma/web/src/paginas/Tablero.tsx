@@ -31,7 +31,7 @@ const useAltoGrafica = () => {
   return ventana < 820 ? 150 : ventana < 1000 ? 165 : 200
 }
 
-const DESCRIPCION_CRECIMIENTO = 'Porcentaje de los niños medidos en cada visita con crecimiento bajo frente a la OMS, por medida.'
+const DESCRIPCION_CRECIMIENTO = 'Porcentaje de los niños evaluados en cada visita con crecimiento bajo frente a la OMS, por medida. Cada niño cuenta una vez por visita, con su última medida válida.'
 
 /** «3 meses (edad corregida)» → «3 meses EC», como en el eje de la gráfica de crecimiento. */
 const corto = (visita: string | null) => (visita ?? '').replace(' (edad corregida)', ' EC')
@@ -80,7 +80,8 @@ export default function Tablero() {
       <div className="flex shrink-0 flex-wrap items-baseline gap-x-4 gap-y-0.5">
         <h1>Resumen de riesgos y calidad de datos</h1>
         <p className="text-sm text-salvia">
-          {datosAl(r.corte)}, actualizados el {fecha(r.corrida.terminada)}.
+          {/* el filtro de Explorar y del Seguimiento clínico no llega aquí: se dice para no confundir las dos cifras */}
+          Toda la población del programa · {datosAl(r.corte)}, actualizados el {fecha(r.corrida.terminada)}.
           {puede(usuario, ['admin']) && r.paquete && <> Paquete {r.paquete}.</>}
         </p>
       </div>
@@ -202,12 +203,13 @@ export function seriesCrecimiento(medidas: string[]): Serie[] {
   return [...conocidas, ...otras]
 }
 
-/** Cada visita y medida como fila de la tabla de la gráfica (con la caída y los datos). */
+/** Cada visita y medida como fila de la tabla de la gráfica (con la caída, los niños evaluados y las mediciones). */
 function tablaCrecimiento(filas: CrecimientoEtapa[]) {
   return {
-    columnas: ['Visita', 'Medida', 'Con crecimiento bajo (%)', 'Cayó desde el control anterior (%)', 'Datos'],
+    columnas: ['Visita', 'Medida', 'Con crecimiento bajo (%)', 'Cayó desde el control anterior (%)', 'Niños evaluados', 'Mediciones'],
     filas: [...filas].sort((a, b) => a.orden - b.orden || a.indicador.localeCompare(b.indicador)).map((f) => ({
-      Visita: nombreVisita(f), Medida: indicador(f.indicador), 'Con crecimiento bajo (%)': f.pct_bajo, 'Cayó desde el control anterior (%)': f.pct_caida, Datos: f.datos,
+      Visita: nombreVisita(f), Medida: indicador(f.indicador), 'Con crecimiento bajo (%)': f.pct_bajo, 'Cayó desde el control anterior (%)': f.pct_caida,
+      'Niños evaluados': f.ninos, Mediciones: f.datos,
     })),
   }
 }
@@ -227,7 +229,7 @@ function Crecimiento({ filas, alto }: { filas: CrecimientoEtapa[]; alto: number 
       const c = celda.get(`${etapa}|${m}`)
       fila[m] = c ? c.pct_bajo : null
       fila[`${m}:caida`] = c ? c.pct_caida : null
-      fila[`${m}:datos`] = c ? c.datos : null
+      fila[`${m}:ninos`] = c ? c.ninos : null
     }
     return fila
   })
@@ -235,9 +237,9 @@ function Crecimiento({ filas, alto }: { filas: CrecimientoEtapa[]; alto: number 
     <>
       <LeyendaSeries series={series} />
       <LineasSeries filas={datos} series={series} alto={alto} formatoY={(v) => `${num(v)} %`}
-        etiqueta={`Porcentaje de niños medidos con crecimiento bajo frente a la OMS en cada visita: ${series.map((s) =>
+        etiqueta={`Porcentaje de niños evaluados con crecimiento bajo frente a la OMS en cada visita: ${series.map((s) =>
           `${s.nombre}, ${datos.map((f) => `${f.x} ${typeof f[s.clave] === 'number' ? pct(f[s.clave] as number) : 'sin dato'}`).join(', ')}`).join('; ')}`}
-        formatoTooltip={(v, f, s) => `${pct(v)} bajo · ${pct(Number(f[`${s.clave}:caida`]))} cayó · ${num(Number(f[`${s.clave}:datos`]))} datos`} />
+        formatoTooltip={(v, f, s) => `${pct(v)} bajo · ${pct(Number(f[`${s.clave}:caida`]))} cayó · ${num(Number(f[`${s.clave}:ninos`]))} niños evaluados`} />
       {series.length < medidas.length && <p className="mt-1 text-sm">Las demás medidas están en «Ver como tabla».</p>}
     </>
   )

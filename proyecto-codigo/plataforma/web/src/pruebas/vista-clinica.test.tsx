@@ -23,6 +23,7 @@ const resumen = {
   observado: {
     grupo: { casos: 41, con_dato: 223, sin_dato: 89, pct: 18.4, pct_sin_dato: 28.5 },
     poblacion: { casos: 412, con_dato: 3680, sin_dato: 800, pct: 11.2, pct_sin_dato: 17.9 },
+    desde: '40 semanas',
   },
   trayectoria: {
     indicador: 'talla', unidad: 'puntaje z de la OMS',
@@ -115,6 +116,8 @@ describe('vista clínica', () => {
     expect(within(panel).getByText(/Toda la población \(referencia\)/)).toBeInTheDocument()
     expect(within(panel).getByText('11,2 %')).toBeInTheDocument()
     expect(within(panel).getByText(/412 de 3\.680/)).toBeInTheDocument()
+    // por qué este «con dato» no es el de la curva de talla: se cuenta entre los que fueron a la visita de 40 semanas
+    expect(within(panel).getByText(/Se cuenta entre los niños que fueron a la visita de 40 semanas/)).toBeInTheDocument()
   })
 
   it('si el grupo son todos los niños no repite la población como referencia (ni en la cifra ni en la gráfica)', async () => {

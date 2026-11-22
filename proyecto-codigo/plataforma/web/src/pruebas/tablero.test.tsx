@@ -1,6 +1,7 @@
 // Tablero: lo que dice cada cifra y su encabezado. Sin «Paquete —» cuando no hay paquete, dos cifras que no repiten el
 // mismo número y un contador de alarmas que coincide con lo que se lista.
 import { screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Usuario } from '../api/tipos'
 import { seriesCrecimiento } from '../paginas/Tablero'
@@ -69,9 +70,9 @@ describe('tablero', () => {
 
   it('crecimiento como líneas por visita y alarmas como serie por trimestre', async () => {
     const crecimiento = [
-      { etapa: 'm3', etapa_nombre: '3 meses (edad corregida)', orden: 3, indicador: 'peso', datos: 400, pct_bajo: 8, pct_caida: 3, z_mediano: -0.5 },
-      { etapa: 's40', etapa_nombre: '40 semanas', orden: 2, indicador: 'peso', datos: 500, pct_bajo: 12, pct_caida: 4, z_mediano: -0.8 },
-      { etapa: 's40', etapa_nombre: '40 semanas', orden: 2, indicador: 'talla', datos: 480, pct_bajo: 15, pct_caida: 2, z_mediano: -1 },
+      { etapa: 'm3', etapa_nombre: '3 meses (edad corregida)', orden: 3, indicador: 'peso', datos: 400, ninos: 390, pct_bajo: 8, pct_caida: 3, z_mediano: -0.5 },
+      { etapa: 's40', etapa_nombre: '40 semanas', orden: 2, indicador: 'peso', datos: 500, ninos: 470, pct_bajo: 12, pct_caida: 4, z_mediano: -0.8 },
+      { etapa: 's40', etapa_nombre: '40 semanas', orden: 2, indicador: 'talla', datos: 480, ninos: 480, pct_bajo: 15, pct_caida: 2, z_mediano: -1 },
     ]
     const trimestres = [
       { periodo: '2025 T2', senal: 'redondeo', alarmas: 2 },
@@ -86,11 +87,17 @@ describe('tablero', () => {
     })
     montar('/tablero')
     // visitas en orden (40 semanas antes que 3 meses) y una medida sin dato en una visita no corre a las demás
-    expect(await screen.findByRole('figure', { name: 'Porcentaje de niños medidos con crecimiento bajo frente a la OMS en cada visita: '
+    expect(await screen.findByRole('figure', { name: 'Porcentaje de niños evaluados con crecimiento bajo frente a la OMS en cada visita: '
       + 'Peso para la edad, 40 semanas 12,0 %, 3 meses EC 8,0 %; Talla para la edad, 40 semanas 15,0 %, 3 meses EC sin dato' }))
       .toBeInTheDocument()
-    // la tabla de la gráfica va en su botón, no en un desplegable aparte
+    // la tabla de la gráfica va en su botón, no en un desplegable aparte; cuenta niños (una medida por niño y visita) y dice las mediciones
     expect(screen.getByRole('button', { name: 'Ver como tabla' })).toBeInTheDocument()
+    const crec = screen.getByRole('figure', { name: /Porcentaje de niños evaluados/ }).closest('section')!
+    await userEvent.click(within(crec).getByRole('button', { name: 'Ver como tabla' }))
+    expect(within(crec).getByRole('columnheader', { name: 'Niños evaluados' })).toBeInTheDocument()
+    expect(within(crec).getByRole('columnheader', { name: 'Mediciones' })).toBeInTheDocument()
+    // las cifras son de toda la población: el filtro de Explorar no llega aquí
+    expect(screen.getByText(/Toda la población del programa/)).toBeInTheDocument()
     expect(screen.queryByText('Ver la tabla')).not.toBeInTheDocument()
     // el trimestre sin alarmas (2025 T3) cuenta en el eje; las señales se dicen en palabras del equipo clínico
     expect(await screen.findByRole('figure', { name: '3 alarmas de grupo entre 2025 T2 y 2025 T4: '
