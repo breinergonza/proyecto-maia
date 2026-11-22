@@ -46,7 +46,7 @@ export function GrupoActivo({ ninos, total, minimo, error, conDato, conPanel = t
 }) {
   const { usuario } = useSesion()
   const filtros = useFiltros()
-  const esExperto = puede(usuario, ['admin', 'experto'])
+  const esExperto = puede(usuario, ['admin', 'experto', 'datos'])   // guardan grupos como muestras
   const [abierto, setAbierto] = useState(false)
   const facetas = useFacetasExplorar(cuerpoDeFacetas(filtros))
   const guardadas = useMuestras(esExperto)

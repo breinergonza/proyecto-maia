@@ -74,7 +74,7 @@ function ComparaEntrenamientos() {
   const cmp = useComparaEntrenamientos(a, b, desenlace)
   const dMet = descripcionDe('comparar_metricas'), dRoc = descripcionDe('comparar_roc'), dGrp = descripcionDe('comparar_grupo'), dMu = descripcionDe('comparar_muestra')
 
-  const esAdmin = puede(usuario, ['admin'])
+  const esAdmin = puede(usuario, ['admin', 'datos'])   // aprueba: administración y el experto en datos
   const metaB = rb.data?.meta ?? lista.data?.entrenamientos.find((m) => m.entrenamiento === b)
   const fuenteB = metaB?.fuente === 'simulado' ? 'simulado' : 'kmc'
   const registrados = useEntrenamientosRegistrados(fuenteB, esAdmin)

@@ -52,7 +52,7 @@ describe('tablero', () => {
   })
 
   it('«por revisar» y las respuestas de los expertos son cifras distintas', async () => {
-    api('experto')
+    api('datos')
     montar('/tablero')
     await screen.findByText('niños con datos')
     expect(cifra('datos por revisar · 12,5 por mil')).toBe('200')
@@ -61,7 +61,7 @@ describe('tablero', () => {
   })
 
   it('el contador de alarmas es el total y dice cuántas se listan', async () => {
-    api('experto')
+    api('datos')
     montar('/tablero')
     const panel = (await screen.findByRole('heading', { name: 'Alertas por grupo de niños' })).closest('section')!
     expect(await within(panel).findByText('789 · se muestran las 100 más recientes')).toBeInTheDocument()
@@ -79,7 +79,7 @@ describe('tablero', () => {
       { periodo: '2025 T4', senal: 'datos faltantes', alarmas: 1 },
     ]
     simularApi((url) => {
-      if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('experto') } }
+      if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('datos') } }
       if (url === '/api/tablero/resumen') return { cuerpo: { ...resumen, crecimiento_por_etapa: crecimiento } }
       if (url === '/api/tablero/alarmas-grupo') return { cuerpo: alarmas }
       if (url === '/api/tablero/alarmas-por-trimestre') return { cuerpo: trimestres }
@@ -120,8 +120,8 @@ describe('series de crecimiento del tablero', () => {
 })
 
 describe('tablero: claridad y enlaces de revisión', () => {
-  it('el experto ve la cifra de datos por revisar sin enlace a /revision/datos; el admin sí', async () => {
-    api('experto')
+  it('quien solo consulta ve la cifra de datos por revisar sin enlace a /revision/datos; administración sí', async () => {
+    api('visualizador')
     const { unmount } = montar('/tablero')
     await screen.findByText('niños con datos')
     expect(screen.getByText('datos por revisar · 12,5 por mil').closest('a')).toBeNull()
@@ -143,14 +143,14 @@ describe('tablero: claridad y enlaces de revisión', () => {
   })
 
   it('sin «datos leídos»: la cifra no le sirve al clínico; el total queda en la ayuda de «por mil»', async () => {
-    api('experto')
+    api('datos')
     montar('/tablero')
     await screen.findByText('niños con datos')
     expect(screen.queryByText('datos leídos')).not.toBeInTheDocument()
     expect(screen.getByText('datos por revisar · 12,5 por mil').closest('div, a')).toHaveAttribute('title', expect.stringContaining('16.000 datos'))
   })
 
-  it('quien solo consulta ve las cifras de riesgo alto sin enlace a la lista de niños; el experto sí lo tiene', async () => {
+  it('quien solo consulta ve las cifras de riesgo alto sin enlace a la lista de niños; administración sí lo tiene', async () => {
     const conDesenlace = (rol: Usuario['rol']) => simularApi((url) => {
       if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario(rol) } }
       if (url === '/api/tablero/resumen') {
@@ -167,7 +167,7 @@ describe('tablero: claridad y enlaces de revisión', () => {
     expect(within(screen.getByRole('table')).getByText('10').closest('a')).toBeNull()
     expect(document.querySelector('a[href^="/ninos"]')).toBeNull()
     unmount()
-    conDesenlace('experto')
+    conDesenlace('admin')      // la lista de niños es de los perfiles clínicos: aquí, administración
     montar('/tablero')
     await screen.findByText('niños con algún riesgo alto')
     expect(screen.getByText('niños con algún riesgo alto').closest('a')).toHaveAttribute('href', '/ninos?percentil_min=90')
@@ -176,7 +176,7 @@ describe('tablero: claridad y enlaces de revisión', () => {
 
   it('«Riesgo por desenlace»: un nombre por desenlace con su visita aparte, y dice qué es «alto»', async () => {
     simularApi((url) => {
-      if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('experto') } }
+      if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('datos') } }
       if (url === '/api/tablero/resumen') {
         return { cuerpo: { ...resumen, riesgos_por_desenlace: [{ clave: 'des12_desde_3', desenlace: 'desarrollo psicomotor bajo a los 12 meses (riesgo calculado a 3 m EC)',
           momento: '3 m EC', momento_nombre: '3 meses (edad corregida)', ninos: 95, altos: 10, riesgo_medio: 0.087 }] } }
@@ -195,7 +195,7 @@ describe('tablero: claridad y enlaces de revisión', () => {
 
   it('cada panel dice una sola vez qué muestra: sin la frase repetida de crecimiento ni la de alarmas', async () => {
     simularApi((url) => {
-      if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('experto') } }
+      if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('datos') } }
       if (url === '/api/tablero/resumen') return { cuerpo: resumen }
       if (url === '/api/tablero/alarmas-grupo') return { cuerpo: alarmas }
       return { cuerpo: [] }

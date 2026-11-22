@@ -42,7 +42,7 @@ const sinVisita = (desenlace: string) => desenlace.replace(/\s*\(riesgo calculad
 export default function Tablero() {
   const { usuario } = useSesion()
   const resumen = useQuery({ queryKey: ['tablero', 'resumen'], queryFn: () => pedir<ResumenTablero>('/tablero/resumen') })
-  const porClasificar = usePorClasificar(puede(usuario, ['admin', 'experto'])).data?.total ?? 0
+  const porClasificar = usePorClasificar(puede(usuario, ['admin', 'datos'])).data?.total ?? 0
   const altoGrafica = useAltoGrafica()
 
   if (resumen.isPending) return <Cargando />
@@ -52,7 +52,7 @@ export default function Tablero() {
         <>
           <Encabezado titulo="Resumen de riesgos y calidad de datos" />
           <Vacio titulo="Todavía no hay resultados">
-            {puede(usuario, ['admin'])
+            {puede(usuario, ['admin', 'datos'])
               ? <>Active un paquete de modelos y ejecute una corrida en <Link className="text-teal underline" to="/admin/corridas">Corridas</Link>.</>
               : 'Todavía no se han procesado los datos: la administración debe hacer la primera actualización.'}
           </Vacio>
@@ -82,7 +82,7 @@ export default function Tablero() {
         <p className="text-sm text-salvia">
           {/* el filtro de Explorar y del Seguimiento clínico no llega aquí: se dice para no confundir las dos cifras */}
           Toda la población del programa · {datosAl(r.corte)}, actualizados el {fecha(r.corrida.terminada)}.
-          {puede(usuario, ['admin']) && r.paquete && <> Paquete {r.paquete}.</>}
+          {puede(usuario, ['admin', 'datos']) && r.paquete && <> Paquete {r.paquete}.</>}
         </p>
       </div>
 
@@ -91,7 +91,7 @@ export default function Tablero() {
       <div className="flex shrink-0 flex-wrap items-baseline gap-x-7 gap-y-1.5 rounded-panel border border-linea/80 bg-papel px-4 py-2.5 shadow-suave">
         <Indicador valor={num(r.ninos)} texto="niños con datos" />
         <Indicador valor={num(r.datos_revisar)} texto={`datos por revisar · ${dec(r.alertas_por_1000)} por mil`} tono="coral"
-          a={puede(usuario, ['admin']) ? '/revision/datos' : undefined}
+          a={puede(usuario, ['admin', 'datos']) ? '/revision/datos' : undefined}
           ayuda={`${dec(r.alertas_por_1000)} por cada mil de los ${num(r.datos)} datos leídos.`} />
         <Indicador valor={num(r.datos_revisados)} texto="datos ya respondidos por expertos" />
         <Indicador valor={num(r.ninos_riesgo_alto)} texto="niños con algún riesgo alto" tono="coral" a={verAltos}
@@ -145,7 +145,7 @@ export default function Tablero() {
         <div className="flex flex-col gap-4 lg:col-span-4 lg:min-h-0">
           <Panel className="shrink-0"
             titulo={<h2 className="text-base" title="Un dato puede tener varias alertas; la cola pone primero los que tienen más.">Datos por revisar, por tipo de alerta</h2>}
-            accion={puede(usuario, ['admin']) && pendientes > 0 &&
+            accion={puede(usuario, ['admin', 'datos']) && pendientes > 0 &&
               <Link to="/revision/datos" className="text-sm font-semibold text-teal hover:underline">Revisar</Link>}>
             <Capas r={r} />
           </Panel>

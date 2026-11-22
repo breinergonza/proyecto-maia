@@ -36,7 +36,7 @@ export function LadoComparado({ serie, filtros, elegido, resumen, contando, erro
   nota?: string
 }) {
   const { usuario } = useSesion()
-  const esExperto = puede(usuario, ['admin', 'experto'])
+  const esExperto = puede(usuario, ['admin', 'experto', 'datos'])   // guardan grupos como muestras
   const facetas = useFacetasExplorar(cuerpoDeFacetas(filtros))
   const guardadas = useMuestras(esExperto)
   const criterios = criteriosActivos(filtros, facetas.data).filter((c) => c.id !== 'tiempo' && c.id !== 'muestreo')

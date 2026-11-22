@@ -67,7 +67,7 @@ function api(rol: Usuario['rol'], ninos: 'ok' | 'error' = 'ok') {
 
 describe('anticipación', () => {
   it('trae todas las familias, sin pedir un solo desenlace, y muestra los tres artefactos', async () => {
-    const llamadas = api('experto')
+    const llamadas = api('admin')
     montar('/analitica/anticipacion?entrenamiento=7')
     expect(await screen.findByText('Casos avisados al menos una visita antes')).toBeInTheDocument()
     expect(screen.getByText('50,0 %')).toBeInTheDocument()
@@ -83,7 +83,7 @@ describe('anticipación', () => {
   })
 
   it('el porcentaje de alerta cambia los casos detectados de la tabla', async () => {
-    api('experto')
+    api('admin')
     montar('/analitica/anticipacion?entrenamiento=7&ver=tabla')
     await screen.findByText('Cada visita de cálculo')
     expect(screen.getAllByText('40,0 %').length).toBeGreaterThan(0)   // 3 m EC con el 10 %
@@ -94,7 +94,7 @@ describe('anticipación', () => {
   })
 
   it('el experto ve niños de ejemplo con su primera alerta; el visualizador no los pide', async () => {
-    const experto = api('experto')
+    const experto = api('admin')
     montar('/analitica/anticipacion?entrenamiento=7&ver=tabla')
     expect(await screen.findByRole('link', { name: 'N-017' })).toBeInTheDocument()
     expect(screen.getByText('Primera alerta: Entrada al programa')).toBeInTheDocument()
@@ -108,7 +108,7 @@ describe('anticipación', () => {
   })
 
   it('sin corrida o sin modelo activo avisa y no rompe la pantalla', async () => {
-    api('experto', 'error')
+    api('admin', 'error')
     montar('/analitica/anticipacion?entrenamiento=7&ver=tabla')
     expect(await screen.findByText(/Todavía no hay una corrida con un modelo activo/)).toBeInTheDocument()
     expect(screen.getByText('Cada visita de cálculo')).toBeInTheDocument()

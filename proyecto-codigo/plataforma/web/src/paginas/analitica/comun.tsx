@@ -84,7 +84,7 @@ export function EstadoVacio({ estado, mensaje }: { estado: 'sin_artefactos' | 'p
     return (
       <Vacio titulo="Este análisis estará disponible pronto">
         <p>{mensaje ?? 'Todavía no se calcula para este modelo. Cuando esté listo aparecerá aquí.'}</p>
-        {mensaje && puede(usuario, ['admin']) && (
+        {mensaje && puede(usuario, ['admin', 'datos']) && (
           <p className="mt-2"><Link to="/admin/entrenamientos" className="font-semibold text-teal underline">Ir a Entrenamientos</Link></p>
         )}
       </Vacio>
@@ -93,7 +93,7 @@ export function EstadoVacio({ estado, mensaje }: { estado: 'sin_artefactos' | 'p
   return (
     <Vacio titulo="Este entrenamiento es anterior a la analítica">
       <p>No se recalcula para no cambiar cifras ya conocidas. Para ver este análisis, vuelva a entrenar el modelo en Administración › Entrenamientos.</p>
-      {puede(usuario, ['admin']) && <p className="mt-2"><Link to="/admin/entrenamientos" className="font-semibold text-teal underline">Ir a Entrenamientos</Link></p>}
+      {puede(usuario, ['admin', 'datos']) && <p className="mt-2"><Link to="/admin/entrenamientos" className="font-semibold text-teal underline">Ir a Entrenamientos</Link></p>}
     </Vacio>
   )
 }

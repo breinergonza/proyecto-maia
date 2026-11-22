@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from maia_comun.modelos_db import PERCENTIL_MUY_ALTO
 
-Rol = Literal['admin', 'experto', 'visualizador']
+Rol = Literal['admin', 'experto', 'datos', 'visualizador']
 Respuesta = Literal['si', 'no', 'no_se']
 _EMAIL = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 

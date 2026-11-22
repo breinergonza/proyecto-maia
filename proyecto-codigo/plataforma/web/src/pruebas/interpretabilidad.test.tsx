@@ -32,7 +32,7 @@ const antiguo = { importancia: [{ variable: 'ern_peso', importancia_pct: 100 }],
 
 function api(datos: object) {
   simularApi((url) => {
-    if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('experto') } }
+    if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('datos') } }
     if (url === '/api/analitica/entrenamientos') return { cuerpo: { entrenamientos: contexto.entrenamientos.map((m) => ({ ...m, modelo: 'clinico', desenlaces: contexto.desenlaces, submodulos: contexto.submodulos })) } }
     if (url.startsWith('/api/analitica/contexto')) return { cuerpo: contexto }
     if (/^\/api\/analitica\/7\/interpretabilidad/.test(url)) return { cuerpo: { estado: 'ok', entrenamiento: 7, submodulo: 'interpretabilidad', desenlaces: { readm_3m: datos } } }

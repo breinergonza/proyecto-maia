@@ -53,9 +53,12 @@ def requiere_rol(*roles: str):
     return _dep
 
 
-ADMIN = requiere_rol('admin')
-EXPERTO = requiere_rol('admin', 'experto')
-CUALQUIERA = requiere_rol('admin', 'experto', 'visualizador')
+ADMIN = requiere_rol('admin')                                   # usuarios y notificaciones
+EXPERTO = requiere_rol('admin', 'experto')                      # lo clínico de cada niño
+DATOS = requiere_rol('admin', 'datos')                          # datos y modelos: diccionario, calidad, configuración,
+                                                                # programación, entrenamientos, paquetes y corridas (D77)
+EXPERTOS = requiere_rol('admin', 'experto', 'datos')            # las muestras guardadas: grupos clínicos y de entrenamiento
+CUALQUIERA = requiere_rol('admin', 'experto', 'datos', 'visualizador')
 
 
 def ip_cliente(request: Request) -> str:

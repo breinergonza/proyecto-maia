@@ -46,7 +46,7 @@ export function EntrenarAhora({ fuente }: { fuente: Fuente }) {
       const elegidos = TIPOS.filter((t) => modelos[t])
       return pedir<Ejecucion>('/entrenamientos/entrenar', {
         cuerpo: {
-          fuente, modelos: elegidos, extraer, guardar,
+          fuente, modelos: elegidos, extraer, guardar, visibilidad: 'oficial',   // el experto en datos también entrena oficiales
           hiperparametros: Object.fromEntries(elegidos.map((t) => [t, Object.fromEntries(
             Object.entries(valores[t] ?? {}).map(([k, v]) => [k, v === '' ? null : Number(v)]))])),
         },

@@ -1,5 +1,6 @@
 """Revisión: la cola de datos por revisar (Calidad de datos: ¿el valor es correcto o hay que corregirlo?) y la revisión
-ciega de riesgos (¿le preocupa?). Las dos son de administración y de los expertos clínicos; quien solo consulta no entra.
+ciega de riesgos (¿le preocupa?). La de datos es de administración y del experto en datos; la de riesgos, de
+administración y de los expertos clínicos (D77). Quien solo consulta no entra.
 
 La revisión de riesgos es ciega: mezcla niños de riesgo alto (posición 90 o más) con el resto, en un orden fijo por
 corrida, y no muestra ni el riesgo ni la posición. ``/revision/resumen`` mide después qué tanto acierta cada capa y si
@@ -26,7 +27,7 @@ from maia_api.consultas import (
     unidades_crecimiento,
     valor_legible,
 )
-from maia_api.dependencias import EXPERTO, auditar, sesion
+from maia_api.dependencias import DATOS, EXPERTO, auditar, sesion
 from maia_api.esquemas import RevisionDatoEntrada, RevisionRiesgoEntrada
 from maia_api.rutas.ninos import unidad_crecimiento
 from maia_comun.modelos_db import PERCENTIL_ALTO, AlertaDato, RevisionDato, RevisionRiesgo, Riesgo, Usuario
@@ -39,7 +40,7 @@ MUESTRA_POR_GRUPO = 20
 @ruta.get('/datos')
 def datos(estado: str = Query('pendiente', pattern='^(pendiente|revisado|todos)$'), capa: str | None = None,
           variable: str | None = None, etapa: str | None = None, pagina: int = Query(1, ge=1),
-          tamano: int = Query(25, ge=1, le=200), corrida_id: int | None = None, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> dict:
+          tamano: int = Query(25, ge=1, le=200), corrida_id: int | None = None, s: Session = Depends(sesion), u: Usuario = Depends(DATOS)) -> dict:
     c = corrida_de(s, corrida_id)
     mapa = etapas(s, c.corte_id)
     filtros = ['a.corrida_id = :c']
@@ -103,7 +104,7 @@ DIAS_12_MESES = 365
 
 
 @ruta.get('/datos/resumen')
-def resumen_datos(corrida_id: int | None = None, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> dict:
+def resumen_datos(corrida_id: int | None = None, s: Session = Depends(sesion), u: Usuario = Depends(DATOS)) -> dict:
     """Lo que la pantalla de Calidad de datos pone sobre la cola: cuántas mediciones faltan por revisar (para quien
     consulta), cuántas se revisaron este mes, las visitas y mediciones que tienen alertas (para filtrar la cola) y la
     completitud de la talla por visita.
@@ -162,7 +163,7 @@ def _cortes_aciertos(maximo: int) -> list[int]:
 
 
 @ruta.get('/datos/aciertos')
-def aciertos(corrida_id: int | None = None, s: Session = Depends(sesion), _: Usuario = Depends(EXPERTO)) -> dict:
+def aciertos(corrida_id: int | None = None, s: Session = Depends(sesion), _: Usuario = Depends(DATOS)) -> dict:
     """Qué tanto acierta la cola: de las k primeras alertas (por prioridad) que ya tienen respuesta, qué porcentaje se
     marcó «error». Una alerta cuenta como error si alguna respuesta dijo «sí». Las respuestas «no sé» cuentan como
     respondidas pero no como error."""
@@ -184,7 +185,7 @@ def aciertos(corrida_id: int | None = None, s: Session = Depends(sesion), _: Usu
 
 
 @ruta.get('/datos/concentracion')
-def concentracion(corrida_id: int | None = None, s: Session = Depends(sesion), _: Usuario = Depends(EXPERTO)) -> dict:
+def concentracion(corrida_id: int | None = None, s: Session = Depends(sesion), _: Usuario = Depends(DATOS)) -> dict:
     """Dónde se acumulan las alertas: por variable y, si el corte trae más de un grupo o sede, por grupo y variable.
     Cada variable y cada celda sale con su cifra, aunque tenga una sola alerta (D63)."""
     c = corrida_de(s, corrida_id)
@@ -268,7 +269,7 @@ def _series(s: Session, corte_id: int, items: list[dict], esq: dict, mapa: dict)
 
 @ruta.post('/datos/{alerta_id}', status_code=status.HTTP_204_NO_CONTENT)
 def responder_dato(alerta_id: int, datos: RevisionDatoEntrada, s: Session = Depends(sesion),
-                   u: Usuario = Depends(EXPERTO)) -> None:
+                   u: Usuario = Depends(DATOS)) -> None:
     if s.get(AlertaDato, alerta_id) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, 'No existe ese dato en la cola.')
     q = pg_insert(RevisionDato).values(alerta_id=alerta_id, usuario_id=u.id, es_error=datos.es_error,

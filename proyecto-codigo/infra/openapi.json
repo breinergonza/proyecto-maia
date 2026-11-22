@@ -3011,7 +3011,7 @@
      "entrenamientos"
     ],
     "summary": "Entrenar",
-    "description": "Entrena ya (administración y expertos): se pone en la cola y el programador los toma uno por vez, en orden de\nllegada. Un experto entrena modelos personales con los hiperparámetros vigentes y tiene cuota (D17, D40); el\nresultado queda en MLflow como ``candidato`` (u ``personal`` si es personal). El avance se ve en\n``GET /entrenamientos/cola``.",
+    "description": "Entrena ya (administración y el experto en datos): se pone en la cola y el programador los toma uno por vez, en\norden de llegada. El experto en datos entrena oficiales (pidiéndolo con ``visibilidad``) y personales; los\npersonales tienen cuota (D17, D40, D77). El resultado queda en MLflow como ``candidato`` (u ``personal`` si es\npersonal). El avance se ve en ``GET /entrenamientos/cola``.",
     "operationId": "entrenar_api_entrenamientos_entrenar_post",
     "requestBody": {
      "content": {
@@ -3253,7 +3253,7 @@
      "entrenamientos"
     ],
     "summary": "Banco",
-    "description": "El banco compartido: entrenamientos terminados (oficiales y personales) con dueño, muestra, métricas\nprincipales y si su corte ya no es el vigente (D38). Filtros por dueño y por Personal u Oficial. Lo ven\nadministración y expertos.",
+    "description": "El banco compartido: entrenamientos terminados (oficiales y personales) con dueño, muestra, métricas\nprincipales y si su corte ya no es el vigente (D38). Filtros por dueño y por Personal u Oficial. Lo ven\nadministración y el experto en datos.",
     "operationId": "banco_api_entrenamientos_banco_get",
     "security": [
      {
@@ -9235,6 +9235,7 @@
         "enum": [
          "admin",
          "experto",
+         "datos",
          "visualizador"
         ]
        },
@@ -9289,6 +9290,7 @@
       "enum": [
        "admin",
        "experto",
+       "datos",
        "visualizador"
       ],
       "title": "Rol"
@@ -9329,6 +9331,7 @@
       "enum": [
        "admin",
        "experto",
+       "datos",
        "visualizador"
       ],
       "title": "Rol"

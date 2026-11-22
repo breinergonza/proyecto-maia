@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from maia_api.dependencias import ADMIN, auditar, configuracion, sesion
+from maia_api.dependencias import DATOS, auditar, configuracion, sesion
 from maia_api.esquemas import (
     Calendario,
     CampoHiperparametro,
@@ -50,7 +50,7 @@ def _invalido(e: Exception) -> HTTPException:
 
 @ruta.get('/resumen', response_model=ResumenAdministracion)
 def resumen(s: Session = Depends(sesion), cfg: Configuracion = Depends(configuracion),
-            _: Usuario = Depends(ADMIN)) -> ResumenAdministracion:
+            _: Usuario = Depends(DATOS)) -> ResumenAdministracion:
     c = CO.guardada(s)
     try:
         clave = bool(CO.clave(c, cfg))
@@ -85,13 +85,13 @@ def _datos(e: ConexionEntrada) -> CO.Datos:
 
 @ruta.get('/conexion', response_model=ConexionSalida)
 def conexion(s: Session = Depends(sesion), cfg: Configuracion = Depends(configuracion),
-             _: Usuario = Depends(ADMIN)) -> ConexionSalida:
+             _: Usuario = Depends(DATOS)) -> ConexionSalida:
     return _salida_conexion(s, cfg)
 
 
 @ruta.put('/conexion', response_model=ConexionSalida)
 def guardar_conexion(datos: ConexionEntrada, s: Session = Depends(sesion), cfg: Configuracion = Depends(configuracion),
-                     admin: Usuario = Depends(ADMIN)) -> ConexionSalida:
+                     admin: Usuario = Depends(DATOS)) -> ConexionSalida:
     _no_real(cfg)
     d = _datos(datos)
     try:
@@ -109,7 +109,7 @@ def guardar_conexion(datos: ConexionEntrada, s: Session = Depends(sesion), cfg: 
 
 @ruta.post('/conexion/probar', response_model=PruebaConexionSalida)
 def probar_conexion(datos: ConexionEntrada | None = None, s: Session = Depends(sesion),
-                    cfg: Configuracion = Depends(configuracion), admin: Usuario = Depends(ADMIN)) -> PruebaConexionSalida:
+                    cfg: Configuracion = Depends(configuracion), admin: Usuario = Depends(DATOS)) -> PruebaConexionSalida:
     """Prueba los datos del formulario (o los guardados) sin guardarlos. Sin clave en el formulario, usa la guardada."""
     _no_real(cfg)
     c = CO.guardada(s)
@@ -139,13 +139,13 @@ def _salida_hp(s: Session, modelo: str) -> HiperparametrosSalida:
 
 
 @ruta.get('/hiperparametros', response_model=list[HiperparametrosSalida])
-def hiperparametros(s: Session = Depends(sesion), _: Usuario = Depends(ADMIN)) -> list[HiperparametrosSalida]:
+def hiperparametros(s: Session = Depends(sesion), _: Usuario = Depends(DATOS)) -> list[HiperparametrosSalida]:
     return [_salida_hp(s, m) for m in HP.TIPOS]
 
 
 @ruta.put('/hiperparametros/{modelo}', response_model=HiperparametrosSalida)
 def guardar_hiperparametros(modelo: str, datos: HiperparametrosEntrada, s: Session = Depends(sesion),
-                            admin: Usuario = Depends(ADMIN)) -> HiperparametrosSalida:
+                            admin: Usuario = Depends(DATOS)) -> HiperparametrosSalida:
     if modelo not in HP.TIPOS:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f'Modelo desconocido: {modelo}')
     try:
@@ -165,7 +165,7 @@ def guardar_hiperparametros(modelo: str, datos: HiperparametrosEntrada, s: Sessi
 
 @ruta.get('/calendario', response_model=Calendario)
 def calendario(cron: str = Query(min_length=9, max_length=120), zona: str | None = Query(None, max_length=64),
-               cfg: Configuracion = Depends(configuracion), _: Usuario = Depends(ADMIN)) -> Calendario:
+               cfg: Configuracion = Depends(configuracion), _: Usuario = Depends(DATOS)) -> Calendario:
     """Cómo se lee una expresión cron y sus próximas cinco fechas (para revisarla antes de guardarla)."""
     zona = zona or cfg.maia_zona_horaria
     try:
@@ -208,13 +208,13 @@ def _programacion(s: Session, pid: int) -> Programacion:
 
 
 @ruta.get('/programaciones', response_model=list[ProgramacionSalida])
-def programaciones(s: Session = Depends(sesion), _: Usuario = Depends(ADMIN)) -> list[ProgramacionSalida]:
+def programaciones(s: Session = Depends(sesion), _: Usuario = Depends(DATOS)) -> list[ProgramacionSalida]:
     return [_salida_prog(p) for p in s.scalars(select(Programacion).order_by(Programacion.id))]
 
 
 @ruta.post('/programaciones', response_model=ProgramacionSalida, status_code=status.HTTP_201_CREATED)
 def crear_programacion(datos: ProgramacionEntrada, s: Session = Depends(sesion),
-                       cfg: Configuracion = Depends(configuracion), admin: Usuario = Depends(ADMIN)) -> ProgramacionSalida:
+                       cfg: Configuracion = Depends(configuracion), admin: Usuario = Depends(DATOS)) -> ProgramacionSalida:
     p = Programacion(creado_por=admin.id)
     _aplicar(p, datos, cfg)
     s.add(p)
@@ -226,7 +226,7 @@ def crear_programacion(datos: ProgramacionEntrada, s: Session = Depends(sesion),
 
 @ruta.put('/programaciones/{pid}', response_model=ProgramacionSalida)
 def cambiar_programacion(pid: int, datos: ProgramacionEntrada, s: Session = Depends(sesion),
-                         cfg: Configuracion = Depends(configuracion), admin: Usuario = Depends(ADMIN)) -> ProgramacionSalida:
+                         cfg: Configuracion = Depends(configuracion), admin: Usuario = Depends(DATOS)) -> ProgramacionSalida:
     p = _programacion(s, pid)
     _aplicar(p, datos, cfg)
     auditar(s, admin, 'cambiar_programacion', str(pid), datos.model_dump(mode='json'))
@@ -235,7 +235,7 @@ def cambiar_programacion(pid: int, datos: ProgramacionEntrada, s: Session = Depe
 
 
 @ruta.delete('/programaciones/{pid}', status_code=status.HTTP_204_NO_CONTENT)
-def borrar_programacion(pid: int, s: Session = Depends(sesion), admin: Usuario = Depends(ADMIN)) -> None:
+def borrar_programacion(pid: int, s: Session = Depends(sesion), admin: Usuario = Depends(DATOS)) -> None:
     p = _programacion(s, pid)
     s.delete(p)
     auditar(s, admin, 'borrar_programacion', str(pid), {'nombre': p.nombre, 'cron': p.cron})
@@ -244,7 +244,7 @@ def borrar_programacion(pid: int, s: Session = Depends(sesion), admin: Usuario =
 
 @ruta.post('/programaciones/{pid}/ejecutar', response_model=EjecucionSalida, status_code=status.HTTP_202_ACCEPTED)
 def ejecutar_programacion(pid: int, s: Session = Depends(sesion), cfg: Configuracion = Depends(configuracion),
-                          admin: Usuario = Depends(ADMIN)) -> Ejecucion:
+                          admin: Usuario = Depends(DATOS)) -> Ejecucion:
     """La ejecuta ya, con sus mismos parámetros, sin mover su próxima hora."""
     p = _programacion(s, pid)
     _no_real(cfg, p.fuente)
@@ -261,12 +261,12 @@ def ejecutar_programacion(pid: int, s: Session = Depends(sesion), cfg: Configura
 
 @ruta.get('/ejecuciones', response_model=list[EjecucionSalida])
 def ejecuciones(limite: int = Query(30, ge=1, le=200), s: Session = Depends(sesion),
-                _: Usuario = Depends(ADMIN)) -> list[Ejecucion]:
+                _: Usuario = Depends(DATOS)) -> list[Ejecucion]:
     return list(s.scalars(select(Ejecucion).order_by(Ejecucion.id.desc()).limit(limite)))
 
 
 @ruta.get('/ejecuciones/{eid}', response_model=EjecucionSalida)
-def ejecucion(eid: int, s: Session = Depends(sesion), _: Usuario = Depends(ADMIN)) -> Ejecucion:
+def ejecucion(eid: int, s: Session = Depends(sesion), _: Usuario = Depends(DATOS)) -> Ejecucion:
     e = s.get(Ejecucion, eid)
     if e is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f'No existe la ejecución {eid}.')
@@ -275,7 +275,7 @@ def ejecucion(eid: int, s: Session = Depends(sesion), _: Usuario = Depends(ADMIN
 
 @ruta.post('/ejecuciones', response_model=EjecucionSalida, status_code=status.HTTP_202_ACCEPTED)
 def nueva_ejecucion(datos: EjecucionNueva, s: Session = Depends(sesion), cfg: Configuracion = Depends(configuracion),
-                    admin: Usuario = Depends(ADMIN)) -> Ejecucion:
+                    admin: Usuario = Depends(DATOS)) -> Ejecucion:
     """Una corrida ahora (extraer, entrenar, registrar en MLflow, revisar y calcular riesgos)."""
     _no_real(cfg, datos.fuente)
     try:

@@ -7,7 +7,8 @@ No hace falta saber de programación. Los nombres en **negrita** son los mismos 
 > revisar. La decisión clínica siempre es del equipo de la Fundación. Esta frase aparece al pie de cada pantalla.
 
 **Contenido:** [Antes de empezar](#antes-de-empezar) · [Ingresar](#cómo-ingresar) · [La pantalla](#cómo-está-organizada-la-pantalla) ·
-[Consulta](#perfil-consulta) · [Experto clínico](#perfil-experto-clínico) · [Administración](#perfil-administración) ·
+[Consulta](#perfil-consulta) · [Experto clínico](#perfil-experto-clínico) · [Experto en datos](#perfil-experto-en-datos) ·
+[Administración](#perfil-administración) ·
 [Glosario](#glosario-de-indicadores-y-columnas) · [Privacidad](#privacidad) · [Preguntas frecuentes](#preguntas-frecuentes)
 
 ---
@@ -20,20 +21,21 @@ Trabaja con los datos del Programa Madre Canguro y usa dos modelos:
 
 * **Anomalías.** Busca datos raros en la historia de cada niño (un peso que no cuadra con su edad, una talla que
   baja de una visita a otra, etc.). Esos datos forman la lista de **Calidad de datos**, que responden los expertos
-  clínicos y la administración.
+  en datos y la administración.
 * **Alertas clínicas.** Calcula el riesgo de desenlaces que se pueden prevenir, ordena a los niños de mayor a menor
   riesgo y dice qué fue lo que más pesó en cada caso. También compara el crecimiento con el estándar de la OMS.
 
 Los resultados se actualizan cada vez que la administración ejecuta una **corrida** (normalmente una vez por corte de
 la base de la Fundación).
 
-### Los tres perfiles
+### Los cuatro perfiles
 
 | Perfil (como aparece en pantalla) | Qué puede hacer |
 |---|---|
-| **Consulta** | Ver cifras de grupo: **Vista clínica**, **Comparar grupos**, **Explorar**, **Modelos** y el **Resumen**. No ve niños uno por uno |
-| **Experto clínico** | Todo lo de Consulta, más la lista de **Niños** y la historia de cada niño, **Revisión de riesgos**, **Predicción**, **Mis modelos**, **Calidad de datos** y **Diccionario** |
-| **Administración** | Todo lo anterior, más **Configuración**, **Modelos y corridas** y **Usuarios** |
+| **Consulta** | Ver cifras de grupo: **Seguimiento clínico**, **Comparar grupos**, **Explorar**, **Evaluación de modelos** y el **Resumen**. No ve niños uno por uno |
+| **Experto clínico** | Lo clínico: **Seguimiento clínico**, **Comparar grupos**, la lista de **Niños** y la historia de cada niño, **Revisión clínica de casos** y **Estimar riesgo**. No ve la sección **Datos y modelos** |
+| **Experto en datos** | Lo de Consulta, más la sección **Datos y modelos** completa: **Mediciones por revisar**, **Guía de variables y unidades**, **Entrenamientos propios**, **Operación de modelos** (entrenar y aprobar, paquetes, recalcular riesgos) y **Configuración** (sistema, entrenamiento y ejecuciones automáticas). No ve niños uno por uno |
+| **Administración** | Todo lo anterior, más **Usuarios y permisos** y **Notificaciones** |
 
 Si una opción del menú no aparece, su perfil no la incluye. Pida el cambio a la administración.
 
@@ -331,44 +333,11 @@ niños**, que ubica al niño frente al resto del programa.
 
 ## Perfil Experto clínico
 
-Además de lo de Consulta, el experto clínico tiene la sección **Revisión clínica**. Sus respuestas son las que dicen
-si los modelos sirven: tómese el tiempo necesario y use **No sé** cuando no esté seguro.
-
-### Calidad de datos (Experto clínico y Administración)
-
-Se abre en **Técnica › Calidad de datos**; el perfil Consulta no ve esta opción. La dirección antigua
-`/revision/datos` lleva a esta página. Son mediciones dudosas o faltantes, no riesgos clínicos: datos a revisar antes de
-usarlos.
-
-Arriba hay tres cifras: **mediciones por revisar** (las que usted no ha respondido), **revisadas este mes** y
-**completitud a los 12 meses** (de los niños elegibles, cuántos tienen talla medida en esa visita).
-
-**Mediciones por revisar** es la lista de trabajo:
-
-* **Filtros:** **Visita**, **Medición**, **Detectado por** (**Valor fuera de lo esperado**, **No cuadra con el resto de
-  sus datos** o **Cambio raro entre controles**) y **Estado** (**Por revisar**, por defecto, **Ya revisadas** o
-  **Todos**).
-* Van primero las que tienen más alertas y más fuertes. Hay 12 por página.
-* Cada fila dice el **niño** (enlace a su historia), la **visita**, la **medición**, el **valor registrado** tal como está
-  en la base (en coral), **por qué es dudosa** («Esperado entre A y B»), quién la **detectó** y su **estado**.
-* **Acción:** **Confirmar** dice que el valor registrado es correcto. **Corregir** la marca como error de registro: solo
-  la marca, el valor no cambia en la plataforma (se corrige en la base de la entidad). **No sé** queda para cuando no se
-  puede decidir. La respuesta se guarda al pulsar y se puede cambiar.
-* La flecha de cada fila abre el detalle: lo más probable para ese niño, cuándo se midió, sus otras visitas, las
-  respuestas de todo el equipo y un **comentario** opcional. Escriba el comentario **antes** de pulsar la respuesta,
-  porque se guarda junto con ella.
-
-Cada persona responde por su cuenta: «Por revisar» y «Ya revisadas» se refieren a sus propias respuestas.
-
-**Completitud por visita** está al lado: el porcentaje de niños con talla medida en cada visita, entre todos los niños
-elegibles. Quien aún no llega a la visita, no asistió o no tiene una talla válida cuenta como sin dato; es la misma
-cuenta de **Comparar grupos › ¿Faltan datos distintos?**
-
-**Cómo se comportan las alertas** (abajo, se despliega) trae cuántas alertas hay por tipo, cuántas marcó el equipo para
-corregir entre las primeras de la lista y en qué sede y dato se concentran.
-
-**Para qué sirven sus respuestas.** Con ellas se mide qué parte de lo que marca cada capa es de verdad un error. Esa
-precisión ajusta qué tan exigente será el modelo en el siguiente entrenamiento.
+El experto clínico trabaja con la sección **Clínica** del menú: **Seguimiento clínico**, **Listado de niños** (y la
+historia de cada uno), **Comparar grupos de niños**, **Revisión clínica de casos** y **Estimar riesgo**. La sección
+**Datos y modelos** (calidad de datos, diccionario, evaluación y operación de modelos, configuración) es del Experto
+en datos (D77). Sus respuestas en la revisión son las que dicen si los modelos sirven: tómese el tiempo necesario y use
+**No sé** cuando no esté seguro.
 
 ### Revisión de riesgos
 
@@ -392,38 +361,7 @@ porque podría traer nombres.
 **Por qué es ciega.** Si el modelo ordena bien, los niños de riesgo alto deberían preocupar más que el resto. Para
 saberlo sin influir en usted, solo la administración ve el resumen mientras dura la revisión.
 
-### Diccionario
-
-El diccionario de variables dice qué es cada variable de la base, en qué visita se mide y si el sistema la usa. Se
-edita en la página, con formularios, y guarda todas sus versiones. El Excel queda para exportar e importar.
-
-* **Editar el diccionario:** una pestaña por hoja (**Variables**, **Visitas**, **Desenlaces**…) con un buscador.
-  Pulse el código de una fila y se abre su formulario: cada campo con su ayuda, listas desplegables donde las
-  respuestas son cerradas y un asterisco (*) en lo obligatorio. El código de una fila no se cambia. **Aplicar** deja el
-  cambio pendiente; **Quitar la fila** la marca para borrar (las variables no se borran: márquelas **No usar**).
-  **Agregar fila** está en las hojas donde se pueden sumar filas (visitas, desenlaces…); las variables las trae la base.
-* Con cambios pendientes aparece **N fila(s) con cambios sin guardar**, con **Descartar** y **Revisar y guardar**. Revisar
-  muestra cada cambio (antes → después) y qué cambia frente a la versión en uso. Si algo no cuadra, dice el problema
-  con la hoja y el código de la fila (por ejemplo «Variables · ac_adapseno: …») y no deja guardar. **Guardar versión
-  nueva** la deja en uso, con una nota opcional. Si alguien guardó otra versión mientras usted editaba, la página lo
-  avisa y sus cambios siguen ahí para revisarlos otra vez.
-* **Variables nuevas por clasificar:** cuando la base trae variables nuevas, aparecen aquí con su visita sugerida.
-  Pulse **Lista** para que el sistema la use o **No usar** para descartarla. Si a una le falta información (por
-  ejemplo, el rol), pulse **Completar**: abre su formulario. Si una actualización trajo variables que aún no están
-  en el diccionario, verá un aviso con **Agregarlas al diccionario**.
-* **Desenlaces que se entrenan:** por defecto, dos. **Desarrollo psicomotor bajo a los 12 meses** está «En uso» (da
-  alertas) y **talla baja para la edad a los 12 meses**, calculada desde cada visita, está «En prueba»: se entrena y
-  se muestra, pero no da alertas hasta que un entrenamiento con datos reales muestre que funciona. Los demás
-  desenlaces siguen en la hoja **Desenlaces** como «No usar»; para volver a usar uno, cambie su estado y entrene de
-  nuevo.
-* El número junto a **Diccionario** en el menú, y el aviso del **Tablero**, dicen cuántas variables faltan por revisar.
-* **Exportar a Excel** (arriba) baja el que está en uso. **Importar desde Excel** sube uno editado fuera: antes de
-  confirmar verá qué cambia; si el archivo tiene un error, dice en qué hoja y fila; si es igual al que está en uso, no
-  se guarda nada.
-* **Historial de versiones:** cada versión con su estado, quién la subió, cuándo y su nota. Puede **Descargar**
-  cualquiera o **Volver a esta**. Ninguna versión se borra.
-
-### Predicción (Experto y Administración)
+### Predicción (Experto clínico y Administración)
 
 **Predicción** es una sola entrada del menú, con dos pestañas arriba: **Un niño** (la que abre por defecto) y **Un
 grupo de niños**. La pestaña elegida queda en la dirección (`/prediccion` y `/prediccion?vista=grupo`), así que se puede
@@ -491,7 +429,85 @@ Calcula el riesgo con un modelo ya entrenado, sin guardar nada por niño.
 * **Exportar CSV por niño:** solo lo ve y lo puede usar la administración; queda registrado quién lo descargó. Con menos de
   20 niños no se exporta.
 
-### Mis modelos (Experto y Administración)
+## Perfil Experto en datos
+
+El experto en datos cuida los datos y los modelos: responde la cola de **Calidad de datos**, mantiene el
+**Diccionario**, configura el sistema y el entrenamiento, programa las ejecuciones automáticas, entrena y aprueba
+modelos, activa paquetes y recalcula riesgos. Todo está en la sección **Datos y modelos** del menú. También ve el
+**Seguimiento clínico**, **Comparar grupos**, la **Evaluación de modelos** y el **Resumen**, pero no ve niños uno por
+uno ni la **Revisión clínica de casos**, **Estimar riesgo**, **Usuarios** o **Notificaciones** (D77).
+
+Las secciones que siguen describen lo que antes hacía la administración; el experto en datos las hace igual. Donde
+dicen «la administración», lea «la administración o el experto en datos».
+
+### Calidad de datos (Experto en datos y Administración)
+
+Se abre en **Datos y modelos › Mediciones por revisar**; los perfiles Consulta y Experto clínico no ven esta opción. La dirección antigua
+`/revision/datos` lleva a esta página. Son mediciones dudosas o faltantes, no riesgos clínicos: datos a revisar antes de
+usarlos.
+
+Arriba hay tres cifras: **mediciones por revisar** (las que usted no ha respondido), **revisadas este mes** y
+**completitud a los 12 meses** (de los niños elegibles, cuántos tienen talla medida en esa visita).
+
+**Mediciones por revisar** es la lista de trabajo:
+
+* **Filtros:** **Visita**, **Medición**, **Detectado por** (**Valor fuera de lo esperado**, **No cuadra con el resto de
+  sus datos** o **Cambio raro entre controles**) y **Estado** (**Por revisar**, por defecto, **Ya revisadas** o
+  **Todos**).
+* Van primero las que tienen más alertas y más fuertes. Hay 12 por página.
+* Cada fila dice el **niño** (enlace a su historia), la **visita**, la **medición**, el **valor registrado** tal como está
+  en la base (en coral), **por qué es dudosa** («Esperado entre A y B»), quién la **detectó** y su **estado**.
+* **Acción:** **Confirmar** dice que el valor registrado es correcto. **Corregir** la marca como error de registro: solo
+  la marca, el valor no cambia en la plataforma (se corrige en la base de la entidad). **No sé** queda para cuando no se
+  puede decidir. La respuesta se guarda al pulsar y se puede cambiar.
+* La flecha de cada fila abre el detalle: lo más probable para ese niño, cuándo se midió, sus otras visitas, las
+  respuestas de todo el equipo y un **comentario** opcional. Escriba el comentario **antes** de pulsar la respuesta,
+  porque se guarda junto con ella.
+
+Cada persona responde por su cuenta: «Por revisar» y «Ya revisadas» se refieren a sus propias respuestas.
+
+**Completitud por visita** está al lado: el porcentaje de niños con talla medida en cada visita, entre todos los niños
+elegibles. Quien aún no llega a la visita, no asistió o no tiene una talla válida cuenta como sin dato; es la misma
+cuenta de **Comparar grupos › ¿Faltan datos distintos?**
+
+**Cómo se comportan las alertas** (abajo, se despliega) trae cuántas alertas hay por tipo, cuántas marcó el equipo para
+corregir entre las primeras de la lista y en qué sede y dato se concentran.
+
+**Para qué sirven sus respuestas.** Con ellas se mide qué parte de lo que marca cada capa es de verdad un error. Esa
+precisión ajusta qué tan exigente será el modelo en el siguiente entrenamiento.
+
+### Diccionario
+
+El diccionario de variables dice qué es cada variable de la base, en qué visita se mide y si el sistema la usa. Se
+edita en la página, con formularios, y guarda todas sus versiones. El Excel queda para exportar e importar.
+
+* **Editar el diccionario:** una pestaña por hoja (**Variables**, **Visitas**, **Desenlaces**…) con un buscador.
+  Pulse el código de una fila y se abre su formulario: cada campo con su ayuda, listas desplegables donde las
+  respuestas son cerradas y un asterisco (*) en lo obligatorio. El código de una fila no se cambia. **Aplicar** deja el
+  cambio pendiente; **Quitar la fila** la marca para borrar (las variables no se borran: márquelas **No usar**).
+  **Agregar fila** está en las hojas donde se pueden sumar filas (visitas, desenlaces…); las variables las trae la base.
+* Con cambios pendientes aparece **N fila(s) con cambios sin guardar**, con **Descartar** y **Revisar y guardar**. Revisar
+  muestra cada cambio (antes → después) y qué cambia frente a la versión en uso. Si algo no cuadra, dice el problema
+  con la hoja y el código de la fila (por ejemplo «Variables · ac_adapseno: …») y no deja guardar. **Guardar versión
+  nueva** la deja en uso, con una nota opcional. Si alguien guardó otra versión mientras usted editaba, la página lo
+  avisa y sus cambios siguen ahí para revisarlos otra vez.
+* **Variables nuevas por clasificar:** cuando la base trae variables nuevas, aparecen aquí con su visita sugerida.
+  Pulse **Lista** para que el sistema la use o **No usar** para descartarla. Si a una le falta información (por
+  ejemplo, el rol), pulse **Completar**: abre su formulario. Si una actualización trajo variables que aún no están
+  en el diccionario, verá un aviso con **Agregarlas al diccionario**.
+* **Desenlaces que se entrenan:** por defecto, dos. **Desarrollo psicomotor bajo a los 12 meses** está «En uso» (da
+  alertas) y **talla baja para la edad a los 12 meses**, calculada desde cada visita, está «En prueba»: se entrena y
+  se muestra, pero no da alertas hasta que un entrenamiento con datos reales muestre que funciona. Los demás
+  desenlaces siguen en la hoja **Desenlaces** como «No usar»; para volver a usar uno, cambie su estado y entrene de
+  nuevo.
+* El número junto a **Diccionario** en el menú, y el aviso del **Tablero**, dicen cuántas variables faltan por revisar.
+* **Exportar a Excel** (arriba) baja el que está en uso. **Importar desde Excel** sube uno editado fuera: antes de
+  confirmar verá qué cambia; si el archivo tiene un error, dice en qué hoja y fila; si es igual al que está en uso, no
+  se guarda nada.
+* **Historial de versiones:** cada versión con su estado, quién la subió, cuándo y su nota. Puede **Descargar**
+  cualquiera o **Volver a esta**. Ninguna versión se borra.
+
+### Mis modelos (Experto en datos y Administración)
 
 Permite entrenar un modelo propio con los hiperparámetros vigentes (solo administración los cambia).
 
@@ -507,27 +523,6 @@ Permite entrenar un modelo propio con los hiperparámetros vigentes (solo admini
   Puede filtrar por **Mostrar** y **Dueño**, y ver el AUC y **Otras medidas**. Una versión personal no se puede aprobar.
 
 ---
-
-## Perfil Administración
-
-Además de todo lo anterior, la administración ve la sección **Administración** y el resumen de **Revisión de
-riesgos**.
-
-### Usuarios
-
-* **Tabla de usuarios:** **Nombre** (con el correo), **Perfil**, **Último ingreso** y **Estado** (**Activo** o
-  **Inactivo**).
-* **Cambiar el perfil:** elija otro en la lista **Perfil** de esa fila. Se guarda de inmediato. No puede cambiar su
-  propio perfil.
-* **Contraseña:** abre un campo **Nueva contraseña para …**. Escriba al menos 10 caracteres y pulse **Guardar
-  contraseña**. Las sesiones abiertas de esa persona se cierran.
-* **Desactivar / Activar:** un usuario inactivo no puede ingresar. No puede desactivarse a sí mismo.
-* **Nuevo usuario** (panel de la derecha): **Nombre**, **Correo**, **Perfil** (**Administración**, **Experto
-  clínico** o **Consulta**) y **Contraseña inicial** (mínimo 10 caracteres). Pulse **Crear usuario**. Entregue la
-  contraseña por un canal seguro (no por el mismo correo).
-
-Buenas prácticas: dé a cada persona el perfil mínimo que necesite. Desactive (no comparta) las cuentas de quienes ya
-no participan.
 
 ### Configuración inicial
 
@@ -636,6 +631,27 @@ tablero, la lista de niños y las colas de revisión.
 
 La corrida con la base de la Fundación (extraer y calcular con los modelos aprobados) se programa o se pide en
 **Programación**; cuando termina, aparece también en este historial.
+
+## Perfil Administración
+
+La administración ve todo lo anterior y, además, la sección **Administración** (usuarios), **Notificaciones** y el
+resumen de **Revisión de riesgos**.
+
+### Usuarios
+
+* **Tabla de usuarios:** **Nombre** (con el correo), **Perfil**, **Último ingreso** y **Estado** (**Activo** o
+  **Inactivo**).
+* **Cambiar el perfil:** elija otro en la lista **Perfil** de esa fila. Se guarda de inmediato. No puede cambiar su
+  propio perfil.
+* **Contraseña:** abre un campo **Nueva contraseña para …**. Escriba al menos 10 caracteres y pulse **Guardar
+  contraseña**. Las sesiones abiertas de esa persona se cierran.
+* **Desactivar / Activar:** un usuario inactivo no puede ingresar. No puede desactivarse a sí mismo.
+* **Nuevo usuario** (panel de la derecha): **Nombre**, **Correo**, **Perfil** (**Administración**, **Experto
+  clínico**, **Experto en datos** o **Consulta**) y **Contraseña inicial** (mínimo 10 caracteres). Pulse **Crear usuario**. Entregue la
+  contraseña por un canal seguro (no por el mismo correo).
+
+Buenas prácticas: dé a cada persona el perfil mínimo que necesite. Desactive (no comparta) las cuentas de quienes ya
+no participan.
 
 ### Notificaciones
 
@@ -837,8 +853,11 @@ No. Cada experto ve solo las suyas. La administración ve el resumen agregado de
 **¿Por qué no veo Niños, Revisión de riesgos o Predicción?**
 Su perfil es Consulta: ve cifras de grupo, no niños uno por uno. Si necesita esas opciones, pídale a la administración el perfil de Experto clínico.
 
-**¿Por qué no veo Calidad de datos?**
-La ven los perfiles Experto clínico y Administración. Si su perfil es Consulta, pídale a la administración el perfil de Experto clínico.
+**¿Por qué no veo Calidad de datos, el Diccionario, la Configuración o los entrenamientos?**
+Son de la sección **Datos y modelos**: la ven los perfiles Experto en datos y Administración (D77). Si los necesita, pídale a la administración el perfil de Experto en datos.
+
+**Soy experto clínico y ya no veo «Datos y modelos».**
+Desde el cambio de perfiles (D77) esa sección es del Experto en datos. Usted conserva lo clínico: Seguimiento, Comparar grupos, Niños, Revisión clínica de casos y Estimar riesgo.
 
 **Me apareció una franja que dice «Su sesión está por vencer».**
 No pierde nada. Termine o guarde lo que está haciendo y pulse **Ingresar de nuevo**; al ingresar vuelve a la misma

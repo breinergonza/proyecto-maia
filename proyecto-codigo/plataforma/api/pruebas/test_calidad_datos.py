@@ -12,6 +12,7 @@ pytestmark = pytest.mark.integracion
 ADMIN = ('admin@maia.prueba', 'clave-admin-de-prueba')
 EXPERTO = ('experto@maia.prueba', 'clave-experto-de-prueba')
 CONSULTA = ('consulta@maia.prueba', 'clave-consulta-de-prueba')
+CLINICO = ('clinico@maia.prueba', 'clave-clinico-de-prueba')
 TOTAL_ALERTAS = 120
 
 
@@ -58,7 +59,7 @@ def admin(cliente):
 @pytest.fixture(scope='module')
 def experto(cliente, admin):
     r = cliente.post('/api/usuarios', headers=admin,
-                     json={'email': EXPERTO[0], 'nombre': 'Experta', 'rol': 'experto', 'clave': EXPERTO[1]})
+                     json={'email': EXPERTO[0], 'nombre': 'Experta', 'rol': 'datos', 'clave': EXPERTO[1]})
     assert r.status_code == 201, r.text
     return _login(cliente, *EXPERTO)
 
@@ -99,9 +100,14 @@ def corrida(cliente, admin):
 
 
 def test_la_ven_expertos_y_administracion_pero_no_quien_solo_consulta(cliente, admin, experto, consulta, corrida):
+    r = cliente.post('/api/usuarios', headers=admin,
+                     json={'email': CLINICO[0], 'nombre': 'Clínico', 'rol': 'experto', 'clave': CLINICO[1]})
+    assert r.status_code == 201, r.text
+    clinico = _login(cliente, *CLINICO)
     for ruta in ('/api/revision/datos', '/api/revision/datos/resumen', '/api/revision/datos/aciertos',
                  '/api/revision/datos/concentracion'):
-        assert cliente.get(ruta, headers=consulta, params={'corrida_id': corrida}).status_code == 403, ruta
+        for fuera in (consulta, clinico):     # la cola de mediciones es del experto en datos, no del clínico
+            assert cliente.get(ruta, headers=fuera, params={'corrida_id': corrida}).status_code == 403, ruta
         for quien in (experto, admin):
             assert cliente.get(ruta, headers=quien, params={'corrida_id': corrida}).status_code == 200, ruta
     assert cliente.post('/api/revision/datos/1', headers=consulta, json={'es_error': 'si'}).status_code == 403

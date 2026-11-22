@@ -92,7 +92,7 @@ export function edad(dias: number | null | undefined): string {
  * api/pruebas/test_umbrales.py los mantiene iguales). */
 export const RIESGO_ALTO = 90
 
-export const ROLES: Record<Rol, string> = { admin: 'Administración', experto: 'Experto clínico', visualizador: 'Consulta' }
+export const ROLES: Record<Rol, string> = { admin: 'Administración', experto: 'Experto clínico', datos: 'Experto en datos', visualizador: 'Consulta' }
 export const RESPUESTAS: Record<Respuesta, string> = { si: 'Sí', no: 'No', no_se: 'No sé' }
 export const CAPAS: Record<string, string> = {
   '1': 'Valor',

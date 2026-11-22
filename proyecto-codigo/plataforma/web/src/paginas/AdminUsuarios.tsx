@@ -13,7 +13,7 @@ import { fechaHora, ROLES } from '../lib/formato'
 const nuevo = z.object({
   nombre: z.string().trim().min(2, 'Escriba el nombre.'),
   email: z.string().trim().email('Ese correo no es válido.'),
-  rol: z.enum(['admin', 'experto', 'visualizador']),
+  rol: z.enum(['admin', 'experto', 'datos', 'visualizador']),
   clave: z.string().min(10, 'Mínimo 10 caracteres.'),
 })
 type Nuevo = z.infer<typeof nuevo>

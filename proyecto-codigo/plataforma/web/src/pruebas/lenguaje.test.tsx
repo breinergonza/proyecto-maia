@@ -146,7 +146,7 @@ const aviso = { notificacion_id: 1, notificacion: 'readmisión a los 3 meses', c
   destinatarios: [{ correo: 'a@maia.prueba', estado: 'enviado', error: null }], estado: 'enviado' }
 const datoRevision = { ...alertaDato, sujeto: 's1', unidad: 'g', etapa_nombre: '3 meses', fecha: '2026-03-01', fuerza: 9, es_error: null, comentario: null, serie: [], revisiones: [] }
 
-function api(rol: 'admin' | 'experto' = 'experto') {
+function api(rol: 'admin' | 'experto' | 'visualizador' = 'experto') {
   simularApi((url) => {
     if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario(rol) } }
     if (url === '/api/notificaciones/alertas') return { cuerpo: notificaciones }
@@ -178,7 +178,7 @@ const visible = () => {
 
 describe('pantallas del equipo clínico sin términos técnicos', () => {
   it('tablero', async () => {
-    api()
+    api('visualizador')        // el Resumen ya no es del experto clínico (D77); lo ve quien consulta
     montar('/tablero')
     expect(await screen.findByText('niños con algún riesgo alto')).toBeInTheDocument()
     expect(await screen.findByText('subió de golpe en todo el programa')).toBeInTheDocument()

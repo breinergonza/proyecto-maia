@@ -1,7 +1,7 @@
 """Muestras de niños (filtros guardados): qué variables se pueden filtrar, cuántos niños da un filtro y guardarlo.
 
 Una muestra guardada no se edita (D3): para cambiarla se duplica, con otro título y, si se quiere, otra definición.
-Solo administración y expertos; quien solo consulta explora con ``/exploracion``."""
+Solo administración y los expertos (clínico y en datos); quien solo consulta explora con ``/exploracion``."""
 from __future__ import annotations
 
 import uuid
@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from maia_api import poblacion as P
-from maia_api.dependencias import EXPERTO, auditar, sesion
+from maia_api.dependencias import EXPERTOS, auditar, sesion
 from maia_comun import muestra as M
 from maia_comun.modelos_db import Corte, Usuario
 from maia_comun.modelos_muestras import Muestra
@@ -100,14 +100,14 @@ def _guardar(s: Session, u: Usuario, titulo: str, descripcion: str | None, defin
 
 
 @ruta.get('/variables')
-def variables(s: Session = Depends(sesion), _: Usuario = Depends(EXPERTO)) -> dict:
+def variables(s: Session = Depends(sesion), _: Usuario = Depends(EXPERTOS)) -> dict:
     """Las variables que se ofrecen como filtro: tipo, opciones y la regla ``cuando`` que se sugiere."""
     corte = P.corte_actual(s)
     return {'corte': str(corte.fecha_corte), 'variables': P.variables_ofrecidas(s, corte.id)}
 
 
 @ruta.post('/facetas')
-def facetas(cuerpo: dict = Body(...), s: Session = Depends(sesion), _: Usuario = Depends(EXPERTO)) -> dict:
+def facetas(cuerpo: dict = Body(...), s: Session = Depends(sesion), _: Usuario = Depends(EXPERTOS)) -> dict:
     """Niños por opción de cada variable con los demás filtros aplicados (el propio no)."""
     corte = P.corte_actual(s)
     try:
@@ -118,7 +118,7 @@ def facetas(cuerpo: dict = Body(...), s: Session = Depends(sesion), _: Usuario =
 
 
 @ruta.post('/contar')
-def contar(cuerpo: dict = Body(...), s: Session = Depends(sesion), _: Usuario = Depends(EXPERTO)) -> dict:
+def contar(cuerpo: dict = Body(...), s: Session = Depends(sesion), _: Usuario = Depends(EXPERTOS)) -> dict:
     corte = P.corte_actual(s)
     ids = P.ids_de(s, corte.id, _cuerpo(cuerpo))
     return {'n': len(ids), 'n_base': P.n_base(s, corte.id), 'minimo': P.MIN_NINOS, 'suficiente': len(ids) >= P.MIN_NINOS,
@@ -126,23 +126,23 @@ def contar(cuerpo: dict = Body(...), s: Session = Depends(sesion), _: Usuario = 
 
 
 @ruta.post('', status_code=status.HTTP_201_CREATED)
-def guardar(cuerpo: MuestraNueva, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> dict:
+def guardar(cuerpo: MuestraNueva, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTOS)) -> dict:
     return _salida(s, _guardar(s, u, cuerpo.titulo, cuerpo.descripcion, cuerpo.muestra))
 
 
 @ruta.get('')
-def listar(s: Session = Depends(sesion), _: Usuario = Depends(EXPERTO)) -> list[dict]:
+def listar(s: Session = Depends(sesion), _: Usuario = Depends(EXPERTOS)) -> list[dict]:
     return [_salida(s, m) for m in s.scalars(select(Muestra).order_by(Muestra.creada.desc(), Muestra.id.desc()))]
 
 
 @ruta.get('/{muestra_id}')
-def leer(muestra_id: int, s: Session = Depends(sesion), _: Usuario = Depends(EXPERTO)) -> dict:
+def leer(muestra_id: int, s: Session = Depends(sesion), _: Usuario = Depends(EXPERTOS)) -> dict:
     return _salida(s, _muestra(s, muestra_id))
 
 
 @ruta.post('/{muestra_id}/duplicar', status_code=status.HTTP_201_CREATED)
 def duplicar(muestra_id: int, cuerpo: MuestraDuplicada | None = None, s: Session = Depends(sesion),
-             u: Usuario = Depends(EXPERTO)) -> dict:
+             u: Usuario = Depends(EXPERTOS)) -> dict:
     """Una muestra nueva con la definición de la original (o la que se envíe), calculada sobre el corte vigente."""
     origen = _muestra(s, muestra_id)
     cuerpo = cuerpo or MuestraDuplicada()

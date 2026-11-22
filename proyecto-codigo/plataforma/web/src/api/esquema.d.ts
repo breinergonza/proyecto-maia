@@ -952,10 +952,10 @@ export interface paths {
         put?: never;
         /**
          * Entrenar
-         * @description Entrena ya (administración y expertos): se pone en la cola y el programador los toma uno por vez, en orden de
-         *     llegada. Un experto entrena modelos personales con los hiperparámetros vigentes y tiene cuota (D17, D40); el
-         *     resultado queda en MLflow como ``candidato`` (u ``personal`` si es personal). El avance se ve en
-         *     ``GET /entrenamientos/cola``.
+         * @description Entrena ya (administración y el experto en datos): se pone en la cola y el programador los toma uno por vez, en
+         *     orden de llegada. El experto en datos entrena oficiales (pidiéndolo con ``visibilidad``) y personales; los
+         *     personales tienen cuota (D17, D40, D77). El resultado queda en MLflow como ``candidato`` (u ``personal`` si es
+         *     personal). El avance se ve en ``GET /entrenamientos/cola``.
          */
         post: operations["entrenar_api_entrenamientos_entrenar_post"];
         delete?: never;
@@ -1059,7 +1059,7 @@ export interface paths {
          * Banco
          * @description El banco compartido: entrenamientos terminados (oficiales y personales) con dueño, muestra, métricas
          *     principales y si su corte ya no es el vigente (D38). Filtros por dueño y por Personal u Oficial. Lo ven
-         *     administración y expertos.
+         *     administración y el experto en datos.
          */
         get: operations["banco_api_entrenamientos_banco_get"];
         put?: never;
@@ -2977,7 +2977,7 @@ export interface components {
             /** Nombre */
             nombre?: string | null;
             /** Rol */
-            rol?: ("admin" | "experto" | "visualizador") | null;
+            rol?: ("admin" | "experto" | "datos" | "visualizador") | null;
             /** Activo */
             activo?: boolean | null;
             /** Clave */
@@ -2993,7 +2993,7 @@ export interface components {
              * Rol
              * @enum {string}
              */
-            rol: "admin" | "experto" | "visualizador";
+            rol: "admin" | "experto" | "datos" | "visualizador";
             /** Clave */
             clave: string;
         };
@@ -3012,7 +3012,7 @@ export interface components {
              * Rol
              * @enum {string}
              */
-            rol: "admin" | "experto" | "visualizador";
+            rol: "admin" | "experto" | "datos" | "visualizador";
             /**
              * Activo
              * @default true

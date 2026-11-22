@@ -6,7 +6,7 @@ import { montar, simularApi, usuario } from './util'
 
 afterEach(() => vi.unstubAllGlobals())
 
-function api(rol: 'admin' | 'experto' | 'visualizador') {
+function api(rol: 'admin' | 'experto' | 'datos' | 'visualizador') {
   simularApi((url) => {
     if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario(rol) } }
     if (url === '/api/inferencia/formulario') return { cuerpo: { campos: [], visitas: [], variables_visita: [], nota: '' } }
@@ -104,9 +104,10 @@ describe('navegación', () => {
     montar('/admin/entrenamientos')
     const menu = (await screen.findAllByRole('navigation', { name: 'Secciones' }))[0]
     expect(within(menu).getByRole('link', { name: 'Operación de modelos' })).toBeInTheDocument()
-    // «Modelos» también es una opción de TÉCNICA: se mira solo la sección de administración
-    const administracion = Array.from(menu.querySelectorAll('p')).find((p) => p.textContent === 'Administración')!.parentElement!
-    for (const t of ['Entrenar y aprobar modelos', 'Modelos disponibles', 'Recalcular riesgos']) expect(within(administracion).getByRole('link', { name: t })).toBeInTheDocument()
+    // la operación de modelos y la configuración son de Datos y modelos (D77); Administración queda con los usuarios
+    const datos = Array.from(menu.querySelectorAll('p')).find((p) => p.textContent === 'Datos y modelos')!.parentElement!
+    for (const t of ['Entrenar y aprobar modelos', 'Modelos disponibles', 'Recalcular riesgos']) expect(within(datos).getByRole('link', { name: t })).toBeInTheDocument()
+    expect(seccion(menu, 'Administración')).toEqual(['Usuarios y permisos'])
     expect(within(menu).getByRole('link', { name: 'Configuración' })).toBeInTheDocument()
     expect(within(menu).queryByRole('link', { name: 'Programar ejecuciones automáticas' })).toBeNull() // el grupo está plegado
     await userEvent.click(within(menu).getByRole('button', { name: 'Desplegar Configuración' }))
@@ -118,16 +119,46 @@ describe('navegación', () => {
     expect(titulos).toEqual(['Clínica', 'Datos y modelos', 'Notificaciones', 'Administración'])
   })
 
-  it('el experto no ve los grupos de administración', async () => {
+  it('el experto clínico ve solo lo clínico: ni Datos y modelos, ni configuración, ni operación de modelos', async () => {
     api('experto')
     montar('/prediccion')
     const menu = (await screen.findAllByRole('navigation', { name: 'Secciones' }))[0]
     await screen.findByRole('tab', { name: 'Estimación individual' })
-    expect(within(menu).queryByRole('link', { name: 'Operación de modelos' })).toBeNull()
-    expect(within(menu).queryByRole('link', { name: 'Configuración' })).toBeNull()
-    await userEvent.click(within(menu).getByRole('button', { name: 'Desplegar Evaluación de modelos' }))
-    expect(within(menu).getByRole('link', { name: 'Entrenamientos propios' })).toBeInTheDocument()
+    expect(Array.from(menu.querySelectorAll('p')).map((p) => p.textContent)).toEqual(['Clínica'])
+    for (const t of ['Operación de modelos', 'Configuración', 'Evaluación de modelos', 'Guía de variables y unidades', 'Mediciones por revisar'])
+      expect(within(menu).queryByRole('link', { name: t })).toBeNull()
   })
+
+  it.each(['/diccionario', '/admin/calidad-datos', '/mis-modelos', '/admin/configuracion', '/admin/programacion', '/admin/entrenamientos', '/tablero', '/analitica'])(
+    'el experto clínico no entra a %s por la dirección', async (ruta) => {
+      api('experto')
+      montar(ruta)
+      expect(await screen.findByRole('heading', { name: 'Sin permiso' })).toBeInTheDocument()
+    })
+
+  it('el experto en datos ve Datos y modelos con la configuración, la programación y la operación de modelos', async () => {
+    api('datos')
+    montar('/diccionario')        // en una página sin grupo: los grupos están plegados
+    const menu = await menuDe()
+    expect(Array.from(menu.querySelectorAll('p')).map((p) => p.textContent)).toEqual(['Clínica', 'Datos y modelos'])
+    expect(seccion(menu, 'Clínica')).toEqual(['Seguimiento clínico', 'Comparar grupos de niños'])
+    expect(seccion(menu, 'Datos y modelos')).toEqual(['Evaluación de modelos', 'Operación de modelos', 'Mediciones por revisar',
+      'Guía de variables y unidades', 'Resumen de riesgos y calidad de datos', 'Configuración'])
+    await userEvent.click(within(menu).getByRole('button', { name: 'Desplegar Configuración' }))
+    expect(within(menu).getByRole('link', { name: 'Programar ejecuciones automáticas' })).toHaveAttribute('href', '/admin/programacion')
+    await userEvent.click(within(menu).getByRole('button', { name: 'Desplegar Operación de modelos' }))
+    expect(within(menu).getByRole('link', { name: 'Entrenar y aprobar modelos' })).toHaveAttribute('href', '/admin/entrenamientos')
+    await userEvent.click(within(menu).getByRole('button', { name: 'Desplegar Evaluación de modelos' }))
+    expect(within(menu).getByRole('link', { name: 'Entrenamientos propios' })).toHaveAttribute('href', '/mis-modelos')
+    expect(screen.getAllByText('Experto en datos').length).toBeGreaterThan(0)    // el perfil, con su nombre
+  })
+
+  it.each(['/admin/usuarios', '/notificaciones/servidor', '/ninos', '/revision/riesgos', '/prediccion'])(
+    'el experto en datos no entra a %s (usuarios, notificaciones ni lo clínico de cada niño)', async (ruta) => {
+      api('datos')
+      montar(ruta)
+      expect(await screen.findByRole('heading', { name: 'Sin permiso' })).toBeInTheDocument()
+    })
 
   it.each(['experto', 'visualizador'] as const)('%s no ve Notificaciones ni entra por la dirección', async (rol) => {
     api(rol)
@@ -144,7 +175,8 @@ describe('navegación', () => {
     montar('/ninos')
     const menu = await menuDe()
     expect(seccion(menu, 'Clínica')).toEqual(['Seguimiento clínico', 'Listado de niños', 'Comparar grupos de niños', 'Revisión clínica de casos', 'Estimar riesgo'])
-    expect(seccion(menu, 'Datos y modelos')).toEqual(['Evaluación de modelos', 'Mediciones por revisar', 'Guía de variables y unidades', 'Resumen de riesgos y calidad de datos'])
+    expect(seccion(menu, 'Datos y modelos')).toEqual(['Evaluación de modelos', 'Operación de modelos', 'Mediciones por revisar',
+      'Guía de variables y unidades', 'Resumen de riesgos y calidad de datos', 'Configuración'])
     // Calidad de datos salió de Administración; Explorar y Tablero ya no están en el menú con esos nombres
     expect(seccion(menu, 'Administración')).not.toContain('Mediciones por revisar')
     expect(within(menu).queryByRole('link', { name: 'Explorar grupos de niños' })).toBeNull()
@@ -159,12 +191,12 @@ describe('navegación', () => {
     expect(within(menu).getByRole('link', { name: 'Entrenamientos propios' })).toHaveAttribute('href', '/mis-modelos')
   })
 
-  it('el experto ve lo clínico y lo técnico, con Calidad de datos', async () => {
+  it('el experto clínico ve todo lo clínico', async () => {
     api('experto')
     montar('/ninos')
     const menu = await menuDe()
     expect(seccion(menu, 'Clínica')).toEqual(['Seguimiento clínico', 'Listado de niños', 'Comparar grupos de niños', 'Revisión clínica de casos', 'Estimar riesgo'])
-    expect(seccion(menu, 'Datos y modelos')).toEqual(['Evaluación de modelos', 'Mediciones por revisar', 'Guía de variables y unidades', 'Resumen de riesgos y calidad de datos'])
+    expect(seccion(menu, 'Datos y modelos')).toBeNull()
   })
 
   it('quien solo consulta ve vista clínica, comparar, modelos y el resumen; no niños uno por uno ni lo que cambia o calcula', async () => {
@@ -186,7 +218,7 @@ describe('navegación', () => {
 
   it('«/» abre la vista clínica y el tablero de antes queda en «/tablero» como «Resumen»', async () => {
     simularApi((url) => {
-      if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('experto') } }
+      if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('datos') } }
       if (url === '/api/tablero/resumen') return { estado: 404, cuerpo: { detail: 'x' } }
       if (url === '/api/clinica/resumen') return { estado: 404, cuerpo: { detail: 'x' } }
       if (url.startsWith('/api/')) return { cuerpo: [] }

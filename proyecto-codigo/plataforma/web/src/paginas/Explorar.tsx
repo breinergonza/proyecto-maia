@@ -22,7 +22,7 @@ import { useFiltros } from '../lib/useFiltros'
 export default function Explorar() {
   const { usuario } = useSesion()
   const filtros = useFiltros()
-  const esExperto = puede(usuario, ['admin', 'experto'])
+  const esExperto = puede(usuario, ['admin', 'experto', 'datos'])   // guardan grupos como muestras
   // una muestra guardada sin cambios se pide por su número: conserva el tiempo y el muestreo que tenga
   const resumen = useResumenExplorar(cuerpoDeFiltros(filtros))
   // las variables agregadas al panel solo afectan a las opciones, no a las cifras del grupo
