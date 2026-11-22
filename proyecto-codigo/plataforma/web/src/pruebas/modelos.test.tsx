@@ -57,7 +57,7 @@ const semaforos = [{ id: 'auc', nombre: 'Detección y falsas alertas', estado: '
 
 type Extra = (url: string, init?: RequestInit) => { estado?: number; cuerpo?: unknown } | undefined
 
-function api(rol: Usuario['rol'] = 'experto', extra?: Extra, conReferencia = true) {
+function api(rol: Usuario['rol'] = 'datos', extra?: Extra, conReferencia = true) {
   return simularApi((url, init) => {
     if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario(rol) } }
     const e = extra?.(url, init)
@@ -112,13 +112,13 @@ describe('modelos: los selectores de arriba', () => {
 
 describe('modelos: configuración y trazabilidad', () => {
   it('muestra con qué datos y cómo se entrenó y qué entrenamiento, versión y paquete es', async () => {
-    api('experto')
+    api('datos')
     montar(`/analitica?entrenamiento=7&desenlace=${T3}&ver=entrenamiento`)
     const config = (await screen.findByRole('heading', { name: 'Configuración' })).closest('section')!
     expect(within(config).getByText((texto) => texto.includes(datosAl('2026-06-30')))).toBeInTheDocument()
     expect(within(config).getByText(/Temporal por fecha de nacimiento/)).toBeInTheDocument()
     expect(within(config).getByText('Gradient boosting (LightGBM)')).toBeInTheDocument()
-    expect(within(config).queryByRole('link', { name: /hiperparámetros/ })).not.toBeInTheDocument()   // solo administración
+    expect(within(config).getByRole('link', { name: /hiperparámetros/ })).toHaveAttribute('href', '/admin/entrenamientos')   // el experto en datos los ajusta
     const hp = screen.getByRole('heading', { name: 'Hiperparámetros' }).closest('section')!   // todos los perfiles los ven, en su propia tarjeta
     expect(within(hp).getByText('Rondas de boosting (máximo)').nextElementSibling).toHaveTextContent('1.200')
     expect(within(hp).getByText('Tasa de aprendizaje').nextElementSibling).toHaveTextContent('0,05')
@@ -132,7 +132,7 @@ describe('modelos: configuración y trazabilidad', () => {
   it('un entrenamiento que guardó sus cohortes y su Diccionario dice con quiénes se entrenó, con quiénes se probó y con qué versión', async () => {
     const completa = { ...meta, diccionario: 14, cohortes: {
       entrenamiento: { ninos: 3400, nacidos_desde: 2007, nacidos_hasta: 2021 }, prueba: { ninos: 600, nacidos_desde: 2020, nacidos_hasta: 2021 } } }
-    api('experto', (url) => {
+    api('datos', (url) => {
       const m = /^\/api\/analitica\/7\/(rendimiento|resumen)\?desenlace=(.+)$/.exec(url)
       if (!m) return undefined
       return { cuerpo: { estado: 'ok', entrenamiento: 7, submodulo: m[1], meta: completa,
@@ -148,7 +148,7 @@ describe('modelos: configuración y trazabilidad', () => {
   })
 
   it('un entrenamiento que no guardó sus hiperparámetros no los muestra', async () => {
-    api('experto')
+    api('datos')
     montar(`/analitica?entrenamiento=6&desenlace=${T3}&ver=entrenamiento`)
     const config = (await screen.findByRole('heading', { name: 'Configuración' })).closest('section')!
     await within(config).findByText('Gradient boosting (LightGBM)')
@@ -224,7 +224,7 @@ describe('modelos: comparación técnica', () => {
   }
 
   it('dice con qué datos se calcula la regla de referencia y da la diferencia con su intervalo', async () => {
-    api('experto', conRegla({ valor: 0.06, ic_bajo: 0.02, ic_alto: 0.1 }))
+    api('datos', conRegla({ valor: 0.06, ic_bajo: 0.02, ic_alto: 0.1 }))
     montar(`/analitica?entrenamiento=7&desenlace=${T3}&ver=evaluacion`)
     const panel = (await screen.findByRole('heading', { name: 'Comparación técnica' })).closest('section')!
     const fila = (t: string) => within(panel).getByText(t).closest('tr')!
@@ -235,7 +235,7 @@ describe('modelos: comparación técnica', () => {
   })
 
   it('si el intervalo de la diferencia incluye el 0, dice que la ventaja puede ser casualidad', async () => {
-    api('experto', conRegla({ valor: 0.02, ic_bajo: -0.03, ic_alto: 0.07 }))
+    api('datos', conRegla({ valor: 0.02, ic_bajo: -0.03, ic_alto: 0.07 }))
     montar(`/analitica?entrenamiento=7&desenlace=${T3}&ver=evaluacion`)
     const panel = (await screen.findByRole('heading', { name: 'Comparación técnica' })).closest('section')!
     expect(within(panel).getByText('Modelo completo').closest('tr')).toHaveTextContent('(−0,03 a 0,07)')
@@ -243,7 +243,7 @@ describe('modelos: comparación técnica', () => {
   })
 
   it('un entrenamiento sin regla de referencia no muestra el panel', async () => {
-    api('experto', undefined, false)
+    api('datos', undefined, false)
     montar(`/analitica?entrenamiento=7&desenlace=${T3}&ver=evaluacion`)
     await screen.findByRole('heading', { name: 'Evaluación en prueba' })
     expect(screen.queryByRole('heading', { name: 'Comparación técnica' })).not.toBeInTheDocument()
@@ -281,7 +281,7 @@ describe('modelos: sin jerga ni repeticiones', () => {
 describe('modelos: falla de red', () => {
   it('explica qué pasó, ofrece reintentar y conserva el desenlace y el entrenamiento elegidos', async () => {
     let caida = true
-    api('experto', (url) => (caida && /\/analitica\/7\/rendimiento/.test(url) ? { estado: 503, cuerpo: { detail: 'El servidor no responde por ahora.' } } : undefined))
+    api('datos', (url) => (caida && /\/analitica\/7\/rendimiento/.test(url) ? { estado: 503, cuerpo: { detail: 'El servidor no responde por ahora.' } } : undefined))
     montar(`/analitica?entrenamiento=7&desenlace=${T40}&ver=evaluacion`, <Ubicacion />)
     const aviso = await screen.findByRole('alert', undefined, { timeout: 20_000 })
     expect(aviso).toHaveTextContent('No se pudo cargar este análisis')

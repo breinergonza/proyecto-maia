@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from maia_api import estado as E
-from maia_api.dependencias import ADMIN, CUALQUIERA, auditar, configuracion, sesion
+from maia_api.dependencias import CUALQUIERA, DATOS, auditar, configuracion, sesion
 from maia_api.esquemas import PaqueteSalida
 from maia_api.semillas import config_notificaciones_de
 from maia_comun import paquete as PQ
@@ -36,7 +36,7 @@ def activo(s: Session = Depends(sesion), _: Usuario = Depends(CUALQUIERA)) -> Pa
 
 
 @ruta.get('/paquetes', response_model=list[PaqueteSalida])
-def listar(s: Session = Depends(sesion), _: Usuario = Depends(ADMIN)) -> list[PaqueteSalida]:
+def listar(s: Session = Depends(sesion), _: Usuario = Depends(DATOS)) -> list[PaqueteSalida]:
     return [_salida(p) for p in s.scalars(select(Paquete).order_by(Paquete.subido_en.desc()))]
 
 
@@ -60,7 +60,7 @@ def registrar_paquete(s: Session, cfg: Configuracion, origen: Path, usuario_id=N
 
 @ruta.post('/paquetes', response_model=PaqueteSalida)
 def subir(archivo: UploadFile = File(...), s: Session = Depends(sesion), cfg: Configuracion = Depends(configuracion),
-          admin: Usuario = Depends(ADMIN)) -> PaqueteSalida:
+          admin: Usuario = Depends(DATOS)) -> PaqueteSalida:
     with tempfile.TemporaryDirectory() as tmp:
         ruta_tmp = Path(tmp) / PQ.NOMBRE
         total = 0
@@ -84,7 +84,7 @@ def subir(archivo: UploadFile = File(...), s: Session = Depends(sesion), cfg: Co
 
 @ruta.post('/paquetes/{version}/activar', response_model=PaqueteSalida)
 def activar(version: str, s: Session = Depends(sesion), cfg: Configuracion = Depends(configuracion),
-            admin: Usuario = Depends(ADMIN)) -> PaqueteSalida:
+            admin: Usuario = Depends(DATOS)) -> PaqueteSalida:
     try:
         E.activar(s, cfg, version)
     except LookupError as e:

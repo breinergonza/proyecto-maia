@@ -40,7 +40,7 @@ CONVENCION = {
     'fk': 'fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s',
     'pk': 'pk_%(table_name)s',
 }
-ROLES = ('admin', 'experto', 'visualizador')
+ROLES = ('admin', 'experto', 'datos', 'visualizador')   # datos: experto en datos y modelos (D77)
 FUENTES = ('kmc', 'simulado')
 RESPUESTAS = ('si', 'no', 'no_se')
 

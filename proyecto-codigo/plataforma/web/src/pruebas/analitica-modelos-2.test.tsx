@@ -104,7 +104,7 @@ const elegida = async () => (await lista()).getByRole('tab', { selected: true })
 
 describe('Población en pestañas', () => {
   it('abre en «La muestra» (cifras y embudo) y deja lo demás en sus pestañas', async () => {
-    api('experto')
+    api('datos')
     montar('/analitica/poblacion?entrenamiento=7&desenlace=des_a')
     expect(await nombres()).toEqual(['La muestra', 'Casos por desenlace', 'Reparto por categoría', 'Valores típicos', 'Datos faltantes'])
     expect(await elegida()).toBe('La muestra')
@@ -116,7 +116,7 @@ describe('Población en pestañas', () => {
   })
 
   it('«Casos por desenlace» lista los desenlaces con sus casos y la advertencia de pocos casos', async () => {
-    api('experto')
+    api('datos')
     montar('/analitica/poblacion?entrenamiento=7&desenlace=des_a')
     await userEvent.click(await screen.findByRole('tab', { name: 'Casos por desenlace' }))
     expect(await screen.findByText(/Cuántos casos hay para validar en cada desenlace/)).toBeInTheDocument()
@@ -125,7 +125,7 @@ describe('Población en pestañas', () => {
   })
 
   it('«Reparto por categoría» y «Valores típicos» ponen la muestra frente a todos los niños', async () => {
-    api('experto')
+    api('datos')
     montar('/analitica/poblacion?entrenamiento=7&desenlace=des_a')
     await userEvent.click(await screen.findByRole('tab', { name: 'Reparto por categoría' }))
     expect(await screen.findByRole('figure', { name: 'sexo: la muestra frente a todos los niños' })).toBeInTheDocument()
@@ -138,7 +138,7 @@ describe('Población en pestañas', () => {
   })
 
   it('«Datos faltantes» lista todos los datos sin esconder ninguno', async () => {
-    api('experto')
+    api('datos')
     montar('/analitica/poblacion?entrenamiento=7&desenlace=des_a&ver=faltantes', <Ubicacion />)
     expect(await elegida()).toBe('Datos faltantes')
     const figura = await screen.findByRole('figure', { name: 'Porcentaje de niños sin cada dato' })
@@ -150,7 +150,7 @@ describe('Población en pestañas', () => {
 
 describe('Equidad en pestañas', () => {
   it('abre en «Por grupo» con el bosque y la tabla de diferencias; el mapa va en «Por desenlace»', async () => {
-    api('experto')
+    api('datos')
     montar('/analitica/equidad?entrenamiento=7&desenlace=des_a')
     expect(await nombres()).toEqual(['Por grupo', 'Por desenlace'])
     expect(await elegida()).toBe('Por grupo')
@@ -163,7 +163,7 @@ describe('Equidad en pestañas', () => {
   })
 
   it('el «Subgrupo por» elegido vale para las dos pestañas', async () => {
-    api('experto')
+    api('datos')
     montar('/analitica/equidad?entrenamiento=7&desenlace=des_a')
     await userEvent.click(await screen.findByRole('button', { name: 'Sede' }))
     expect(await screen.findByText(/Equidad por grupo: sede/)).toBeInTheDocument()
@@ -174,7 +174,7 @@ describe('Equidad en pestañas', () => {
   })
 
   it('la dirección elige la pestaña', async () => {
-    api('experto')
+    api('datos')
     montar('/analitica/equidad?entrenamiento=7&desenlace=des_a&ver=desenlace')
     expect(await elegida()).toBe('Por desenlace')
     expect(await screen.findByRole('table', { name: 'Qué tan bien ordena por grupo y desenlace' })).toBeInTheDocument()
@@ -183,7 +183,7 @@ describe('Equidad en pestañas', () => {
 
 describe('Estabilidad en pestañas', () => {
   it('el aviso de reentrenar queda sobre las pestañas; «Por trimestre» abre con las dos gráficas', async () => {
-    api('experto')
+    api('datos')
     montar('/analitica/estabilidad?entrenamiento=7&desenlace=des_a')
     expect(await nombres()).toEqual(['Rendimiento por trimestre', 'Datos por trimestre', 'Cambios en la población evaluada'])
     expect(await elegida()).toBe('Rendimiento por trimestre')
@@ -194,7 +194,7 @@ describe('Estabilidad en pestañas', () => {
   })
 
   it('«Datos por trimestre» tiene la tabla de la gráfica y «Cambio de la población» el cuadro de cambios con su semáforo', async () => {
-    api('experto')
+    api('datos')
     montar('/analitica/estabilidad?entrenamiento=7&desenlace=des_a')
     await userEvent.click(await screen.findByRole('tab', { name: 'Datos por trimestre' }))
     expect(await screen.findByRole('columnheader', { name: 'Casos' })).toBeInTheDocument()
@@ -206,7 +206,7 @@ describe('Estabilidad en pestañas', () => {
   })
 
   it('la dirección elige la pestaña', async () => {
-    api('experto')
+    api('datos')
     montar('/analitica/estabilidad?entrenamiento=7&desenlace=des_a&ver=poblacion')
     expect(await elegida()).toBe('Cambios en la población evaluada')
   })
@@ -214,7 +214,7 @@ describe('Estabilidad en pestañas', () => {
 
 describe('Trayectorias en pestañas', () => {
   it('los selectores quedan sobre las pestañas y «Trayectoria media» abre con la gráfica', async () => {
-    api('experto')
+    api('datos')
     montar('/analitica/trayectorias?entrenamiento=7&desenlace=des_a')
     expect(await nombres()).toEqual(['Trayectoria media', 'Frente a la OMS', 'Niños individuales'])
     expect(await elegida()).toBe('Trayectoria media')
@@ -224,7 +224,7 @@ describe('Trayectorias en pestañas', () => {
   })
 
   it('«Frente a la OMS» trae la tabla y «Niños individuales» la lista con enlaces', async () => {
-    api('experto')
+    api('datos')
     montar('/analitica/trayectorias?entrenamiento=7&desenlace=des_a')
     await userEvent.click(await screen.findByRole('tab', { name: 'Frente a la OMS' }))
     expect(await screen.findByText('Diferencia con la OMS (z)')).toBeInTheDocument()
@@ -244,7 +244,7 @@ describe('Trayectorias en pestañas', () => {
   })
 
   it('la dirección elige la pestaña y cambiar un selector no la pierde', async () => {
-    api('experto')
+    api('datos')
     montar('/analitica/trayectorias?entrenamiento=7&desenlace=des_a&ver=oms', <Ubicacion />)
     expect(await screen.findByText('Diferencia con la OMS (z)')).toBeInTheDocument()
     expect(await elegida()).toBe('Frente a la OMS')
@@ -255,7 +255,7 @@ describe('Trayectorias en pestañas', () => {
 
 describe('Perfiles', () => {
   it('muestra los perfiles, el interruptor de tipo y la nota de confianza a la vez, sin pestañas', async () => {
-    api('experto')
+    api('datos')
     montar('/analitica/perfiles?entrenamiento=7&desenlace=des_a')
     expect(await screen.findByText('Muy prematuro')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Por edad gestacional', pressed: true })).toBeInTheDocument()
@@ -266,7 +266,7 @@ describe('Perfiles', () => {
 
 describe('Comparar entrenamientos en pestañas', () => {
   it('los selectores quedan sobre las pestañas y «Medidas» abre con A, B, la diferencia y su certeza', async () => {
-    api('experto')
+    api('datos')
     montar('/analitica/comparar?entrenamiento=7&desenlace=des_a')
     expect(await nombres()).toEqual(['Métricas de validación', 'Curva ROC', 'Niños y grupos'])
     expect(await elegida()).toBe('Métricas de validación')
@@ -278,7 +278,7 @@ describe('Comparar entrenamientos en pestañas', () => {
   })
 
   it('«Curva ROC» pone A y B en la misma gráfica; «Niños y grupos» trae el AUC por grupo y los niños de cada entrenamiento', async () => {
-    api('experto')
+    api('datos')
     montar('/analitica/comparar?entrenamiento=7&desenlace=des_a')
     await userEvent.click(await screen.findByRole('tab', { name: 'Curva ROC' }))
     expect(await screen.findByRole('figure', { name: 'Casos detectados frente a falsas alertas en A y en B' })).toBeInTheDocument()

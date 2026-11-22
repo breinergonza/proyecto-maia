@@ -155,7 +155,8 @@ def test_limite_de_intentos(cliente):
 
 
 def test_usuarios_y_roles(cliente, admin):
-    for email, rol in (('experta@maia.prueba', 'experto'), ('visor@maia.prueba', 'visualizador')):
+    for email, rol in (('experta@maia.prueba', 'experto'), ('visor@maia.prueba', 'visualizador'),
+                      ('datos@maia.prueba', 'datos')):
         r = cliente.post('/api/usuarios', headers=admin,
                          json={'email': email, 'nombre': rol.title(), 'rol': rol, 'clave': 'clave-larga-123'})
         assert r.status_code == 201, r.text
@@ -166,6 +167,11 @@ def test_usuarios_y_roles(cliente, admin):
     assert cliente.get('/api/revision/datos', headers=visor).status_code == 403
     assert cliente.get('/api/corridas', headers=experta).status_code == 403
     assert cliente.get('/api/modelos/activo', headers=visor).status_code == 200
+    datos = _login(cliente, 'datos@maia.prueba', 'clave-larga-123')
+    assert cliente.get('/api/auth/yo', headers=datos).json()['rol'] == 'datos'
+    assert cliente.get('/api/corridas', headers=datos).status_code == 200
+    assert cliente.get('/api/modelos/activo', headers=datos).status_code == 200
+    assert cliente.get('/api/usuarios', headers=datos).status_code == 403
     r = cliente.post('/api/usuarios', headers=admin,
                      json={'email': 'experta@maia.prueba', 'nombre': 'Otra', 'rol': 'experto', 'clave': 'clave-larga-123'})
     assert r.status_code == 409
@@ -393,7 +399,9 @@ def test_perfil_un_valor_por_nino_y_sin_codigos_de_no_se_hizo(cliente, admin, co
 
 def test_revision(cliente, admin, corrida):
     experta = _login(cliente, 'experta@maia.prueba', 'clave-larga-123')
-    assert cliente.get('/api/revision/datos', headers=experta).status_code == 200   # la calidad de datos también es de los expertos
+    datos = _login(cliente, 'datos@maia.prueba', 'clave-larga-123')
+    assert cliente.get('/api/revision/datos', headers=datos).status_code == 200     # la calidad de datos es del experto en datos
+    assert cliente.get('/api/revision/datos', headers=experta).status_code == 403
     cola = cliente.get('/api/revision/datos', headers=admin).json()
     if cola['items']:
         a = cola['items'][0]

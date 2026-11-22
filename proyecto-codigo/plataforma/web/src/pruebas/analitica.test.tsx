@@ -70,7 +70,7 @@ function Ubicacion() {
 
 describe('analítica: contexto en la URL', () => {
   it('lee entrenamiento y desenlace de la URL, pide ese desenlace y marca «En prueba»', async () => {
-    const llamadas = api('experto')
+    const llamadas = api('datos')
     montar('/analitica/rendimiento?entrenamiento=7&desenlace=des_b', <Ubicacion />)
     // el encabezado nombra el submódulo y su pregunta (plan v3.7, 6.1)
     expect(await screen.findByRole('heading', { level: 1, name: 'Detección y falsas alertas' })).toBeInTheDocument()
@@ -81,7 +81,7 @@ describe('analítica: contexto en la URL', () => {
   })
 
   it('al cambiar de desenlace la URL guarda el contexto y las fichas lo conservan', async () => {
-    api('experto')
+    api('datos')
     montar('/analitica/rendimiento?entrenamiento=7', <Ubicacion />)
     const selector = await screen.findByLabelText('Resultado clínico evaluado')
     await waitFor(() => expect(selector).toHaveValue('des_a'))
@@ -92,7 +92,7 @@ describe('analítica: contexto en la URL', () => {
   })
 
   it('/analitica abre el resumen', async () => {
-    api('experto')
+    api('datos')
     montar('/analitica', <Ubicacion />)
     await waitFor(() => expect(screen.getByTestId('ubicacion').textContent).toBe('/analitica/resumen'))
   })
@@ -108,7 +108,7 @@ describe('analítica: estados', () => {
   })
 
   it('pendiente dice que el análisis estará disponible pronto', async () => {
-    api('experto')
+    api('datos')
     montar('/analitica/trayectorias?entrenamiento=7')
     expect(await screen.findByText('Este análisis estará disponible pronto')).toBeInTheDocument()
   })
@@ -128,7 +128,7 @@ describe('analítica: anticipación sin datos', () => {
 
 describe('analítica: a cuántos niños se alerta', () => {
   it('empieza en 10 % y el control deslizante recalcula las cifras en el navegador', async () => {
-    const llamadas = api('experto')
+    const llamadas = api('datos')
     montar('/analitica/rendimiento?entrenamiento=7&desenlace=des_a&ver=linea')
     const control = await screen.findByRole('slider')
     expect(control).toHaveValue('10')
@@ -141,7 +141,7 @@ describe('analítica: a cuántos niños se alerta', () => {
   })
 
   it('con 2 de cada 100 niños alertados la cifra sale con su número, no oculta', async () => {
-    api('experto')
+    api('datos')
     montar('/analitica/rendimiento?entrenamiento=7&desenlace=des_a&ver=linea')
     const control = await screen.findByRole('slider')
     fireEvent.change(control, { target: { value: '2' } })
@@ -150,7 +150,7 @@ describe('analítica: a cuántos niños se alerta', () => {
   })
 
   it('una sola palabra: sin interruptor técnico, «Casos detectados» explica que en estadística es la sensibilidad', async () => {
-    api('experto')
+    api('datos')
     montar('/analitica/rendimiento?entrenamiento=7&desenlace=des_a&ver=linea')
     await screen.findByRole('slider')
     expect(screen.queryByRole('switch', { name: 'Modo técnico' })).not.toBeInTheDocument()
@@ -163,7 +163,7 @@ describe('analítica: a cuántos niños se alerta', () => {
 
 describe('analítica: equidad con grupos pequeños', () => {
   it('un grupo de 3 niños dice cuántos son y su AUC pide 20, sin decir «n menor que 5»', async () => {
-    api('experto', (url) => {
+    api('datos', (url) => {
       if (url.startsWith('/api/analitica/7/equidad')) {
         return { cuerpo: { estado: 'ok', entrenamiento: 7, submodulo: 'equidad', desenlaces: { des_a: { subgrupos: { sexo: [
           { grupo: 'Niñas', n: 500, casos: 30, auc: 0.8, ic_bajo: 0.7, ic_alto: 0.9, riesgo_medio: 0.06, observado: 0.06, tasa_alerta_top10: 0.1, sensibilidad_top10: 0.4 },
@@ -202,7 +202,7 @@ describe('analítica: acceso y menú', () => {
   })
 
   it('en la analítica el grupo del menú se abre solo y lista los submódulos', async () => {
-    api('experto')
+    api('datos')
     montar('/analitica/resumen?entrenamiento=7')
     await screen.findByRole('heading', { level: 1, name: 'Ficha del modelo' })
     for (const s of SUBMODULOS) expect(screen.getAllByRole('link', { name: s.texto }).length).toBeGreaterThan(0)
@@ -218,8 +218,8 @@ describe('analítica: comparar', () => {
     expect(await screen.findByText('Diferencia de B frente a A')).toBeInTheDocument()
   })
 
-  it('un experto no ve «Aprobar B»', async () => {
-    api('experto')
+  it('quien solo consulta no ve «Aprobar B»; el experto en datos aprueba (D77)', async () => {
+    api('visualizador')
     montar('/analitica/comparar?entrenamiento=7&desenlace=des_a')
     await screen.findByText('Entrenamiento B')
     expect(screen.queryByRole('button', { name: /Aprobar y activar el modelo B/ })).not.toBeInTheDocument()
@@ -228,7 +228,7 @@ describe('analítica: comparar', () => {
 
 describe('analítica: sin riesgo calculado para el desenlace', () => {
   it('Trayectorias lo explica y ofrece agrupar por perfil o sexo', async () => {
-    api('experto', (url) => (url.startsWith('/api/analitica/7/trayectorias')
+    api('datos', (url) => (url.startsWith('/api/analitica/7/trayectorias')
       ? { cuerpo: { estado: 'pendiente', entrenamiento: 7, submodulo: 'trayectorias', motivo: 'sin_riesgo', grupos: [],
         mensaje: 'La última corrida no calculó el riesgo de este desenlace: el riesgo se calcula solo para los niños que siguen en seguimiento.' } }
       : undefined))

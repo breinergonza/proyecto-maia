@@ -9,7 +9,7 @@ import { montar, simularApi, usuario } from './util'
 
 afterEach(() => vi.unstubAllGlobals())
 
-const como = (rol: 'admin' | 'experto') => (url: string) =>
+const como = (rol: 'admin' | 'datos') => (url: string) =>
   url === '/api/auth/refrescar' ? { cuerpo: { acceso: 't', usuario: usuario(rol) } } : undefined
 
 const nombresDePestanas = (lista?: string) =>
@@ -193,7 +193,7 @@ const banco = [{
 }]
 
 describe('Mis modelos en pestañas', () => {
-  const api = (rol: 'admin' | 'experto') => simularApi((url) => como(rol)(url) ?? (
+  const api = (rol: 'admin' | 'datos') => simularApi((url) => como(rol)(url) ?? (
     url === '/api/entrenamientos/cola' ? { cuerpo: cola }
       : url === '/api/entrenamientos/banco' ? { cuerpo: banco }
         : url === '/api/entrenamientos/cuotas' ? { cuerpo: { cola_max: 2, modelos_max: 3, dias_sin_uso: 90, dias_aviso: 14 } }
@@ -201,18 +201,18 @@ describe('Mis modelos en pestañas', () => {
             : url === '/api/exploracion/facetas' ? { cuerpo: { n: 900, minimo: 20, n_base: 1000, facetas: {} } }
               : url === '/api/muestras/contar' ? { cuerpo: { n: 150, n_base: 1000, minimo: 20, suficiente: true, huella: 'h' } } : undefined))
 
-  it('el experto abre en entrenar (límites, formulario y cola) y tiene el banco en su pestaña', async () => {
-    api('experto')
+  it('el experto en datos abre en entrenar (límites, formulario y cola), con el banco y los límites de uso en sus pestañas', async () => {
+    api('datos')
     montar('/mis-modelos')
     expect(visible(await screen.findByText('Mi prueba'))).toBe(true)
-    expect(nombresDePestanas()).toEqual(['Nuevo entrenamiento', 'Modelos propios'])
+    expect(nombresDePestanas()).toEqual(['Nuevo entrenamiento', 'Modelos propios', 'Límites de uso'])   // los fija (D77)
     expect(visible(screen.getByText(/1 de 2/))).toBe(true)
     expect(visible(screen.getByRole('button', { name: 'Entrenar modelo nuevo' }))).toBe(true)
     expect(visible(screen.getByText('Modelo de Ana'))).toBe(false)
   })
 
   it('el banco va en la dirección y trae sus filtros', async () => {
-    api('experto')
+    api('datos')
     montar('/mis-modelos?ver=banco')
     expect(visible(await screen.findByText('Modelo de Ana'))).toBe(true)
     expect(seleccionada()).toHaveTextContent('Modelos propios')
@@ -229,7 +229,7 @@ describe('Mis modelos en pestañas', () => {
   })
 
   it('armar una muestra reemplaza el formulario y cerrar lo devuelve con lo escrito', async () => {
-    api('experto')
+    api('datos')
     montar('/mis-modelos')
     await userEvent.type(await screen.findByLabelText('Nombre'), 'Prueba A')
     await userEvent.click(screen.getByRole('button', { name: 'Seleccionar niños para el entrenamiento' }))
@@ -264,7 +264,7 @@ const porClasificar = {
 }
 
 describe('Diccionario en pestañas', () => {
-  const api = () => simularApi((url) => como('experto')(url) ?? (
+  const api = () => simularApi((url) => como('datos')(url) ?? (
     url === '/api/diccionario/por-clasificar' ? { cuerpo: porClasificar }
       : url === '/api/diccionario/versiones' ? { cuerpo: [vigente, version(1, 'archivado')] }
         : url === '/api/diccionario/versiones/20/vista' ? { cuerpo: vista } : undefined))

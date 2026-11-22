@@ -79,7 +79,7 @@ const interpretabilidad = {
 
 /** ``caida``: la petición que empieza así falla como falla el navegador sin conexión. ``sinCorrida``: los niños de ejemplo
  *  responden 409, como cuando no hay un paquete activo. */
-function api(rol: Usuario['rol'] = 'experto', { caida, sinCorrida = false }: { caida?: string; sinCorrida?: boolean } = {}) {
+function api(rol: Usuario['rol'] = 'datos', { caida, sinCorrida = false }: { caida?: string; sinCorrida?: boolean } = {}) {
   return simularApi((url) => {
     if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario(rol) } }
     if (caida && url.startsWith(caida)) throw new TypeError('Failed to fetch')
@@ -173,7 +173,7 @@ describe('Modelos 1: Rendimiento en pestañas', () => {
 
 describe('Modelos 1: Anticipación en pestañas', () => {
   it('«Ventaja» abre primero; «Qué cuesta avisar antes» y «Tabla y niños de ejemplo» traen el resto', async () => {
-    api('experto')
+    api('admin')
     montar(ruta('anticipacion'), <Ubicacion />)
     expect(await pestana('Ventaja')).toHaveAttribute('aria-selected', 'true')
     expect(await screen.findByText('Casos avisados al menos una visita antes')).toBeInTheDocument()
@@ -191,7 +191,7 @@ describe('Modelos 1: Anticipación en pestañas', () => {
   })
 
   it('el porcentaje de alerta se elige desde cualquier pestaña y cambia la tabla', async () => {
-    api('experto')
+    api('datos')
     montar(ruta('anticipacion', 'tabla'))
     await screen.findByText('Cada visita de cálculo')
     fireEvent.change(screen.getByLabelText('Alertar al'), { target: { value: '20' } })
@@ -286,7 +286,7 @@ describe('Modelos 1: el marco de Analítica es compacto', () => {
 
 describe('Modelos sin red (prueba de resiliencia del asesor)', () => {
   it('los niños de ejemplo de Anticipación se pueden reintentar', async () => {
-    const llamadas = api('experto', { caida: '/api/analitica/riesgo-por-visita' })
+    const llamadas = api('admin', { caida: '/api/analitica/riesgo-por-visita' })
     montar(ruta('anticipacion', 'tabla'))
     const pedidas = () => llamadas.filter((l) => l.url.startsWith('/api/analitica/riesgo-por-visita')).length
     await userEvent.click(await screen.findByRole('button', { name: 'Reintentar' }))
@@ -295,14 +295,14 @@ describe('Modelos sin red (prueba de resiliencia del asesor)', () => {
   })
 
   it('sin corrida activa, Anticipación lo dice sin ofrecer reintentar', async () => {
-    api('experto', { sinCorrida: true })
+    api('admin', { sinCorrida: true })
     montar(ruta('anticipacion', 'tabla'))
     expect(await screen.findByText(/Todavía no hay una corrida con un modelo activo/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Reintentar' })).not.toBeInTheDocument()
   })
 
   it('un análisis que se calcula al pedirlo (Trayectorias) se puede reintentar', async () => {
-    const llamadas = api('experto', { caida: '/api/analitica/7/trayectorias' })
+    const llamadas = api('datos', { caida: '/api/analitica/7/trayectorias' })
     montar(ruta('trayectorias'))
     const pedidas = () => llamadas.filter((l) => l.url.startsWith('/api/analitica/7/trayectorias')).length
     const boton = await screen.findByRole('button', { name: 'Reintentar' })

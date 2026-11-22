@@ -6,7 +6,7 @@ import { montar, simularApi, usuario } from './util'
 
 afterEach(() => vi.unstubAllGlobals())
 
-const como = (rol: 'experto' | 'visualizador') => (url: string) =>
+const como = (rol: 'datos' | 'visualizador') => (url: string) =>
   url === '/api/auth/refrescar' ? { cuerpo: { acceso: 't', usuario: usuario(rol) } } : undefined
 
 const version = (v: number, estado: VersionDiccionario['estado'], origen: VersionDiccionario['origen'], extra = {}): VersionDiccionario => ({
@@ -28,7 +28,7 @@ const diferencias = {
 }
 
 function api(extra?: (url: string, init?: RequestInit) => { estado?: number; cuerpo?: unknown } | undefined) {
-  return simularApi((url, init) => como('experto')(url) ?? extra?.(url, init) ?? (
+  return simularApi((url, init) => como('datos')(url) ?? extra?.(url, init) ?? (
     url === '/api/diccionario/por-clasificar' ? { cuerpo: pendientes }
       : url === '/api/diccionario/versiones' && (init?.method ?? 'GET') === 'GET' ? { cuerpo: versiones }
         : url === '/api/diccionario/clasificar' ? { cuerpo: version(4, 'vigente', 'subido') }
@@ -46,7 +46,7 @@ describe('diccionario de variables', () => {
     expect(screen.getByText(/visita sugerida: 3 meses \(edad corregida\)/)).toBeInTheDocument()
     const enlace = screen.getAllByRole('link', { name: /Guía de variables y unidades/ })[0]
     expect(within(enlace).getByText('3')).toBeInTheDocument()
-    expect(screen.getAllByRole('link', { name: 'Estimar riesgo' }).length).toBeGreaterThan(0)
+    expect(screen.queryAllByRole('link', { name: 'Estimar riesgo' })).toHaveLength(0)   // lo clínico no es del experto en datos (D77)
     // sin palabras técnicas para el equipo clínico
     expect(document.body.textContent).not.toMatch(/sha|corte|corrida/i)
     await userEvent.click(screen.getByRole('button', { name: 'Marcar var_simulada_a como Lista' }))

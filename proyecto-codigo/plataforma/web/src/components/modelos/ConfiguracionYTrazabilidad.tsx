@@ -38,7 +38,7 @@ export function ConfiguracionModelo({ meta }: { meta: AnaliticaMeta | undefined 
   const { entrenamiento, prueba } = meta?.cohortes ?? {}
   return (
     <Panel titulo="Configuración"
-      accion={puede(usuario, ['admin']) ? <Link to="/admin/entrenamientos" className="text-sm font-semibold text-teal hover:underline">Ver hiperparámetros ›</Link> : undefined}>
+      accion={puede(usuario, ['admin', 'datos']) ? <Link to="/admin/entrenamientos" className="text-sm font-semibold text-teal hover:underline">Ver hiperparámetros ›</Link> : undefined}>
       <Datos filas={[
         ['Datos de entrenamiento', meta?.corte ? `${datosAl(meta.corte)}${meta.fuente ? `, ${(FUENTES[meta.fuente] ?? meta.fuente).toLowerCase()}` : ''}` : null],
         ['Cohorte de entrenamiento', entrenamiento

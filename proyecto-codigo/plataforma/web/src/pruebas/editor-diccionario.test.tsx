@@ -40,7 +40,7 @@ const pendientes = {
 }
 
 function api(extra?: (url: string, init?: RequestInit) => { estado?: number; cuerpo?: unknown } | undefined) {
-  return simularApi((url, init) => (url === '/api/auth/refrescar' ? { cuerpo: { acceso: 't', usuario: usuario('experto') } } : undefined)
+  return simularApi((url, init) => (url === '/api/auth/refrescar' ? { cuerpo: { acceso: 't', usuario: usuario('datos') } } : undefined)
     ?? extra?.(url, init) ?? (
     url === '/api/diccionario/por-clasificar' ? { cuerpo: pendientes }
       : url === '/api/diccionario/versiones' ? { cuerpo: [vigente, version(1, 'archivado')] }

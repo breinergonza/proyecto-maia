@@ -22,6 +22,7 @@ const minutos = (m: number | null) => (m == null ? 'sin datos todavía' : `${Mat
 export default function MisModelos() {
   const { usuario } = useSesion()
   const admin = puede(usuario, ['admin'])
+  const opera = puede(usuario, ['admin', 'datos'])      // fija los límites de uso (D77)
   const cliente = useQueryClient()
   const cola = useQuery({ queryKey: ['mis-modelos', 'cola'], queryFn: () => pedir<ColaEntrenamientos>('/entrenamientos/cola'), refetchInterval: 15000 })
   const banco = useQuery({ queryKey: ['mis-modelos', 'banco'], queryFn: () => pedir<ItemBanco[]>('/entrenamientos/banco') })
@@ -35,7 +36,7 @@ export default function MisModelos() {
     trabajosPropios.current = vigentes
   }, [cola.data, cliente])
   const muestras = useQuery({ queryKey: ['muestras'], queryFn: () => pedir<(MuestraGuardada & { propietario_id?: string | null })[]>('/muestras') })
-  const cuotas = useQuery({ queryKey: ['mis-modelos', 'cuotas'], queryFn: () => pedir<CuotasConfig>('/entrenamientos/cuotas'), enabled: admin })
+  const cuotas = useQuery({ queryKey: ['mis-modelos', 'cuotas'], queryFn: () => pedir<CuotasConfig>('/entrenamientos/cuotas'), enabled: opera })
   const [ver, setVer] = useState('todos')               // todos | mios | oficial | personal
   const [dueno, setDueno] = useState('')                // id de la persona; vacío = todas
   const refrescar = () => void cliente.invalidateQueries({ queryKey: ['mis-modelos'] })
@@ -71,12 +72,12 @@ export default function MisModelos() {
   const dCola = descripcionDe('cola')
   const dBanco = descripcionDe('banco_modelos')
 
-  const secciones: Seccion[] = admin ? ['entrenar', 'banco', 'limites'] : ['entrenar', 'banco']
+  const secciones: Seccion[] = opera ? ['entrenar', 'banco', 'limites'] : ['entrenar', 'banco']
   const [activa, elegir] = usePestanaEnUrl('ver', secciones)
   const pestanas: { clave: Seccion; texto: string }[] = [
     { clave: 'entrenar', texto: 'Nuevo entrenamiento' },
     { clave: 'banco', texto: dBanco.titulo },
-    ...(admin ? [{ clave: 'limites' as const, texto: 'Límites de uso' }] : []),
+    ...(opera ? [{ clave: 'limites' as const, texto: 'Límites de uso' }] : []),
   ]
 
   const limites = (
@@ -239,7 +240,7 @@ export default function MisModelos() {
           ),
         },
         { clave: 'banco', contenido: bancoDeModelos },
-        ...(admin && cuotas.data ? [{ clave: 'limites' as const, contenido: <LimitesAdmin valores={cuotas.data} alGuardar={refrescar} /> }] : []),
+        ...(opera && cuotas.data ? [{ clave: 'limites' as const, contenido: <LimitesAdmin valores={cuotas.data} alGuardar={refrescar} /> }] : []),
       ]} />
     </div>
   )

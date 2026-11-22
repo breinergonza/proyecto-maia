@@ -23,7 +23,7 @@ const muestras = [
   { id: 5, titulo: 'De otra persona', fuente: 'simulado', propietario: 'Ana', propietario_id: 'otro', n_ninos: 80, definicion: { version: 2, y: [] } },
 ]
 
-const api = (rol: 'admin' | 'experto' | 'visualizador') => (url: string) =>
+const api = (rol: 'admin' | 'datos' | 'visualizador') => (url: string) =>
   url === '/api/auth/refrescar' ? { cuerpo: { acceso: 't', usuario: usuario(rol) } }
     : url === '/api/entrenamientos/cola' ? { cuerpo: cola }
       : url === '/api/entrenamientos/banco' ? { cuerpo: banco }
@@ -40,7 +40,7 @@ describe('Entrenamientos propios', () => {
   })
 
   it('muestra límites, cola con posición, banco con corte anterior y cancela el propio', async () => {
-    const llamadas = simularApi(api('experto'))
+    const llamadas = simularApi(api('datos'))
     montar('/mis-modelos')
     expect(await screen.findByText('Mi prueba')).toBeInTheDocument()
     expect(screen.getByText(/1 de 3/)).toBeInTheDocument()
@@ -55,7 +55,7 @@ describe('Entrenamientos propios', () => {
   it('entrena con el nombre y envía solo lo escrito', async () => {
     const libre = { ...cola, items: [], limites: { ...cola.limites, cola_usada: 0 } }
     const llamadas = simularApi((url, init) => url === '/api/entrenamientos/cola' ? { cuerpo: libre }
-      : url === '/api/entrenamientos/entrenar' && init?.method === 'POST' ? { estado: 202, cuerpo: {} } : api('experto')(url))
+      : url === '/api/entrenamientos/entrenar' && init?.method === 'POST' ? { estado: 202, cuerpo: {} } : api('datos')(url))
     montar('/mis-modelos')
     await userEvent.type(await screen.findByLabelText('Nombre'), 'Prueba A')
     await userEvent.click(screen.getByRole('button', { name: 'Entrenar modelo nuevo' }))
@@ -68,7 +68,7 @@ describe('Entrenamientos propios', () => {
   it('entrena con una muestra guardada elegida en el selector (solo las propias)', async () => {
     const libre = { ...cola, items: [], limites: { ...cola.limites, cola_usada: 0 } }
     const llamadas = simularApi((url, init) => url === '/api/entrenamientos/cola' ? { cuerpo: libre }
-      : url === '/api/entrenamientos/entrenar' && init?.method === 'POST' ? { estado: 202, cuerpo: {} } : api('experto')(url))
+      : url === '/api/entrenamientos/entrenar' && init?.method === 'POST' ? { estado: 202, cuerpo: {} } : api('datos')(url))
     montar('/mis-modelos')
     const selector = await screen.findByLabelText('Muestra de niños')
     await screen.findByRole('option', { name: /Prematuros/ })
@@ -83,7 +83,7 @@ describe('Entrenamientos propios', () => {
     const libre = { ...cola, items: [], limites: { ...cola.limites, cola_usada: 0 } }
     const llamadas = simularApi((url, init) => url === '/api/entrenamientos/cola' ? { cuerpo: libre }
       : url === '/api/muestras' && init?.method === 'POST' ? { estado: 201, cuerpo: { ...muestras[0], id: 11 } }
-        : url === '/api/entrenamientos/entrenar' && init?.method === 'POST' ? { estado: 202, cuerpo: {} } : api('experto')(url))
+        : url === '/api/entrenamientos/entrenar' && init?.method === 'POST' ? { estado: 202, cuerpo: {} } : api('datos')(url))
     montar('/mis-modelos')
     await userEvent.click(await screen.findByRole('button', { name: 'Seleccionar niños para el entrenamiento' }))
     expect(await screen.findByText(/Son pocos niños \(150/)).toBeInTheDocument()
@@ -109,13 +109,13 @@ describe('Mis modelos: banco con medidas, filtros por dueño y límites del admi
     { ...banco[0], id: 10, propietario: 'Persona experto', propietario_id: 'yo', propia: true, nombre: 'El mío', auc: null, corte_anterior: false },
     { ...banco[0], id: 11, propietario: 'Admin', propietario_id: 'adm', visibilidad: 'oficial', nombre: 'Oficial base', auc: 0.9, corte_anterior: false, propia: false },
   ]
-  const conBanco = (rol: 'admin' | 'experto') => (url: string, init?: { method?: string; body?: unknown }) =>
+  const conBanco = (rol: 'admin' | 'datos') => (url: string, init?: { method?: string; body?: unknown }) =>
     url === '/api/entrenamientos/banco' ? { cuerpo: banco2 }
       : url === '/api/entrenamientos/cuotas' ? (init?.method === 'PUT' ? { cuerpo: JSON.parse(String(init.body)) } : { cuerpo: { cola_max: 1, modelos_max: 3, dias_sin_uso: 90, dias_aviso: 14 } })
         : api(rol)(url)
 
   it('muestra otras medidas, el aviso de borrado y filtra por etiqueta y por dueño', async () => {
-    simularApi(conBanco('experto'))
+    simularApi(conBanco('datos'))
     montar('/mis-modelos?ver=banco')
     expect(await screen.findByText('Precisión promedio: 0.32')).toBeInTheDocument()
     expect(screen.getByText('Se borra en 5 días si no se usa')).toBeInTheDocument()
@@ -132,11 +132,10 @@ describe('Mis modelos: banco con medidas, filtros por dueño y límites del admi
     expect(screen.queryByText('El mío')).toBeNull()
   })
 
-  it('el experto no ve los límites editables; el admin los cambia', async () => {
-    simularApi(conBanco('experto'))
-    montar('/mis-modelos')
-    await screen.findByText('Mi prueba')
-    expect(screen.queryByRole('button', { name: 'Guardar límites' })).toBeNull()
+  it('el experto en datos también fija los límites de uso (D77)', async () => {
+    simularApi(conBanco('datos'))
+    montar('/mis-modelos?ver=limites')
+    expect(await screen.findByRole('button', { name: 'Guardar límites' })).toBeInTheDocument()
   })
 
   it('el admin guarda los límites', async () => {

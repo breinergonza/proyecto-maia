@@ -62,7 +62,7 @@ function api(rol: Usuario['rol'], pendiente = false) {
 
 describe('analítica viva', () => {
   it('trayectorias: tabla frente a la OMS, niños individuales con enlace y selectores', async () => {
-    const llamadas = api('experto')
+    const llamadas = api('datos')
     montar('/analitica/trayectorias?entrenamiento=7&ver=oms')   // cada pregunta tiene su pestaña (?ver=): aquí, la tabla frente a la OMS
     expect(await screen.findByText('Diferencia con la OMS (z)')).toBeInTheDocument()
     expect(screen.getAllByText('Riesgo alto').length).toBeGreaterThan(0)
@@ -77,7 +77,7 @@ describe('analítica viva', () => {
   })
 
   it('perfiles: tarjetas, una categoría de 3 niños con su cifra y nota de confianza', async () => {
-    api('experto')
+    api('datos')
     montar('/analitica/perfiles?entrenamiento=7')
     expect(await screen.findByText('Muy prematuro')).toBeInTheDocument()
     expect(screen.getByText('25,0 %')).toBeInTheDocument()
@@ -90,7 +90,7 @@ describe('analítica viva', () => {
   })
 
   it('anticipación: avisados antes, tabla y nota', async () => {
-    api('experto')
+    api('datos')
     montar('/analitica/anticipacion?entrenamiento=7')
     expect(await screen.findByText('Casos avisados al menos una visita antes')).toBeInTheDocument()
     expect(screen.getByText('50,0 %')).toBeInTheDocument()
@@ -102,7 +102,7 @@ describe('analítica viva', () => {
   })
 
   it.each(['trayectorias', 'perfiles', 'anticipacion'])('%s: estado pendiente con mensaje', async (sub) => {
-    api('experto', true)
+    api('datos', true)
     montar(`/analitica/${sub}?entrenamiento=7`)
     expect(await screen.findByText('Este análisis estará disponible pronto')).toBeInTheDocument()
   })

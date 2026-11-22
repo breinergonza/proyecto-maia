@@ -35,7 +35,7 @@ const concentracion = { corrida_id: 1, hay_sede: false, celdas: [], por_variable
   { variable: 'peso', etiqueta: 'Peso', alertas: 12 }, { variable: 'pc', etiqueta: 'Perímetro cefálico', alertas: 1 }] }
 
 function api(items: object[] = [dato()], extra?: (url: string, init?: RequestInit) => { estado?: number; cuerpo?: unknown } | undefined,
-  rol: 'admin' | 'experto' | 'visualizador' = 'admin') {
+  rol: 'admin' | 'datos' | 'visualizador' = 'admin') {
   return simularApi((url, init) => {
     if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario(rol) } }
     const e = extra?.(url, init)
@@ -76,7 +76,7 @@ describe('calidad de datos: cifras y encabezado', () => {
   })
 
   it('el experto clínico también entra y ve la cola', async () => {
-    api([dato()], undefined, 'experto')
+    api([dato()], undefined, 'datos')
     montar('/admin/calidad-datos')
     expect(await screen.findByRole('heading', { level: 1, name: 'Mediciones por revisar' })).toBeInTheDocument()
     expect(await screen.findByRole('link', { name: 'S-02210' })).toBeInTheDocument()

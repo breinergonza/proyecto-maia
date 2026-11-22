@@ -14,6 +14,7 @@ ADMIN = ('admin@maia.prueba', 'clave-admin-de-prueba')
 EXPERTOS = {'a': ('experta.a@maia.prueba', 'clave-experta-a-de-prueba'),
             'b': ('experta.b@maia.prueba', 'clave-experta-b-de-prueba')}
 VISUAL = ('visual@maia.prueba', 'clave-visual-de-prueba')
+CLINICO = ('clinico@maia.prueba', 'clave-clinico-de-prueba')
 CUERPO = {'fuente': 'simulado', 'modelos': ['clinico']}
 
 
@@ -60,11 +61,13 @@ def admin(cliente):
 
 @pytest.fixture(scope='module')
 def personas(cliente, admin):
-    for rol, (email, clave) in [('experto', EXPERTOS['a']), ('experto', EXPERTOS['b']), ('visualizador', VISUAL)]:
+    for rol, (email, clave) in [('datos', EXPERTOS['a']), ('datos', EXPERTOS['b']), ('visualizador', VISUAL),
+                              ('experto', CLINICO)]:
         r = cliente.post('/api/usuarios', headers=admin, json={'email': email, 'nombre': email.split('@')[0],
                                                                'rol': rol, 'clave': clave})
         assert r.status_code == 201, r.text
-    return {'a': _login(cliente, *EXPERTOS['a']), 'b': _login(cliente, *EXPERTOS['b']), 'v': _login(cliente, *VISUAL)}
+    return {'a': _login(cliente, *EXPERTOS['a']), 'b': _login(cliente, *EXPERTOS['b']), 'v': _login(cliente, *VISUAL),
+            'c': _login(cliente, *CLINICO)}
 
 
 @pytest.fixture(autouse=True)
@@ -83,11 +86,11 @@ def _entrenar(c, h, **extra):
 
 
 def test_visualizador_sin_acceso(cliente, personas):
-    v = personas['v']
-    assert _entrenar(cliente, v).status_code == 403
-    assert cliente.get('/api/entrenamientos/cola', headers=v).status_code == 403
-    assert cliente.get('/api/entrenamientos/banco', headers=v).status_code == 403
-    assert cliente.post('/api/entrenamientos/1/cancelar', headers=v).status_code == 403
+    for v in (personas['v'], personas['c']):          # ni quien consulta ni el experto clínico entrenan modelos
+        assert _entrenar(cliente, v).status_code == 403
+        assert cliente.get('/api/entrenamientos/cola', headers=v).status_code == 403
+        assert cliente.get('/api/entrenamientos/banco', headers=v).status_code == 403
+        assert cliente.post('/api/entrenamientos/1/cancelar', headers=v).status_code == 403
 
 
 def test_experto_personal_con_cuota_de_cola(cliente, personas):
@@ -98,14 +101,14 @@ def test_experto_personal_con_cuota_de_cola(cliente, personas):
     assert r.json()['solicitada_por']
     assert _entrenar(cliente, personas['a']).status_code == 409                  # 1 en cola por persona
     assert _entrenar(cliente, personas['b']).status_code == 202                  # otra persona sí
-    assert _entrenar(cliente, personas['a'], visibilidad='oficial').status_code == 403
+    r = _entrenar(cliente, personas['a'], visibilidad='oficial')   # el experto en datos entrena oficiales sin cuota (D77)
+    assert r.status_code == 202 and r.json()['parametros']['visibilidad'] == 'oficial'
 
 
-def test_experto_no_cambia_hiperparametros(cliente, personas):
-    hp = {'clinico': {'rondas': 800}}
-    r = _entrenar(cliente, personas['a'], hiperparametros=hp)
-    assert r.status_code == 422 and 'hiperpar' in r.text
-    assert _entrenar(cliente, personas['a'], guardar=True).status_code == 422
+def test_el_experto_en_datos_ajusta_hiperparametros(cliente, personas):
+    r = _entrenar(cliente, personas['a'], hiperparametros={'clinico': {'rondas': 800}})
+    assert r.status_code == 202, r.text
+    assert r.json()['parametros']['hiperparametros']['clinico']['rondas'] == 800
 
 
 def test_validar_parametros_rechaza_hiperparametros_de_experto():
@@ -294,7 +297,8 @@ def test_cuotas_valen_los_de_fabrica_y_el_admin_las_cambia(cliente, admin, perso
     assert cliente.get('/api/entrenamientos/cuotas', headers=personas['v']).status_code == 403
     r = cliente.get('/api/entrenamientos/cuotas', headers=personas['a'])
     assert r.json() == {'cola_max': 1, 'modelos_max': 3, 'dias_sin_uso': 90, 'dias_aviso': 14}
-    assert cliente.put('/api/entrenamientos/cuotas', headers=personas['a'], json={'cola_max': 5}).status_code == 403
+    assert cliente.get('/api/entrenamientos/cuotas', headers=personas['c']).status_code == 403
+    assert cliente.put('/api/entrenamientos/cuotas', headers=personas['c'], json={'cola_max': 5}).status_code == 403
     assert cliente.put('/api/entrenamientos/cuotas', headers=admin, json={'cola_max': -1}).status_code == 422
     assert cliente.put('/api/entrenamientos/cuotas', headers=admin, json={'dias_sin_uso': 0}).status_code == 422
     r = cliente.put('/api/entrenamientos/cuotas', headers=admin, json={'cola_max': 2, 'dias_sin_uso': 60})
@@ -365,7 +369,9 @@ def test_aprobar_rechaza_versiones_personales(cliente, admin, personas):
     r = cliente.post('/api/entrenamientos/aprobar', headers=admin,
                      json={'fuente': 'simulado', 'anomalias': '40', 'clinico': '41'})
     assert r.status_code == 409 and 'modelo personal' in r.json()['detail'] and 'clínico' in r.json()['detail']
-    assert cliente.post('/api/entrenamientos/aprobar', headers=personas['a'],
+    assert cliente.post('/api/entrenamientos/aprobar', headers=personas['a'],      # el experto en datos aprueba,
+                        json={'fuente': 'simulado', 'anomalias': '40', 'clinico': '41'}).status_code == 409   # no personales
+    assert cliente.post('/api/entrenamientos/aprobar', headers=personas['c'],
                         json={'fuente': 'simulado', 'anomalias': '40', 'clinico': '41'}).status_code == 403
     # una versión oficial sí se aprueba
     _con_modelo(cliente, admin, 'clinico', '42', visibilidad='oficial')

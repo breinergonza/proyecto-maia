@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from maia_api.dependencias import ADMIN, EXPERTO, auditar, configuracion, sesion
+from maia_api.dependencias import DATOS, auditar, configuracion, sesion
 from maia_api.esquemas import (
     AprobacionEntrada,
     ColaEntrenamientos,
@@ -46,7 +46,7 @@ def _enlace(cfg: Configuracion, e: dict) -> str | None:
 def listar(fuente: Fuente | None = Query(None), limite: int = Query(30, ge=1, le=200),
            propietario: uuid.UUID | None = Query(None, description='Solo lo entrenado por esta persona.'),
            visibilidad: Literal['personal', 'oficial'] | None = Query(None),
-           cfg: Configuracion = Depends(configuracion), _: Usuario = Depends(ADMIN)) -> Entrenamientos:
+           cfg: Configuracion = Depends(configuracion), _: Usuario = Depends(DATOS)) -> Entrenamientos:
     lector = ML.Lector(cfg.mlflow_tracking_uri, cfg.mlflow_tracking_username, cfg.mlflow_tracking_password)
     try:
         datos = {t: lector.entrenamientos(t, fuente, limite, str(propietario) if propietario else None, visibilidad)
@@ -80,7 +80,7 @@ def _es_personal(s: Session, cfg: Configuracion, tipo: str, numero: str, fuente:
 
 @ruta.post('/aprobar', response_model=EjecucionSalida, status_code=status.HTTP_202_ACCEPTED)
 def aprobar(datos: AprobacionEntrada, s: Session = Depends(sesion), cfg: Configuracion = Depends(configuracion),
-            admin: Usuario = Depends(ADMIN)) -> Ejecucion:
+            admin: Usuario = Depends(DATOS)) -> Ejecucion:
     """Promueve las dos versiones a ``produccion``, arma el paquete y lo activa en la solución."""
     if cfg.maia_solo_simulado and datos.fuente == 'kmc':
         raise HTTPException(status.HTTP_409_CONFLICT, 'Este servicio solo trabaja con datos simulados.')
@@ -101,25 +101,27 @@ def aprobar(datos: AprobacionEntrada, s: Session = Depends(sesion), cfg: Configu
 
 @ruta.post('/entrenar', response_model=EjecucionSalida, status_code=status.HTTP_202_ACCEPTED)
 def entrenar(datos: EntrenarAhora, s: Session = Depends(sesion), cfg: Configuracion = Depends(configuracion),
-             usuario: Usuario = Depends(EXPERTO)) -> Ejecucion:
-    """Entrena ya (administración y expertos): se pone en la cola y el programador los toma uno por vez, en orden de
-    llegada. Un experto entrena modelos personales con los hiperparámetros vigentes y tiene cuota (D17, D40); el
-    resultado queda en MLflow como ``candidato`` (u ``personal`` si es personal). El avance se ve en
-    ``GET /entrenamientos/cola``."""
+             usuario: Usuario = Depends(DATOS)) -> Ejecucion:
+    """Entrena ya (administración y el experto en datos): se pone en la cola y el programador los toma uno por vez, en
+    orden de llegada. El experto en datos entrena oficiales (pidiéndolo con ``visibilidad``) y personales; los
+    personales tienen cuota (D17, D40, D77). El resultado queda en MLflow como ``candidato`` (u ``personal`` si es
+    personal). El avance se ve en ``GET /entrenamientos/cola``."""
     es_admin = usuario.rol == 'admin'
+    opera = usuario.rol in ('admin', 'datos')                # entrena oficiales, extrae y guarda hiperparámetros
     if cfg.maia_solo_simulado and datos.fuente == 'kmc':
         raise HTTPException(status.HTTP_409_CONFLICT, 'Este servicio solo trabaja con datos simulados.')
     visibilidad = datos.visibilidad or ('oficial' if es_admin else 'personal')
-    if not es_admin and visibilidad != 'personal':
-        raise HTTPException(status.HTTP_403_FORBIDDEN, 'Solo administración entrena modelos oficiales.')
-    if not es_admin:
+    if not opera and visibilidad != 'personal':
+        raise HTTPException(status.HTTP_403_FORBIDDEN,
+                            'Solo administración y el experto en datos entrenan modelos oficiales.')
+    if not es_admin and visibilidad == 'personal':
         if EJ.activas_de(s, usuario.id) >= CU.cuota_cola(s):
             raise HTTPException(status.HTTP_409_CONFLICT,
                                 'Ya tiene un entrenamiento en cola o en curso: espere a que termine o cancélelo.')
         if EJ.personales_guardados(s, usuario.id) >= CU.cuota_modelos(s):
             raise HTTPException(status.HTTP_409_CONFLICT,
                                 f'Ya tiene {CU.cuota_modelos(s)} modelos personales guardados: descarte alguno.')
-    extraer = datos.extraer if es_admin else False       # un experto entrena con el corte vigente
+    extraer = datos.extraer if es_admin or (opera and visibilidad == 'oficial') else False   # un personal usa el corte vigente
     if datos.muestra_id is not None and 'extraer' not in datos.model_fields_set:
         extraer = False                                  # una muestra es del corte vigente: no se extrae aparte
     try:
@@ -128,8 +130,8 @@ def entrenar(datos: EntrenarAhora, s: Session = Depends(sesion), cfg: Configurac
                                         rol=usuario.rol, hiperparametros=datos.hiperparametros)
     except ValueError as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from e
-    if not es_admin and datos.guardar:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, 'Los expertos no cambian los hiperparámetros.')
+    if not opera and datos.guardar:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, 'Solo administración y el experto en datos cambian los hiperparámetros.')
     if datos.muestra_id is not None:
         if extraer:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -145,7 +147,7 @@ def entrenar(datos: EntrenarAhora, s: Session = Depends(sesion), cfg: Configurac
             parametros[k] = getattr(datos, k)
     if datos.fuente == 'simulado' and datos.sujetos:
         parametros['sujetos'] = datos.sujetos
-    if datos.guardar and es_admin:
+    if datos.guardar and opera:
         for m, valores in hp.items():
             h = s.get(Hiperparametro, m) or Hiperparametro(modelo=m)
             antes = dict(h.valores or {})
@@ -166,13 +168,13 @@ def _limites(s: Session, u: Usuario) -> LimitesPersona:
 
 
 @ruta.get('/cuotas', response_model=CuotasConfig)
-def ver_cuotas(s: Session = Depends(sesion), _: Usuario = Depends(EXPERTO)) -> CuotasConfig:
+def ver_cuotas(s: Session = Depends(sesion), _: Usuario = Depends(DATOS)) -> CuotasConfig:
     """Los límites vigentes de Mis modelos (los cambia administración)."""
     return CuotasConfig(**CU.valores(s))
 
 
 @ruta.put('/cuotas', response_model=CuotasConfig)
-def cambiar_cuotas(datos: CuotasCambio, s: Session = Depends(sesion), admin: Usuario = Depends(ADMIN)) -> CuotasConfig:
+def cambiar_cuotas(datos: CuotasCambio, s: Session = Depends(sesion), admin: Usuario = Depends(DATOS)) -> CuotasConfig:
     """Administración cambia los límites de cola, modelos guardados y días sin uso; queda en la auditoría."""
     cambios = datos.model_dump(exclude_none=True)
     antes = CU.valores(s)
@@ -186,7 +188,7 @@ def cambiar_cuotas(datos: CuotasCambio, s: Session = Depends(sesion), admin: Usu
 
 
 @ruta.get('/cola', response_model=ColaEntrenamientos)
-def cola(s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> ColaEntrenamientos:
+def cola(s: Session = Depends(sesion), u: Usuario = Depends(DATOS)) -> ColaEntrenamientos:
     """Los entrenamientos en cola o en curso, con su posición y el tiempo estimado, y los límites de esta persona."""
     promedio = EJ.promedio_minutos(s)
     activas = s.execute(select(Ejecucion, Usuario.nombre).outerjoin(Usuario, Usuario.id == Ejecucion.solicitada_por)
@@ -205,7 +207,7 @@ def cola(s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> ColaEnt
 
 
 @ruta.post('/{ejecucion_id}/cancelar', response_model=EjecucionSalida)
-def cancelar(ejecucion_id: int, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> Ejecucion:
+def cancelar(ejecucion_id: int, s: Session = Depends(sesion), u: Usuario = Depends(DATOS)) -> Ejecucion:
     """Cancela un entrenamiento pendiente propio (administración cancela cualquiera); uno en curso no se cancela."""
     e = s.get(Ejecucion, ejecucion_id)
     if e is None or e.tipo != 'entrenamiento':
@@ -221,7 +223,7 @@ def cancelar(ejecucion_id: int, s: Session = Depends(sesion), u: Usuario = Depen
 
 
 @ruta.post('/{ejecucion_id}/descartar', response_model=EjecucionSalida)
-def descartar(ejecucion_id: int, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> Ejecucion:
+def descartar(ejecucion_id: int, s: Session = Depends(sesion), u: Usuario = Depends(DATOS)) -> Ejecucion:
     """Descarta un modelo personal terminado propio (libera un lugar de la cuota; administración puede con cualquiera)."""
     e = s.get(Ejecucion, ejecucion_id)
     if e is None or e.tipo != 'entrenamiento' or e.estado != 'ok' or not EJ.es_personal(e):
@@ -239,10 +241,10 @@ def banco(limite: int = Query(100, ge=1, le=300),
           propietario_id: uuid.UUID | None = Query(None, description='Solo los de esta persona.'),
           mios: bool = Query(False, description='Solo los míos.'),
           visibilidad: Literal['personal', 'oficial'] | None = Query(None),
-          s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> list[ItemBanco]:
+          s: Session = Depends(sesion), u: Usuario = Depends(DATOS)) -> list[ItemBanco]:
     """El banco compartido: entrenamientos terminados (oficiales y personales) con dueño, muestra, métricas
     principales y si su corte ya no es el vigente (D38). Filtros por dueño y por Personal u Oficial. Lo ven
-    administración y expertos."""
+    administración y el experto en datos."""
     cuotas = CU.valores(s)
     vigentes = {c.fuente: str(c.fecha_corte) for c in s.scalars(select(Corte).where(Corte.vigente.is_(True)))}
     filas = s.execute(select(Ejecucion, Usuario.nombre).outerjoin(Usuario, Usuario.id == Ejecucion.solicitada_por)
@@ -279,7 +281,7 @@ def banco(limite: int = Query(100, ge=1, le=300),
 
 @ruta.get('/ejecuciones', response_model=list[EjecucionSalida])
 def ejecuciones(limite: int = Query(10, ge=1, le=50), s: Session = Depends(sesion),
-                _: Usuario = Depends(ADMIN)) -> list[Ejecucion]:
+                _: Usuario = Depends(DATOS)) -> list[Ejecucion]:
     """Los últimos entrenamientos pedidos desde la web, con su paso actual (para la capa de presentación)."""
     return list(s.scalars(select(Ejecucion).where(Ejecucion.tipo == 'entrenamiento')
                           .order_by(Ejecucion.id.desc()).limit(limite)))

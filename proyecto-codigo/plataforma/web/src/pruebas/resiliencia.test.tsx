@@ -12,7 +12,7 @@ const SIN_CONEXION = 'No se pudo conectar con el servidor. Revise su conexión e
 
 /** La sesión responde; la petición que empieza por ``caida`` falla como falla el navegador sin red. */
 const api = (caida: string) => (url: string) => {
-  if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('experto') } }
+  if (url === '/api/auth/refrescar') return { cuerpo: { acceso: 't', usuario: usuario('admin') } }   // admin: las cuatro páginas, lo clínico y el Resumen
   if (url.startsWith(caida)) throw new TypeError('Failed to fetch')
   return undefined   // lo demás responde 404, como en util
 }

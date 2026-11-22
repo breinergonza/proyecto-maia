@@ -91,7 +91,7 @@ function api(rol: Usuario['rol'], extra?: Extra) {
 
 describe('calibración: riesgo con y sin el desenlace', () => {
   it('muestra la gráfica con descripción, PNG y CSV, y los tramos de 1 a 4 niños salen con su cifra', async () => {
-    api('experto')
+    api('datos')
     montar('/analitica/calibracion?entrenamiento=7&desenlace=des_a&ver=reparto')
     expect(await screen.findByText('Riesgo de los niños con y sin el desenlace', { selector: 'h2, h3' })).toBeInTheDocument()
     expect(screen.getByText(/Cómo se reparte el riesgo en quienes tuvieron el desenlace/)).toBeInTheDocument()
@@ -103,7 +103,7 @@ describe('calibración: riesgo con y sin el desenlace', () => {
   })
 
   it('un entrenamiento anterior sin hist_riesgo sigue mostrando el histograma de siempre', async () => {
-    api('experto', (url) => (/\/analitica\/7\/calibracion/.test(url)
+    api('datos', (url) => (/\/analitica\/7\/calibracion/.test(url)
       ? { cuerpo: { estado: 'ok', entrenamiento: 7, submodulo: 'calibracion', desenlaces: { des_a: { ...calibracion, hist_riesgo: undefined } } } } : undefined))
     montar('/analitica/calibracion?entrenamiento=7&desenlace=des_a&ver=reparto')
     expect(await screen.findByRole('figure', { name: 'Distribución del riesgo estimado' })).toBeInTheDocument()
@@ -125,7 +125,7 @@ describe('población: muestra frente a todos los niños', () => {
   })
 
   it('un entrenamiento anterior lo explica y no inventa cifras', async () => {
-    api('experto', (url) => (/\/analitica\/7\/poblacion/.test(url)
+    api('datos', (url) => (/\/analitica\/7\/poblacion/.test(url)
       ? { cuerpo: { estado: 'ok', entrenamiento: 7, submodulo: 'poblacion', desenlaces: { des_a: { ...poblacion, distribuciones_muestra_universo: undefined } } } } : undefined))
     montar('/analitica/poblacion?entrenamiento=7&desenlace=des_a&ver=categorias')
     expect(await screen.findByText(/no trae la comparación de la muestra con todos los niños/)).toBeInTheDocument()
@@ -134,7 +134,7 @@ describe('población: muestra frente a todos los niños', () => {
 
 describe('comparar entrenamientos: intervalos y Aprobar B', () => {
   it('pide la comparación con réplicas y muestra la certeza, el n y el aviso de aproximación', async () => {
-    const llamadas = api('experto')
+    const llamadas = api('datos')
     montar('/analitica/comparar?entrenamiento=7&desenlace=des_a')
     expect(await screen.findByText('Diferencia clara *')).toBeInTheDocument()
     expect(screen.getByText(/A: 1\.500 niños, 90 casos/)).toBeInTheDocument()
@@ -142,7 +142,7 @@ describe('comparar entrenamientos: intervalos y Aprobar B', () => {
     expect(screen.getAllByText('Sin intervalo').length).toBeGreaterThan(0)
     expect(screen.getByText(/el intervalo de la diferencia es aproximado/)).toBeInTheDocument()
     expect(llamadas.some((l) => l.url === '/api/analitica/comparar?a=6&b=7&desenlace=des_a')).toBe(true)
-    expect(screen.queryByRole('button', { name: /Aprobar y activar el modelo B/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Aprobar y activar el modelo B/ })).toBeInTheDocument()   // el experto en datos aprueba (D77)
     // en el teléfono cada fila de métricas, grupos y muestra se vuelve una tarjeta: B y la diferencia no quedan fuera de la vista
     const apiladas = () => {
       const tablas = screen.getAllByRole('table').filter((t) => !t.closest('figure'))
@@ -208,7 +208,7 @@ describe('comparar entrenamientos: intervalos y Aprobar B', () => {
 
 describe('comparar: solo entrenamientos', () => {
   it('no mezcla grupos de niños con entrenamientos: ninguna pestaña es de grupos y una línea lleva a Comparar grupos', async () => {
-    api('experto')
+    api('datos')
     montar('/analitica/comparar?entrenamiento=7&desenlace=des_a')
     expect(await screen.findByText('Entrenamiento B')).toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: 'Grupos de niños' })).not.toBeInTheDocument()

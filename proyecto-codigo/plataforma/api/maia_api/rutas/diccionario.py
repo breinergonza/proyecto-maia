@@ -1,4 +1,4 @@
-"""El diccionario de variables con versiones, para experto y administración (la consulta no entra).
+"""El diccionario de variables con versiones, para el experto en datos y administración (D77; nadie más entra).
 
 Se edita con formularios (``/editar``): la web manda los cambios por fila y aquí se aplican a la vigente, se validan con
 el núcleo y quedan como una versión nueva. El Excel queda para importar y exportar: se descarga, se edita y se sube, y
@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, Upl
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from maia_api.dependencias import EXPERTO, auditar, sesion
+from maia_api.dependencias import DATOS, auditar, sesion
 from maia_api.esquemas.diccionario import (
     BorradorDiccionario,
     Clasificacion,
@@ -71,7 +71,7 @@ def _excel(v: VersionDiccionario) -> Response:
 
 
 @ruta.get('/versiones', response_model=list[VersionDiccionarioSalida])
-def versiones(s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> list[VersionDiccionarioSalida]:
+def versiones(s: Session = Depends(sesion), u: Usuario = Depends(DATOS)) -> list[VersionDiccionarioSalida]:
     filas = s.execute(select(VersionDiccionario.id, VersionDiccionario.version, VersionDiccionario.estado,
                              VersionDiccionario.origen, VersionDiccionario.nota, VersionDiccionario.sha256,
                              func.length(VersionDiccionario.archivo).label('tamano'),
@@ -82,7 +82,7 @@ def versiones(s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> li
 
 
 @ruta.get('/vigente/archivo', response_class=Response, responses={200: {'content': {XLSX: {}}}})
-def descargar_vigente(s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> Response:
+def descargar_vigente(s: Session = Depends(sesion), u: Usuario = Depends(DATOS)) -> Response:
     v = DIC.vigente(s)
     if v is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, 'Todavía no hay un diccionario vigente.')
@@ -90,12 +90,12 @@ def descargar_vigente(s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO
 
 
 @ruta.get('/versiones/{vid}/archivo', response_class=Response, responses={200: {'content': {XLSX: {}}}})
-def descargar(vid: int, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> Response:
+def descargar(vid: int, s: Session = Depends(sesion), u: Usuario = Depends(DATOS)) -> Response:
     return _excel(_version(s, vid))
 
 
 @ruta.get('/versiones/{vid}/vista', response_model=VistaDiccionario)
-def vista(vid: int, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> VistaDiccionario:
+def vista(vid: int, s: Session = Depends(sesion), u: Usuario = Depends(DATOS)) -> VistaDiccionario:
     """Las hojas de esa versión como se ven en el Excel, para previsualizarla sin descargarla."""
     v = _version(s, vid)
     try:
@@ -107,14 +107,14 @@ def vista(vid: int, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO))
 
 @ruta.post('/comparar', response_model=DiferenciasDiccionario)
 def comparar(archivo: UploadFile = File(...), s: Session = Depends(sesion),
-             u: Usuario = Depends(EXPERTO)) -> DiferenciasDiccionario:
+             u: Usuario = Depends(DATOS)) -> DiferenciasDiccionario:
     """Valida el archivo y dice qué cambia frente a la vigente, sin guardar nada."""
     return _diferencias(s, _contenido(archivo), archivo.filename)
 
 
 @ruta.post('/versiones', response_model=VersionDiccionarioSalida, status_code=status.HTTP_201_CREATED)
 def subir(archivo: UploadFile = File(...), nota: str | None = Form(None, max_length=500), borrador: bool = Form(False),
-          s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> VersionDiccionarioSalida:
+          s: Session = Depends(sesion), u: Usuario = Depends(DATOS)) -> VersionDiccionarioSalida:
     """Guarda el archivo como versión nueva, vigente (o como borrador, si se pide; un campo ausente es «no»)."""
     contenido = _contenido(archivo)
     try:
@@ -133,12 +133,12 @@ def subir(archivo: UploadFile = File(...), nota: str | None = Form(None, max_len
 
 
 @ruta.get('/versiones/{vid}/diferencias', response_model=DiferenciasDiccionario)
-def diferencias(vid: int, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> DiferenciasDiccionario:
+def diferencias(vid: int, s: Session = Depends(sesion), u: Usuario = Depends(DATOS)) -> DiferenciasDiccionario:
     return _diferencias(s, _version(s, vid).archivo)
 
 
 @ruta.post('/versiones/{vid}/activar', response_model=VersionDiccionarioSalida)
-def activar(vid: int, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> VersionDiccionarioSalida:
+def activar(vid: int, s: Session = Depends(sesion), u: Usuario = Depends(DATOS)) -> VersionDiccionarioSalida:
     """Deja vigente esa versión; también sirve para volver a una anterior."""
     _version(s, vid)
     try:
@@ -151,7 +151,7 @@ def activar(vid: int, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO
 
 
 @ruta.get('/por-clasificar', response_model=PorClasificar)
-def por_clasificar(s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> PorClasificar:
+def por_clasificar(s: Session = Depends(sesion), u: Usuario = Depends(DATOS)) -> PorClasificar:
     """Las variables «Por clasificar» de la vigente y, si una actualización trajo variables nuevas, su borrador."""
     actual = DIC.vigente(s)
     variables = DIC.por_clasificar(DIC.leer(actual.archivo)) if actual is not None else []
@@ -169,7 +169,7 @@ def por_clasificar(s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) 
 
 
 @ruta.post('/clasificar', response_model=VersionDiccionarioSalida)
-def clasificar(c: Clasificacion, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> VersionDiccionarioSalida:
+def clasificar(c: Clasificacion, s: Session = Depends(sesion), u: Usuario = Depends(DATOS)) -> VersionDiccionarioSalida:
     """Marca rápido una variable como Lista o No usar: queda una versión nueva, vigente."""
     try:
         v = DIC.clasificar(s, c.variable, c.estado, u.id)
@@ -199,13 +199,13 @@ def _edicion[T](f: Callable[[], T]) -> T:
 
 
 @ruta.post('/editar/revisar', response_model=DiferenciasDiccionario)
-def revisar_edicion(e: Edicion, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> DiferenciasDiccionario:
+def revisar_edicion(e: Edicion, s: Session = Depends(sesion), u: Usuario = Depends(DATOS)) -> DiferenciasDiccionario:
     """Valida los cambios de los formularios y dice qué cambia frente a la vigente, sin guardar nada."""
     return DiferenciasDiccionario(**_edicion(lambda: DIC.revisar(s, e.base, _cambios(e))))
 
 
 @ruta.post('/editar', response_model=VersionDiccionarioSalida, status_code=status.HTTP_201_CREATED)
-def editar(e: Edicion, s: Session = Depends(sesion), u: Usuario = Depends(EXPERTO)) -> VersionDiccionarioSalida:
+def editar(e: Edicion, s: Session = Depends(sesion), u: Usuario = Depends(DATOS)) -> VersionDiccionarioSalida:
     """Guarda los cambios de los formularios como una versión nueva, vigente."""
     v = _edicion(lambda: DIC.editar(s, e.base, _cambios(e), nota=e.nota, usuario_id=u.id))
     auditar(s, u, 'editar_diccionario', f'diccionario v{v.version}',

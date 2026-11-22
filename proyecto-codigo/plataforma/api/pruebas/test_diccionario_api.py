@@ -18,6 +18,7 @@ pytestmark = pytest.mark.integracion
 ADMIN = ('admin@maia.prueba', 'clave-admin-de-prueba')
 EXPERTO = ('experto@maia.prueba', 'clave-experto-de-prueba')
 CONSULTA = ('consulta@maia.prueba', 'clave-consulta-de-prueba')
+CLINICO = ('clinico@maia.prueba', 'clave-clinico-de-prueba')
 XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
 
@@ -69,7 +70,12 @@ def _usuario(cliente, admin, datos, rol, nombre):
 
 @pytest.fixture(scope='module')
 def experto(cliente, admin):
-    return _usuario(cliente, admin, EXPERTO, 'experto', 'Experta')
+    return _usuario(cliente, admin, EXPERTO, 'datos', 'Experta')
+
+
+@pytest.fixture(scope='module')
+def clinico(cliente, admin):
+    return _usuario(cliente, admin, CLINICO, 'experto', 'Clínico')
 
 
 @pytest.fixture(scope='module')
@@ -90,14 +96,15 @@ def _archivo(contenido: bytes, nombre: str = 'diccionario.xlsx') -> dict:
     return {'archivo': (nombre, BytesIO(contenido), XLSX)}
 
 
-def test_semilla_y_permisos(cliente, admin, experto, consulta):
+def test_semilla_y_permisos(cliente, admin, experto, consulta, clinico):
     versiones = cliente.get('/api/diccionario/versiones', headers=experto).json()
     assert [(v['version'], v['estado'], v['origen']) for v in versiones] == [(1, 'vigente', 'semilla')]
     assert versiones[0]['tamano'] > 0 and versiones[0]['creado_por'] is None
     for metodo, ruta in (('get', '/api/diccionario/versiones'), ('get', '/api/diccionario/por-clasificar'),
                          ('get', '/api/diccionario/vigente/archivo'), ('post', '/api/diccionario/clasificar'),
                          ('post', '/api/diccionario/versiones/1/activar')):
-        assert getattr(cliente, metodo)(ruta, headers=consulta).status_code == 403, ruta
+        for quien in (consulta, clinico):
+            assert getattr(cliente, metodo)(ruta, headers=quien).status_code == 403, ruta
     assert cliente.get('/api/diccionario/versiones').status_code == 401
     assert cliente.get('/api/diccionario/versiones', headers=admin).status_code == 200
 

@@ -233,7 +233,8 @@ describe('administración de las ejecuciones', () => {
     expect((await screen.findAllByText('Entrenando…')).length).toBeGreaterThan(0)   // aviso en el menú
     const post = llamadas.find((l) => l.url === '/api/entrenamientos/entrenar')!
     expect(JSON.parse(String(post.init!.body))).toEqual({
-      fuente: 'kmc', modelos: ['clinico'], extraer: true, guardar: false, hiperparametros: { clinico: { rondas: 800 } } })
+      fuente: 'kmc', modelos: ['clinico'], extraer: true, guardar: false, visibilidad: 'oficial',   // también para el experto en datos
+      hiperparametros: { clinico: { rondas: 800 } } })
     estado = 'ok'
     expect(await screen.findByText('Modelo entrenado', {}, { timeout: 6000 })).toBeInTheDocument()
     expect(screen.getByText(/Alertas clínicas v12 \(candidato\)/)).toBeInTheDocument()

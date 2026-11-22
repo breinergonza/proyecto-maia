@@ -24,16 +24,20 @@ import { Cargando, Insignia } from './ui'
 
 type Enlace = { a: string; texto: string; icono: LucideIcon; roles?: Rol[]; hijos?: Hijo[] }
 
-/** Quién entra a cada página. El menú y las rutas de App.tsx leen estas listas, para que no se desacuerden. */
+/** Quién entra a cada página. El menú y las rutas de App.tsx leen estas listas, para que no se desacuerden. Lo clínico
+ * de cada niño es del experto clínico; los datos y los modelos (diccionario, calidad, configuración, programación,
+ * entrenamientos, paquetes y corridas), del experto en datos (D77). */
 export const ROLES_ADMIN: Rol[] = ['admin']
 export const ROLES_CLINICOS: Rol[] = ['admin', 'experto']
-export const ROLES_CONSULTA: Rol[] = ['admin', 'experto', 'visualizador']
+export const ROLES_DATOS: Rol[] = ['admin', 'datos']
+export const ROLES_MODELOS: Rol[] = ['admin', 'datos', 'visualizador']
+export const ROLES_CONSULTA: Rol[] = ['admin', 'experto', 'datos', 'visualizador']
 
 const MODELOS: Enlace = {
-  a: '/analitica', texto: 'Evaluación de modelos', icono: Activity, roles: ROLES_CONSULTA,
+  a: '/analitica', texto: 'Evaluación de modelos', icono: Activity, roles: ROLES_MODELOS,
   hijos: [
     ...SUBMODULOS.map((s) => ({ a: `/analitica/${s.id}`, texto: s.texto })),
-    { a: '/mis-modelos', texto: 'Entrenamientos propios', roles: ROLES_CLINICOS },
+    { a: '/mis-modelos', texto: 'Entrenamientos propios', roles: ROLES_DATOS },
   ],
 }
 
@@ -52,9 +56,24 @@ const SECCIONES: { titulo: string; enlaces: Enlace[] }[] = [
     titulo: 'Datos y modelos',
     enlaces: [
       MODELOS,
-      { a: '/admin/calidad-datos', texto: 'Mediciones por revisar', icono: ClipboardCheck, roles: ROLES_CLINICOS },
-      { a: '/diccionario', texto: 'Guía de variables y unidades', icono: BookOpen, roles: ROLES_CLINICOS },
-      { a: '/tablero', texto: 'Resumen de riesgos y calidad de datos', icono: Gauge, roles: ROLES_CONSULTA },
+      {
+        a: '/admin/modelos-y-corridas', texto: 'Operación de modelos', icono: Package, roles: ROLES_DATOS,
+        hijos: [
+          { a: '/admin/entrenamientos', texto: 'Entrenar y aprobar modelos' },
+          { a: '/admin/modelos', texto: 'Modelos disponibles' },
+          { a: '/admin/corridas', texto: 'Recalcular riesgos' },
+        ],
+      },
+      { a: '/admin/calidad-datos', texto: 'Mediciones por revisar', icono: ClipboardCheck, roles: ROLES_DATOS },
+      { a: '/diccionario', texto: 'Guía de variables y unidades', icono: BookOpen, roles: ROLES_DATOS },
+      { a: '/tablero', texto: 'Resumen de riesgos y calidad de datos', icono: Gauge, roles: ROLES_MODELOS },
+      {
+        a: '/admin/configuracion', texto: 'Configuración', icono: Settings, roles: ROLES_DATOS,
+        hijos: [
+          { a: '/admin/configuracion', texto: 'Configuración del sistema y del entrenamiento' },
+          { a: '/admin/programacion', texto: 'Programar ejecuciones automáticas' },
+        ],
+      },
     ],
   },
   {
@@ -67,21 +86,6 @@ const SECCIONES: { titulo: string; enlaces: Enlace[] }[] = [
   {
     titulo: 'Administración',
     enlaces: [
-      {
-        a: '/admin/configuracion', texto: 'Configuración', icono: Settings, roles: ROLES_ADMIN,
-        hijos: [
-          { a: '/admin/configuracion', texto: 'Configuración del sistema y del entrenamiento' },
-          { a: '/admin/programacion', texto: 'Programar ejecuciones automáticas' },
-        ],
-      },
-      {
-        a: '/admin/modelos-y-corridas', texto: 'Operación de modelos', icono: Package, roles: ROLES_ADMIN,
-        hijos: [
-          { a: '/admin/entrenamientos', texto: 'Entrenar y aprobar modelos' },
-          { a: '/admin/modelos', texto: 'Modelos disponibles' },
-          { a: '/admin/corridas', texto: 'Recalcular riesgos' },
-        ],
-      },
       { a: '/admin/usuarios', texto: 'Usuarios y permisos', icono: Users, roles: ROLES_ADMIN },
     ],
   },
@@ -99,8 +103,8 @@ function useDestinos(): Destino[] {
 
 function Navegacion({ alElegir, compacto, filtro = '' }: { alElegir?: () => void; compacto?: boolean; filtro?: string }) {
   const { usuario } = useSesion()
-  const entrenando = enMarcha(useEntrenamientos(puede(usuario, ['admin'])).data?.[0])
-  const porClasificar = usePorClasificar(puede(usuario, ['admin', 'experto'])).data?.total ?? 0
+  const entrenando = enMarcha(useEntrenamientos(puede(usuario, ROLES_DATOS)).data?.[0])
+  const porClasificar = usePorClasificar(puede(usuario, ROLES_DATOS)).data?.total ?? 0
   return (
     <nav aria-label="Secciones" className={cn('flex flex-col', compacto ? 'gap-3' : 'gap-4')}>
       {SECCIONES.map((s) => {

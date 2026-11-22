@@ -15,6 +15,7 @@ pytestmark = pytest.mark.integracion
 
 ADMIN = ('admin@maia.prueba', 'clave-admin-de-prueba')
 EXPERTO = ('experto@maia.prueba', 'clave-experto-de-prueba')
+DATOS = ('datos@maia.prueba', 'clave-datos-de-prueba')
 
 
 @pytest.fixture(scope='module')
@@ -74,6 +75,21 @@ def test_solo_administracion(cliente, experto):
         r = getattr(cliente, metodo)(ruta, headers=experto, **({'json': {}} if metodo in ('put', 'post') else {}))
         assert r.status_code == 403, (ruta, r.status_code)
     assert cliente.get('/api/administracion/resumen').status_code == 401
+
+
+def test_el_experto_en_datos_configura_programa_y_opera_modelos(cliente, admin):
+    r = cliente.post('/api/usuarios', headers=admin,
+                     json={'email': DATOS[0], 'nombre': 'Datos', 'rol': 'datos', 'clave': DATOS[1]})
+    assert r.status_code == 201, r.text
+    datos = _login(cliente, *DATOS)
+    for ruta in ('/api/administracion/resumen', '/api/administracion/conexion', '/api/administracion/hiperparametros',
+                 '/api/administracion/programaciones', '/api/administracion/ejecuciones', '/api/corridas',
+                 '/api/modelos/paquetes', '/api/entrenamientos/cuotas'):
+        assert cliente.get(ruta, headers=datos).status_code == 200, ruta
+    # lo que no es de datos ni de modelos sigue siendo de administración o del equipo clínico
+    for ruta in ('/api/usuarios', '/api/notificaciones/servidor', '/api/revision/riesgos', '/api/inferencia/formulario',
+                 '/api/ninos'):
+        assert cliente.get(ruta, headers=datos).status_code == 403, ruta
 
 
 def test_resumen_inicial(cliente, admin):
