@@ -34,8 +34,8 @@ export default function AdminUsuarios() {
   return (
     <>
       <Encabezado titulo="Usuarios y permisos">
-        Administración crea usuarios y cambia todo; un experto clínico responde las revisiones y calcula niños; consulta solo
-        ve el tablero y la lista de niños.
+        Administración crea usuarios y tiene todas las opciones; el experto clínico revisa casos y estima el riesgo de los
+        niños; el experto en datos cuida los datos y los modelos; consulta ve cifras de grupo, no niños uno por uno.
       </Encabezado>
       <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="min-w-0">
