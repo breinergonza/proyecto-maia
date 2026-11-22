@@ -408,3 +408,40 @@ def test_la_etiqueta_del_diccionario_manda_sobre_la_de_respaldo():
     assert P.etiqueta_sexo('F') == 'Femenino' and P.etiqueta_sexo('m') == 'Masculino'
     assert P.etiqueta_sexo('F', 'Mujer') == 'Mujer'
     assert P.etiqueta_sexo('X') == 'X'   # un código que no se conoce se deja como está
+
+
+def _corrida_con_medidas_repetidas(corte_id: int, a: str, b: str) -> int:
+    """Una corrida donde el niño ``a`` tiene dos pesos a las 40 semanas (dos variables del diccionario, como v218 y
+    v234): el último, bajo; el niño ``b``, uno solo, normal."""
+    from maia_comun import db
+    from maia_comun.modelos_db import Corrida, Crecimiento
+    with db.fabrica()() as s:
+        c = Corrida(corte_id=corte_id, fuente='simulado', fecha_corte=date(2026, 6, 30), tipo='completa', estado='ok',
+                    resumen={'ninos': 2, 'datos': 3, 'corte': '2026-06-30'})
+        s.add(c)
+        s.flush()
+        s.add_all([
+            Crecimiento(corrida_id=c.id, sujeto=a, etapa='40 sem', indicador='peso', variable='v218',
+                        fecha=date(2026, 1, 1), z=-1.0, valor=1.0, bajo_2de=False),
+            Crecimiento(corrida_id=c.id, sujeto=a, etapa='40 sem', indicador='peso', variable='v234',
+                        fecha=date(2026, 1, 5), z=-2.5, valor=1.0, bajo_2de=True),
+            Crecimiento(corrida_id=c.id, sujeto=b, etapa='40 sem', indicador='peso', variable='v218',
+                        fecha=date(2026, 1, 3), z=-0.5, valor=1.0, bajo_2de=False)])
+        s.commit()
+        return c.id
+
+
+def test_el_crecimiento_bajo_cuenta_ninos_y_no_mediciones(cliente, tokens, corte, sev):  # noqa: F811
+    """Un niño con dos medidas de la misma visita y medida cuenta una vez, con la última; el porcentaje es de niños
+    evaluados. El Resumen y Explorar dicen lo mismo, y siguen diciendo cuántas mediciones hubo."""
+    a, b = sorted(sev.sujetos.sujeto)[:2]
+    cid = _corrida_con_medidas_repetidas(corte, a, b)
+    t = cliente.get('/api/tablero/resumen', headers=tokens['admin'], params={'corrida_id': cid}).json()
+    e = _resumen(cliente, tokens, corrida_id=cid).json()
+    for r in (t, e):
+        f = next(f for f in r['crecimiento_por_etapa'] if f['etapa'] == '40 sem' and f['indicador'] == 'peso')
+        assert f['ninos'] == 2 and f['datos'] == 3
+        assert f['pct_bajo'] == pytest.approx(50.0)   # contando mediciones daría 33,3 %
+        assert f['z_mediano'] == pytest.approx(-1.5)  # la mediana de -2,5 y -0,5, no la de las tres medidas
+    # el indicador de Explorar: de los niños evaluados, cuántos tuvieron crecimiento bajo en alguna visita
+    assert e['ninos_crecimiento'] == 2 and e['pct_crecimiento_bajo'] == pytest.approx(50.0)

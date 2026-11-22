@@ -14,8 +14,8 @@ const resumen = {
   insuficiente: false, minimo: 20, corrida, corte: '2026-06-30', filtrado: true, ninos: 240, ninos_total: 600, datos: 4800,
   ninos_riesgo_alto: 25, riesgos_altos: 31, percentil_alto: 90,
   riesgos_por_desenlace: [{ clave: 'readm', desenlace: 'Readmisión', momento: '40 sem', momento_nombre: '40 semanas', ninos: 200, altos: 20, riesgo_medio: 0.2 }],
-  crecimiento_por_etapa: [{ etapa: '3 m EC', etapa_nombre: '3 meses', indicador: 'peso', datos: 180, pct_bajo: 12, pct_caida: 5, z_mediano: -0.3, orden: 2 }],
-  pct_crecimiento_bajo: 12.5,
+  crecimiento_por_etapa: [{ etapa: '3 m EC', etapa_nombre: '3 meses', indicador: 'peso', datos: 180, ninos: 170, pct_bajo: 12, pct_caida: 5, z_mediano: -0.3, orden: 2 }],
+  pct_crecimiento_bajo: 12.5, ninos_crecimiento: 160,
   distribuciones: { sexo: { etiqueta: 'Sexo', categorias: [
     { categoria: 'M', etiqueta: 'Masculino', grupo: 60, todos: 50 }, { categoria: 'F', etiqueta: 'Femenino', grupo: 40, todos: 50 }] } },
 }
@@ -68,7 +68,7 @@ describe('explorar', () => {
     expect(screen.queryByText(/niños en el grupo, de/)).not.toBeInTheDocument()   // el grupo activo ya dice cuántos son
     expect(cifra('niños con algún riesgo alto')).toBe('25')
     expect(cifra('datos registrados de los niños del grupo')).toBe('4.800')
-    expect(cifra('de los datos de crecimiento, bajos frente a la OMS')).toBe('12,5 %')
+    expect(cifra('de los 160 niños evaluados tuvo crecimiento bajo en alguna visita')).toBe('12,5 %')
     // una gráfica por pestaña, para que la página no se desplace: el riesgo primero
     expect(screen.getByRole('tab', { name: 'Riesgo', selected: true })).toBeInTheDocument()
     for (const [pestana, t] of [['Riesgo', 'Riesgo estimado del grupo'], ['Crecimiento', 'Crecimiento del grupo'],

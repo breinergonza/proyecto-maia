@@ -91,7 +91,7 @@ export function DesenlaceObservado({ d, r, vista = 'observado', ancho = false }:
         <FichaDelDato items={{
           variable: variableDe(d, r.trayectoria.umbral), unidad: '% de niños con dato',
           momento: '12 meses de edad corregida', poblacion,
-          validos: 'los niños con dato de cada fila (el denominador)',
+          validos: d.desde ? `los niños con dato que fueron a la visita de ${d.desde} (el denominador)` : 'los niños con dato de cada fila (el denominador)',
         }} />
       </div>
     </div>

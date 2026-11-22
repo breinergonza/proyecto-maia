@@ -113,7 +113,8 @@ def test_contrato(cliente, tokens, corrida, datos):  # noqa: F811
 
     obs = datos['observados'][datos['observados'].familia == 'talla_baja_12m']
     esperado = {'casos': int(obs.valor.sum()), 'con_dato': len(obs), 'sin_dato': n - len(obs),
-                'pct': round(100 * int(obs.valor.sum()) / len(obs), 1), 'pct_sin_dato': round(100 * (n - len(obs)) / n, 1)}
+                'pct': round(100 * int(obs.valor.sum()) / len(obs), 1), 'pct_sin_dato': round(100 * (n - len(obs)) / n, 1),
+                'desde': r['observado']['desde']}   # la visita entre cuyos asistentes se cuenta
     assert r['observado']['grupo'] == esperado == r['observado']['poblacion']   # sin filtro, el grupo es la población
 
     tr = r['trayectoria']
@@ -165,7 +166,8 @@ def test_un_filtro_cambia_cada_bloque(cliente, tokens, corrida, datos):  # noqa:
     obs = obs[(obs.familia == 'talla_baja_12m') & obs.sujeto.isin(ids)]
     assert v['observado']['grupo'] == {'casos': int(obs.valor.sum()), 'con_dato': len(obs), 'sin_dato': len(ids) - len(obs),
                                        'pct': round(100 * int(obs.valor.sum()) / len(obs), 1),
-                                       'pct_sin_dato': round(100 * (len(ids) - len(obs)) / len(ids), 1)}
+                                       'pct_sin_dato': round(100 * (len(ids) - len(obs)) / len(ids), 1),
+                                       'desde': v['observado']['desde']}
     assert v['observado']['poblacion'] == todos['observado']['poblacion']   # la población de referencia no cambia
     z = _z(datos, 'talla', ids)
     for e, antes in zip(v['trayectoria']['etapas'], todos['trayectoria']['etapas']):
@@ -238,6 +240,42 @@ def test_los_ninos_uno_por_uno_son_solo_de_experto_y_administracion(cliente, tok
             # pasa el permiso; la historia del riesgo responde 409 en esta prueba porque no hay paquete activo
             r = cliente.get(url, headers=tokens[rol], params={'corrida_id': corrida})
             assert r.status_code in ((200, 409) if url.endswith('historia-riesgo') else (200,)), (url, rol, r.status_code)
+
+
+def test_la_curva_cuenta_un_dato_por_nino(cliente, tokens, corte, sev):  # noqa: F811
+    """Con dos tallas del mismo niño en la misma visita, la mediana usa la última y no las dos."""
+    from maia_comun import db
+    from maia_comun.modelos_db import Corrida, Crecimiento, DesenlaceObservado
+    a, b = sorted(sev.sujetos.sujeto)[:2]
+    with db.fabrica()() as s:
+        c = Corrida(corte_id=corte, fuente='simulado', fecha_corte=date(2026, 6, 30), tipo='completa', estado='ok',
+                    resumen={'ninos': 2, 'corte': '2026-06-30'})
+        s.add(c)
+        s.flush()
+        s.add_all([Crecimiento(corrida_id=c.id, sujeto=a, etapa='40 sem', indicador='talla', fecha=date(2026, 1, 1), z=-1.0),
+                   Crecimiento(corrida_id=c.id, sujeto=a, etapa='40 sem', indicador='talla', fecha=date(2026, 1, 5), z=-3.0),
+                   Crecimiento(corrida_id=c.id, sujeto=b, etapa='40 sem', indicador='talla', fecha=date(2026, 1, 3), z=-2.5),
+                   DesenlaceObservado(corrida_id=c.id, sujeto=a, familia='talla_baja_12m', valor=True)])
+        s.commit()
+        cid = c.id
+    r = _resumen(cliente, tokens, corrida_id=cid, familia='talla_baja_12m').json()
+    e = next(e for e in r['trayectoria']['etapas'] if e['etapa'] == '40 sem')
+    assert e['grupo']['n'] == 2 and e['grupo']['mediana'] == pytest.approx(-2.75)   # con las tres daría -2,5
+
+
+def test_lo_observado_dice_desde_que_visita_se_cuenta(cliente, tokens, corrida):  # noqa: F811
+    """Lo observado a los 12 meses se cuenta entre los niños que fueron a la primera visita en que se calcula el
+    riesgo de la familia; la curva de talla, entre todos los que tienen dato. La respuesta dice esa visita para que la
+    pantalla explique por qué los dos «con dato» de los 12 meses no coinciden."""
+    from maia_api.consultas import etapas
+    from maia_comun import db
+    from maia_comun.modelos_db import Corrida
+    with db.fabrica()() as s:
+        mapa = etapas(s, s.get(Corrida, corrida).corte_id)
+    talla = _resumen(cliente, tokens, corrida_id=corrida, familia='talla_baja_12m').json()['observado']
+    desarrollo = _resumen(cliente, tokens, corrida_id=corrida, familia='desarrollo_12m').json()['observado']
+    assert talla['desde'] == mapa['40 sem']['nombre']      # talla baja se calcula desde las 40 semanas
+    assert desarrollo['desde'] == mapa['6 m EC']['nombre']  # desarrollo psicomotor, a los 6 meses
 
 
 def test_familia_o_indicador_desconocidos(cliente, tokens, corrida):  # noqa: F811

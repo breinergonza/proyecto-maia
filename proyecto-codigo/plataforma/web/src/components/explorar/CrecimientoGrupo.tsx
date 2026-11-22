@@ -1,4 +1,5 @@
-// Crecimiento del grupo elegido: una línea por medida con el % de niños medidos con crecimiento bajo en cada visita.
+// Crecimiento del grupo elegido: una línea por medida con el % de niños evaluados (una medida por niño y visita) con crecimiento
+// bajo en cada visita.
 // Los colores de cada medida son los del Tablero (seriesCrecimiento).
 import type { CrecimientoEtapa } from '../../api/tipos'
 import { num, pct } from '../../lib/formato'
@@ -18,7 +19,7 @@ export function CrecimientoGrupo({ filas }: { filas: CrecimientoEtapa[] }) {
     for (const m of medidas) {
       const c = celda.get(`${etapa}|${m}`)
       fila[m] = c ? c.pct_bajo : null
-      fila[`${m}:datos`] = c ? c.datos : null
+      fila[`${m}:ninos`] = c ? c.ninos : null
     }
     return fila
   })
@@ -28,7 +29,7 @@ export function CrecimientoGrupo({ filas }: { filas: CrecimientoEtapa[] }) {
       <LineasSeries filas={datos} series={series} alto={260} formatoY={(v) => `${num(v)} %`}
         etiqueta={`Porcentaje de niños del grupo con crecimiento bajo en cada visita: ${series.map((s) =>
           `${s.nombre}, ${datos.map((f) => `${f.x} ${typeof f[s.clave] === 'number' ? pct(f[s.clave] as number) : 'sin dato'}`).join(', ')}`).join('; ')}`}
-        formatoTooltip={(v, f, s) => `${pct(v)} bajo · ${num(Number(f[`${s.clave}:datos`]))} datos`} />
+        formatoTooltip={(v, f, s) => `${pct(v)} bajo · ${num(Number(f[`${s.clave}:ninos`]))} niños evaluados`} />
       {series.length < medidas.length && <p className="mt-1 text-sm">Las demás medidas no se dibujan.</p>}
     </>
   )

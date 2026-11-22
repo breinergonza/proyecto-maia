@@ -227,6 +227,26 @@ describe('el formulario cabe en la ventana: las casillas se reparten a lo ancho 
   })
 })
 
+describe('un resultado de datos que ya cambiaron se marca', () => {
+  it('editar el formulario después de calcular avisa que el resultado es de los datos anteriores, hasta volver a calcular', async () => {
+    const enviados = api('experto')
+    montar('/prediccion')
+    await userEvent.type(await screen.findByLabelText('Fecha de nacimiento'), '2026-01-10')
+    await userEvent.type(screen.getByLabelText('Semanas de gestación al nacer'), '30')
+    await userEvent.type(screen.getByLabelText('Peso al nacer (g)'), '900')
+    await userEvent.click(screen.getByRole('button', { name: 'Estimar riesgo' }))
+    await waitFor(() => expect(enviados).toHaveLength(1))
+    await screen.findByText('desarrollo psicomotor bajo a los 6 meses', { selector: 'h2' })
+    expect(screen.queryByText(/datos que ya cambiaron/)).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: 'Datos del niño' }))
+    await userEvent.type(screen.getByLabelText('Peso al nacer (g)'), '0')
+    expect(screen.getByText(/datos que ya cambiaron/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Estimar riesgo' }))
+    await waitFor(() => expect(enviados).toHaveLength(2))
+    await waitFor(() => expect(screen.queryByText(/datos que ya cambiaron/)).not.toBeInTheDocument())
+  })
+})
+
 describe('cuando no se puede calcular, cada rol sabe a quién acudir', () => {
   const sinModelo = { estado: 409, cuerpo: { detail: 'No hay un paquete de modelos activo.' } }
   const falla = { estado: 422, cuerpo: { detail: 'No se pudo calcular el riesgo con estos datos. Revise los valores que escribió e intente de nuevo.' } }

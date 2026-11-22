@@ -125,13 +125,18 @@ function Calculo({ modelo, universo, grupo, listo }: {
   const [visita, setVisita] = useState('')
   const [excluir, setExcluir] = useState(false)
   const [trabajoId, setTrabajoId] = useState<number | null>(null)
+  // la selección con que se lanzó el cálculo que se ve: si el grupo, la visita o la exclusión cambian, ese resultado ya no
+  // es el de la pantalla y se marca hasta volver a calcular
+  const [enviado, setEnviado] = useState<string | null>(null)
   const lanzar = useLanzarPrediccion()
-  const lanzarCon = (c: Parameters<typeof lanzar.mutate>[0]) => lanzar.mutate(c, { onSuccess: (x) => setTrabajoId(x.id) })
+  const lanzarCon = (c: Parameters<typeof lanzar.mutate>[0]) =>
+    lanzar.mutate(c, { onSuccess: (x) => { setTrabajoId(x.id); setEnviado(JSON.stringify(c)) } })
   const trabajo = useTrabajoPrediccion(trabajoId)
   const cuerpo: CuerpoPrediccionMuestra = {
     modelo: modelo || null, ...grupo, excluir_entrenamiento: excluir, visita: visita || null,
   }
   const t = trabajo.data
+  const deOtraSeleccion = t !== undefined && enviado !== null && enviado !== JSON.stringify(cuerpo)
   const corriendo = lanzar.isPending || (t !== undefined && EN_CURSO.includes(t.estado))
   return (
     <div className="flex flex-col gap-3 lg:h-full">
@@ -164,7 +169,12 @@ function Calculo({ modelo, universo, grupo, listo }: {
       )}
       {t && EN_CURSO.includes(t.estado) && <Avance t={t} />}
       {t?.estado === 'error' && <Aviso>{t.mensaje ?? 'El cálculo falló. Intente de nuevo.'}</Aviso>}
-      {t?.estado === 'ok' && t.resultado && <Resultado t={t} r={t.resultado} admin={admin} />}
+      {t?.estado === 'ok' && t.resultado && deOtraSeleccion && (
+        <Aviso tono="coral">Resultado de la selección anterior. Vuelva a calcular: cambió el grupo, la visita o la exclusión de niños.</Aviso>
+      )}
+      {t?.estado === 'ok' && t.resultado && (
+        <div className={deOtraSeleccion ? 'opacity-50 lg:min-h-0 lg:flex-1' : 'contents'}><Resultado t={t} r={t.resultado} admin={admin} /></div>
+      )}
       {t?.estado === 'ok' && !t.resultado && <Aviso tono="teal">Este cálculo ya venció (se conserva una hora). Vuelva a calcular.</Aviso>}
     </div>
   )

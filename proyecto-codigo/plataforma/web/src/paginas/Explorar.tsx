@@ -87,7 +87,7 @@ function Cifras({ r, filtros }: { r: ExplorarResumen; filtros: number }) {
         <Indicador valor={num(r.datos)} texto="datos registrados de los niños del grupo" />
         <Indicador valor={num(r.ninos_riesgo_alto)} texto="niños con algún riesgo alto" tono="coral"
           ayuda={`Un niño puede tenerlo en varios desenlaces: son ${num(r.riesgos_altos)} riesgos altos en total.`} />
-        <Indicador valor={pct(r.pct_crecimiento_bajo)} texto="de los datos de crecimiento, bajos frente a la OMS" />
+        <Indicador valor={pct(r.pct_crecimiento_bajo)} texto={`de los ${num(r.ninos_crecimiento)} niños evaluados tuvo crecimiento bajo en alguna visita`} />
       </div>
       {r.muestreo && (
         <p className="text-xs text-salvia">

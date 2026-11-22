@@ -16,7 +16,7 @@ const RUTA = '/api/analitica/comparar/grupos/clinico'
 
 const talla: DesenlaceComparado = {
   clave: 'talla_baja_12m', nombre: 'Talla baja a los 12 meses', estado: 'en_prueba', indicador: 'talla',
-  definicion: 'Talla para la edad con puntaje z menor que −2 frente a la referencia de la OMS, medido a los 12 m EC.',
+  definicion: 'Talla para la edad con puntaje z menor que −2 frente a la referencia de la OMS, medido a los 12 m EC.', desde: '40 semanas',
   a: { casos: 52, con_dato: 397, sin_dato: 101, pct: 13.1, pct_sin_dato: 20.3 }, b: { casos: 41, con_dato: 223, sin_dato: 89, pct: 18.4, pct_sin_dato: 28.5 },
   dif: { valor: 5.3, ic_bajo: -0.8, ic_alto: 11.4, clara: false },
   riesgo_con_modelo: true,
@@ -183,6 +183,7 @@ describe('comparar grupos', () => {
     expect(within(panel).getByText(/Unidad: % de niños con dato/)).toBeVisible()
     expect(within(panel).getByText(/Momento: 12 meses de edad corregida/)).toBeVisible()
     expect(within(panel).getByText(/Población: niños elegibles de A \(498\) y de B \(312\)/)).toBeVisible()
+    expect(within(panel).getByText(/niños con dato que fueron a la visita de 40 semanas/)).toBeVisible()
   })
 
   it('la talla por visita dibuja un punto solo donde hay dato, con el umbral y los niños con dato de cada visita', async () => {

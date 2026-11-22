@@ -122,7 +122,9 @@ las mismas cifras, sin el enlace a la lista de niños.
 
 ### Tablero
 
-Es la pantalla de inicio. Debajo del título dice de qué fecha son los datos («Datos al …») y cuándo se actualizaron.
+Es la pantalla de inicio. Debajo del título dice que las cifras son de **toda la población del programa** (el grupo
+que se arma en Explorar o en la Vista clínica no llega aquí), de qué fecha son los datos («Datos al …») y cuándo se
+actualizaron.
 Administración ve además el paquete de modelos y el número de la corrida.
 
 Si aparece «Todavía no hay resultados», la administración aún no ha hecho la primera actualización.
@@ -154,7 +156,9 @@ Si aparece «Todavía no hay resultados», la administración aún no ha hecho l
 * **Crecimiento frente a la OMS.** Una fila por visita y una columna por medida (**Peso para la edad**, **Talla para
   la edad**, **Perímetro cefálico**). En cada celda: el porcentaje de niños con la medida **baja para la edad** (en
   color ocre si es 10 % o más) y, con la flecha ↓, el porcentaje que **cayó desde el control anterior**. «EC» quiere
-  decir edad corregida. Al pasar el cursor sobre una celda se ve también cuántos datos hay y el puntaje z mediano.
+  decir edad corregida. Los porcentajes son de **niños evaluados**, no de mediciones: un niño con dos medidas de la
+  misma visita (el peso a las 40 semanas viene en dos variables) cuenta una vez, con su última medida válida (D74). Al
+  pasar el cursor se ve cuántos niños se evaluaron; la tabla dice además cuántas mediciones hubo.
 
 ### Niños (Experto y Administración)
 
@@ -252,7 +256,8 @@ Tablero, pero para el grupo de niños que usted elija; el Tablero no cambia y si
   volver a usarlo (por ejemplo en Predicción). Al guardar, el formulario ofrece el **Muestreo para entrenar** (todos los
   que cumplen o un tope por categoría): es propio de la muestra que se guarda para entrenar, así que no aparece en la
   Vista clínica, en Comparar grupos ni en Explorar, y el grupo guardado conserva el que traiga la dirección.
-* **Qué se ve:** niños en el grupo, datos leídos, niños con algún riesgo alto, crecimiento bajo frente a la OMS, y
+* **Qué se ve:** niños en el grupo, datos leídos, niños con algún riesgo alto, el porcentaje de los niños evaluados que
+  tuvo crecimiento bajo frente a la OMS en alguna visita (D74), y
   tres gráficas: riesgo del grupo, crecimiento del grupo y quiénes son los niños. En el crecimiento del grupo, bajo cada
   visita dice cuántos niños tienen dato. La mediana sale con cualquier número de niños; la mitad central pide 20 niños o
   más con dato en esa visita (límite estadístico, no de privacidad): con menos, esa visita tiene su punto pero no su
@@ -439,8 +444,9 @@ la administración activa otro.
    * Primero aparecen los datos que más pesan en el riesgo y las medidas de crecimiento; el resto está en **Más datos
      de esta visita**. Los números aceptan coma o punto; las listas muestran sus opciones.
    * La tarjeta muestra cuántos datos tiene llenos.
-3. Pulse **Calcular el riesgo**. Si falta algo (la fecha de nacimiento, la fecha de una visita con datos, un número mal
-   escrito), aparece arriba del botón qué falta.
+3. Pulse **Estimar riesgo**. Si falta algo (la fecha de nacimiento, la fecha de una visita con datos, un número mal
+   escrito), aparece arriba del botón qué falta. Si cambia un dato después de calcular, un aviso dice que el resultado
+   es de datos que ya cambiaron hasta que vuelva a calcular (D75).
 
 Lo que deje vacío se toma como dato faltante: el modelo calcula igual, con menos información. **Cargar un niño de
 ejemplo** llena el formulario con un niño simulado para ver cómo funciona; **Limpiar** lo vacía.
@@ -474,7 +480,9 @@ Calcula el riesgo con un modelo ya entrenado, sin guardar nada por niño.
   que se entrenó el modelo se dejan fuera, y la pantalla lo avisa.
 * **Resultado:** cómo se reparte el riesgo, riesgo por desenlace, el **riesgo alto en cada visita** y los niños con más
   riesgo (los de riesgo alto o muy alto llevan etiqueta). El cálculo corre en segundo plano con barra de avance; la tabla
-  por niño se conserva **una hora** y se ve de 200 en 200 (después hay que recalcular).
+  por niño se conserva **una hora** y se ve de 200 en 200 (después hay que recalcular). Si después de calcular cambia
+  el grupo, la visita o la exclusión de niños, el resultado se atenúa con el aviso «Resultado de la selección
+  anterior» hasta volver a calcular (D75).
 * **Niño nuevo:** elija una visita y un perfil, parta de un niño de ejemplo con valores típicos, cambie solo lo que sea
   distinto y calcule. Con menos de 20 niños en el perfil no se da un ejemplo. **Guardar este niño** lo deja como niño o
   como plantilla (las plantillas las ven todos los expertos) y se borra desde la tabla de guardados.

@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from clinico import configuracion as CONFIG
 from clinico import crecimiento as CR
 from maia_api import poblacion as P
-from maia_api.consultas import INDICADORES, corrida_de, etapas, nombre_etapa
+from maia_api.consultas import INDICADORES, corrida_de, crecimiento_por_nino, etapas, nombre_etapa
 from maia_api.dependencias import CUALQUIERA, auditar, sesion
 from maia_api.rutas.exploracion import Consulta, _definicion
 from maia_comun import clinica as CL
@@ -56,6 +56,19 @@ class Dic:
         d = self.desenlaces
         propias = d[d.clave.map(CL.familia_de) == familia].sort_values('clave', key=lambda c: c.ne(familia))
         return None if propias.empty else propias.iloc[0].to_dict()
+
+    def visita_base(self, familia: str, mapa: dict[str, dict]) -> str | None:
+        """La primera visita en que se calcula el riesgo de la familia (de sus filas que no están apagadas), con su
+        nombre. Lo observado a los 12 meses se cuenta entre los niños que fueron a esa visita (es la población de la
+        corrida, ``tabla_observados``), mientras la curva de talla cuenta a todos los que tienen dato en cada visita."""
+        if self.desenlaces.empty:
+            return None
+        d = self.desenlaces
+        propias = d[(d.clave.map(CL.familia_de) == familia) & (d.estado != D.APAGADO) & d.momento.notna()]
+        if propias.empty:
+            return None
+        primera = min(propias.momento, key=lambda e: mapa.get(e, {}).get('orden', 99))
+        return nombre_etapa(mapa, primera)
 
     def umbral(self, indicador: str) -> float:
         """El puntaje z bajo el cual el crecimiento se considera bajo (el del diccionario; si no, el de la OMS)."""
@@ -130,10 +143,11 @@ def _filas(s: Session, sql: str, **p) -> list[dict]:
     return [dict(r._mapping) for r in s.execute(text(sql), p)]
 
 
-def observado_de(s: Session, corrida: int, familia: str, ids: list[str] | None, n: int) -> dict | None:
+def observado_de(s: Session, corrida: int, familia: str, ids: list[str] | None, n: int,
+                 desde: str | None = None) -> dict | None:
     """Casos, niños con dato y sin dato de ``n`` niños (``ids``; ``None`` es todo el corte), el porcentaje de casos
-    entre quienes tienen dato y el de niños sin dato entre los ``n``, de los mismos conteos. Sin niños
-    con dato, nada."""
+    entre quienes tienen dato y el de niños sin dato entre los ``n``, de los mismos conteos. ``desde``: la visita entre
+    cuyos asistentes se cuenta lo observado (``Dic.visita_base``). Sin niños con dato, nada."""
     de = ' AND sujeto = ANY(:ids)' if ids is not None else ''
     p = {'c': corrida, 'f': familia, **({'ids': ids} if ids is not None else {})}
     casos, con_dato = s.execute(text(f"""
@@ -144,7 +158,7 @@ def observado_de(s: Session, corrida: int, familia: str, ids: list[str] | None, 
     sin_dato = max(n - con_dato, 0)
     return {'casos': int(casos), 'con_dato': int(con_dato),
             'sin_dato': int(sin_dato), 'pct': round(100 * casos / con_dato, 1),
-            'pct_sin_dato': round(100 * sin_dato / n, 1) if n else None}
+            'pct_sin_dato': round(100 * sin_dato / n, 1) if n else None, 'desde': desde}
 
 
 def trayectoria_de(s: Session, corrida: int, corte_id: int, indicador: str, ids: list[str] | None,
@@ -154,16 +168,16 @@ def trayectoria_de(s: Session, corrida: int, corte_id: int, indicador: str, ids:
     niños; la mitad central (cuartiles) pide al menos 20 con dato en la visita, como toda distribución (D52): con
     menos, el cuarto y los tres cuartos dicen poco del grupo."""
     por = {'p': {'c': corrida, 'i': indicador}, 'g': {'c': corrida, 'i': indicador, 'ids': ids}}
+    # una talla por niño y visita (la última válida): la mediana y los cuartiles son de niños, no de mediciones
     sql = """
-        SELECT etapa, count(DISTINCT sujeto) AS n, percentile_cont(0.25) WITHIN GROUP (ORDER BY z) AS p25,
+        SELECT etapa, count(*) AS n, percentile_cont(0.25) WITHIN GROUP (ORDER BY z) AS p25,
                percentile_cont(0.5) WITHIN GROUP (ORDER BY z) AS mediana,
                percentile_cont(0.75) WITHIN GROUP (ORDER BY z) AS p75
-        FROM resultados.crecimiento
-        WHERE corrida_id = :c AND indicador = :i AND z IS NOT NULL AND NOT improbable{de}
-        GROUP BY etapa"""
-    poblacion = {f['etapa']: f for f in _filas(s, sql.format(de=''), **por['p'])}
-    grupo = poblacion if ids is None else {
-        f['etapa']: f for f in _filas(s, sql.format(de=' AND sujeto = ANY(:ids)'), **por['g'])}
+        FROM {fuente} GROUP BY etapa"""
+    propia = ' AND indicador = :i AND z IS NOT NULL'
+    poblacion = {f['etapa']: f for f in _filas(s, sql.format(fuente=crecimiento_por_nino(propia)), **por['p'])}
+    grupo = poblacion if ids is None else {f['etapa']: f for f in _filas(
+        s, sql.format(fuente=crecimiento_por_nino(propia + ' AND sujeto = ANY(:ids)')), **por['g'])}
     mapa = etapas(s, corte_id)
 
     def celda(f: dict | None, completa: bool) -> dict | None:
@@ -268,6 +282,7 @@ def resumen(consulta: ConsultaClinica, s: Session = Depends(sesion), u: Usuario 
     familia = elegida['clave'] if elegida else None
     indicador = consulta.indicador or (elegida and elegida['indicador']) or INDICADOR_POR_DEFECTO
     ve_ninos = u.rol in ('admin', 'experto')
+    desde = dic.visita_base(familia, etapas(s, corrida.corte_id)) if familia else None
     ninos = _ninos(s, corrida.id, corrida.corte_id, familia, grupo, indicador) if familia and ve_ninos else None
     if ninos is not None:
         auditar(s, u, 'clinica.ninos', f'corrida:{corrida.id}', {'familia': familia, 'ninos': len(ninos)})
@@ -277,8 +292,9 @@ def resumen(consulta: ConsultaClinica, s: Session = Depends(sesion), u: Usuario 
         'datos_al': (corrida.resumen or {}).get('corte') or (str(corrida.fecha_corte) if corrida.fecha_corte else None),
         'familias': familias, 'familia': familia, 'indicador': indicador,
         'grupo': {'n': int(len(ids)), 'n_total': int(total)},
-        'observado': {'grupo': observado_de(s, corrida.id, familia, grupo, len(ids)) if familia else None,
-                      'poblacion': observado_de(s, corrida.id, familia, None, total) if familia else None},
+        'observado': {'grupo': observado_de(s, corrida.id, familia, grupo, len(ids), desde) if familia else None,
+                      'poblacion': observado_de(s, corrida.id, familia, None, total, desde) if familia else None,
+                      'desde': desde},
         'trayectoria': trayectoria_de(s, corrida.id, corrida.corte_id, indicador, grupo, dic),
         'riesgo': riesgo_de(s, corrida.id, corrida.corte_id, familia, grupo, dic) if familia else [],
         'riesgo_con_modelo': riesgo_con_modelo(s, corrida.id, familia) if familia else False,

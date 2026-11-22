@@ -5,10 +5,12 @@ import type { ObservadoClinico } from '../../api/tipos'
 import { num, pct } from '../../lib/formato'
 import { Panel } from '../ui'
 
-export function Observado({ grupo, poblacion, esPoblacion, className }: {
+export function Observado({ grupo, poblacion, esPoblacion, desde, className }: {
   grupo: ObservadoClinico | null; poblacion: ObservadoClinico | null
   /** El grupo son todos los niños: la referencia sería la misma cifra. */
   esPoblacion: boolean
+  /** La visita entre cuyos asistentes se cuenta lo observado. */
+  desde?: string | null
   className?: string
 }) {
   return (
@@ -22,6 +24,12 @@ export function Observado({ grupo, poblacion, esPoblacion, className }: {
         </div>
       ) : (
         <p className="text-sm">Ningún niño del grupo elegido tiene dato a los 12 meses.</p>
+      )}
+      {desde && (
+        // sin esta nota, los «con dato a los 12 meses» de aquí y de la curva de talla parecen contradecirse
+        <p className="mt-1 text-xs text-salvia">
+          Se cuenta entre los niños que fueron a la visita de {desde}; la curva de crecimiento cuenta a todos los niños con dato en cada visita.
+        </p>
       )}
       {esPoblacion ? (
         <p className="mt-2 text-sm">Referencia: el grupo es toda la población.</p>

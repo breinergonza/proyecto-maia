@@ -295,11 +295,12 @@ def _desenlace(s: Session, corrida: Corrida, familia: dict, ids_a: list[str], id
     clave = familia['clave']
     va, vb = _valores_observados(s, corrida.id, clave, ids_a, ids_b)
     comparacion = CM.comparar_valores(va, vb, escala=100, unidad='pp')
+    desde = dic.visita_base(clave, etapas(s, corrida.corte_id))   # entre quiénes se cuenta lo observado
 
     def observado(ids: list[str], pct: float | None) -> dict | None:
-        o = CLI.observado_de(s, corrida.id, clave, ids, len(ids))
+        o = CLI.observado_de(s, corrida.id, clave, ids, len(ids), desde)
         return None if o is None else {**o, 'pct': pct}
-    return {**familia, 'a': observado(ids_a, comparacion['a']), 'b': observado(ids_b, comparacion['b']),
+    return {**familia, 'desde': desde, 'a': observado(ids_a, comparacion['a']), 'b': observado(ids_b, comparacion['b']),
             'dif': {'valor': comparacion['diferencia'], 'ic_bajo': comparacion['ic_bajo'], 'ic_alto': comparacion['ic_alto'],
                     'clara': comparacion['clara']},
             'riesgo': _riesgo_por_corte(s, corrida, clave, ids_a, ids_b, dic),

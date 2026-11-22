@@ -44,6 +44,42 @@ def nombre_etapa(mapa: dict[str, dict], etapa: str | None) -> str | None:
     return mapa.get(etapa, {}).get('nombre', etapa)
 
 
+def crecimiento_por_nino(filtro: str = '') -> str:
+    """Subconsulta con una fila por niño, visita y medida de crecimiento: la última medida válida de esa visita. Un niño
+    con dos pesos en la misma visita (el diccionario tiene a veces dos variables para la misma medida, como el peso a
+    las 40 semanas) cuenta una vez, y los porcentajes son de niños y no de mediciones. Pide ``:c`` (la corrida);
+    ``filtro`` agrega condiciones SQL (empiezan con `` AND``)."""
+    return f"""(SELECT DISTINCT ON (sujeto, etapa, indicador) sujeto, etapa, indicador, z, bajo_2de, caida_1de
+        FROM resultados.crecimiento WHERE corrida_id = :c AND NOT improbable{filtro}
+        ORDER BY sujeto, etapa, indicador, fecha DESC NULLS LAST, id DESC) AS cr"""
+
+
+def crecimiento_por_visita(s: Session, corrida_id: int, mapa: dict[str, dict], ids: list[str] | None = None) -> list[dict]:
+    """Por visita y medida: los niños evaluados (``ninos``), las mediciones válidas (``datos``) y, sobre los niños, el
+    porcentaje con crecimiento bajo, el que cayó desde la visita anterior y la mediana del puntaje z. Con ``ids``, solo
+    esos niños. Lo usan el Resumen y Explorar, que así dicen lo mismo."""
+    de = ' AND sujeto = ANY(:ids)' if ids is not None else ''
+    p = {'c': corrida_id, **({'ids': ids} if ids is not None else {})}
+    filas = [dict(r._mapping) for r in s.execute(text(f"""
+        SELECT etapa, indicador, count(*) AS ninos,
+               100.0 * avg(CASE WHEN bajo_2de THEN 1 ELSE 0 END) AS pct_bajo,
+               100.0 * avg(CASE WHEN caida_1de THEN 1 ELSE 0 END) AS pct_caida,
+               percentile_cont(0.5) WITHIN GROUP (ORDER BY z) AS z_mediano
+        FROM {crecimiento_por_nino(de)} GROUP BY etapa, indicador"""), p)]
+    datos = {(e, i): int(n) for e, i, n in s.execute(text(f"""
+        SELECT etapa, indicador, count(*) FROM resultados.crecimiento WHERE corrida_id = :c AND NOT improbable{de}
+        GROUP BY etapa, indicador"""), p)}
+    for f in filas:
+        f['ninos'] = int(f['ninos'])
+        for k in ('pct_bajo', 'pct_caida', 'z_mediano'):   # Postgres da numeric: a la web llega como número
+            f[k] = None if f[k] is None else float(f[k])
+        f['datos'] = datos.get((f['etapa'], f['indicador']), f['ninos'])
+        f['etapa_nombre'] = nombre_etapa(mapa, f['etapa'])
+        f['orden'] = mapa.get(f['etapa'], {}).get('orden', 99)
+    filas.sort(key=lambda f: (f['orden'], f['indicador']))
+    return filas
+
+
 def esquema(s: Session, corte_id: int | None) -> dict[str, dict]:
     if corte_id is None:
         return {}
