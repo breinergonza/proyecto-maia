@@ -84,8 +84,8 @@ describe('navegación', () => {
   it('el título de la pestaña sigue a la página y se anuncia', async () => {
     api('admin')
     montar('/diccionario')
-    await waitFor(() => expect(document.title).toBe('Guía de variables y unidades · Observatorio Canguro'))
-    expect(screen.getAllByRole('status').some((s) => s.textContent === 'Guía de variables y unidades · Observatorio Canguro')).toBe(true)
+    await waitFor(() => expect(document.title).toBe('Guía de variables y unidades · KMCPred'))
+    expect(screen.getAllByRole('status').some((s) => s.textContent === 'Guía de variables y unidades · KMCPred')).toBe(true)
   })
 
   it('tabla de títulos: submódulos de analítica, ficha del niño y página inexistente', () => {
@@ -96,7 +96,7 @@ describe('navegación', () => {
     expect(nombrePagina('/tablero')).toBe('Resumen de riesgos y calidad de datos')
     expect(nombrePagina('/comparar')).toBe('Comparar grupos de niños')
     expect(nombrePagina('/prediccion')).toBe('Estimar riesgo')
-    expect(tituloDocumento('/x/y')).toBe('No existe esa página · Observatorio Canguro')
+    expect(tituloDocumento('/x/y')).toBe('No existe esa página · KMCPred')
   })
 
   it('el administrador ve el menú agrupado: Operación de modelos, y Configuración', async () => {
@@ -228,7 +228,7 @@ describe('navegación', () => {
     unmount()
     montar('/tablero')
     expect(await screen.findByRole('heading', { level: 1, name: 'Resumen de riesgos y calidad de datos' })).toBeInTheDocument()
-    await waitFor(() => expect(document.title).toBe('Resumen de riesgos y calidad de datos · Observatorio Canguro'))
+    await waitFor(() => expect(document.title).toBe('Resumen de riesgos y calidad de datos · KMCPred'))
   })
 
   it('«/comparar» abre «Comparar grupos» con el grupo A y un atajo para elegir el B', async () => {

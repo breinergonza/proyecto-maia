@@ -11,7 +11,15 @@ describe('ingreso y permisos', () => {
   it('sin sesión lleva al ingreso', async () => {
     simularApi(sinSesion)
     montar('/ninos')
-    expect(await screen.findByRole('heading', { name: 'Iniciar sesión en MAIA' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Iniciar sesión en KMCPred' })).toBeInTheDocument()
+  })
+
+  it('el ingreso muestra el nombre KMCPred y qué es la plataforma', async () => {
+    simularApi(sinSesion)
+    montar('/ingresar')
+    expect(await screen.findByText('KMCPred')).toBeInTheDocument()
+    expect(screen.getByText('Sistema interpretable de alertas y predicción temprana de riesgos en niños prematuros y de bajo peso del Programa Madre Canguro')).toBeInTheDocument()
+    await waitFor(() => expect(document.title).toBe('Iniciar sesión · KMCPred'))
   })
 
   it('valida el formulario antes de llamar a la API', async () => {
