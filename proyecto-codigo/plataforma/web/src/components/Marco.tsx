@@ -13,7 +13,7 @@ import { cn } from '../lib/cn'
 import { esDemo } from '../lib/config'
 import { usePorClasificar } from '../lib/diccionario'
 import { ROLES } from '../lib/formato'
-import { useTituloPagina } from '../lib/useTituloPagina'
+import { DESCRIPCION_APP, LEMA_APP, NOMBRE_APP, useTituloPagina } from '../lib/useTituloPagina'
 import { SUBMODULOS } from '../paginas/analitica/submodulos'
 import { AvisoSesion } from './AvisoSesion'
 import { BuscarMenu, coincide, normalizar, type Destino } from './BuscarMenu'
@@ -170,10 +170,10 @@ function Navegacion({ alElegir, compacto, filtro = '' }: { alElegir?: () => void
   )
 }
 
-/** Marca: una curva de crecimiento con su visita destacada. */
-export function Marca({ claro, soloIcono }: { claro?: boolean; soloIcono?: boolean }) {
+/** Marca: una curva de crecimiento con su visita destacada. Con `descripcion` dice qué es la plataforma en una frase. */
+export function Marca({ claro, soloIcono, descripcion }: { claro?: boolean; soloIcono?: boolean; descripcion?: boolean }) {
   return (
-    <div className="flex items-center gap-3" aria-label={soloIcono ? 'Observatorio Canguro' : undefined}>
+    <div className="flex items-center gap-3" aria-label={soloIcono ? NOMBRE_APP : undefined} title={soloIcono ? DESCRIPCION_APP : undefined}>
       <span className={cn('grid size-9 shrink-0 place-items-center rounded-[10px]', claro ? 'bg-white/12' : 'bg-teal')} aria-hidden>
         <svg viewBox="0 0 24 24" className="size-5" fill="none">
           <path d="M3 17 L8 13 L12 14 L16 9 L21 6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -181,8 +181,10 @@ export function Marca({ claro, soloIcono }: { claro?: boolean; soloIcono?: boole
         </svg>
       </span>
       <div className={cn('leading-tight', soloIcono && 'hidden')}>
-        <p className={cn('font-bold tracking-tight', claro ? 'text-white' : 'text-tinta')}>Observatorio Canguro</p>
-        <p className={cn('text-xs', claro ? 'text-white/65' : 'text-salvia')}>Alertas clínicas tempranas</p>
+        <p className={cn('font-bold tracking-tight', claro ? 'text-white' : 'text-tinta')}>{NOMBRE_APP}</p>
+        <p className={cn('text-xs', claro ? 'text-white/65' : 'text-salvia', descripcion && 'max-w-[34ch] text-[0.8rem] leading-snug')}>
+          {descripcion ? DESCRIPCION_APP : LEMA_APP}
+        </p>
       </div>
     </div>
   )

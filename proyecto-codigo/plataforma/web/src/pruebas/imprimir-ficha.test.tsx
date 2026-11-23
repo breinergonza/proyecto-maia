@@ -37,6 +37,6 @@ describe('imprimir la ficha', () => {
     const boton = await screen.findByRole('button', { name: /Imprimir ficha/ })
     expect(boton.closest('.no-imprimir')).not.toBeNull()
     expect(screen.getByRole('link', { name: /Todos los niños/ }).closest('.no-imprimir')).not.toBeNull()
-    expect(document.querySelector('.solo-imprimir')?.textContent).toMatch(/Impreso el .* · Observatorio Canguro · Documento de apoyo clínico: no reemplaza el criterio médico/)
+    expect(document.querySelector('.solo-imprimir')?.textContent).toMatch(/Impreso el .* · KMCPred · Documento de apoyo clínico: no reemplaza el criterio médico/)
   })
 })

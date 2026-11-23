@@ -64,7 +64,7 @@ export default function Ingresar() {
         <section className="relative isolate flex flex-col gap-8 overflow-hidden lg:gap-5 bg-[linear-gradient(160deg,#18443f_0%,#12312f_48%,#0b2321_100%)] px-6 pb-20 pt-6 text-white sm:px-10 sm:pb-24 lg:justify-between lg:px-14 lg:pb-8 lg:pt-8">
           <Fondo />
           <Circuito />
-          <div className="animate-aparecer"><Marca claro /></div>
+          <div className="animate-aparecer"><Marca claro descripcion /></div>
 
           <div className="max-w-[31rem]">
             <p className="animate-subir text-xs font-medium uppercase tracking-[0.2em] text-white/60 sm:text-sm" style={tras(0.1)}>
@@ -74,7 +74,7 @@ export default function Ingresar() {
               Cada visita del niño prematuro cuenta <span className="text-[#ef8d6f]">cómo crece.</span>
             </p>
             <p className="mt-4 hidden max-w-[42ch] animate-subir text-white/75 sm:block lg:text-[1.05rem]" style={tras(0.35)}>
-              El observatorio lee la historia completa: señala los datos que conviene revisar y ordena a los niños por
+              KMCPred lee la historia completa: señala los datos que conviene revisar y ordena a los niños por
               el riesgo de lo que se puede prevenir.
             </p>
           </div>
@@ -93,8 +93,8 @@ export default function Ingresar() {
                 <span className="grid size-14 place-items-center rounded-2xl bg-teal-tinte text-teal" aria-hidden>
                   <HeartPulse size={28} />
                 </span>
-                <h1 className="mt-5">Iniciar sesión en MAIA</h1>
-                <p className="mt-1.5 text-salvia">Acceda a la plataforma de monitoreo y alertas clínicas.</p>
+                <h1 className="mt-5">Iniciar sesión en KMCPred</h1>
+                <p className="mt-1.5 text-salvia">Acceda al sistema de alertas y predicción temprana de riesgos.</p>
               </div>
 
               {error && <Aviso>{error}</Aviso>}
@@ -131,7 +131,7 @@ export default function Ingresar() {
                   {errors.clave && <p id="clave-error" className="text-sm text-coral-hondo" role="alert">{errors.clave.message}</p>}
                   <div id="olvido" hidden={!olvido}>
                     <Aviso tono="teal">
-                      Pídale a la administración del observatorio una contraseña nueva: se asigna en Administración ›
+                      Pídale a la administración de KMCPred una contraseña nueva: se asigna en Administración ›
                       Usuarios y se la comparten por un canal seguro.
                     </Aviso>
                   </div>
@@ -167,7 +167,7 @@ function Cinta() {
       <div className="flex w-max animate-cinta gap-2 hover:[animation-play-state:paused]">
         {[0, 1].map((copia) => (
           <ul key={copia} className="flex gap-2" aria-hidden={copia === 1 || undefined}
-            aria-label={copia === 0 ? 'Lo que hace el observatorio' : undefined}>
+            aria-label={copia === 0 ? 'Lo que hace KMCPred' : undefined}>
             {SELLOS.map(({ icono: Icono, texto }) => (
               <li key={texto} className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-xs text-white/85 backdrop-blur-sm xl:px-3.5 xl:text-[0.8rem]">
                 <Icono size={15} aria-hidden className="text-[#7fd3c6]" />{texto}

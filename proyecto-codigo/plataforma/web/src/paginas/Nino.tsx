@@ -95,7 +95,7 @@ function Ficha({ n, historia, trayectoria, perfil }: {
         <PanelesPestana prefijo="ficha" activa={activa} paneles={secciones} className="lg:h-full lg:overflow-y-auto print:h-auto print:overflow-visible" />
       </div>
       <p className="solo-imprimir">
-        Impreso el {fecha(new Date().toISOString())} · Observatorio Canguro · Documento de apoyo clínico: no reemplaza el criterio médico
+        Impreso el {fecha(new Date().toISOString())} · KMCPred · Documento de apoyo clínico: no reemplaza el criterio médico
       </p>
     </div>
   )

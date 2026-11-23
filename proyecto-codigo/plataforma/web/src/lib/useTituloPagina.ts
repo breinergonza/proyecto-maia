@@ -3,10 +3,15 @@ import { useEffect } from 'react'
 import { useLocation } from 'react-router'
 import { SUBMODULOS } from '../paginas/analitica/submodulos'
 
-export const NOMBRE_APP = 'Observatorio Canguro'
+export const NOMBRE_APP = 'KMCPred'
+/** Qué es la plataforma, en una frase (D78). */
+export const DESCRIPCION_APP =
+  'Sistema interpretable de alertas y predicción temprana de riesgos en niños prematuros y de bajo peso del Programa Madre Canguro'
+/** Versión corta para el menú lateral, donde la frase completa no cabe. */
+export const LEMA_APP = 'Alertas y predicción temprana'
 
 const TITULOS: Record<string, string> = {
-  '/ingresar': 'Iniciar sesión en MAIA',
+  '/ingresar': 'Iniciar sesión',
   '/': 'Seguimiento clínico',
   '/tablero': 'Resumen de riesgos y calidad de datos',
   '/comparar': 'Comparar grupos de niños',
