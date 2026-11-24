@@ -56,8 +56,16 @@ export function filasDeLaVista(r: ClinicaResumen): FilaCsv[] {
       if (e.grupo.p25 != null && e.grupo.p75 != null) {
         agregar(crecimiento, `${visita}: mitad central del grupo`, `${numero(e.grupo.p25)} a ${numero(e.grupo.p75)}`)
       }
+      // las dos pestañas de la gráfica (D79): promedio, DE y varianza, y los bigotes de la caja de cuartiles
+      if (e.grupo.media != null) agregar(crecimiento, `${visita}: promedio del grupo`, numero(e.grupo.media))
+      if (e.grupo.de != null) agregar(crecimiento, `${visita}: DE del grupo`, numero(e.grupo.de))
+      if (e.grupo.varianza != null) agregar(crecimiento, `${visita}: varianza del grupo`, numero(e.grupo.varianza))
+      if (e.grupo.bigote_bajo != null && e.grupo.bigote_alto != null) {
+        agregar(crecimiento, `${visita}: mínimo y máximo no atípicos del grupo`, `${numero(e.grupo.bigote_bajo)} a ${numero(e.grupo.bigote_alto)}`)
+      }
     }
     if (e.poblacion?.mediana != null && !esPoblacion) agregar(crecimiento, `${visita}: mediana de toda la población`, numero(e.poblacion.mediana))
+    if (e.poblacion?.media != null && !esPoblacion) agregar(crecimiento, `${visita}: promedio de toda la población`, numero(e.poblacion.media))
   }
   return filas
 }

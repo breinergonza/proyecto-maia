@@ -71,8 +71,8 @@ def prueba(datos: PruebaCorreo, s: Session = Depends(sesion), cfg: Configuracion
            admin: Usuario = Depends(ADMIN)) -> None:
     try:
         smtp = correo.cargar(s, cfg)
-        correo.enviar(smtp, [datos.destinatario], '[MAIA] Correo de prueba',
-                      'Si recibe este correo, las notificaciones del Observatorio están bien configuradas.')
+        correo.enviar(smtp, [datos.destinatario], f'[{N.NOMBRE_PLATAFORMA}] Correo de prueba',
+                      f'Si recibe este correo, las notificaciones de {N.NOMBRE_PLATAFORMA} están bien configuradas.')
     except correo.SinServidor as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, SIN_SERVIDOR) from e
     except cifrado.SinLlave as e:

@@ -31,6 +31,8 @@ from sevarti import diccionario as D
 ruta = APIRouter(prefix='/clinica', tags=['clinica'])
 
 NINOS_LISTADOS = 25
+# los puntos de la gráfica de crecimiento: por visita, los niños en alerta que más se alejan del promedio del grupo (D79)
+EXTREMOS_POR_VISITA = 5
 INDICADOR_POR_DEFECTO = 'talla'
 UNIDAD = 'puntaje z (desviaciones estándar)'
 _SUFIJO = re.compile(r'\s*\(riesgo calculado a [^)]*\)\s*$')
@@ -163,17 +165,24 @@ def observado_de(s: Session, corrida: int, familia: str, ids: list[str] | None, 
 
 def trayectoria_de(s: Session, corrida: int, corte_id: int, indicador: str, ids: list[str] | None,
                  dic: Dic) -> dict:
-    """Por visita (en orden clínico), la mediana y la mitad central del puntaje z del grupo y la mediana de la
-    población, con los niños que tienen dato. Los datos improbables no cuentan. La mediana sale con cualquier número de
-    niños; la mitad central (cuartiles) pide al menos 20 con dato en la visita, como toda distribución (D52): con
-    menos, el cuarto y los tres cuartos dicen poco del grupo."""
+    """Por visita (en orden clínico), del puntaje z del grupo: la mediana, los cuartiles, el promedio, la desviación
+    estándar y la varianza (muestrales) y los bigotes (el valor más bajo y más alto que no es atípico: a no más de 1,5
+    veces el alto de la caja de los cuartiles); de la población, la mediana y el promedio. Cuentan los niños con dato;
+    los datos improbables no. La mediana sale con cualquier número de niños; lo demás pide al menos 20 con dato en la
+    visita, como toda distribución (D52): con menos, dice poco del grupo."""
     por = {'p': {'c': corrida, 'i': indicador}, 'g': {'c': corrida, 'i': indicador, 'ids': ids}}
-    # una talla por niño y visita (la última válida): la mediana y los cuartiles son de niños, no de mediciones
+    # una talla por niño y visita (la última válida): las cifras son de niños, no de mediciones
     sql = """
-        SELECT etapa, count(*) AS n, percentile_cont(0.25) WITHIN GROUP (ORDER BY z) AS p25,
-               percentile_cont(0.5) WITHIN GROUP (ORDER BY z) AS mediana,
-               percentile_cont(0.75) WITHIN GROUP (ORDER BY z) AS p75
-        FROM {fuente} GROUP BY etapa"""
+        WITH cr AS (SELECT etapa, z FROM {fuente}),
+        q AS (SELECT etapa, count(*) AS n, percentile_cont(0.25) WITHIN GROUP (ORDER BY z) AS p25,
+                     percentile_cont(0.5) WITHIN GROUP (ORDER BY z) AS mediana,
+                     percentile_cont(0.75) WITHIN GROUP (ORDER BY z) AS p75,
+                     avg(z) AS media, stddev_samp(z) AS de, var_samp(z) AS varianza
+              FROM cr GROUP BY etapa)
+        SELECT q.*, min(cr.z) FILTER (WHERE cr.z >= q.p25 - 1.5 * (q.p75 - q.p25)) AS bigote_bajo,
+               max(cr.z) FILTER (WHERE cr.z <= q.p75 + 1.5 * (q.p75 - q.p25)) AS bigote_alto
+        FROM q JOIN cr USING (etapa)
+        GROUP BY q.etapa, q.n, q.p25, q.mediana, q.p75, q.media, q.de, q.varianza"""
     propia = ' AND indicador = :i AND z IS NOT NULL'
     poblacion = {f['etapa']: f for f in _filas(s, sql.format(fuente=crecimiento_por_nino(propia)), **por['p'])}
     grupo = poblacion if ids is None else {f['etapa']: f for f in _filas(
@@ -185,16 +194,47 @@ def trayectoria_de(s: Session, corrida: int, corte_id: int, indicador: str, ids:
             return None
         n = int(f['n'])
         if not completa:
-            return {'n': n, 'mediana': float(f['mediana'])}
+            return {'n': n, 'mediana': float(f['mediana']), 'media': float(f['media'])}
         con_cuartiles = n >= P.MIN_NINOS
-        return {'n': n, 'p25': float(f['p25']) if con_cuartiles else None, 'mediana': float(f['mediana']),
-                'p75': float(f['p75']) if con_cuartiles else None}
+
+        def cifra(k: str) -> float | None:
+            return float(f[k]) if con_cuartiles and f[k] is not None else None
+        return {'n': n, 'p25': cifra('p25'), 'mediana': float(f['mediana']), 'p75': cifra('p75'),
+                'media': cifra('media'), 'de': cifra('de'), 'varianza': cifra('varianza'),
+                'bigote_bajo': cifra('bigote_bajo'), 'bigote_alto': cifra('bigote_alto')}
 
     visitas = sorted(set(poblacion) | set(grupo), key=lambda e: (mapa.get(e, {}).get('orden', 99), str(e)))
     return {'indicador': indicador, 'nombre': INDICADORES[indicador], 'unidad': UNIDAD, 'referencia': 'OMS',
             'umbral': dic.umbral(indicador),
             'etapas': [{'etapa': e, 'etapa_nombre': nombre_etapa(mapa, e), 'grupo': celda(grupo.get(e), True),
                         'poblacion': celda(poblacion.get(e), False)} for e in visitas]}
+
+
+def extremos_de(s: Session, corrida: int, familia: str, indicador: str, ids: list[str] | None,
+                trayectoria: dict) -> list[dict]:
+    """Los puntos de la gráfica de crecimiento (D79): en cada visita en que se calcula el riesgo de la familia, los
+    ``EXTREMOS_POR_VISITA`` niños en alerta (percentil de ``PERCENTIL_ALTO`` o más, el más alto de sus claves en esa
+    visita) cuyo dato de esa visita más se aleja del promedio del grupo. Solo visitas con promedio (20 niños o más con
+    dato); en orden clínico y, dentro de cada visita, del más al menos alejado."""
+    medias = {e['etapa']: e['grupo']['media'] for e in trayectoria['etapas']
+              if e['grupo'] and e['grupo'].get('media') is not None}
+    if not medias:
+        return []
+    de = ' AND sujeto = ANY(:ids)' if ids is not None else ''
+    filas = _filas(s, f"""
+        SELECT a.sujeto, a.momento AS etapa, a.riesgo, a.percentil, cr.z
+        FROM (SELECT DISTINCT ON (sujeto, momento) sujeto, momento, riesgo, percentil FROM resultados.riesgos
+              WHERE corrida_id = :c AND NOT silencio AND (clave = :f OR clave LIKE :l) AND percentil >= :alto{de}
+              ORDER BY sujeto, momento, percentil DESC) a
+        JOIN {crecimiento_por_nino(' AND indicador = :i AND z IS NOT NULL')} ON cr.sujeto = a.sujeto AND cr.etapa = a.momento
+        """, c=corrida, f=familia, l=familia.replace('_', r'\_') + _DESDE, alto=PERCENTIL_ALTO, i=indicador,
+                   **({'ids': ids} if ids is not None else {}))
+    puntos = []
+    for etapa, media in medias.items():   # el orden de la trayectoria es el clínico
+        suyos = sorted((f for f in filas if f['etapa'] == etapa), key=lambda f: (-abs(float(f['z']) - media), f['sujeto']))
+        puntos += [{'sujeto': f['sujeto'], 'etapa': etapa, 'z': float(f['z']), 'riesgo': float(f['riesgo']),
+                    'percentil': float(f['percentil'])} for f in suyos[:EXTREMOS_POR_VISITA]]
+    return puntos
 
 
 def riesgo_de(s: Session, corrida: int, corte_id: int, familia: str, ids: list[str] | None, dic: Dic) -> list[dict]:
@@ -284,8 +324,12 @@ def resumen(consulta: ConsultaClinica, s: Session = Depends(sesion), u: Usuario 
     ve_ninos = u.rol in ('admin', 'experto')
     desde = dic.visita_base(familia, etapas(s, corrida.corte_id)) if familia else None
     ninos = _ninos(s, corrida.id, corrida.corte_id, familia, grupo, indicador) if familia and ve_ninos else None
+    trayectoria = trayectoria_de(s, corrida.id, corrida.corte_id, indicador, grupo, dic)
+    # los puntos de la gráfica son niños uno por uno: los mismos perfiles que la lista, y quedan en la auditoría
+    extremos = extremos_de(s, corrida.id, familia, indicador, grupo, trayectoria) if familia and ve_ninos else None
     if ninos is not None:
-        auditar(s, u, 'clinica.ninos', f'corrida:{corrida.id}', {'familia': familia, 'ninos': len(ninos)})
+        auditar(s, u, 'clinica.ninos', f'corrida:{corrida.id}',
+                {'familia': familia, 'ninos': len(ninos), 'extremos': len(extremos or [])})
         s.commit()
     return {
         'insuficiente': False, 'minimo': P.MIN_NINOS, 'corrida_id': corrida.id,
@@ -295,9 +339,10 @@ def resumen(consulta: ConsultaClinica, s: Session = Depends(sesion), u: Usuario 
         'observado': {'grupo': observado_de(s, corrida.id, familia, grupo, len(ids), desde) if familia else None,
                       'poblacion': observado_de(s, corrida.id, familia, None, total, desde) if familia else None,
                       'desde': desde},
-        'trayectoria': trayectoria_de(s, corrida.id, corrida.corte_id, indicador, grupo, dic),
+        'trayectoria': trayectoria,
         'riesgo': riesgo_de(s, corrida.id, corrida.corte_id, familia, grupo, dic) if familia else [],
         'riesgo_con_modelo': riesgo_con_modelo(s, corrida.id, familia) if familia else False,
         'alerta_percentil': PERCENTIL_ALTO,
         'ninos': ninos,
+        'extremos': extremos,
     }

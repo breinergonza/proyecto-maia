@@ -12,7 +12,7 @@ from sqlalchemy import select
 # la API, los usuarios y el corte simulado son los de las pruebas de muestras
 from test_muestras_api import _muestra, _y, cliente, corte, sev, tokens  # noqa: F401
 
-from maia_api.rutas.clinica import NINOS_LISTADOS
+from maia_api.rutas.clinica import EXTREMOS_POR_VISITA, NINOS_LISTADOS
 
 pytestmark = pytest.mark.integracion
 
@@ -124,7 +124,14 @@ def test_contrato(cliente, tokens, corrida, datos):  # noqa: F811
         v = z[z.etapa == e['etapa']].z
         assert e['grupo']['n'] == len(v) and e['grupo']['mediana'] == pytest.approx(v.median())
         assert e['grupo']['p25'] == pytest.approx(v.quantile(.25)) and e['grupo']['p75'] == pytest.approx(v.quantile(.75))
-        assert e['poblacion'] == {'n': len(v), 'mediana': pytest.approx(v.median())}
+        # la pestaña «Desviación estándar»: promedio, DE y varianza de los niños (muestrales, como pandas)
+        assert e['grupo']['media'] == pytest.approx(v.mean()) and e['grupo']['de'] == pytest.approx(v.std())
+        assert e['grupo']['varianza'] == pytest.approx(v.var())
+        # la de cuartiles: los bigotes llegan al valor más bajo y más alto que no es atípico (1,5 veces la caja)
+        q1, q3 = v.quantile(.25), v.quantile(.75)
+        assert e['grupo']['bigote_bajo'] == pytest.approx(v[v >= q1 - 1.5 * (q3 - q1)].min())
+        assert e['grupo']['bigote_alto'] == pytest.approx(v[v <= q3 + 1.5 * (q3 - q1)].max())
+        assert e['poblacion'] == {'n': len(v), 'mediana': pytest.approx(v.median()), 'media': pytest.approx(v.mean())}
     assert tr['etapas'][-1]['grupo']['n'] < tr['etapas'][0]['grupo']['n']   # a los 12 meses vino menos gente
 
     ri = datos['riesgos']
@@ -193,6 +200,9 @@ def test_celdas_de_menos_de_5_dan_su_cifra(cliente, tokens, corrida, datos):  # 
     assert doce['grupo'] is not None and 1 <= doce['grupo']['n'] < 5 and doce['poblacion']['n'] > POCOS
     # la mediana sale con cualquier número de niños; la mitad central pide 20 con dato en la visita (mínimo estadístico, D52)
     assert doce['grupo']['mediana'] is not None and doce['grupo']['p25'] is None and doce['grupo']['p75'] is None
+    # y lo mismo la caja de la desviación estándar y los bigotes: con 3 niños dicen poco del grupo
+    for k in ('media', 'de', 'varianza', 'bigote_bajo', 'bigote_alto'):
+        assert doce['grupo'][k] is None, k
     assert doce['poblacion']['mediana'] is not None
     assert r['riesgo'] and all(1 <= c['calculados'] < 5 for c in r['riesgo'])   # solo 3 varones tienen riesgo de esa familia
     assert r['riesgo_con_modelo'] is True   # la corrida sí calcula esa familia: la pantalla no dice «sin modelo»
@@ -211,7 +221,7 @@ def test_el_visualizador_no_ve_ninos_y_ve_las_mismas_cifras(cliente, tokens, cor
     for rol in ('admin', 'experto'):
         assert len(_resumen(cliente, tokens, rol, corrida_id=corrida).json()['ninos']) == NINOS_LISTADOS == 25   # la lista se desplaza dentro de su panel
     vis = _resumen(cliente, tokens, 'visualizador', corrida_id=corrida)
-    assert vis.status_code == 200 and vis.json()['ninos'] is None
+    assert vis.status_code == 200 and vis.json()['ninos'] is None and vis.json()['extremos'] is None
     # un grupo de 20 a 99 niños con un conteo que no es múltiplo de 5
     elegida = None
     for tope in range(25, 36):
@@ -225,7 +235,7 @@ def test_el_visualizador_no_ve_ninos_y_ve_las_mismas_cifras(cliente, tokens, cor
     v = _resumen(cliente, tokens, 'visualizador', corrida_id=corrida, muestra=m).json()
     e = _resumen(cliente, tokens, 'experto', corrida_id=corrida, muestra=m).json()
     assert e['ninos'] is not None and v['ninos'] is None
-    assert v['grupo']['n'] == n and v == {**e, 'ninos': None}   # las mismas cifras, sin redondeo (D64)
+    assert v['grupo']['n'] == n and v == {**e, 'ninos': None, 'extremos': None}   # las mismas cifras, sin redondeo (D64)
 
 
 def test_los_ninos_uno_por_uno_son_solo_de_experto_y_administracion(cliente, tokens, corrida, sev):  # noqa: F811
@@ -296,4 +306,29 @@ def test_quedan_en_la_auditoria(cliente, tokens, corrida):  # noqa: F811
     consultas = [f for f in filas if f.accion == 'clinica.consultar']
     ninos = [f for f in filas if f.accion == 'clinica.ninos']
     assert consultas and ninos and len(ninos) < len(consultas)   # el visualizador consulta, pero no lista niños
-    assert ninos[-1].detalle == {'familia': 'talla_baja_12m', 'ninos': NINOS_LISTADOS}   # códigos contados, sin valores clínicos
+    # códigos contados, sin valores clínicos: los de la lista y los puntos de la gráfica de crecimiento
+    assert ninos[-1].detalle == {'familia': 'talla_baja_12m', 'ninos': NINOS_LISTADOS, 'extremos': ninos[-1].detalle['extremos']}
+    assert 0 < ninos[-1].detalle['extremos'] <= EXTREMOS_POR_VISITA * len(ETAPAS)
+
+
+def test_los_puntos_son_los_ninos_en_alerta_mas_alejados_del_promedio(cliente, tokens, corrida, datos):  # noqa: F811
+    """En cada visita en que se calcula el riesgo, los EXTREMOS_POR_VISITA niños en alerta de la familia cuyo dato de
+    esa visita más se aleja del promedio del grupo; a los 12 meses no hay, porque ahí se mide el desenlace."""
+    r = _resumen(cliente, tokens, corrida_id=corrida).json()
+    medias = {e['etapa']: e['grupo']['media'] for e in r['trayectoria']['etapas'] if e['grupo']}
+    ri = datos['riesgos']
+    ri = ri[ri.clave.str.startswith('talla_baja_12m') & (ri.percentil >= ALTO)]
+    ri = ri.sort_values('percentil', ascending=False).drop_duplicates(['sujeto', 'momento'])
+    unidos = ri.merge(_z(datos, 'talla'), left_on=['sujeto', 'momento'], right_on=['sujeto', 'etapa'])
+    esperado = []
+    for etapa, g in unidos.groupby('etapa'):
+        g = g.assign(d=(g.z - medias[etapa]).abs()).sort_values(['d', 'sujeto'], ascending=[False, True])
+        esperado += [(etapa, s) for s in g.sujeto.head(EXTREMOS_POR_VISITA)]
+    assert esperado and [(x['etapa'], x['sujeto']) for x in r['extremos']] == sorted(
+        esperado, key=lambda t: (ETAPAS.index(t[0]), esperado.index(t)))
+    primero = r['extremos'][0]
+    assert set(primero) == {'sujeto', 'etapa', 'z', 'riesgo', 'percentil'} and primero['percentil'] >= ALTO
+    assert all(x['etapa'] != '12 m EC' for x in r['extremos'])
+    # con un grupo, solo sus niños
+    v = _resumen(cliente, tokens, corrida_id=corrida, muestra=_muestra(_y('sexo', 'lista', ['M']))).json()
+    assert v['extremos'] and all(x['sujeto'] in set(datos['varones']) for x in v['extremos'])

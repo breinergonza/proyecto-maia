@@ -123,7 +123,7 @@ function Contenido({ r, activa, elegir }: { r: ClinicaResumen; activa: string; e
         className="grid gap-3 lg:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-rows-[minmax(0,1fr)] [&>*]:min-w-0">
         <div className="flex flex-col gap-3 xl:min-h-0">
           <Observado grupo={r.observado.grupo} poblacion={r.observado.poblacion} esPoblacion={esPoblacion} desde={r.observado.desde} className="shrink-0" />
-          <Trayectoria indicador={r.trayectoria.indicador} unidad={r.trayectoria.unidad} etapas={r.trayectoria.etapas} muestra={muestra}
+          <Trayectoria indicador={r.trayectoria.indicador} unidad={r.trayectoria.unidad} etapas={r.trayectoria.etapas} extremos={r.extremos} muestra={muestra}
             conPoblacion={!esPoblacion} className="xl:min-h-0 xl:flex-1" />
         </div>
         <div className="flex flex-col gap-3 xl:min-h-0">
