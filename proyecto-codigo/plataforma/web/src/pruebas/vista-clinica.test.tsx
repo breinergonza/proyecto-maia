@@ -1,11 +1,12 @@
 // Vista clínica: el desenlace a 12 meses del grupo activo, su trayectoria, el riesgo por corte y los niños con más riesgo;
 // la barra «Grupo activo» y los estados de carga, vacío y error.
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { useLocation } from 'react-router'
+import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { FamiliaClinica, RespuestaClinica, Usuario } from '../api/tipos'
 import { filasDeLaVista } from '../components/clinica/exportarVista'
+import { DetalleNino, PuntoNino } from '../components/clinica/Trayectoria'
 import { montar, simularApi, usuario } from './util'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -28,12 +29,19 @@ const resumen = {
   trayectoria: {
     indicador: 'talla', unidad: 'puntaje z de la OMS',
     etapas: [
-      { etapa: '40 sem', grupo: { n: 298, p25: -1.4, mediana: -1, p75: -0.6 }, poblacion: { n: 4000, mediana: -0.2 } },
-      { etapa: '3 m EC', grupo: { n: 271, p25: -1.9, mediana: -1.5, p75: -1.1 }, poblacion: { n: 3900, mediana: -0.7 } },
-      { etapa: '6 m EC', grupo: null, poblacion: { n: 3500, mediana: -0.8 } },
-      { etapa: '12 m EC', grupo: { n: 223, p25: -1.6, mediana: -1.2, p75: -0.8 }, poblacion: { n: 3680, mediana: -0.5 } },
+      { etapa: '40 sem', grupo: { n: 298, p25: -1.4, mediana: -1, p75: -0.6, media: -1.05, de: 0.6, varianza: 0.36, bigote_bajo: -2.6, bigote_alto: 0.5 },
+        poblacion: { n: 4000, mediana: -0.2, media: -0.25 } },
+      { etapa: '3 m EC', grupo: { n: 271, p25: -1.9, mediana: -1.5, p75: -1.1, media: -1.55, de: 0.62, varianza: 0.3844, bigote_bajo: -3.1, bigote_alto: 0.1 },
+        poblacion: { n: 3900, mediana: -0.7, media: -0.75 } },
+      { etapa: '6 m EC', grupo: null, poblacion: { n: 3500, mediana: -0.8, media: -0.82 } },
+      { etapa: '12 m EC', grupo: { n: 223, p25: -1.6, mediana: -1.2, p75: -0.8, media: -1.25, de: 0.58, varianza: 0.3364, bigote_bajo: -2.8, bigote_alto: 0.4 },
+        poblacion: { n: 3680, mediana: -0.5, media: -0.55 } },
     ],
   },
+  extremos: [
+    { sujeto: 'S-01633', etapa: '3 m EC', z: -3.4, riesgo: 0.9996, percentil: 99 },
+    { sujeto: 'S-02210', etapa: '3 m EC', z: -3.0, riesgo: 0.57, percentil: 95 },
+  ],
   riesgo: [
     { momento: '40 sem', clave: 'talla_baja_12m_desde_40sem', estado: 'en_prueba', calculados: 290, en_alerta: 58, pct_en_alerta: 20 },
     { momento: '3 m EC', clave: 'talla_baja_12m_desde_3m', estado: 'en_prueba', calculados: 268, en_alerta: 61, pct_en_alerta: 22.8 },
@@ -128,8 +136,8 @@ describe('vista clínica', () => {
     // una línea corta dice que la referencia es el mismo grupo, en vez de repetir la cifra
     expect(within(panel).getByText('Referencia: el grupo es toda la población.')).toBeInTheDocument()
     const grafica = screen.getByRole('heading', { name: 'Crecimiento: talla para la edad' }).closest('section')!
-    expect(within(grafica).queryByText('Toda la población')).toBeNull()
-    expect(within(grafica).getByText('Mediana del grupo')).toBeInTheDocument()
+    expect(within(grafica).queryByText(/toda la población/)).toBeNull()
+    expect(within(grafica).getByText('Promedio')).toBeInTheDocument()
     expect(within(grafica).getByRole('figure').getAttribute('aria-label')).not.toMatch(/población/)
     const barra = screen.getByRole('region', { name: 'Grupo activo' })
     expect(within(barra).getByText('5.000 niños elegibles')).toBeInTheDocument()
@@ -144,35 +152,69 @@ describe('vista clínica', () => {
     expect(within(panel).getByText(/Toda la población \(referencia\)/)).toBeInTheDocument()
   })
 
-  it('una visita con menos de 20 niños con dato tiene su mediana y su cuenta, pero no la mitad central', async () => {
+  it('una visita con menos de 20 niños con dato tiene su mediana y su cuenta, pero no la caja', async () => {
     const etapas = resumen.trayectoria.etapas.map((e) => e.etapa === '3 m EC' ? { ...e, grupo: { n: 3, p25: null, mediana: -1.5, p75: null } } : e)
     api('experto', () => ({ ...resumen, trayectoria: { ...resumen.trayectoria, etapas } }))
     montar('/')
     const panel = (await screen.findByRole('heading', { name: 'Crecimiento: talla para la edad' })).closest('section')!
-    expect(within(panel).getByText('Sin mitad central: pide al menos 20 niños con dato en la visita.')).toBeInTheDocument()
-    expect(within(panel).getByRole('figure', { name: /3 m EC\. Mediana del grupo -1,5, 3 niños con dato, sin mitad central/ })).toBeInTheDocument()
+    expect(within(panel).getByText('Sin caja: pide al menos 20 niños con dato en la visita.')).toBeInTheDocument()
+    expect(within(panel).getByRole('figure', { name: /3 m EC\. Mediana del grupo -1,5, 3 niños con dato, sin caja/ })).toBeInTheDocument()
     await userEvent.click(within(panel).getByRole('button', { name: 'Ver como tabla' }))
     const fila = within(within(panel).getByRole('table')).getByRole('row', { name: /3 m EC/ })
-    expect(fila).toHaveTextContent('3 m EC3-1,5sin cifra')
+    expect(fila).toHaveTextContent('3 m EC3sin cifrasin cifrasin cifrasin cifrasin cifra-1,5sin cifrasin cifra')
     // la vista de tabla se recuerda: se deja como estaba
     await userEvent.click(within(panel).getByRole('button', { name: 'Ver como tabla' }))
   })
 
-  it('si ninguna visita llega a 20 niños, ni la leyenda ni la descripción prometen la mitad central', async () => {
+  it('si ninguna visita llega a 20 niños, no hay pestañas ni se promete la caja', async () => {
     const etapas = resumen.trayectoria.etapas.map((e) => e.grupo ? { ...e, grupo: { n: 6, p25: null, mediana: e.grupo.mediana, p75: null } } : e)
     api('experto', () => ({ ...resumen, trayectoria: { ...resumen.trayectoria, etapas } }))
     montar('/')
     const panel = (await screen.findByRole('heading', { name: 'Crecimiento: talla para la edad' })).closest('section')!
-    expect(within(panel).getByText('Sin mitad central: pide al menos 20 niños con dato en la visita.')).toBeInTheDocument()
-    expect(within(panel).queryByText('Mitad central del grupo')).not.toBeInTheDocument()
+    expect(within(panel).getByText('Sin caja: pide al menos 20 niños con dato en la visita.')).toBeInTheDocument()
+    expect(within(panel).queryByRole('tab', { name: 'Varianza' })).not.toBeInTheDocument()
     expect(within(panel).getByText(/^Mediana del grupo por visita, frente a la mediana de toda la población/)).toBeInTheDocument()
   })
 
-  it('sin visitas con menos de 20 niños no hay nota de la mitad central', async () => {
+  it('sin visitas con menos de 20 niños no hay nota de la caja', async () => {
     api('experto')
     montar('/')
     const panel = (await screen.findByRole('heading', { name: 'Crecimiento: talla para la edad' })).closest('section')!
-    expect(within(panel).queryByText(/Sin mitad central:/)).not.toBeInTheDocument()
+    expect(within(panel).queryByText(/Sin caja:/)).not.toBeInTheDocument()
+  })
+
+  it('dos pestañas: la desviación estándar alrededor del promedio y la varianza con la caja de cuartiles', async () => {
+    api('experto')
+    montar('/')
+    const panel = (await screen.findByRole('heading', { name: 'Crecimiento: talla para la edad' })).closest('section')!
+    const de = within(panel).getByRole('tab', { name: 'Desviación estándar' })
+    expect(de).toHaveAttribute('aria-selected', 'true')
+    const figura = within(panel).getByRole('figure')
+    expect(figura.getAttribute('aria-label')).toMatch(/40 sem\. Promedio -1,05, DE 0,6, 298 niños con dato/)
+    // los puntos: los niños en alerta más alejados del promedio de su visita, con su riesgo
+    expect(figura.getAttribute('aria-label')).toMatch(/3 m EC\..*En alerta y más alejados: S-01633 \(-3,4; riesgo más de 99,9 %\), S-02210/)
+    for (const t of ['2 DE por encima', 'Promedio', '2 DE por debajo', 'Promedio de toda la población', 'Riesgo más de 99,9 %', 'Riesgo menor, en alerta']) {
+      expect(within(panel).getByText(t)).toBeInTheDocument()
+    }
+    expect(within(panel).getByText(/Toque un punto para ver el niño/)).toBeInTheDocument()
+
+    await userEvent.click(within(panel).getByRole('tab', { name: 'Varianza' }))
+    expect(within(panel).getByRole('tab', { name: 'Varianza' })).toHaveAttribute('aria-selected', 'true')
+    expect(within(panel).getByRole('figure').getAttribute('aria-label'))
+      .toMatch(/40 sem\. Mediana -1, mitad central -1,4 a -0,6, varianza 0,36, 298 niños con dato/)
+    for (const t of ['Máximo no atípico', 'Mediana', 'Mínimo no atípico', 'Mediana de toda la población']) {
+      expect(within(panel).getByText(t)).toBeInTheDocument()
+    }
+    expect(within(panel).queryByText('2 DE por debajo')).not.toBeInTheDocument()
+  })
+
+  it('quien no ve niños uno por uno ve las cajas sin puntos', async () => {
+    api('visualizador', () => ({ ...resumen, ninos: null, extremos: null }))
+    montar('/')
+    const panel = (await screen.findByRole('heading', { name: 'Crecimiento: talla para la edad' })).closest('section')!
+    expect(within(panel).getByRole('figure').getAttribute('aria-label')).not.toMatch(/S-01633|En alerta/)
+    expect(within(panel).queryByText('Riesgo más de 99,9 %')).not.toBeInTheDocument()
+    expect(within(panel).queryByText(/Toque un punto/)).not.toBeInTheDocument()
   })
 
   it('la trayectoria dice qué muestra, trae su leyenda y una vista de tabla con los niños con dato de cada visita', async () => {
@@ -181,9 +223,8 @@ describe('vista clínica', () => {
     // «Crecimiento» y la medida en el título: en el desenlace de desarrollo también se ve que la gráfica es de talla
     const titulo = await screen.findByRole('heading', { name: 'Crecimiento: talla para la edad' })
     const panel = titulo.closest('section')!
-    expect(within(panel).getByText('Mediana del grupo')).toBeInTheDocument()
-    expect(within(panel).getByText('Mitad central del grupo')).toBeInTheDocument()
-    expect(within(panel).getByText('Toda la población')).toBeInTheDocument()
+    expect(within(panel).getByText('Promedio')).toBeInTheDocument()
+    expect(within(panel).getByText('Promedio de toda la población')).toBeInTheDocument()
     expect(within(panel).getByText(/Umbral de talla baja/)).toBeInTheDocument()
     // el umbral nombra la referencia y explica «DE» a pedido (asesor: referencia OMS, significado de «DE» y umbral z < −2)
     await userEvent.click(within(panel).getByRole('button', { name: /^−2/ }))
@@ -193,9 +234,12 @@ describe('vista clínica', () => {
     expect(within(panel).getByText(/Grupo activo: 312 niños de 5\.000/)).toBeInTheDocument()
     await userEvent.click(within(panel).getByRole('button', { name: 'Ver como tabla' }))
     const tabla = within(panel).getByRole('table')
-    for (const t of ['Visita', 'Niños con dato', 'Mediana del grupo', 'Mitad central del grupo', 'Mediana de la población']) {
+    for (const t of ['Visita', 'Niños con dato', 'Promedio', 'DE', 'Varianza', 'Mínimo no atípico', 'Primer cuartil (25 %)', 'Mediana',
+      'Tercer cuartil (75 %)', 'Máximo no atípico', 'Promedio de la población', 'Mediana de la población']) {
       expect(within(tabla).getByRole('columnheader', { name: t })).toBeInTheDocument()
     }
+    // la tabla y el CSV son cifras del grupo: ningún niño uno por uno
+    expect(within(tabla).queryByText('S-01633')).not.toBeInTheDocument()
     expect(within(tabla).getByText('298')).toBeInTheDocument()
     expect(within(tabla).getByText('271')).toBeInTheDocument()
     expect(within(tabla).getByText('223')).toBeInTheDocument()
@@ -376,6 +420,9 @@ describe('vista clínica: exportar', () => {
       'Calculado a los 3 meses: niños en alerta: 61', 'Calculado a los 3 meses: niños con riesgo calculado: 268', 'Calculado a los 3 meses: % en alerta: 22,8'])
     expect(de('Crecimiento: talla para la edad (puntaje z)')).toContain('40 sem: mediana del grupo: -1')
     expect(de('Crecimiento: talla para la edad (puntaje z)')).toContain('40 sem: niños del grupo con dato: 298')
+    expect(de('Crecimiento: talla para la edad (puntaje z)')).toEqual(expect.arrayContaining([
+      '40 sem: promedio del grupo: -1,05', '40 sem: DE del grupo: 0,6', '40 sem: varianza del grupo: 0,36',
+      '40 sem: mínimo y máximo no atípicos del grupo: -2,6 a 0,5', '40 sem: promedio de toda la población: -0,25']))
     // una visita sin dato del grupo no inventa una mediana
     expect(de('Crecimiento: talla para la edad (puntaje z)').some((x) => x.startsWith('6 m EC: mediana del grupo'))).toBe(false)
     // ningún niño individual sale en el archivo
@@ -446,5 +493,30 @@ describe('grupo activo', () => {
     montar('/explorar?f=sexo|lista|F')
     const barra = await screen.findByRole('region', { name: 'Grupo activo' })
     expect(await within(barra).findByText(/Sexo: Femenino/)).toBeInTheDocument()
+  })
+})
+
+describe('vista clínica: los puntos de la gráfica de crecimiento', () => {
+  const punto = { sujeto: 'S-01633', x: '3 m EC', z: -3.4, riesgo: 0.9996, fuerte: true, dx: -13, rotulo: true, distancia: 3.0 }
+
+  it('un punto se elige con un clic o con Enter, dice el niño, su dato y su riesgo, y el más alejado lleva su código', async () => {
+    const elegir = vi.fn()
+    render(<svg><PuntoNino cx={50} cy={60} payload={punto} elegido={false} elegir={elegir} /></svg>)
+    const boton = screen.getByRole('button', { name: 'Niño S-01633, 3 m EC: -3,4, riesgo más de 99,9 %' })
+    await userEvent.click(boton)
+    expect(elegir).toHaveBeenCalledWith('S-01633')
+    boton.focus()
+    await userEvent.keyboard('{Enter}')
+    expect(elegir).toHaveBeenCalledTimes(2)
+    expect(screen.getByText('S-01633')).toBeInTheDocument()
+  })
+
+  it('el niño elegido muestra su visita, su dato, su riesgo, cuánto se aleja y el enlace a su ficha', () => {
+    render(<MemoryRouter><DetalleNino punto={punto} pestana="de" /></MemoryRouter>)
+    expect(screen.getByText('Niño S-01633')).toBeInTheDocument()
+    expect(screen.getByText(/3 m EC/)).toBeInTheDocument()
+    expect(screen.getByText(/riesgo estimado más de 99,9 %/)).toBeInTheDocument()
+    expect(screen.getByText(/a 3 DE por debajo del promedio de su visita/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Abrir ficha del niño' })).toHaveAttribute('href', '/ninos/S-01633')
   })
 })

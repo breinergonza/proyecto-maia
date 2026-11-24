@@ -646,11 +646,18 @@ export interface FamiliaClinica { clave: string; nombre: string; definicion: str
 /** ``pct``: casos entre quienes tienen dato. */
 /** ``desde``: la visita entre cuyos asistentes se cuenta lo observado (la primera en que se calcula el riesgo). */
 export interface ObservadoClinico { casos: number | null; con_dato: number | null; sin_dato: number | null; pct: number; pct_sin_dato: number | null; desde?: string | null }
+/** Del grupo, por visita: la mediana con cualquier número de niños; lo demás, con 20 o más con dato (D52). Promedio,
+ *  ``de`` y ``varianza`` son muestrales; los bigotes, el valor más bajo y más alto que no es atípico (D79). */
 export interface EtapaClinica {
   etapa: string
-  grupo: { n: number; p25: number | null; mediana: number | null; p75: number | null } | null
-  poblacion: { n: number; mediana: number | null } | null
+  grupo: {
+    n: number; p25: number | null; mediana: number | null; p75: number | null
+    media?: number | null; de?: number | null; varianza?: number | null; bigote_bajo?: number | null; bigote_alto?: number | null
+  } | null
+  poblacion: { n: number; mediana: number | null; media?: number | null } | null
 }
+/** Un punto de la gráfica de crecimiento: un niño en alerta de los que más se alejan del promedio de su visita (D79). */
+export interface ExtremoClinico { sujeto: string; etapa: string; z: number; riesgo: number; percentil: number }
 /** ``pct_en_alerta``: niños en alerta entre los que tienen riesgo calculado. */
 export interface RiesgoCorte { momento: string; clave: string; estado: 'en_uso' | 'en_prueba'; calculados: number; en_alerta: number; pct_en_alerta: number }
 export interface NinoEnAlerta { sujeto: string; semanas: number | null; momento: string; riesgo: number; percentil: number; ultima_z: number | null }
@@ -671,6 +678,8 @@ export interface ClinicaResumen {
   alerta_percentil: number
   /** ``null`` para quien no ve niños individuales. */
   ninos: NinoEnAlerta[] | null
+  /** Los puntos de la gráfica de crecimiento; ``null`` (o ausente) para quien no ve niños individuales. */
+  extremos?: ExtremoClinico[] | null
 }
 /** Como en Explorar: con menos de 20 niños (``ninos`` nulo) o ninguno (``vacio``) no hay cifras. */
 export interface ClinicaInsuficiente { insuficiente: true; vacio?: boolean; ninos: number | null; minimo: number }
