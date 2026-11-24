@@ -24,7 +24,8 @@ from maia_comun.modelos_db import PERCENTIL_MUY_ALTO, Corrida, Notificacion, Not
 from maia_comun.perfiles import VARIABLE_LUBCHENCO, perfil_provisional
 
 LOTE = 5000   # filas por INSERT del historial
-NOMBRE_EXCEL = 'maia-riesgo-alto.xlsx'
+NOMBRE_PLATAFORMA = 'KMCPred'   # el mismo de la web (D78): web/src/lib/useTituloPagina.ts
+NOMBRE_EXCEL = 'kmcpred-riesgo-alto.xlsx'
 PIE_CORREO = 'Apoyo a la decisión, no diagnóstico. El riesgo ordena a los niños; la decisión es del equipo clínico.'
 # Identidad de la plataforma (web/src/estilos.css y components/Marco.tsx), repetida en línea porque el correo no carga CSS
 COLOR_TEAL, COLOR_TEAL_MEDIO, COLOR_TEAL_TINTE = '#1f4e52', '#2e6b70', '#e8f1f0'
@@ -141,7 +142,7 @@ def _html_correo(nombre: str, resumen: list[dict], total: int, url: str, minimo:
     return (
         '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
-        '<meta name="color-scheme" content="light"><title>Observatorio Canguro</title></head>'
+        f'<meta name="color-scheme" content="light"><title>{NOMBRE_PLATAFORMA}</title></head>'
         f'<body style="margin:0;padding:0;background:{COLOR_FONDO};font-family:{FUENTE};color:{COLOR_TINTA}">'
         f'<div style="display:none;max-height:0;overflow:hidden;opacity:0">{titulo}</div>'
         f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:{COLOR_FONDO}">'
@@ -154,8 +155,8 @@ def _html_correo(nombre: str, resumen: list[dict], total: int, url: str, minimo:
         f'<td width="36" height="36" align="center" valign="middle" style="background:{COLOR_TEAL_MEDIO};border-radius:10px;'
         f'color:#ffffff;font-size:20px;font-weight:bold;line-height:36px" aria-hidden="true">&#8599;</td>'
         '<td style="padding-left:12px;line-height:1.25">'
-        '<div style="color:#ffffff;font-size:17px;font-weight:bold">Observatorio Canguro</div>'
-        '<div style="color:#d4e3e1;font-size:13px">Alertas cl&iacute;nicas tempranas</div></td></tr></table></td></tr>'
+        f'<div style="color:#ffffff;font-size:17px;font-weight:bold">{NOMBRE_PLATAFORMA}</div>'
+        '<div style="color:#d4e3e1;font-size:13px">Alertas y predicci&oacute;n temprana</div></td></tr></table></td></tr>'
         # contenido
         f'<tr><td style="padding:24px 24px 8px 24px;font-size:15px;line-height:1.5">'
         f'<p style="margin:0 0 12px 0;color:{COLOR_SALVIA}">Hola,</p>'
@@ -182,6 +183,11 @@ def _html_correo(nombre: str, resumen: list[dict], total: int, url: str, minimo:
         '</table></td></tr></table></body></html>')
 
 
+def asunto(total: int, nombre: str) -> str:
+    """Asunto del correo de alerta, con el nombre de la plataforma."""
+    return f'[{NOMBRE_PLATAFORMA}] {_plural(total, "niño con riesgo alto", "niños con riesgo alto")}: {nombre}'
+
+
 def _cuerpo(nombre: str, filas: list, url: str, minimo: float) -> tuple[str, str]:
     """(texto, html) del correo: solo el resumen por alerta, sin códigos de niños ni perfiles; el detalle va en el Excel."""
     resumen = _resumen_por_alerta(filas)
@@ -196,7 +202,7 @@ def _despachar(s: Session, smtp: correo.Smtp, n: NotificacionConfig, destinatari
     adjunto = (NOMBRE_EXCEL, libro_excel(riesgos, perfiles, url), MIME_XLSX)
     estado, error = 'enviado', None
     try:
-        correo.enviar(smtp, [destinatario], f'[MAIA] {len(riesgos)} niños con riesgo alto: {n.nombre}', texto, html, [adjunto])
+        correo.enviar(smtp, [destinatario], asunto(len(riesgos), n.nombre), texto, html, [adjunto])
         resumen['correos'] += 1
         resumen['ninos'] += len(riesgos)
     except (OSError, smtplib.SMTPException, ValueError) as e:   # ValueError: cabeceras inválidas

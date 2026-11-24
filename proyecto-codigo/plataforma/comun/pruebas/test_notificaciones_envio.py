@@ -31,7 +31,7 @@ def test_un_correo_en_dos_notificaciones_recibe_cada_nino_una_vez(sesion_db, mot
     _notif(sesion_db, 'Dos', ['a', 'b'], ['x@maia.prueba'])
     N.enviar_pendientes(motor, corrida_con_riesgos)
     assert len(buzon.mensajes) == 2
-    assert '1 niños con riesgo alto: Dos' in buzon.mensajes[1]['Subject']   # solo el niño de 'b'
+    assert buzon.mensajes[1]['Subject'] == '[KMCPred] 1 niño con riesgo alto: Dos'   # solo el niño de 'b'
     N.enviar_pendientes(motor, corrida_con_riesgos)                         # idempotente
     assert len(buzon.mensajes) == 2
 

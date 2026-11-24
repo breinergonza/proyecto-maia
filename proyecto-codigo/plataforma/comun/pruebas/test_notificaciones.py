@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 from openpyxl import load_workbook
 
-from maia_comun.notificaciones import COLUMNAS_EXCEL, _cuerpo, _resumen_por_alerta, cuantos_menos, libro_excel
+from maia_comun.notificaciones import COLUMNAS_EXCEL, _cuerpo, _resumen_por_alerta, asunto, cuantos_menos, libro_excel
 
 
 @pytest.mark.parametrize('percentil, de_diez', [(0, 0), (9.9, 0), (87, 8), (95, 9), (97.4, 9), (100, 9)])
@@ -31,7 +31,7 @@ def test_el_correo_es_un_resumen_sin_detalle_de_ninos():
         assert not re.search(r'KMC-\d+', cuerpo), 'ningún código de niño en el cuerpo'
         assert 'posición' not in cuerpo.lower() and 'de cada 100' not in cuerpo
         assert 'Muy prematuro' not in cuerpo and 'visita 6 meses' not in cuerpo
-        assert 'de cada 10' in cuerpo and 'maia-riesgo-alto.xlsx' in cuerpo and 'no diagnóstico' in cuerpo
+        assert 'de cada 10' in cuerpo and 'kmcpred-riesgo-alto.xlsx' in cuerpo and 'no diagnóstico' in cuerpo
         assert '4 niños con riesgo alto' in cuerpo and 'Alertas del servicio' in cuerpo
         assert 'más riesgo que 9 de cada 10' in cuerpo.replace('&aacute;', 'á').replace('&ntilde;', 'ñ')
         assert 'readmisión a los 3 meses' in cuerpo and 'crecimiento bajo' in cuerpo and 'mortalidad' in cuerpo
@@ -66,7 +66,12 @@ def test_el_html_escapa_y_no_trae_nada_externo():
     assert 'http://' not in html
     for color in ('#1f4e52', '#f6f8f8', '#fbeae5', '#a8472a', '#f7eed9', '#7a5712', '#14262a'):
         assert color in html
-    assert 'Observatorio Canguro' in html and 'viewport' in html and 'max-width:600px' in html
+    assert 'KMCPred' in html and 'Observatorio Canguro' not in html and 'viewport' in html and 'max-width:600px' in html
+
+
+def test_el_asunto_lleva_el_nombre_de_la_plataforma():
+    assert asunto(4, 'Alertas del servicio') == '[KMCPred] 4 niños con riesgo alto: Alertas del servicio'
+    assert asunto(1, 'N') == '[KMCPred] 1 niño con riesgo alto: N'
 
 
 def test_el_excel_lista_a_todos_sin_valores_clinicos():
