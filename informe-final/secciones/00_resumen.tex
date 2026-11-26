@@ -1,0 +1,11 @@
+\begin{abstract}
+El seguimiento de niños prematuros y de bajo peso del Programa Madre Canguro produce registros clínicos que permiten estudiar la calidad de los datos y anticipar riesgos en el crecimiento y desarrollo infantil. Presentamos KMCPred, una plataforma de IA interpretable desarrollada con información del Observatorio Canguro: 62.043 niños y 13.884.056 mediciones (corte 24/Julio/2026).
+
+La solución integra dos etapas. La primera detecta posibles anomalías mediante métodos estadísticos, LightGBM y análisis longitudinal. En pruebas con errores introducidos artificialmente identificó 83,6\% de las anomalías, con 65,1 alertas por cada 1.000 registros sin alteraciones. La segunda estima riesgos clínicos a partir de datos disponibles en visitas tempranas. Inicialmente evaluamos 14 desenlaces; en 13, la AUROC superó la del modelo de referencia y en uno fue equivalente. Con el experto clínico priorizamos dos desenlaces a los 12 meses de edad corregida: talla baja y desarrollo psicomotor bajo. Implementamos cinco modelos: cuatro de talla baja, con predicciones a las 40 semanas de edad posmenstrual y a los 3, 6 y 9 meses de edad corregida (AUROC 0,79--0,93 frente a 0,59--0,61), y uno de desarrollo psicomotor bajo a los 6 meses (AUROC 0,77 frente a 0,62).
+
+KMCPred permite revisar anomalías, consultar información clínica, comparar cohortes y visualizar riesgos, integrando herramientas como MLflow, FastAPI y React. Los resultados muestran el potencial de combinar la revisión de calidad de los datos con modelos predictivos para apoyar el seguimiento temprano; sin embargo, los resultados son retrospectivos y requieren validación clínica prospectiva antes de su uso asistencial.
+\end{abstract}
+
+\begin{IEEEkeywords}
+prematuridad, Método Madre Canguro, aprendizaje automático, talla baja, neurodesarrollo, calidad de datos, MLOps.
+\end{IEEEkeywords}

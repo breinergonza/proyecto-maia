@@ -1,0 +1,106 @@
+%% =====================================================================
+%% Informe final del proyecto de grado — Maestría en Inteligencia Artificial
+%% Universidad de los Andes · Curso Proyecto: despliegue de soluciones
+%% Plantilla: IEEEtran.cls v1.7a (modo conference), según el ejemplo
+%% de la carpeta Ejemplo-Proyecto-LaTeX2e.
+%%
+%% Compilar:  pdflatex articulo.tex   (dos veces, para referencias cruzadas)
+%%   o bien:  latexmk -pdf articulo.tex
+%%
+%% Los resultados que aún no existen están marcados con \pendiente{...}
+%% (texto rojo). Antes de entregar: buscar "\pendiente" y reemplazar.
+%% =====================================================================
+\documentclass[conference,letterpaper]{IEEEtran}
+
+% ---------- Codificación, idioma y tipografía ----------
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{mathptmx}            % Times, como pide el formato del curso
+% Español si está instalado babel-spanish; si no, se traducen los rótulos a mano.
+\IfFileExists{spanish.ldf}{%
+  \usepackage[spanish,es-tabla,es-nodecimaldot,es-noshorthands]{babel}%
+}{%
+  \usepackage[english]{babel}%
+  \addto\captionsenglish{%
+    \renewcommand{\figurename}{Figura}%
+    \renewcommand{\tablename}{Tabla}%
+    \renewcommand{\refname}{Referencias}%
+    \renewcommand{\abstractname}{Resumen}}%
+}
+\usepackage{icomma}              % coma decimal en modo matemático
+\usepackage{microtype}
+
+% ---------- Matemáticas, tablas y figuras ----------
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage[table]{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,backgrounds,calc,shapes.geometric}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.16}
+\usepackage{cite}
+\usepackage{url}
+\usepackage[hidelinks]{hyperref}
+
+% ---------- Formato del curso: secciones 1, 2, 3 y 2.1, 2.2 en negrita ----------
+\renewcommand\thesection{\arabic{section}}
+\renewcommand\thesubsection{\thesection.\arabic{subsection}}
+\renewcommand\thesectiondis{\thesection.}
+\renewcommand\thesubsectiondis{\thesection.\arabic{subsection}.}
+\renewcommand\thesubsubsectiondis{\thesubsection.\arabic{subsubsection}.}
+\makeatletter
+\def\section{\@startsection{section}{1}{\z@}{1.6ex plus 1.2ex minus 0.4ex}%
+  {0.8ex plus 0.4ex minus 0.2ex}{\normalfont\normalsize\bfseries}}
+\def\subsection{\@startsection{subsection}{2}{\z@}{1.2ex plus 1ex minus 0.3ex}%
+  {0.6ex plus 0.3ex minus 0.1ex}{\normalfont\normalsize\bfseries}}
+\makeatother
+
+% ---------- Utilidades del equipo ----------
+% Marca de contenido pendiente: se ve en rojo y se busca con "\pendiente".
+\newcommand{\pendiente}[1]{\textcolor{red}{\textbf{[Pendiente:} #1\textbf{]}}}
+\newcommand{\fuente}[1]{\emph{Fuente: #1}}
+\definecolor{tinta}{HTML}{1F4E52}
+\definecolor{acento}{HTML}{D9694C}
+\definecolor{niebla}{HTML}{EEF3F2}
+
+\hyphenation{an-tro-po-mé-tri-cas o-xi-ge-no-de-pen-den-cia re-ad-mi-sión pre-ma-tu-ros
+  se-gui-mien-to ca-li-bra-ción ex-pli-ca-ción ob-ser-va-to-rio pseu-do-ni-mi-za-da
+  e-xi-gen-cia an-te-rior de-sen-la-ces di-ccio-na-rio ló-gi-ca pro-ba-bi-li-dad}
+
+\begin{document}
+
+\renewcommand{\abstractname}{Resumen}
+\def\IEEEkeywordsname{Palabras clave}
+
+\title{KMCPred: sistema interpretable de alertas y predicción temprana de riesgos en niños prematuros y de bajo peso del Programa Madre Canguro}
+
+\author{%
+\IEEEauthorblockN{Alex P. Chirino Caicedo, Breitner E. González Angarita,\\
+Santiago J. Ramos Echeverry y Wilfrido A. Gómez Pérez}
+\IEEEauthorblockA{Maestría en Inteligencia Artificial, Universidad de los Andes, Colombia\\
+En colaboración con la Fundación Canguro\\
+\{a.chirino, b.gonzalez, s.ramose, w.gomezp\}@uniandes.edu.co}}
+
+\maketitle
+
+\input{secciones/00_resumen}
+\input{secciones/01_introduccion}
+\input{secciones/02_estado_del_arte}
+\input{secciones/03_metodologia}
+\input{secciones/04_resultados}
+\input{secciones/05_discusion}
+\input{secciones/06_conclusiones}
+
+\section*{Agradecimientos}
+Se agradece a la Fundación Canguro y al profesor José Tiberio Hernández por el acompañamiento académico y la documentación institucional utilizada en este proyecto.
+
+\section*{Declaración de uso de IA generativa y contribución de autoría}
+Para la revisión de la redacción de este documento y búsqueda de información de estado del arte se utilizaron ChatGPT y Claude como herramientas de apoyo. No se generaron datos ni se sustituyeron experimentos o decisiones del equipo, todo el contenido fue revisado y validado por los autores.
+
+\input{referencias}
+
+\end{document}
