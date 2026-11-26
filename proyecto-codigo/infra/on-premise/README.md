@@ -1,13 +1,13 @@
 # Despliegue completo on-premise (servidor con GPU)
 
 Todo el sistema en un solo servidor propio (on-premise), administrado con un orquestador de Docker Compose:
-Postgres, MinIO, MLflow, el trainer con GPU, la API y la web. El servidor reemplaza al «equipo local» del [README principal](../../README.md): entrena, guarda los cortes
+Postgres, MinIO, MLflow, el trainer con GPU, la API y la web (KMCPred). El servidor reemplaza al «equipo local» del [README principal](../../README.md): entrena, guarda los cortes
 y sirve la aplicación. El archivo es [`docker-compose.on-premise.yml`](../../docker-compose.on-premise.yml).
 
 ```
                  Internet ──https──▶ Traefik (proxy)   ──▶ web (nginx + React) ──/api──▶ api (FastAPI)
                                                                                               │
-   SSH (túnel) ──▶ 127.0.0.1:5000 MLflow ◀── trainer (GPU) ──▶ Postgres ◀─────────────────────┘
+   SSH (túnel) ──▶ 127.0.0.1:5000 MLflow ◀── trainer (GPU, programador) ──▶ Postgres ◀────────┘
                └─▶ 127.0.0.1:9001 consola MinIO ◀── MinIO ◀───┘
 ```
 
@@ -18,7 +18,7 @@ y sirve la aplicación. El archivo es [`docker-compose.on-premise.yml`](../../do
 | `postgres` | Datos, resultados, usuarios y la base de MLflow (la crea su initdb) | No |
 | `minio` + `minio-init` | Cortes, salidas, paquetes y artefactos de MLflow | Consola en `127.0.0.1:9001` del servidor |
 | `mlflow` | Experimentos y registro de modelos | `127.0.0.1:5000` del servidor |
-| `trainer` | CLI `maia` con LightGBM CUDA. Queda encendido sin hacer nada; los trabajos se lanzan con `docker exec` | No |
+| `trainer` | CLI `maia` con LightGBM CUDA. Arranca como programador (`maia programador`): ejecuta las corridas programadas o pedidas en la web y las aprobaciones de modelos; también se puede entrar a su terminal y correr `maia ...` a mano | No |
 
 ## Antes de empezar: decisiones
 
@@ -64,14 +64,14 @@ y sirve la aplicación. El archivo es [`docker-compose.on-premise.yml`](../../do
    |---|---|
    | `MAIA_ADMIN_EMAIL` | Correo de la cuenta de administración (obligatoria) |
    | `MINIO_IMAGEN`, `MC_IMAGEN` | Ver «decisiones», punto 2 |
-   | `KMC_PW` | Opcional: mejor guardarla cifrada en **Administración › Configuración** (la web la cifra con `SERVICE_BASE64_64_CIFRADO`, que el orquestador genera como `MAIA_CIFRADO_CLAVE`) |
-   | `MLFLOW_URL_PUBLICA` | Enlace a MLflow desde **Administración › Entrenamientos** (por defecto `http://localhost:5000`, el túnel SSH) |
+   | `KMC_PW` | Opcional: mejor guardarla cifrada en **Datos y modelos › Configuración** (la web la cifra con `SERVICE_BASE64_64_CIFRADO`, que el orquestador genera como `MAIA_CIFRADO_CLAVE`) |
+   | `MLFLOW_URL_PUBLICA` | Enlace a MLflow desde **Operación de modelos › Entrenar y aprobar modelos** (por defecto `http://localhost:5000`, el túnel SSH) |
    | `MAIA_ZONA_HORARIA` | Zona de los horarios programados en la web (por defecto `America/Bogota`) |
    | `MAIA_ENTORNO`, `MAIA_SOLO_SIMULADO` | Ver la tabla de modos (por defecto `produccion` / `false`) |
    | `MLFLOW_PUERTO`, `MINIO_CONSOLA_PUERTO` | Solo si 5000 o 9001 ya están ocupados en el servidor |
    | `MLFLOW_USUARIO` | Usuario administrador de MLflow (por defecto `admin`); su clave es `SERVICE_PASSWORD_MLFLOWADMIN` |
 
-   El servidor de correo se configura en la web, en **Notificaciones › Servidor de correo** (la clave se guarda cifrada y requiere `MAIA_CIFRADO_CLAVE`). Para desarrollo con Mailpit: servidor `mailpit`, puerto `1025`, sin TLS. Sin servidor de correo, la app funciona, pero los correos quedan con error.
+   El servidor de correo se configura en la web, en **Notificaciones › Configuración del correo saliente** (la clave se guarda cifrada con `MAIA_CIFRADO_CLAVE`, que aquí es `SERVICE_BASE64_64_CIFRADO`). Este compose no trae Mailpit: use el SMTP de la Fundación. Sin servidor de correo, la app funciona, pero los correos quedan con error. Los avisos llevan el asunto «[KMCPred] …» y el adjunto `kmcpred-riesgo-alto.xlsx`.
 
    La clave del administrador es `SERVICE_PASSWORD_ADMIN` (cópiela del panel). Si define `KMC_PW` aquí, queda guardada
    en la base del orquestador y en el `.env` que este escribe en el servidor: proteja el acceso SSH y el panel.
@@ -83,9 +83,9 @@ y sirve la aplicación. El archivo es [`docker-compose.on-premise.yml`](../../do
 ## Operar on-premise
 
 El contenedor `trainer` es el **programador** (`maia programador`): ejecuta las corridas que se programan o piden en
-**Administración › Programación** y las aprobaciones de modelos de **Administración › Entrenamientos**. La primera
-vez: ingrese como administración, guarde la conexión en **Configuración** y cree la programación (por ejemplo, cada
-semestre). Sus registros: `docker logs -f $(docker ps -qf name=trainer)`.
+**Datos y modelos › Configuración › Programar ejecuciones automáticas** y las aprobaciones de modelos de **Operación de
+modelos › Entrenar y aprobar modelos**. La primera vez: ingrese como administración (o como experto en datos), guarde la
+conexión en **Configuración del sistema y del entrenamiento** y cree la programación (por ejemplo, cada semestre). Sus registros: `docker logs -f $(docker ps -qf name=trainer)`.
 
 Los comandos de la CLI también corren a mano dentro del contenedor `trainer`: desde **Terminal** en el panel (servicio `trainer`), o
 por SSH con `docker exec -it $(docker ps -qf name=trainer) maia ...`.
@@ -128,19 +128,26 @@ Luego abra http://localhost:5000 (MLflow) y http://localhost:9001 (MinIO, usuari
 
 * **Código:** un push a la rama vuelve a desplegar (con la GitHub App y *Auto Deploy*). La API aplica las migraciones
   al arrancar. El trainer se reconstruye, pero los datos siguen en los volúmenes.
-* **Diccionario de los expertos:** vive con versiones en Postgres y se edita en la página **Diccionario**. Antes de cada
+* **Diccionario de los expertos:** vive con versiones en Postgres y se edita en la página **Guía de variables y
+  unidades** (`/diccionario`, del experto en datos y de administración). Antes de cada
   corrida o entrenamiento el trainer baja la versión en uso al volumen. `nucleo/entradas/diccionario.xlsx` solo se
   siembra si la base no tiene ninguna versión: cambiarlo en git no cambia una instalación que ya tiene diccionario.
 * **Desenlaces por defecto (D68):** la semilla deja solo desarrollo psicomotor 12 m («En uso») y talla baja 12 m («En
-  prueba»). En una instalación que ya tiene diccionario: **Diccionario › Importar desde Excel** con
+  prueba»). En una instalación que ya tiene diccionario: **Guía de variables y unidades › Importar desde Excel** con
   `nucleo/entradas/diccionario.xlsx`. Confirme solo si la vista previa muestra únicamente cambios de estado en
   **Desenlaces**; si muestra otros cambios (variables que los expertos ya clasificaron), cancele, use **Exportar a
   Excel**, cambie a «No usar» el estado de los demás desenlaces en la hoja **Desenlaces** e importe ese archivo. Luego
   entrene de nuevo y ejecute una corrida.
 * **Regla de referencia de la talla baja (D72):** la semilla compara la talla baja a 12 meses con `z_talla` (el puntaje
-  z de talla de la visita del cálculo). En una instalación que ya tiene diccionario: **Diccionario › Desenlaces**, abra
+  z de talla de la visita del cálculo). En una instalación que ya tiene diccionario: **Guía de variables y unidades › Desenlaces**, abra
   cada fila `talla_baja_12m_desde_*`, ponga `z_talla` en **Comparar con** y guarde; la vista previa de «Importar desde
-  Excel» no lista este cambio. Luego entrene de nuevo: **Modelos › Comparación técnica** dirá «solo talla, puntaje z…».
+  Excel» no lista este cambio. Luego entrene de nuevo: **Evaluación de modelos › Ficha del modelo › Comparación técnica** dirá «solo talla, puntaje z…».
+* **Rol «Experto en datos» (D77, migración `0014_rol_experto_datos`):** la API agrega el rol al arrancar. Desde ese
+  cambio, **Datos y modelos** (Diccionario, Mediciones por revisar, Configuración, entrenamientos, paquetes y corridas)
+  es de administración y del experto en datos; el experto clínico ya no lo ve. En **Administración › Usuarios y
+  permisos**, pase a «Experto en datos» a quienes operan los datos y los modelos.
+* **Nombre de la plataforma (D78):** la web y los correos dicen **KMCPred**; las variables (`MAIA_*`) y los servicios
+  no cambian de nombre.
 * **Réplicas:** una por servicio. El paquete activo vive en la memoria de la API.
 
 ## Si algo falla

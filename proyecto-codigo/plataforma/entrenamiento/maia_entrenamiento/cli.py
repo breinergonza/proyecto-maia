@@ -298,7 +298,7 @@ def _modelos_para_riesgos(fuente: str, alias: str, tmp: Path):
         modelos, (mva, _, _), (mvc, _, _) = _modelos_de_registro(fuente, alias, alias, tmp)
     except MlflowException as ex:
         raise RuntimeError(f'No hay modelos con alias {alias} para la fuente {fuente}: entrene y apruebe una versión de '
-                           'cada modelo en Administración › Entrenamientos.') from ex
+                           'cada modelo en Datos y modelos › Operación de modelos › Entrenar y aprobar modelos.') from ex
     _decir(f'Riesgos con los modelos {alias}: anomalías v{mva.version} · clínico v{mvc.version}')
     return modelos
 

@@ -89,9 +89,9 @@ _CONOCIDOS: tuple[tuple[str, str], ...] = (
     (r'(?i)mlflow.*(connection refused|max retries exceeded|connectionerror)|(connection refused|max retries exceeded).*:5000',
      'No se pudo conectar con MLflow. Revise que el servicio esté encendido.'),
     (r'(?i)password authentication failed',
-     'La base de la entidad rechazó el usuario o la clave. Revíselos en Administración › Configuración.'),
+     'La base de la entidad rechazó el usuario o la clave. Revíselos en Datos y modelos › Configuración.'),
     (r'(?i)could not translate host name|name or service not known|nodename nor servname',
-     'No se encontró el servidor de la base de la entidad. Revise el nombre en Administración › Configuración.'),
+     'No se encontró el servidor de la base de la entidad. Revise el nombre en Datos y modelos › Configuración.'),
     (r'(?i)connection refused|connection timed out|timeout expired|could not connect to server',
      'No se pudo conectar con la base de datos: revise el servidor, el puerto y que la red lo permita.'),
     (r'(?i)no hay cortes.*simulado',
@@ -101,8 +101,8 @@ _CONOCIDOS: tuple[tuple[str, str], ...] = (
      'Todavía no hay datos guardados de esta fuente. En Entrenar ahora, marque '
      '«Extraer datos nuevos de la base de la entidad» o ejecute primero una actualización de datos.'),
     (r'No hay modelos con alias produccion',
-     'Todavía no hay modelos aprobados: entrene y apruebe una versión de cada modelo en Administración › '
-     'Entrenamientos antes de la corrida.'),
+     'Todavía no hay modelos aprobados: entrene y apruebe una versión de cada modelo en Datos y modelos › '
+     'Operación de modelos › Entrenar y aprobar modelos antes de la corrida.'),
     (r'(?i)no space left on device', 'El servidor se quedó sin espacio en disco.'),
     (r'(?i)cuda.*out of memory|out of memory.*cuda', 'La GPU se quedó sin memoria durante el entrenamiento.'),
     (r'MemoryError|código -9\b|código 137\b', 'El servidor se quedó sin memoria durante la ejecución.'),
@@ -304,11 +304,11 @@ class Programador:
                 c = CO.guardada(s)
                 datos, clave = CO.datos_de(c, self.cfg), CO.clave(c, self.cfg)
             if not clave:
-                raise FalloEjecucion('No hay clave de la base de la entidad: guárdela en Administración › '
+                raise FalloEjecucion('No hay clave de la base de la entidad: guárdela en Datos y modelos › '
                                      'Configuración o defina KMC_PW en el servidor.')
             if not (datos.host and datos.usuario):
                 raise FalloEjecucion('Falta el servidor o el usuario de la base de la entidad: guárdelos en '
-                                     'Administración › Configuración o defina KMC_HOST y KMC_USUARIO.')
+                                     'Datos y modelos › Configuración o defina KMC_HOST y KMC_USUARIO.')
             env.update(CO.entorno(datos, clave))
         return env
 
@@ -344,8 +344,8 @@ class Programador:
         con = f'anomalías v{aprobados["anomalias"]} · clínico v{aprobados["clinico"]}' if aprobados else ''
         if 'modelos' in r:
             r['mensaje'] = ((f'Riesgos calculados con los modelos aprobados ({con}). ' if con else '') +
-                            'Los recién entrenados quedaron como candidatos: apruébelos en Administración › '
-                            'Entrenamientos para usarlos en la solución.')
+                            'Los recién entrenados quedaron como candidatos: apruébelos en Datos y modelos › '
+                            'Operación de modelos › Entrenar y aprobar modelos para usarlos en la solución.')
         elif con:
             r['mensaje'] = f'Riesgos calculados con los modelos aprobados ({con}).'
         return r

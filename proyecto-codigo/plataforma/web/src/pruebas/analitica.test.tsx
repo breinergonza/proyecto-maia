@@ -103,7 +103,7 @@ describe('analítica: estados', () => {
     api('admin', (url) => (url.startsWith('/api/analitica/7/rendimiento') ? { cuerpo: { estado: 'sin_artefactos', entrenamiento: 7, submodulo: 'rendimiento' } } : undefined))
     montar('/analitica/rendimiento?entrenamiento=7')
     expect(await screen.findByText('Este entrenamiento es anterior a la analítica')).toBeInTheDocument()
-    expect(screen.getByText(/vuelva a entrenar el modelo en Administración › Entrenamientos/)).toBeInTheDocument()
+    expect(screen.getByText(/vuelva a entrenar el modelo en Datos y modelos › Operación de modelos › Entrenar y aprobar modelos/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Ir a Entrenamientos' })).toHaveAttribute('href', '/admin/entrenamientos')
   })
 

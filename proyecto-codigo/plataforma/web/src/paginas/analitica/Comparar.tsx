@@ -1,5 +1,5 @@
 // Comparar entrenamientos: pone A (referencia) frente a B (candidato) con la diferencia, su intervalo por réplicas bootstrap
-// y los niños detrás de cada cifra; el administrador puede aprobar B (el mismo endpoint de Administración › Entrenamientos,
+// y los niños detrás de cada cifra; el administrador puede aprobar B (el mismo endpoint de Entrenar y aprobar modelos,
 // que deja la ejecución y la auditoría) o mantener A. Comparar dos grupos de niños no se hace aquí (S8: un grupo no es un
 // entrenamiento): vive en Comparar grupos (/comparar) y esta pantalla solo lo señala. Los dos entrenamientos y su aprobación
 // quedan fijos arriba; debajo, una pestaña por pregunta (?ver=): las medidas de A y B con su diferencia, la curva ROC y los
@@ -157,7 +157,7 @@ function ComparaEntrenamientos() {
         )}
       </div>
       {a === b && <Aviso tono="teal">Elija dos entrenamientos distintos para compararlos.</Aviso>}
-      {esAdmin && aprobacion.isSuccess && <p role="status" className="shrink-0 text-sm font-semibold text-teal">Aprobación en cola (ejecución n.º {aprobacion.data.id}). Siga el avance en Administración › Entrenamientos.</p>}
+      {esAdmin && aprobacion.isSuccess && <p role="status" className="shrink-0 text-sm font-semibold text-teal">Aprobación en cola (ejecución n.º {aprobacion.data.id}). Siga el avance en Datos y modelos › Operación de modelos › Entrenar y aprobar modelos.</p>}
       {esAdmin && aprobacion.isError && <p role="alert" className="shrink-0 text-sm text-coral-hondo">{aprobacion.error.message}</p>}
       {esAdmin && mantiene && !aprobacion.isSuccess && <p role="status" className="shrink-0 text-sm">Se mantiene A. No se cambió nada.</p>}
       {/* las pestañas están siempre; a su lado, la frase que separa los entrenamientos de los grupos de niños (S8) */}

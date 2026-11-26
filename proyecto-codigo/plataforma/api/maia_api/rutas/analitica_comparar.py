@@ -11,7 +11,7 @@
   cifras de cada lado salen de las mismas funciones que la Vista clínica (``rutas.clinica``) y con sus reglas de
   privacidad: 20 niños por lado; las cifras son exactas para todos los perfiles (D64).
 
-Aprobar B no vive aquí: la pantalla llama a ``POST /entrenamientos/aprobar`` (solo administración, con auditoría).
+Aprobar B no vive aquí: la pantalla llama a ``POST /entrenamientos/aprobar`` (administración y experto en datos, D77; con auditoría).
 """
 from __future__ import annotations
 

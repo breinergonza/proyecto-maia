@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react'
 import { pedir } from '../api/cliente'
 import type { HistoriaRiesgo, PerfilNino, PerfilProvisional, PrimeraAlerta, PuntoCrecimiento, PuntoHistoria } from '../api/tipos'
 import { cn } from '../lib/cn'
-import { aproximado, dec, edad, indicador, meses, posicion, riesgo, RIESGO_ALTO } from '../lib/formato'
+import { aproximado, dec, edad, indicador, meses, posicion, riesgo, RIESGO_ALTO, unidad as unidadLegible } from '../lib/formato'
 import { AYUDA_DOS_CIFRAS, AYUDA_MOTIVOS, ayudaPosicion, BAJO_EDAD, CAYO, cuantosMenos, desviaciones, familia, frenteDemas, frenteOms,
   motivosRiesgo, nivelAlto, nombreFamilia, RIESGO_MUY_ALTO } from '../lib/lenguaje'
 import type { EstadoDesenlace } from '../api/ninos'
@@ -339,7 +339,9 @@ export function PerfilCohorte({ sujeto, grilla }: { sujeto: string; grilla?: str
       </span>}>
       <ul className={cn('grid grid-cols-1 gap-x-8 gap-y-4', grilla)}>
         {q.data.variables.map((v) => {
-          const formato = (x: number) => `${v.unidad === 'semanas' ? dec(x) : aproximado(x)}${v.unidad ? ` ${v.unidad}` : ''}`
+          // la unidad como se escribe en clínica, igual que en el encabezado de la ficha: «GRAMOS» → «g»
+          const u = unidadLegible(v.unidad)
+          const formato = (x: number) => `${u === 'semanas' ? dec(x) : aproximado(x)}${u ? ` ${u}` : ''}`
           return (
             <li key={v.variable}>
               <div className="flex flex-wrap items-baseline justify-between gap-x-3">

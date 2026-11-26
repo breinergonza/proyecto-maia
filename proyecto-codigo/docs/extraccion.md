@@ -14,8 +14,9 @@ llama sin modificarlo.
 
 ## Configuración
 
-Lo más simple es configurar la conexión en **Administración › Configuración** (la clave se guarda cifrada con
-`MAIA_CIFRADO_CLAVE`). Para las ejecuciones que lanza el programador, eso reemplaza a las variables de abajo. Sin
+Lo más simple es configurar la conexión en la web, en **Datos y modelos › Configuración › Configuración del sistema y
+del entrenamiento**, pestaña **Base de datos** (perfiles Experto en datos y Administración, D77; queda en
+`app.conexion_origen` y la clave se guarda cifrada con `MAIA_CIFRADO_CLAVE`). Para las ejecuciones que lanza el programador, eso reemplaza a las variables de abajo. Sin
 conexión guardada, o al correr `maia` a mano, las variables se leen del entorno o de `.env` (`maia_comun.config`).
 El servidor y el usuario no tienen valor por defecto: los entrega el Observatorio y no se escriben en el código.
 
@@ -49,6 +50,11 @@ Todos son opcionales. Sin ninguno, la extracción trae la base completa, igual q
 
 Las combinaciones imposibles se rechazan antes de conectar: `desde` posterior a `hasta` o a la fecha de corte,
 `anio_desde` posterior a `anio_hasta` o al año de corte, años fuera de 1980-2100, `limite` menor que 1.
+
+Desde la web (**Programar ejecuciones automáticas › Filtros de la extracción (opcionales)**), el programador traduce
+los filtros a estas mismas opciones de `maia extraer --fuente kmc`: **Nacidos desde (año)** y **Nacidos hasta (año)**
+pasan como `--anio-desde` y `--anio-hasta`, y **Solo niños con visitas en los últimos (meses)** como `--desde-visita`
+con la fecha de hoy menos esos meses (`programador.py`). La web no ofrece `--fecha-corte` ni `--hasta-visita`.
 
 En `maia corrida`, la opción `--desde` **no** es un parámetro de extracción. Sigue siendo el inicio del periodo de
 revisión de datos y riesgos. Los parámetros de extracción solo se aceptan con `--fuente kmc` y sin `--sin-extraer`.

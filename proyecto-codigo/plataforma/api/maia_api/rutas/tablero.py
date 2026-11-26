@@ -1,6 +1,6 @@
 """Tablero: resumen del programa y alarmas por grupo y trimestre. Solo agregados.
 
-La validación técnica de los modelos (AUC y demás) no pasa por aquí: está en Administración › Modelos y en MLflow."""
+La validación técnica de los modelos (AUC y demás) no pasa por aquí: está en Evaluación de modelos y en MLflow."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends

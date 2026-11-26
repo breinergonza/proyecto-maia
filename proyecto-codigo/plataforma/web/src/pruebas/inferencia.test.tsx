@@ -263,7 +263,7 @@ describe('cuando no se puede calcular, cada rol sabe a quién acudir', () => {
 
   it('la administración recibe un enlace a Modelos', async () => {
     const aviso = await calcularConError('admin', sinModelo)
-    expect(within(aviso).getByRole('link', { name: 'Modelos' })).toHaveAttribute('href', '/admin/modelos')
+    expect(within(aviso).getByRole('link', { name: 'Modelos disponibles' })).toHaveAttribute('href', '/admin/modelos')
   })
 
   it('un experto no es enviado a una pantalla que no puede abrir', async () => {
@@ -283,7 +283,7 @@ describe('cuando no se puede calcular, cada rol sabe a quién acudir', () => {
     api('admin', [], { activo: null })
     montar('/prediccion')
     const vacio = (await screen.findByText('No hay un paquete de modelos activo')).parentElement!
-    expect(within(vacio).getByRole('link', { name: 'Modelos' })).toHaveAttribute('href', '/admin/modelos')
+    expect(within(vacio).getByRole('link', { name: 'Modelos disponibles' })).toHaveAttribute('href', '/admin/modelos')
   })
 
   it('sin paquete activo, el experto sabe a quién pedirlo', async () => {

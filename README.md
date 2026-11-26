@@ -51,12 +51,15 @@ Con el acompañamiento de la Fundación Canguro y del profesor José Tiberio Her
 | Carpeta | Contenido |
 |---|---|
 | [`proyecto-codigo/`](proyecto-codigo/README.md) | Plataforma completa: núcleo de modelos, CLI `maia`, API FastAPI, web React e infraestructura (Docker, Railway, on-premise) |
-| `insumo-datos/` | Núcleo de datos y modelos (contrato SEVARTI, anomalías y alertas clínicas) e informes |
-| `Modelos/`, `Notebooks/` | Modelos y cuadernos de exploración |
+| [`insumo-datos/`](insumo-datos/README.md) | Núcleo de datos y modelos (contrato SEVARTI, anomalías y alertas clínicas) e informes; la plataforma usa una copia con parches en `proyecto-codigo/nucleo/` |
+| [`Datos/`](Datos/README.md) | Diccionario de datos (`diccionario.xlsx`, copia de `insumo-datos/entradas/`) |
+| [`Modelos/`](Modelos/README.md) | Modelos entrenados `maia-anomalias/v8` y `maia-clinico/v9`: ficha de cada uno y enlace de descarga del `.pkl` |
+| [`Notebooks/`](Notebooks/README.md) | Cuadernos de análisis de datos, modelo de anomalías y alertas clínicas, con su `.html` (copia de `insumo-datos/informes/`) |
 | `insumo-plan/` | Insumos de planeación |
 | `avances-1-latex/` | Informe de avance |
 | [`informe-final/`](informe-final/README.md) | Informe final en LaTeX (IEEEtran) |
-| `proyecto-latex/` | Artículo previo en LaTeX |
+| [`proyecto-latex/`](proyecto-latex/README.md) | Artículo previo en LaTeX |
+| `.github/workflows/` | Integración continua: `codigo.yml` (lint, pruebas y build de `proyecto-codigo/`) y `compilar-avance.yml` (PDF del avance) |
 
 ## Enlaces relevantes
 
@@ -122,14 +125,14 @@ defina en `.env` valores como estos (de ejemplo; cámbielos):
 | `MAIA_ADMIN_EMAIL` | `admin@ejemplo.org` |
 | `MAIA_ADMIN_CLAVE` | una clave propia de 12 caracteres o más |
 
-Ingrese en http://localhost:8080 con esa cuenta y cree, en *Administración → Usuarios*, una cuenta por perfil:
+Ingrese en http://localhost:8080 con esa cuenta y cree, en *Administración → Usuarios y permisos*, una cuenta por perfil:
 
 | Perfil | Qué puede hacer | Usuario de ejemplo |
 |---|---|---|
-| Administración | Todo: usuarios, corridas, modelos, configuración | `admin@ejemplo.org` |
-| Experto clínico | Revisiones y cálculo de riesgo de un niño | `expertoclinico@ejemplo.org` |
-| Experto en Datos | Revisión y validación de calidad de los datos | `expertoendatos@ejemplo.org`
-| Consulta | Tablero y lista de niños | `consulta@ejemplo.org` |
+| Administración | Todo: usuarios, notificaciones, corridas, modelos, configuración | `admin@ejemplo.org` |
+| Experto clínico | Lo clínico: seguimiento clínico, lista y ficha de cada niño, revisión clínica de casos y estimar riesgo de un niño | `expertoclinico@ejemplo.org` |
+| Experto en datos | Datos y modelos: mediciones por revisar, guía de variables, entrenar y aprobar modelos, recalcular riesgos y configuración; no ve niños uno por uno | `expertoendatos@ejemplo.org` |
+| Consulta | Cifras de grupo: seguimiento clínico, comparar grupos, evaluación de modelos y resumen; no ve niños uno por uno | `consulta@ejemplo.org` |
 
 Las claves de cada cuenta las define quien la crea. La clave de la base de la Fundación (`KMC_PW`) nunca se guarda en
 archivos ni imágenes; el acceso a datos reales lo concede la Fundación Canguro.
@@ -154,8 +157,9 @@ make estado           # todo debe estar "healthy" o "running"
 | http://localhost:8025 | Mailpit (correos de prueba) |
 
 Para solo recorrer las pantallas (sin MinIO, MLflow ni trainer):
-`docker compose -f docker-compose.app.yml up -d --build`. Perfiles: **administración**, **experto clínico**
-(revisiones y cálculo de un niño) y **consulta** (tablero y lista de niños).
+`docker compose -f docker-compose.app.yml up -d --build`. Perfiles: **administración** (todo), **experto clínico**
+(niños, revisión clínica de casos y estimar riesgo), **experto en datos** (datos y modelos) y **consulta** (cifras de
+grupo); el detalle está en [Credenciales de ejemplo](#credenciales-de-ejemplo).
 
 Otros comandos útiles: `make detener`, `make registros`, `make respaldo`, `make pruebas`, `make verificar-todo`
 (`make` sin argumentos lista todo).
@@ -167,9 +171,9 @@ verificación de cada paso, está en
 [`proyecto-codigo/README.md`](proyecto-codigo/README.md#despliegue-completo-paso-a-paso).
 
 1. **Local:** `make env` → editar `.env` → guardar `KMC_PW` en el llavero (nunca en archivos) → `make arrancar` →
-   `make verificar-gpu` → crear usuarios en *Administración → Usuarios*.
+   `make verificar-gpu` → crear usuarios en *Administración → Usuarios y permisos*.
 2. **Modelos simulados:** `make demo-entrenar && make demo-exportar && make demo-publicar`, y luego
-   *Administración → Corridas → Ejecutar corrida*.
+   *Datos y modelos → Operación de modelos → Recalcular riesgos → Iniciar recálculo de riesgos*.
 3. **Base real:** `make corrida` (o `make corrida-silencio` para guardar riesgos sin mostrarlos).
 4. **Railway (una vez):** crear proyecto con Postgres, servicios `api` y `web`, volumen `/datos/paquetes`, variables
    (`MAIA_SOLO_SIMULADO=true` y la misma `MAIA_PAQUETE_CLAVE` del `.env` local) y dominio público
@@ -212,9 +216,12 @@ make demo-entrenar SIN_GPU=1
 curl http://localhost:8080/api/salud      # {"db": true, ..., "entorno": "local"}
 ```
 
-**Flujo en la aplicación:** el equipo clínico abre *Seguimiento clínico*, filtra una cohorte, abre la ficha de un niño
-y calcula su riesgo de talla baja a los 12 meses desde la visita elegida (40 semanas, 3, 6 o 9 meses EC), con el riesgo
-estimado, su percentil y las variables que más pesaron (TreeSHAP). Los expertos revisan las alertas en *Datos por
-revisar* y *Revisión de riesgos*.
+**Flujo en la aplicación:** el equipo clínico abre *Seguimiento clínico*, filtra una cohorte y ve su crecimiento por
+visita en caja y bigotes (pestañas *Desviación estándar* y *Varianza*, con los niños en alerta más alejados como
+puntos); abre la ficha de un niño con su riesgo por visita y, en *Estimar riesgo › Estimación individual*, calcula el
+riesgo de talla baja a los 12 meses desde la visita elegida (40 semanas, 3, 6 o 9 meses EC) o de desarrollo
+psicomotor bajo a los 12 meses (desde los 6 meses), con el riesgo estimado, su percentil y las variables que más
+pesaron (TreeSHAP). El experto en datos revisa las alertas de calidad en *Mediciones por revisar* y el experto
+clínico, los casos en *Revisión clínica de casos*.
 
 **Informe:** `cd informe-final && latexmk -pdf articulo.tex`.

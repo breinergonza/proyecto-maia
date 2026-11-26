@@ -48,7 +48,11 @@ const historia = (dosFamilias = true): RiesgoPorCorte => ({
     ...(dosFamilias ? [punto(d3, 'desarrollo psicomotor bajo a los 12 meses', 0.6, 95)] : []),
   ],
 })
-const perfil = { variables: [{ variable: 'eg_semanas', etiqueta: 'Edad gestacional', unidad: 'semanas', ninos: 800, cuantiles: { p5: 28, p25: 31, p50: 33, p75: 35, p95: 36 }, valor: 31, posicion: 40 }] }
+const perfil = { variables: [
+  { variable: 'eg_semanas', etiqueta: 'Edad gestacional', unidad: 'semanas', ninos: 800, cuantiles: { p5: 28, p25: 31, p50: 33, p75: 35, p95: 36 }, valor: 31, posicion: 40 },
+  // la unidad llega como la escribe la base: en mayúsculas
+  { variable: 'peso_nacer', etiqueta: 'Peso al nacer', unidad: 'GRAMOS', ninos: 800, cuantiles: { p5: 1340, p25: 1900, p50: 2250, p75: 2500, p95: 2800 }, valor: 2300, posicion: 51 },
+] }
 
 function apiFicha(h: RiesgoPorCorte | { paquete: string; puntos: [] } = historia()) {
   simularApi((url) => {
@@ -105,6 +109,17 @@ describe('ficha del niño en pestañas', () => {
     const visitas = await screen.findByRole('tab', { name: 'Historial de visitas' })
     expect(visitas).toHaveAttribute('aria-selected', 'true')
     expect(await within(screen.getByRole('tabpanel')).findByText('Peso a los 3 meses')).toBeInTheDocument()
+  })
+
+  it('al nacer, frente a los demás niños: la unidad se escribe como en clínica («GRAMOS» → «g»), igual que en el encabezado', async () => {
+    apiFicha()
+    montar('/ninos/s1?ver=perfil')
+    const panel = (await screen.findByRole('heading', { name: 'Al nacer, frente a los demás niños' })).closest('section')!
+    expect(await within(panel).findByText('2.300 g')).toBeInTheDocument()
+    expect(within(panel).getByText('1.340 g')).toBeInTheDocument()
+    expect(within(panel).getByText('2.800 g')).toBeInTheDocument()
+    expect(within(panel).getByText('31 semanas')).toBeInTheDocument()
+    expect(within(panel).queryByText(/GRAMOS/)).not.toBeInTheDocument()
   })
 
   it('lo que se abrió en una pestaña sigue ahí al volver a ella', async () => {

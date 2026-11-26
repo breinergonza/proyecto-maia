@@ -3,6 +3,8 @@
 **Alertas clínicas tempranas con IA interpretable en niños prematuros y de bajo peso**
 Informe final tipo artículo del curso *Proyecto: despliegue de soluciones* (MAIA, Uniandes), (IEEEtran.cls v1.7a).
 
+> **Versión previa.** El informe final entregado, con el nombre de la plataforma (KMCPred) y los resultados de los modelos publicados, está en [`../informe-final/`](../informe-final/README.md). Esta carpeta se conserva como antecedente y no se actualizó con esos cambios.
+
 ## Compilar
 
 ```bash
@@ -27,12 +29,15 @@ Funciona también en Overleaf (subir la carpeta completa). Si el sistema tiene `
 | `secciones/06_conclusiones.tex` | Conclusiones y trabajo futuro | Conclusiones (10) |
 | `figuras/*.tex` | Figuras en TikZ/pgfplots (arquitectura, cobertura, errores), legibles en escala de grises | — |
 | `figuras/sevarti.jpg` | Modelo SEVARTI de la Fundación Canguro | — |
+| `Avance_proyecto.tex` / `.pdf` | Informe de avance en un solo archivo (5 páginas); usa `figuras/figura*.png` y `figuras/tabla3_validacion.png`. El flujo `.github/workflows/compilar-avance.yml` lo compila | — |
 | `referencias.tex` | Bibliografía IEEE, **generada** (no editar a mano) | — |
 | `herramientas/ordenar_referencias.py` | Ordena la bibliografía por primera cita | — |
 
 Hoy el PDF tiene 9 páginas; el límite es 12.
 
 ## Pendientes antes de entregar
+
+Esta lista es de esta versión previa y quedó como estaba: el texto de esta carpeta todavía tiene esas marcas. Los resultados que se alcanzaron están en el informe final de [`../informe-final/`](../informe-final/README.md).
 
 El texto marca en **rojo** con `\pendiente{...}` lo que depende de resultados que todavía no existen. Buscar `\pendiente` y reemplazar:
 

@@ -26,7 +26,9 @@ from maia_comun.perfiles import VARIABLE_LUBCHENCO, perfil_provisional
 LOTE = 5000   # filas por INSERT del historial
 NOMBRE_PLATAFORMA = 'KMCPred'   # el mismo de la web (D78): web/src/lib/useTituloPagina.ts
 NOMBRE_EXCEL = 'kmcpred-riesgo-alto.xlsx'
-PIE_CORREO = 'Apoyo a la decisión, no diagnóstico. El riesgo ordena a los niños; la decisión es del equipo clínico.'
+# el mismo pie de la web (components/Marco.tsx)
+PIE_CORREO = ('Apoyo a la decisión clínica. El riesgo estimado ayuda a priorizar la revisión. '
+              'El equipo clínico toma la decisión.')
 # Identidad de la plataforma (web/src/estilos.css y components/Marco.tsx), repetida en línea porque el correo no carga CSS
 COLOR_TEAL, COLOR_TEAL_MEDIO, COLOR_TEAL_TINTE = '#1f4e52', '#2e6b70', '#e8f1f0'
 COLOR_CORAL_TINTE, COLOR_CORAL_HONDO = '#fbeae5', '#a8472a'

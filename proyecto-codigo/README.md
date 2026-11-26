@@ -1,14 +1,18 @@
-# Observatorio Canguro · MAIA
+# KMCPred · MAIA
 
-Alertas clínicas tempranas con IA interpretable en niños prematuros y de bajo peso. Proyecto de grado de la Maestría
-en Inteligencia Artificial (Universidad de los Andes) con la Fundación Canguro.
+**KMCPred**: sistema interpretable de alertas y predicción temprana de riesgos en niños prematuros y de bajo peso del
+Programa Madre Canguro. Proyecto de grado de la Maestría en Inteligencia Artificial (Universidad de los Andes) con la
+Fundación Canguro. «Observatorio Canguro» sigue nombrando la cohorte y la base de la Fundación; los nombres internos
+(`MAIA_*`, `maia_api`, la CLI `maia`) no cambian (D78 en `docs/decisiones.md`).
 
 Dos modelos sobre la base del Programa Madre Canguro:
 
 * **Anomalías**: encuentra los datos raros de cada niño (capas de valor, contexto, trayectoria y grupo) y arma la cola
   que revisan los expertos.
 * **Alertas clínicas**: ordena a los niños por el riesgo de desenlaces que se pueden prevenir, con los motivos que más
-  pesaron, y mide el crecimiento contra el estándar de la OMS.
+  pesaron, y mide el crecimiento contra el estándar de la OMS. Por defecto el Diccionario deja en uso el desarrollo
+  psicomotor bajo a los 12 meses y en prueba la talla baja a los 12 meses; los demás desenlaces quedan «No usar» y un
+  experto los reactiva (D68).
 
 Apoyo a la decisión, no diagnóstico.
 
@@ -32,11 +36,12 @@ flowchart LR
     subgraph LOCAL["Equipo local · Ubuntu + GPU NVIDIA · docker compose"]
         direction TB
         TR["trainer<br/>CLI maia + núcleo<br/>LightGBM CUDA"]
+        PROG["programador<br/>(maia programador, misma imagen y GPU)<br/>corridas y aprobaciones pedidas en la web"]
         MINIO[("MinIO<br/>cortes SEVARTI, salidas,<br/>paquetes, artefactos")]
         PG[("Postgres<br/>sevarti · resultados · app<br/>+ base de MLflow")]
         MLF["MLflow<br/>experimentos y registro<br/>(alias candidato / produccion)"]
         API_L["API FastAPI"]
-        WEB_L["web<br/>nginx + React"]
+        WEB_L["web KMCPred<br/>nginx + React"]
         MAIL["Mailpit<br/>(correo de prueba)"]
         TR -- "1 extrae (KMC_PW)" --> KMC
         TR -- "2 guarda el corte" --> MINIO
@@ -46,14 +51,18 @@ flowchart LR
         MLF -- artefactos --> MINIO
         TR -- "5 resultados de la corrida" --> PG
         TR -- "6 paquete firmado" --> MINIO
+        PROG -- "toma las ejecuciones pendientes" --> PG
+        PROG -. "lanza maia corrida / promover + exportar" .-> TR
         API_L --> PG
-        API_L --> MAIL
+        API_L -- "importa y activa paquetes aprobados" --> MINIO
+        API_L -- "lee entrenamientos (REST)" --> MLF
+        API_L -- "alertas [KMCPred]" --> MAIL
         WEB_L -- "/api" --> API_L
     end
 
     subgraph RW["Railway · demostración con niños simulados"]
         direction TB
-        WEB_R["web<br/>nginx + React<br/>(dominio público)"]
+        WEB_R["web KMCPred<br/>nginx + React<br/>(dominio público)"]
         API_R["api FastAPI<br/>MAIA_SOLO_SIMULADO=true<br/>volumen /datos/paquetes"]
         PG_R[("Postgres<br/>(cohorte simulada)")]
         WEB_R -- "/api · red privada" --> API_R
@@ -71,11 +80,12 @@ flowchart LR
 Si su visor no dibuja Mermaid (GitHub, GitLab y VS Code sí lo hacen), esta es la misma idea:
 
 ```
-  Base KMC ──(KMC_PW)──▶ trainer (GPU) ──▶ MinIO ◀── MLflow ──▶ Postgres ◀── API ◀── web ◀── expertos
-                              │                                    ▲
-                              └──────────── resultados ────────────┘
-                              │
-                              └── maia publicar (paquete simulado firmado) ──▶ web Railway ──▶ API Railway ──▶ Postgres Railway
+  Base KMC ──(KMC_PW)──▶ trainer (GPU) ──▶ MinIO ◀── MLflow ──▶ Postgres ◀── API ◀── web KMCPred ◀── expertos
+                             │ ▲                                    ▲         │
+                             ├─┼────────── resultados ──────────────┘         └──▶ correos de alerta [KMCPred]
+                             │ └── programador (corridas programadas en la web)
+                             │
+                             └── maia publicar (paquete simulado firmado) ──▶ web Railway ──▶ API Railway ──▶ Postgres Railway
 ```
 
 ### Componentes
@@ -86,9 +96,10 @@ Si su visor no dibuja Mermaid (GitHub, GitLab y VS Code sí lo hacen), esta es l
 | `minio` | Cortes de la base (parquet), salidas para la Fundación, paquetes de modelos, artefactos de MLflow | `minio/minio` | 9000 (API), 9001 (consola) | local |
 | `minio-init` | Crea los cuatro buckets con versionado y dos usuarios de servicio | `minio/mc` | — | local |
 | `mlflow` | Experimentos, métricas agregadas y registro de modelos con alias `candidato` y `produccion` | `infra/docker/mlflow.Dockerfile` | 5000 | local |
-| `trainer` | CLI `maia`: extraer, simular, entrenar, exportar, publicar, corrida | `infra/docker/trainer.Dockerfile` (CUDA) | — | local |
-| `api` | FastAPI: sesión, tablero, niños, revisión, inferencia, paquetes, corridas, correo | `infra/docker/api.Dockerfile` | 8000 (interno) | local y Railway |
-| `web` | React compilado, servido por nginx, que también reenvía `/api` a la API | `infra/docker/web.Dockerfile` | 8080 | local y Railway |
+| `trainer` | CLI `maia`: extraer, simular, entrenar, exportar, publicar, corrida (perfil `entrenamiento`: se usa con `docker compose run`) | `infra/docker/trainer.Dockerfile` (CUDA) | — | local |
+| `programador` | `maia programador`: ejecuta las corridas y aprobaciones de modelos que se programan o piden en la web (perfil `programador`, `make programador`) | `infra/docker/trainer.Dockerfile` (CUDA) | — | local |
+| `api` | FastAPI (`/api/*`): sesión, usuarios, tablero, niños, vista clínica, comparar y explorar, revisión, inferencia y predicción, analítica de modelos, muestras, diccionario, entrenamientos, paquetes, corridas, administración y notificaciones | `infra/docker/api.Dockerfile` | 8000 (interno) | local y Railway |
+| `web` | KMCPred: React compilado, servido por nginx, que también reenvía `/api` a la API | `infra/docker/web.Dockerfile` | 8080 | local y Railway |
 | `mailpit` | Recibe los correos en local para revisarlos | `axllent/mailpit` | 8025 (web), 1025 (SMTP) | local |
 
 ### Cómo viajan los modelos
@@ -109,7 +120,7 @@ Si su visor no dibuja Mermaid (GitHub, GitLab y VS Code sí lo hacen), esta es l
 |---|---|---|
 | **Para qué** | El trabajo real: corrida semestral, revisión de los expertos, correos al equipo clínico | Mostrar la solución (jurados, profesores, socialización) sin exponer datos |
 | **Datos** | Base real de la Fundación y cohortes simuladas | Solo una cohorte simulada que la API genera al arrancar |
-| **Servicios** | Postgres, MinIO, MLflow, trainer (GPU), API, web, Mailpit | Postgres administrado, API y web |
+| **Servicios** | Postgres, MinIO, MLflow, trainer y programador (GPU), API, web, Mailpit | Postgres administrado, API y web |
 | **Modelos** | Se entrenan aquí (GPU) | Llegan como paquete firmado, entrenado con datos simulados |
 | **Secretos** | `.env` (fuera de git) y `KMC_PW` en la terminal o el llavero | Variables de servicio de Railway; **nunca** `KMC_PW` |
 | **Correo** | Mailpit, o el SMTP de la Fundación | SMTP opcional |
@@ -155,16 +166,19 @@ Edite `.env` y cambie todo lo que dice `cambiar`:
 | `MAIA_JWT_SECRETO` | Secreto largo (`openssl rand -base64 48`) |
 | `MAIA_ADMIN_EMAIL`, `MAIA_ADMIN_CLAVE` | La cuenta de administración que se crea al arrancar por primera vez |
 | `MAIA_LGBM_DEVICE` | `cuda` en el equipo con GPU, `cpu` en otro |
+| `MAIA_CIFRADO_CLAVE` | 32 caracteres o más (`openssl rand -hex 32`). Cifra la clave de la base de la Fundación y la del servidor de correo que se guardan desde la web; vacía, la web no guarda claves |
+| `KMC_HOST`, `KMC_USUARIO` | Servidor y usuario de solo lectura de la base de la Fundación (los entrega el Observatorio). También se pueden guardar en la web, en **Datos y modelos › Configuración** |
 
 Los valores `postgres`, `minio`, `mlflow` y `mailpit` de las URL son los nombres de los servicios dentro del compose;
 no los cambie.
 
-El servidor de correo se configura en la web, en **Notificaciones › Servidor de correo** (la clave se guarda cifrada y requiere `MAIA_CIFRADO_CLAVE`). Para desarrollo con Mailpit: servidor `mailpit`, puerto `1025`, sin TLS. El botón **Reestablecer** borra el servidor guardado (host, usuario y clave) y los avisos dejan de salir hasta configurarlo de nuevo; el correo de prueba solo se envía si es un correo válido (se escribe en minúscula y sin espacios).
+El servidor de correo se configura en la web, en **Notificaciones › Configuración del correo saliente** (la clave se guarda cifrada y requiere `MAIA_CIFRADO_CLAVE`). Para desarrollo con Mailpit: servidor `mailpit`, puerto `1025`, sin TLS. El botón **Reestablecer** borra el servidor guardado (host, usuario y clave) y los avisos dejan de salir hasta configurarlo de nuevo; el correo de prueba (**Enviar correo de prueba**) solo se envía si es un correo válido (se escribe en minúscula y sin espacios).
 
 ### 2. La clave de la base de la Fundación
 
-`KMC_PW` no va en `.env`. Lo recomendado es escribirla en **Administración › Configuración** (queda cifrada; necesita
-`MAIA_CIFRADO_CLAVE` en `.env`) y programar ahí las corridas: `make programador` enciende el servicio que las ejecuta.
+`KMC_PW` no va en `.env`. Lo recomendado es escribirla en **Datos y modelos › Configuración › Configuración del
+sistema y del entrenamiento** (queda cifrada; necesita `MAIA_CIFRADO_CLAVE` en `.env`) y programar las corridas en
+**Configuración › Programar ejecuciones automáticas**: `make programador` enciende el servicio que las ejecuta.
 Para correr `make corrida` a mano, elija una forma:
 
 ```bash
@@ -195,7 +209,7 @@ Del `.env` usa `POSTGRES_PASSWORD` (solo letras y números: va dentro de la URL 
 siembra 1.000 niños simulados (`MAIA_DEMO_SUJETOS`). El tablero y los riesgos quedan vacíos hasta que se publique un
 paquete firmado con la misma `MAIA_PAQUETE_CLAVE` (ver [Probar con datos simulados](#probar-con-datos-simulados), con
 la pila completa). Otro puerto: `WEB_PUERTO=8081`. La cuenta de administración se crea solo con la base vacía: si
-cambia `MAIA_ADMIN_CLAVE` después, cámbiela también en **Administración → Usuarios** (o empiece de cero con `down -v`).
+cambia `MAIA_ADMIN_CLAVE` después, cámbiela también en **Administración → Usuarios y permisos** (o empiece de cero con `down -v`).
 
 ### Levantar todo
 
@@ -227,8 +241,8 @@ make demo-exportar    # arma y firma el paquete simulado
 make demo-publicar    # lo sube y lo activa en la web local
 ```
 
-Luego, en la web: **Administración → Corridas → Ejecutar corrida**. En unos segundos el tablero, la lista de niños y
-las colas de revisión tienen datos.
+Luego, en la web: **Datos y modelos → Operación de modelos → Recalcular riesgos → Iniciar recálculo de riesgos**. En
+unos segundos el resumen, la lista de niños y las colas de revisión tienen datos.
 
 ### Con la base real
 
@@ -245,7 +259,7 @@ El contenedor `trainer` pide una GPU NVIDIA. En un equipo sin ella, levante los 
 directamente en el equipo, en CPU, con `SIN_GPU=1`:
 
 ```bash
-uv sync                        # una vez: entorno de Python del proyecto
+uv sync --all-packages         # una vez: entorno de Python del proyecto (todo el workspace)
 make arrancar
 make demo-entrenar SIN_GPU=1
 make demo-exportar SIN_GPU=1
@@ -279,12 +293,12 @@ El orden importa: Railway recibe modelos que se entrenan en el equipo local, as�
 | A3 | Guardar `KMC_PW` en el llavero | `secret-tool lookup maia kmc_pw` la muestra |
 | A4 | `make arrancar` | `make estado`: todo sano; http://localhost:8080 muestra el ingreso |
 | A5 | `make verificar-gpu` | Primera línea: `cuda` |
-| A6 | Ingresar como administración y crear los usuarios en **Administración → Usuarios** | Los expertos pueden ingresar |
-| A7 | `make demo-entrenar && make demo-exportar && make demo-publicar` | En **Modelos** aparece un paquete `simulado` activo |
-| A8 | **Corridas → Ejecutar corrida** | El tablero muestra niños, datos por revisar y riesgos |
+| A6 | Ingresar como administración y crear los usuarios en **Administración → Usuarios y permisos** (perfiles: administración, experto clínico, experto en datos, consulta) | Los expertos pueden ingresar |
+| A7 | `make demo-entrenar && make demo-exportar && make demo-publicar` | En **Operación de modelos → Modelos disponibles** aparece un paquete `simulado` activo |
+| A8 | **Operación de modelos → Recalcular riesgos** | El resumen muestra niños, mediciones por revisar y riesgos |
 | A9 | `make corrida` (base real) | Corrida terminada; Excel en `maia-salidas`; tablero con los niños reales |
-| A10 | Activar desenlaces en **Notificaciones** y **Enviar prueba** | El correo llega (Mailpit o el buzón real) |
-| A11 | Programar la corrida (ver [Operación](#operación-del-semestre)) | `crontab -l` muestra la línea |
+| A10 | Configurar **Notificaciones → Configuración del correo saliente** (**Enviar correo de prueba**) y crear una regla en **Reglas y envíos de alertas por correo** | El correo llega (Mailpit o el buzón real), con asunto «[KMCPred] …» y el adjunto `kmcpred-riesgo-alto.xlsx` |
+| A11 | Programar la corrida (ver [Operación](#operación-del-semestre)) | La programación aparece en **Configuración → Programar ejecuciones automáticas** con `make programador` encendido, o `crontab -l` muestra la línea |
 
 > **Alternativa: todo on-premise en un servidor con GPU.** Si el servidor propio tiene GPU NVIDIA, las fases A a D
 > se reemplazan por un solo recurso Docker Compose: ver [`infra/on-premise/README.md`](infra/on-premise/README.md).
@@ -336,9 +350,9 @@ unset RCLAVE
 
 1. Ingrese a `https://<dominio-web>` con la cuenta de administración de Railway; arriba debe aparecer el aviso de
    demostración con niños simulados.
-2. **Modelos**: el paquete `simulado` aparece activo.
-3. **Corridas → Ejecutar corrida**: termina en segundos.
-4. **Tablero**, **Niños** y la línea temporal de un niño muestran datos.
+2. **Operación de modelos → Modelos disponibles**: el paquete `simulado` aparece activo.
+3. **Operación de modelos → Recalcular riesgos**: termina en segundos.
+4. **Seguimiento clínico**, **Resumen de riesgos y calidad de datos**, **Listado de niños** y la ficha de un niño muestran datos.
 5. Cree usuarios de consulta para quienes van a ver la demostración.
 
 ### Actualizaciones
@@ -348,8 +362,8 @@ unset RCLAVE
 | Código de la API o de la web | `make railway-api` / `make railway-web` (y `make arrancar` en local, que reconstruye) |
 | Modelos simulados nuevos | `make demo-entrenar`, `make demo-exportar` y la Fase D; luego una corrida en la web |
 | Modelos con datos reales | Solo en local: `make corrida` |
-| Núcleo nuevo en `insumo-datos` | `make sincronizar-nucleo` (copia, vuelve a aplicar `nucleo/parches` y corre sus pruebas) |
-| Esquema de la base | Migración nueva en `plataforma/comun/maia_comun/alembic/versions`; la API la aplica al arrancar |
+| Núcleo nuevo en `insumo-datos` | `make sincronizar-nucleo` (copia, vuelve a aplicar `nucleo/parches` y corre sus pruebas; no pisa el Diccionario semilla `nucleo/entradas/diccionario.xlsx`, D68) |
+| Esquema de la base | Migración nueva en `plataforma/comun/maia_comun/alembic/versions` (la última es `0014_rol_experto_datos`); la API la aplica al arrancar (`make migrar` la aplica a mano) |
 
 ---
 
@@ -357,21 +371,23 @@ unset RCLAVE
 
 ```mermaid
 flowchart LR
-    A["Corte nuevo en la base KMC"] --> B["make corrida-si-hay-corte-nuevo<br/>(cron, lunes 6:00)"]
-    B --> C["Datos por revisar<br/>(expertos)"]
+    A["Corte nuevo en la base KMC"] --> B["Corrida programada en la web + make programador<br/>(o cron: make corrida-si-hay-corte-nuevo)"]
+    B --> C["Mediciones por revisar<br/>(experto en datos)"]
     B --> D["Riesgos y crecimiento<br/>(equipo clínico)"]
-    B --> E["Correos ante riesgo alto"]
+    B --> E["Correos ante riesgo alto<br/>(asunto [KMCPred])"]
     C --> F["Precisión por capa<br/>→ elegir alpha"]
     F --> G["Siguiente entrenamiento<br/>maia entrenar anomalias --config"]
     D --> H["Revisión ciega de riesgos<br/>¿preocupa más el riesgo alto?"]
 ```
 
-* **Corrida automática.** Con `KMC_PW` en el llavero, agregue a `crontab -e`:
+* **Corrida automática.** Lo recomendado: guardar la conexión en **Datos y modelos › Configuración**, crear la
+  programación en **Configuración › Programar ejecuciones automáticas** y dejar encendido `make programador`. Sin la
+  web, con `KMC_PW` en el llavero, agregue a `crontab -e`:
   `0 6 * * 1 cd /ruta/proyecto-codigo && make corrida-si-hay-corte-nuevo >> respaldos/cron.log 2>&1`
   (corre cada lunes y solo trabaja si la base cambió).
-* **Revisión.** Los expertos responden **Datos por revisar** y **Revisión de riesgos**. Al final de **Revisión de
-  riesgos**, administración ve qué parte de lo marcado por cada capa era un error y si los niños de riesgo alto
-  preocupan más que el resto. Con esa precisión se elige `alpha` para el siguiente entrenamiento
+* **Revisión.** El experto en datos responde **Mediciones por revisar** y el experto clínico **Revisión clínica de
+  casos**. Al final de **Revisión clínica de casos**, administración ve qué parte de lo marcado por cada capa era un
+  error y si los niños de riesgo alto preocupan más que el resto. Con esa precisión se elige `alpha` para el siguiente entrenamiento
   (`maia entrenar anomalias --config archivo.json`, con `{"alpha": ...}`).
 * **Silencio.** Antes de mostrar riesgos de un modelo nuevo, `make corrida-silencio` los guarda sin entregarlos para
   compararlos después.
@@ -382,7 +398,7 @@ flowchart LR
 ## Desarrollo
 
 ```bash
-uv sync                                       # entorno de Python con todo el workspace
+uv sync --all-packages                        # entorno de Python con todo el workspace (como la CI)
 make pruebas                                  # pytest (usa el Postgres del compose o MAIA_TEST_DATABASE_URL)
 uv run uvicorn maia_api.main:app --reload     # API en http://localhost:8000 (MAIA_ENTORNO=local)
 cd plataforma/web && npm ci && npm run dev    # web en http://localhost:5173, con /api hacia localhost:8000
@@ -398,16 +414,18 @@ proyecto-codigo/
 ├── plataforma/
 │   ├── comun/                 configuración, base de datos (Alembic), MinIO, paquetes firmados, correo, puntuación
 │   ├── entrenamiento/         CLI "maia": extraer, simular, entrenar, registrar, exportar, publicar, corrida
-│   ├── api/                   FastAPI: sesión, tablero, niños, revisión, inferencia, modelos, corridas
-│   └── web/                   React + Vite + Tailwind
+│   ├── api/                   FastAPI (maia_api/rutas): sesión, usuarios, tablero, niños, clínica, comparar, exploración,
+│   │                          revisión, inferencia, predicción, analítica, muestras, diccionario, entrenamientos,
+│   │                          modelos, corridas, administración, notificaciones
+│   └── web/                   KMCPred: React 19 + Vite + Tailwind 4
 ├── infra/
 │   ├── local/                 docker-compose del equipo local, inicialización de Postgres y MinIO
-│   ├── docker/                Dockerfile de trainer (CUDA), api, web (nginx) y mlflow
+│   ├── docker/                Dockerfile de trainer (CUDA), api, web (nginx) y mlflow; postgres y minio-init (on-premise)
 │   ├── railway/               guía detallada de la demostración
 │   ├── on-premise/            guía del despliegue completo on-premise (docker-compose.on-premise.yml)
 │   └── openapi.json           contrato de la API (de él salen los tipos del frontend)
 ├── docs/decisiones.md         versiones, desvíos del plan y lo que falta verificar
-├── docs/manual_usuario.md     manual de uso por perfil (administración, experto clínico, consulta)
+├── docs/manual_usuario.md     manual de uso por perfil
 ├── docs/extraccion.md         extracción parametrizada desde la base PostgreSQL de la Fundación
 ├── docker-compose.app.yml     solo base de datos, API y web, para ver la aplicación
 ├── docker-compose.on-premise.yml  despliegue completo en un servidor con GPU
@@ -415,8 +433,15 @@ proyecto-codigo/
 └── uv.lock                    versiones exactas de Python
 ```
 
-Perfiles de la aplicación: **administración** (todo), **experto clínico** (revisiones y cálculo de un niño) y
-**consulta** (tablero y lista de niños).
+Perfiles de la aplicación (`requiere_rol` en `plataforma/api/maia_api/dependencias.py`; menú en
+`plataforma/web/src/components/Marco.tsx`; el perfil `datos` llegó con la migración `0014_rol_experto_datos`, D77):
+
+| Perfil (rol) | Qué ve |
+|---|---|
+| **Administración** (`admin`) | Todo, además de **Usuarios y permisos** y **Notificaciones** |
+| **Experto clínico** (`experto`) | Lo clínico: Seguimiento clínico, Listado de niños y su ficha, Comparar grupos, Revisión clínica de casos y Estimar riesgo |
+| **Experto en datos** (`datos`) | Seguimiento clínico y Comparar grupos, y toda la sección **Datos y modelos**: Evaluación de modelos y Entrenamientos propios, Operación de modelos (entrenar y aprobar, modelos disponibles, recalcular riesgos), Mediciones por revisar, Guía de variables y unidades, Resumen y Configuración (sistema, entrenamiento y ejecuciones automáticas). No ve niños uno por uno |
+| **Consulta** (`visualizador`) | Agregados: Seguimiento clínico, Comparar grupos, Evaluación de modelos y Resumen. No ve niños uno por uno (D65) |
 
 ---
 
@@ -431,7 +456,7 @@ Perfiles de la aplicación: **administración** (todo), **experto clínico** (re
 | «Este entorno solo acepta modelos entrenados con datos simulados» | Paquete de la base real en Railway | Es lo esperado: en Railway solo van paquetes `simulado` |
 | «El paquete se hizo con LightGBM X» | Versiones distintas entre trainer y API | Reconstruya ambas imágenes con el `uv.lock` actual |
 | La web responde 502 en `/api` | La API no está sana o `API_INTERNA` está mal | `make registros`; en Railway, revise el dominio privado y el puerto 8000 |
-| La corrida dice «No hay un paquete de modelos activo» | No se publicó o no se activó | **Modelos → Activar**, o `make demo-publicar` |
+| La corrida dice «No hay un paquete de modelos activo» | No se publicó o no se activó | **Operación de modelos → Modelos disponibles → Activar**, o `make demo-publicar` |
 | Puerto 5432, 5000, 8080 o 9000 ocupado | Otro servicio local | Deténgalo o cambie el puerto publicado en `infra/local/docker-compose.yml` |
 
 Más contexto (versiones, desvíos del plan, lo que no se pudo verificar al escribir el código):

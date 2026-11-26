@@ -132,7 +132,7 @@ export default function Ingresar() {
                   <div id="olvido" hidden={!olvido}>
                     <Aviso tono="teal">
                       Pídale a la administración de KMCPred una contraseña nueva: se asigna en Administración ›
-                      Usuarios y se la comparten por un canal seguro.
+                      Usuarios y permisos y se la comparten por un canal seguro.
                     </Aviso>
                   </div>
                 </div>

@@ -218,7 +218,7 @@ def test_corrida_sin_modelos_aprobados_dice_que_hacer(motor):
         EJ.encolar(s, 'corrida', 'simulado', 'manual')
         s.commit()
     salida = ('Traceback...\nRuntimeError: No hay modelos con alias produccion para la fuente simulado: entrene y '
-              'apruebe una versión de cada modelo en Administración › Entrenamientos.')
+              'apruebe una versión de cada modelo en Datos y modelos › Operación de modelos › Entrenar y aprobar modelos.')
     Programador(motor=motor, lanzar=Lanzador({'corrida': (1, salida)}), cfg=CFG).ciclo()
     e = _ultima(motor)
     assert e.estado == 'error' and e.mensaje.startswith('Todavía no hay modelos aprobados')

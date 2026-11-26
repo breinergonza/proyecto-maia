@@ -9,6 +9,8 @@ import { Check, ChevronDown, Circle, CircleHelp, Pencil } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { TAMANO_COLA, useColaDatos, useResponderDato, type EstadoCola, type FiltrosCola, type ResumenCalidad } from '../../api/calidad'
+import { puede, useSesion } from '../../auth/sesion'
+import { ROLES_CLINICOS } from '../Marco'
 import type { DatoRevision, Respuesta, RevisionDelEquipo } from '../../api/tipos'
 import { cn } from '../../lib/cn'
 import { aproximado, fecha, fechaHora, frase, medida, num, unidad as unidadLegible } from '../../lib/formato'
@@ -118,6 +120,8 @@ function Estado({ respuesta }: { respuesta: Respuesta | null }) {
 const quien = (r: RevisionDelEquipo) => (r.propia ? 'Tú' : r.usuario)
 
 function FilaDato({ dato }: { dato: DatoRevision }) {
+  const { usuario } = useSesion()
+  const veFicha = puede(usuario, ROLES_CLINICOS)
   const [comentario, setComentario] = useState(dato.comentario ?? '')
   const [abierta, setAbierta] = useState(Boolean(dato.comentario))   // el detalle se abre solo si ya hay un comentario
   const [elegida, setElegida] = useState<Respuesta | null>(dato.es_error)
@@ -136,7 +140,10 @@ function FilaDato({ dato }: { dato: DatoRevision }) {
     <>
       <tr>
         <td className="whitespace-nowrap font-semibold">
-          <Link className="text-teal underline-offset-2 hover:underline" to={`/ninos/${encodeURIComponent(dato.sujeto)}`}>{dato.sujeto}</Link>
+          {/* la ficha es de administración y del experto clínico (D65, D77): para los demás, solo el código */}
+          {veFicha
+            ? <Link className="text-teal underline-offset-2 hover:underline" to={`/ninos/${encodeURIComponent(dato.sujeto)}`}>{dato.sujeto}</Link>
+            : dato.sujeto}
         </td>
         <td className="whitespace-nowrap">{visita}</td>
         <td className="font-semibold">{nombre}</td>

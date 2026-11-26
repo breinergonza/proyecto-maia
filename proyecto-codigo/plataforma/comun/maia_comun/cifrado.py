@@ -45,4 +45,4 @@ def descifrar(token: str, cfg: Configuracion | None = None) -> str:
         return _fernet(cfg).decrypt(token.encode('ascii')).decode('utf-8')
     except InvalidToken:
         raise SinLlave('La clave guardada no se puede descifrar: MAIA_CIFRADO_CLAVE cambió. Escríbala de nuevo en '
-                       'Administración › Configuración.') from None
+                       'Datos y modelos › Configuración.') from None

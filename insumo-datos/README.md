@@ -1,5 +1,7 @@
 # Análisis de datos del Observatorio Canguro
 
+> **Relación con la plataforma.** La plataforma web KMCPred (`proyecto-codigo/` en la raíz del repositorio) no usa `insumo-datos/` directamente: usa una copia en `proyecto-codigo/nucleo/`, que `make sincronizar-nucleo` trae de `insumo-datos/` y a la que le vuelve a aplicar los parches de `proyecto-codigo/nucleo/parches/`. La sincronización no pisa el diccionario semilla de la plataforma (`proyecto-codigo/nucleo/entradas/diccionario.xlsx`), que deja por defecto solo dos desenlaces a los 12 meses, desarrollo psicomotor y talla baja (decisión D68 de `proyecto-codigo/docs/decisiones.md`); el de `insumo-datos/entradas/` trae los 14 «En uso» que se describen abajo.
+
 Tres notebooks y dos herramientas de uso diario:
 
 - `informes/informe_analisis_datos.ipynb`: el mapa de los datos (qué hay, qué tan confiable es, qué cosas raras aparecen).
@@ -129,7 +131,7 @@ Para agregar un desenlace: una fila nueva en Desenlaces con estado "En prueba", 
 
 Abrir el notebook en `informes/` y ejecutar todas las celdas. El del modelo tarda alrededor de una hora: entrena un modelo por variable, mete errores en tres rondas y revisa toda la base.
 
-El de análisis se calculó entre el 12 y el 14 de octubre de 2026. El 15 la Fundación restringió la fecha exacta de nacimiento, la sede, la llave del paciente y las fechas de hospitalización; después volvió a habilitar todo salvo la llave (`iden_codigo`, que nunca se usa). El código sigue trabajando sin sede ni fecha de parto, y las secciones del análisis que las usan no corren tal cual: volver a usarlas es la decisión abierta b de [Decisiones abiertas del Observatorio](https://claude.ai/code/artifact/f3199f60-eb35-4318-8ff2-9de4d77cbfa3).
+El de análisis se calculó entre el 12 y el 14 de octubre de 2026. El 15 la Fundación restringió la fecha exacta de nacimiento, la sede, la llave del paciente y las fechas de hospitalización; después volvió a habilitar todo salvo la llave (`iden_codigo`, que nunca se usa). El código sigue trabajando sin sede ni fecha de parto, y las secciones del análisis que las usan no corren tal cual: volver a usarlas es la decisión abierta b de [Decisiones abiertas del Observatorio](https://claude.ai/code/artifact/f3199f60-eb35-4318-8ff2-9de4d77cbfa3) (copia en `insumo-plan/2-Decisiones_abiertas_del_Observatorio.docx`, en la raíz del repositorio).
 
 Los textos de los notebooks se editan en `informes/construir_*.py`: se corre el script y luego se ejecuta el notebook.
 
@@ -219,17 +221,18 @@ Se devuelven a la misma carpeta con el mismo nombre, sin cambiar encabezados ni 
 | `clinico/crecimiento.py` | Puntaje z contra la curva de la OMS y alertas de crecimiento |
 | `clinico/oms_lms.csv` | Estándares de crecimiento de la OMS (2006), tablas LMS de 0 a 24 meses |
 | `clinico/oms_peso_talla.csv` | Estándar de la OMS (2006) de peso para la longitud, de 45 a 110 cm (solo lo usan los desenlaces en prueba) |
-| `retroalimentacion/` | Las hojas ciegas y su medición (`python -m retroalimentacion`, en `__main__.py`): `expertos.py` para los expertos, `medicos.py` para los médicos |
+| `retroalimentacion/` | Las hojas ciegas y su medición (`python -m retroalimentacion`, en `__main__.py`): `expertos.py` para los expertos, `medicos.py` para los médicos y `respuestas.py` con lo que comparten (cómo se lee una respuesta) |
 | `archivos/libros.py` | Los archivos Excel que recibe la Fundación: instrucciones, encabezados y columnas para responder |
 | `archivos/carpetas.py` | Dónde va cada archivo de `entradas/`, `salidas/` e `interno/` |
 | `archivos/entregas.py` | Qué periodo cubre cada entrega |
+| `archivos/pantalla.py` | Cómo imprimen sus tablas las herramientas de la línea de comandos |
 | `informes/informe_analisis_datos.ipynb` / `.html` | El notebook de análisis, con resultados |
 | `informes/modelo_anomalias.ipynb` / `.html` | La validación del modelo, con resultados |
 | `informes/alertas_clinicas.ipynb` / `.html` | La validación de las alertas clínicas, con resultados |
 | `informes/construir_notebook.py` / `construir_modelo.py` / `construir_clinico.py` | Generan los notebooks. Si cambian textos, editen aquí y vuelvan a correr el script |
 | `informes/graficos.py` | Estilo y funciones de gráficos de los notebooks |
 | `informes/diccionario_snapshot.csv` | Copia del diccionario de la última ejecución, para detectar variables nuevas o cambiadas |
-| `pruebas/` | Pruebas automáticas, con datos SEVARTI inventados (`pruebas/simulador_sevarti.py`) |
+| `pruebas/` | Pruebas automáticas, con datos SEVARTI inventados (`pruebas/simulador_sevarti.py`), una base KMC simulada (`pruebas/base_kmc.py`) y las tablas SEVARTI que se esperan de ella (`pruebas/esperado_kmc/`) |
 
 ### Entradas, por tipo
 
@@ -254,7 +257,7 @@ El anexo B del notebook de análisis explica cómo agregar variables, medidas re
 
 ## Lo que no viene de la Fundación
 
-Todo lo demás sale de la base, del diccionario, de `consumo.categoria` o de lo que indicó la Fundación (estancias desde `hd_diasurn` y `hd_totaldiashospital`, `EG_Semanas` para la edad corregida, variables restringidas, carga cada 6 meses). Las filas marcadas con una letra siguen abiertas y por ahora quedan como están; cada una se explica en [Decisiones abiertas del Observatorio](https://claude.ai/code/artifact/f3199f60-eb35-4318-8ff2-9de4d77cbfa3).
+Todo lo demás sale de la base, del diccionario, de `consumo.categoria` o de lo que indicó la Fundación (estancias desde `hd_diasurn` y `hd_totaldiashospital`, `EG_Semanas` para la edad corregida, variables restringidas, carga cada 6 meses). Las filas marcadas con una letra siguen abiertas y por ahora quedan como están; cada una se explica en [Decisiones abiertas del Observatorio](https://claude.ai/code/artifact/f3199f60-eb35-4318-8ff2-9de4d77cbfa3) (copia en `insumo-plan/2-Decisiones_abiertas_del_Observatorio.docx`, en la raíz del repositorio).
 
 | Qué | De dónde | Dónde se usa |
 |---|---|---|

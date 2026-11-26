@@ -75,11 +75,13 @@ describe('calidad de datos: cifras y encabezado', () => {
     expect(screen.queryByText('completitud a los 12 meses')).not.toBeInTheDocument()
   })
 
-  it('el experto clínico también entra y ve la cola', async () => {
+  it('el experto en datos también entra y ve la cola; el código del niño no enlaza a una ficha que no puede abrir', async () => {
     api([dato()], undefined, 'datos')
     montar('/admin/calidad-datos')
     expect(await screen.findByRole('heading', { level: 1, name: 'Mediciones por revisar' })).toBeInTheDocument()
-    expect(await screen.findByRole('link', { name: 'S-02210' })).toBeInTheDocument()
+    // la ficha de un niño es de administración y del experto clínico (D65, D77): para el experto en datos es solo el código
+    expect(await screen.findByText('S-02210')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'S-02210' })).not.toBeInTheDocument()
   })
 })
 

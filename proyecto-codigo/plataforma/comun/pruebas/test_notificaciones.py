@@ -31,7 +31,7 @@ def test_el_correo_es_un_resumen_sin_detalle_de_ninos():
         assert not re.search(r'KMC-\d+', cuerpo), 'ningún código de niño en el cuerpo'
         assert 'posición' not in cuerpo.lower() and 'de cada 100' not in cuerpo
         assert 'Muy prematuro' not in cuerpo and 'visita 6 meses' not in cuerpo
-        assert 'de cada 10' in cuerpo and 'kmcpred-riesgo-alto.xlsx' in cuerpo and 'no diagnóstico' in cuerpo
+        assert 'de cada 10' in cuerpo and 'kmcpred-riesgo-alto.xlsx' in cuerpo and 'El equipo clínico toma la decisión.' in cuerpo
         assert '4 niños con riesgo alto' in cuerpo and 'Alertas del servicio' in cuerpo
         assert 'más riesgo que 9 de cada 10' in cuerpo.replace('&aacute;', 'á').replace('&ntilde;', 'ñ')
         assert 'readmisión a los 3 meses' in cuerpo and 'crecimiento bajo' in cuerpo and 'mortalidad' in cuerpo

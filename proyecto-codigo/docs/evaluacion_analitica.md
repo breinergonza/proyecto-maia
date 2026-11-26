@@ -114,3 +114,30 @@ Sigue pendiente: casos reales frente a riesgo esperado por trimestre (el artefac
 Para verlo en producción: (1) desplegar este código (al arrancar rellena los atributos; Explorar, muestras y Predicción
 vuelven a filtrar); (2) reentrenar el modelo clínico con la base real en el equipo con GPU (calcula la analítica con
 los niños de validación), `maia exportar --fuente kmc`, publicar y activar el paquete (importa la analítica).
+
+## Estado al 2026-11-23 (cambios posteriores a esta evaluación)
+
+Lo de arriba es la foto del 2026-11-09 y se conserva como registro. Desde entonces cambió lo siguiente (verificado en
+el código de `plataforma/web/src` y en `docs/decisiones.md`):
+
+| Punto | Antes (en esta evaluación) | Ahora | Dónde |
+| --- | --- | --- | --- |
+| Nombre de la plataforma | Observatorio Canguro | **KMCPred** («Sistema interpretable de alertas y predicción temprana de riesgos en niños prematuros y de bajo peso del Programa Madre Canguro»); «Observatorio Canguro» queda para la cohorte y la base de la Fundación. El lienzo de Claude Design conserva su nombre | D78, `lib/useTituloPagina.ts` |
+| Entrada del menú | «Analítica» | Grupo **Evaluación de modelos** en la sección **Datos y modelos**, con los once análisis y **Entrenamientos propios** | `components/Marco.tsx` |
+| Quién la ve | Todos los perfiles | Consulta, Experto en datos y Administración (`ROLES_MODELOS`); el Experto clínico ya no | D77, `App.tsx` |
+| Encabezado | «Analítica › Submódulo» con su pregunta | Igual, con los nombres nuevos de los submódulos (abajo) | `paginas/AnaliticaLayout.tsx`, `paginas/analitica/submodulos.ts` |
+| Modo técnico | Interruptor arriba a la derecha | Quitado: una sola palabra clínica cuya explicación termina con «En estadística: …»; Brier y ECE con tres decimales | D66 |
+| Desenlaces | Los de readmisión, psicomotor, etc. | Dos por defecto: desarrollo psicomotor bajo a los 12 meses («En uso») y talla baja a los 12 meses desde cada visita («En prueba») | D68 |
+| Anticipación | Estado vacío (faltaba el artefacto) | Encendida por defecto (`MAIA_ANTICIPACION=0` la apaga); los tres niños de ejemplo solo los ve la administración | D68, D77 |
+| Aprobar B (Comparar) | Visible para la administración | Administración y Experto en datos (**Aprobar y activar el modelo B**) | D77, `paginas/analitica/Comparar.tsx` |
+| Redondeo y conteos pequeños | «n menor que 5», redondeo de 5 en 5 | Se muestra la cifra real de 1 a 4 niños y nada se redondea; solo queda el mínimo estadístico de 20 niños | D63, D64 |
+
+Nombres actuales de los submódulos (`submodulos.ts`): **Ficha del modelo** (resumen), **Detección y falsas alertas**
+(rendimiento), **Anticipación de las alertas**, **Calibración y umbrales de alerta**, **Variables que influyen en la
+estimación** (interpretabilidad), **Niños incluidos y datos disponibles** (población), **Rendimiento por grupo de
+niños** (equidad), **Rendimiento del modelo en el tiempo** (estabilidad), **Evolución del crecimiento**
+(trayectorias), **Perfiles de niños** (encabezado «Grupos de niños con características similares») y **Comparar
+entrenamientos**. Las direcciones (`/analitica/<id>`) no cambiaron.
+
+No se volvieron a tomar capturas a 1440 px después de estos cambios: las conclusiones de las tablas de arriba sobre lo
+que «se ve» no se han revalidado.

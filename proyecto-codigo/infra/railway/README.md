@@ -1,6 +1,6 @@
 # Despliegue de la demostración en Railway
 
-Railway aloja **solo** la demostración: la web, la API y un Postgres, con niños simulados. Ningún dato real, modelo
+Railway aloja **solo** la demostración: la web (KMCPred), la API y un Postgres, con niños simulados. Ningún dato real, modelo
 entrenado con la base de la Fundación, `.env` ni `KMC_PW` sale del equipo local. La API lo hace cumplir:
 con `MAIA_SOLO_SIMULADO=true` rechaza cualquier paquete cuya fuente no sea `simulado`.
 
@@ -43,6 +43,7 @@ firma el equipo local):
 ```bash
 openssl rand -base64 48   # para MAIA_JWT_SECRETO
 openssl rand -base64 24   # para MAIA_ADMIN_CLAVE
+openssl rand -hex 32      # opcional, para MAIA_CIFRADO_CLAVE (solo si va a guardar un servidor de correo)
 ```
 
 ```bash
@@ -66,7 +67,7 @@ railway volume add --service api --mount-path /datos/paquetes
 * `PORT=8000` fija el puerto interno para que la web sepa adónde llamar.
 * `RAILWAY_RUN_UID=0`: la imagen corre sin root, pero los volúmenes de Railway se montan como root; con esta variable
   el proceso puede escribir los paquetes subidos.
-* El servidor de correo se configura en la web, en **Notificaciones › Servidor de correo** (la clave se guarda cifrada y requiere `MAIA_CIFRADO_CLAVE`). Para desarrollo con Mailpit: servidor `mailpit`, puerto `1025`, sin TLS. Sin servidor de correo la demostración funciona igual; solo fallan los correos (quedan como error en el historial).
+* El servidor de correo se configura en la web, en **Notificaciones › Configuración del correo saliente** (la clave se guarda cifrada y requiere `MAIA_CIFRADO_CLAVE`: agréguela con `railway variables --service api --set 'MAIA_CIFRADO_CLAVE=<secreto generado>'`). En Railway no hay Mailpit: use un SMTP real. Sin servidor de correo la demostración funciona igual; solo fallan los correos (quedan como error en el historial). Los que salen llevan el asunto «[KMCPred] …» y el adjunto `kmcpred-riesgo-alto.xlsx`.
 
 ### Variables de `web`
 
@@ -111,7 +112,7 @@ unset RCLAVE
 ```
 
 Sube el paquete simulado firmado más reciente y lo activa (la clave se lee sin mostrarla y no queda en el historial). Después, en la web:
-**Administración → Corridas → Ejecutar corrida**.
+**Datos y modelos → Operación de modelos → Recalcular riesgos → Iniciar recálculo de riesgos**.
 
 ## Si algo falla
 

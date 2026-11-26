@@ -1,0 +1,60 @@
+--- a/README.md
++++ b/README.md
+@@ -1,6 +1,10 @@
+ # Análisis de datos del Observatorio Canguro
+ 
+-> **Relación con la plataforma.** La plataforma web KMCPred (`proyecto-codigo/` en la raíz del repositorio) no usa `insumo-datos/` directamente: usa una copia en `proyecto-codigo/nucleo/`, que `make sincronizar-nucleo` trae de `insumo-datos/` y a la que le vuelve a aplicar los parches de `proyecto-codigo/nucleo/parches/`. La sincronización no pisa el diccionario semilla de la plataforma (`proyecto-codigo/nucleo/entradas/diccionario.xlsx`), que deja por defecto solo dos desenlaces a los 12 meses, desarrollo psicomotor y talla baja (decisión D68 de `proyecto-codigo/docs/decisiones.md`); el de `insumo-datos/entradas/` trae los 14 «En uso» que se describen abajo.
++> **En `proyecto-codigo/`** esta carpeta es una copia de `insumo-datos` con los cambios de `parches/` (los aplica
++> `make sincronizar-nucleo`). Lo que la copia cambia frente al original se marca aquí con «(plataforma)»: el
++> Diccionario semilla con dos desenlaces (D68), los límites de dato improbable de la OMS (parche 03), «Usar como
++> filtro» (parche 10) y «Comparar con» con puntaje z (parche 11). La plataforma usa Python 3.13 con `uv`
++> (`pyproject.toml`). `make sincronizar-nucleo` vuelve a copiar este README desde `insumo-datos`.
+ 
+ Tres notebooks y dos herramientas de uso diario:
+ 
+@@ -19,6 +23,7 @@
+ 
+ ```
+ README.md, requirements.txt
++pyproject.toml, parches/    (plataforma) el paquete maia-nucleo del workspace de uv y los cambios a este código
+ pipeline.py                 la corrida completa del semestre
+ entradas/                   lo que se le da al sistema: el diccionario de variables y las hojas de retroalimentación
+ salidas/                    lo que el sistema entrega: la revisión de datos y los riesgos
+@@ -93,6 +98,7 @@
+ | Códigos de "no se hizo" | Códigos que no son una medida (por ejemplo 99), separados por `;` |
+ | Etiquetas de los códigos | Qué significa cada código de una categoría: `1=buena;2=regular` |
+ | Rango desde / hasta | Rango esperado. Solo informa, no descarta datos |
++| Usar como filtro | (plataforma) Sí: la variable se ofrece como filtro al armar una muestra y en Explorar (por ejemplo sexo al nacer o Lubchenco). Vacío es No; si ninguna lo tiene, se ofrecen las de siempre |
+ | Nota | Lo que quieran anotar; el sistema escribe aquí el aviso de las variables nuevas |
+ 
+ **Hoja Visitas** (las visitas del seguimiento, como ventanas de edad)
+@@ -121,9 +127,9 @@
+ | Porcentaje más bajo | Solo en Entre los más bajos. Vacío es 10 |
+ | Medida de crecimiento, Visita del desenlace | Solo en Crecimiento bajo: el indicador de la hoja Crecimiento y la visita en que se mira |
+ | Solo nacidos desde | Opcional: un quiebre de la hoja Quiebres, si antes el desenlace se anotaba distinto |
+-| Comparar con | Las variables de la regla simple contra la que se mide el modelo, separadas por `;` (`eg_semanas` es la edad gestacional) |
++| Comparar con | Las variables de la regla simple contra la que se mide el modelo, separadas por `;` (`eg_semanas` es la edad gestacional). (plataforma) También acepta `z_<medida>`, el puntaje z de una medida de crecimiento en uso en la visita del cálculo: la talla baja se compara con `z_talla` (D72) |
+ 
+-**Hoja Crecimiento** (una fila por indicador de la OMS): el indicador (peso, talla o perímetro cefálico para la edad, o peso para la talla), el "Qué mide" de sus variables, la unidad en que la base lo anota (g, kg, cm o mm), para el peso para la talla el "Qué mide" de la talla, el puntaje z bajo el cual es bajo (vacío es -2) y la caída entre visitas que alerta (vacío es 1), y su estado. **Hoja Curva OMS** (una fila): la variable del sexo, sus códigos de niño y de niña, y las visitas en que se compara con la curva.
++**Hoja Crecimiento** (una fila por indicador de la OMS): el indicador (peso, talla o perímetro cefálico para la edad, o peso para la talla), el "Qué mide" de sus variables, la unidad en que la base lo anota (g, kg, cm o mm), para el peso para la talla el "Qué mide" de la talla, el puntaje z bajo el cual es bajo (vacío es -2) y la caída entre visitas que alerta (vacío es 1), (plataforma) los puntajes z fuera de los cuales el dato es improbable y se manda a revisar («Dato improbable si z menor que / mayor que»; vacío es el límite de la OMS: -6/+6 en talla, -6/+5 en peso, -5/+5 en perímetro cefálico y peso para la talla), y su estado. **Hoja Curva OMS** (una fila): la variable del sexo, sus códigos de niño y de niña, y las visitas en que se compara con la curva.
+ 
+ Para agregar un desenlace: una fila nueva en Desenlaces con estado "En prueba", `python -m clinico experimento` para ver cómo predice, y si convence, estado "En uso" y `python -m clinico entrenar`.
+ 
+@@ -166,7 +172,7 @@
+ 
+ Tienen las mismas opciones `--sevarti CARPETA` y `--modelo CARPETA` (antes de la orden). En `salidas/riesgos/<fecha>.xlsx` va cada niño pendiente con la probabilidad de cada desenlace (Riesgo %), su posición frente a los niños con que se calibró el modelo (de 0 a 100) y los datos que más le suben el riesgo (Por qué). La ficha del modelo (`interno/clinico/modelos/<versión>/ficha.json`) trae el AUC de cada desenlace frente a la regla simple, para saber cuánto vale cada riesgo. Los desenlaces y las medidas de crecimiento los configuran los expertos en el diccionario.
+ 
+-**Desenlaces en prueba.** El diccionario trae 14 desenlaces "En uso" (readmisión, no volver a la siguiente visita, oxígeno y desarrollo) y 38 "En prueba", para probarlos antes de usarlos:
++**Desenlaces en prueba.** En `insumo-datos` el diccionario trae 14 desenlaces "En uso" (readmisión, no volver a la siguiente visita, oxígeno y desarrollo) y 38 "En prueba", para probarlos antes de usarlos. (plataforma) El Diccionario semilla de `proyecto-codigo` tiene los mismos 52, pero deja "En uso" solo `desarrollo_12m` (desarrollo psicomotor bajo a los 12 meses), "En prueba" la talla baja a los 12 meses calculada a las 40 semanas y a los 3, 6 y 9 meses (`talla_baja_12m_desde_{40,3,6,9}`) y los otros 47 en "No usar"; un experto los reactiva desde la página del Diccionario (D68). Los que el archivo trae:
+ 
+ - Eventos anotados en cada visita, con el riesgo calculado en la visita anterior: enfermedad infecciosa, ictericia, apnea e infección pulmonar antes de las 40 semanas; enfermedad respiratoria aguda antes de los 3, 6, 9 y 12 meses; oxígeno ambulatorio a los 6 y 9 meses.
+ - Eventos cuya forma de anotarse cambió con el sistema de 2022, contados solo desde entonces porque la proporción de "sí" cayó entre 4 y 30 veces (displasia de caderas, de 11,7% a 1,3%): tono anormal, falla en el crecimiento, enfermedad gastrointestinal aguda, examen neurológico anormal, displasia de caderas y riesgo de parálisis cerebral. Varios tienen muy pocos casos; si no alcanzan, quedan sin modelo y la tabla dice por qué.
+@@ -266,7 +272,7 @@
+ | Por debajo de -2 DE | Definición de la OMS de bajo peso, talla o perímetro para la edad | Crecimiento |
+ | Primer contenido de las hojas Desenlaces, Crecimiento y Curva OMS (qué desenlaces, desde qué visita, sus códigos y la regla simple) | Nuestro; la propuesta de la Fundación pide el crecimiento a los 12 meses, los eventos los elegimos de la base. Desde ahí los cambian los expertos en el diccionario | Alertas clínicas |
+ | Cae más de 1 DE entre visitas | Criterio clínico usual de falla de crecimiento; no es de la OMS (f) | Crecimiento |
+-| Más de 6 DE = dato improbable | Regla de limpieza de la OMS, simplificada a ±6 DE para los tres indicadores (la OMS usa límites algo distintos por indicador, por ejemplo -6/+5 en peso para la edad) (f) | Crecimiento: se manda a revisar el dato |
++| Más de 6 DE = dato improbable | Regla de limpieza de la OMS, simplificada a ±6 DE para los tres indicadores (la OMS usa límites algo distintos por indicador, por ejemplo -6/+5 en peso para la edad) (f). (plataforma) El parche 03 usa los límites de la OMS por indicador (-6/+6 talla, -6/+5 peso, -5/+5 perímetro cefálico y peso para la talla) y los expertos los cambian en la hoja Crecimiento | Crecimiento: se manda a revisar el dato |
+ | Edad corregida = edad − (40 − semanas de gestación) × 7 días | Convención clínica estándar | Los dos modelos |
+ | Desarrollo "bajo" = 10% inferior | Definición nuestra, relativa a los niños de entrenamiento (c) | Modelo clínico |
+ | Ventanas de cada visita | Nuestras, con márgenes alrededor de la edad de cada visita (a); quedan en la hoja Visitas del diccionario, donde los expertos las pueden cambiar | Los dos modelos |

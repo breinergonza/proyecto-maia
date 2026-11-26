@@ -1,7 +1,7 @@
 // Resumen (antes «Tablero» y «Resumen»): en escritorio cabe entero en la ventana. Las cifras van en una sola franja y los paneles
 // en dos columnas que llenan el resto del alto: las gráficas conservan su alto completo (dependiendo del de la ventana) y lo que
 // cede es la lista (la tabla de desenlaces y las alarmas recientes), que se desplaza por dentro con su encabezado fijo.
-// La validación técnica de los modelos no va aquí: está en Administración › Modelos.
+// La validación técnica de los modelos no va aquí: está en Evaluación de modelos.
 import { useQuery } from '@tanstack/react-query'
 import { useSyncExternalStore } from 'react'
 import { Link } from 'react-router'

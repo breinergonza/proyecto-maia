@@ -92,7 +92,7 @@ export function EstadoVacio({ estado, mensaje }: { estado: 'sin_artefactos' | 'p
   }
   return (
     <Vacio titulo="Este entrenamiento es anterior a la analítica">
-      <p>No se recalcula para no cambiar cifras ya conocidas. Para ver este análisis, vuelva a entrenar el modelo en Administración › Entrenamientos.</p>
+      <p>No se recalcula para no cambiar cifras ya conocidas. Para ver este análisis, vuelva a entrenar el modelo en Datos y modelos › Operación de modelos › Entrenar y aprobar modelos.</p>
       {puede(usuario, ['admin', 'datos']) && <p className="mt-2"><Link to="/admin/entrenamientos" className="font-semibold text-teal underline">Ir a Entrenamientos</Link></p>}
     </Vacio>
   )

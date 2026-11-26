@@ -26,8 +26,27 @@ escribió el código. Léalo antes de la primera instalación en el equipo con G
     como grupo e `iden_fechaparto` como fecha de nacimiento cuando la base las trae y no están restringidas.
     `iden_codigo` nunca se lee. Al cambiar `MAIA_USAR_SEDE_FECHA` hay que reentrenar el modelo de anomalías (los
     grupos son parte del modelo). Incluye `pruebas/test_decisiones_ab.py`.
+  * `05-diccionario-mostradas.patch`: `sevarti.diccionario.mostradas` entrega cada hoja del libro tal como la
+    muestra el Excel (la vista previa y los formularios del Diccionario en la web).
+  * `06-diccionario-reglas.patch`: `sevarti.diccionario.reglas` dice qué revisa la lectura de cada hoja además de
+    sus respuestas cerradas (columnas obligatorias, numéricas y de fecha), para que los formularios validen lo mismo.
+  * `07-diccionario-escalas.patch`: rechaza valores en la escala equivocada (una fracción donde va un porcentaje, un
+    z con el signo cambiado) con un mensaje que dice qué escribir.
+  * `08-alpha-produccion.patch`: el objetivo de falsas alertas de la capa 2 de anomalías pasa a 0,05 por dato (50 por
+    1.000), el valor de producción, como valor por defecto del núcleo.
+  * `09-anticipacion-desenlaces.patch` (D20): el mismo desenlace predicho desde las visitas anteriores a la que lo
+    registra; 21 filas «En prueba» con clave nueva (`sevarti/kmc.py`). Incluye `pruebas/test_anticipacion.py`.
+  * `10-usar-como-filtro.patch`: columna opcional «Usar como filtro» en la hoja «Variables» (por defecto «No»): la
+    variable se ofrece como filtro al armar una muestra. Incluye `pruebas/test_usar_como_filtro.py`.
+  * `11-filtro-en-el-esquema.patch`: lleva esa marca al esquema de SEVARTI (`sevarti/contrato.py`). Incluye
+    `pruebas/test_filtro_en_el_esquema.py`.
+  * `11-comparar-con-puntaje-z.patch` (D72): «Comparar con» acepta `z_<medida>`, el puntaje z de una medida de
+    crecimiento en uso en la visita del cálculo (`clinico/configuracion.py` y `clinico/modelo.py`).
+  * `12-readme-plataforma.patch`: el `README.md` de la copia dice en qué se aparta del original (marcas
+    «(plataforma)»: los parches, la semilla de D68, «Usar como filtro», `z_<medida>` y los límites de la OMS). Sin él,
+    `make sincronizar-nucleo` volvería a copiar el README de `insumo-datos` tal cual.
 * `nucleo/pyproject.toml` es nuevo (empaqueta el núcleo para el workspace de uv).
-* Con los cuatro parches, el núcleo pasa 191 pruebas (1 omitida).
+* Con los parches, el núcleo pasa 213 pruebas (1 omitida; `uv run pytest nucleo/pruebas`, 2026-11-25).
 * **`nucleo/` está atrasado frente a `insumo-datos`** (2026-10-28): allí ya hay `en_ventana`/`revisar` en
   `clinico/crecimiento.py` y `modelo.py`. Los parches 03 y 04 se generaron contra una copia fresca de `insumo-datos`
   y aplican limpio después de 01 y 02; falta correr `make sincronizar-nucleo` y revisar. Ese objetivo excluye
@@ -250,15 +269,17 @@ riesgo, suba `MAIA_DEMO_SUJETOS`.
 
 ## Pruebas
 
+Cantidades al 2026-11-25 (las de Python, pruebas recogidas con `pytest --collect-only`; el núcleo y el frontend,
+corridos completos). Las de Python con base de datos usan Postgres real: `MAIA_TEST_DATABASE_URL` o, vacía, un
+contenedor de testcontainers (Docker encendido).
+
 | Conjunto | Cantidad | Cómo |
 |---|---|---|
-| Núcleo | 191 (1 omitida) | `uv run pytest nucleo/pruebas` |
-| Común | 9 + 1 + 6 | Postgres real (`MAIA_TEST_DATABASE_URL`) y MinIO simulado (moto); buckets de otro usuario de MinIO; texto del correo de alerta; versiones del diccionario |
-| Extracción KMC | 26 | 18 unitarias y 8 contra un esquema `consumo` de prueba en Postgres real |
-| Administración de ejecuciones | 19 + 9 + 3 + 10 | cron, cifrado, hiperparámetros, cola y conexión (comun); programador con lanzador falso, incluidos los mensajes de los fallos conocidos y el diccionario; API con MLflow simulado |
-| CLI de entrenamiento | flujo completo | simular → entrenar → registrar → promover → exportar → corrida → silencio |
-| API | 11 + 3 + 6 | paquete firmado real, Postgres real, SMTP de prueba; riesgo alto por niño y sin métricas de la regla simple; errores de validación en español y 500 sin traza; diccionario |
-| Frontend | 33 | Vitest + Testing Library (5 de las páginas de administración, incluido entrenar ahora; 8 del glosario clínico y la guardia de términos técnicos; 2 del formulario de cálculo; 5 del diccionario) |
+| Núcleo | 213 (1 omitida) | `uv run pytest nucleo/pruebas` |
+| Común (`plataforma/comun/pruebas`) | 256 | MinIO simulado (moto); analítica, muestras y filtros, diccionario, cuotas, perfiles, notificaciones y correo, administración de ejecuciones (cron, cifrado, hiperparámetros, cola), predicción por grupos, cohorte simulada |
+| Entrenamiento (`plataforma/entrenamiento/pruebas`) | 81 | CLI completa (simular → entrenar → registrar → promover → exportar → corrida → silencio), extracción KMC contra un esquema `consumo` de prueba, programador con lanzador falso, anticipación e interpretabilidad |
+| API (`plataforma/api/pruebas`) | 235 | Paquete firmado real, SMTP de prueba, MLflow simulado, contrato OpenAPI; `test_api.py` solo pasa corrido completo (sus pruebas dependen del orden) |
+| Frontend (`plataforma/web`) | 539 en 48 archivos | Vitest + Testing Library (`npx vitest run`), incluida la guardia de lenguaje clínico (`lenguaje.test.tsx`) |
 
 
 ## Decisiones D1 a D54 del plan de implementación

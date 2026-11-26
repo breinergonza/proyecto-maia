@@ -1,5 +1,5 @@
 // Comparar: dos entrenamientos (con réplicas bootstrap, en Modelos), dos grupos de niños (Comparar grupos) y «Aprobar B»
-// (solo administración), que usa el mismo endpoint de aprobación que Administración › Entrenamientos.
+// (administración y experto en datos), que usa el mismo endpoint de aprobación que Entrenar y aprobar modelos.
 import { keepPreviousData, skipToken, useMutation, useQuery } from '@tanstack/react-query'
 import { pedir } from './cliente'
 import type { CuerpoExplorar, Ejecucion, Entrenamientos } from './tipos'

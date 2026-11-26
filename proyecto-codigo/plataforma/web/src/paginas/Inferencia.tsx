@@ -49,7 +49,7 @@ const quitarEdadGestacional = (f: FormularioCalculo): FormularioCalculo => ({
 /** Qué hacer cuando no hay un modelo activo: solo la administración puede activarlo. */
 function ActivarModelo({ admin }: { admin: boolean }) {
   return admin
-    ? <>Active uno en <Link className="font-semibold text-teal underline" to="/admin/modelos">Modelos</Link>.</>
+    ? <>Active uno en <Link className="font-semibold text-teal underline" to="/admin/modelos">Modelos disponibles</Link>.</>
     : <>Pídale a la administración que active un modelo.</>
 }
 

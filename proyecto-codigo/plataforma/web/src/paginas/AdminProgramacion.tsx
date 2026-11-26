@@ -49,10 +49,10 @@ export default function AdminProgramacion() {
     <div className="flex flex-col xl:h-full">
       <Encabezado titulo="Programar ejecuciones automáticas">
         Cada ejecución extrae la base de la entidad con los filtros indicados, revisa los datos y calcula los riesgos con
-        los modelos aprobados en <Link className="text-teal underline" to="/admin/entrenamientos">Entrenamientos</Link>.
+        los modelos aprobados en <Link className="text-teal underline" to="/admin/entrenamientos">Entrenar y aprobar modelos</Link>.
         Las programadas además entrenan los dos modelos (con los hiperparámetros de Configuración) y los dejan en MLflow
         como candidatos; <strong>Corrida ahora</strong> no entrena. Para recalcular sin extraer, use{' '}
-        <Link className="text-teal underline" to="/admin/corridas">Corridas</Link>.
+        <Link className="text-teal underline" to="/admin/corridas">Recalcular riesgos</Link>.
       </Encabezado>
       <Pestanas prefijo="programacion" etiqueta="Secciones de la programación" pestanas={pestanas} activa={activa} elegir={elegir} />
       <PanelesPestana prefijo="programacion" activa={activa} className="mt-3 flex min-h-0 flex-col gap-3 xl:flex-1" paneles={[

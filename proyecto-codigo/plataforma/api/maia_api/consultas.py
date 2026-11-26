@@ -26,7 +26,7 @@ def corrida_de(s: Session, corrida_id: int | None = None) -> Corrida:
     c = s.scalars(select(Corrida).where(Corrida.estado == 'ok').order_by(Corrida.id.desc())).first()
     if c is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND,
-                            'Todavía no hay resultados: ejecute una corrida (Administración > Corridas).')
+                            'Todavía no hay resultados: ejecute una corrida (Datos y modelos › Operación de modelos › Recalcular riesgos).')
     return c
 
 

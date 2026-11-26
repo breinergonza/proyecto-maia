@@ -195,7 +195,7 @@ def conectar(cfg: Configuracion | None = None) -> psycopg.Connection:
     """Conexión de solo lectura: ``default_transaction_read_only`` en la sesión y ``read_only`` en psycopg."""
     cfg = cfg or obtener()
     if not (cfg.kmc_host and cfg.kmc_usuario):
-        raise RuntimeError('Defina KMC_HOST y KMC_USUARIO (o guarde la conexión en Administración › Configuración).')
+        raise RuntimeError('Defina KMC_HOST y KMC_USUARIO (o guarde la conexión en Datos y modelos › Configuración).')
     if not cfg.kmc_pw:
         raise RuntimeError('Defina la variable de entorno KMC_PW con la clave de la base de la Fundación.')
     conn = psycopg.connect(host=cfg.kmc_host, port=cfg.kmc_port, dbname=cfg.kmc_db, user=cfg.kmc_usuario,
