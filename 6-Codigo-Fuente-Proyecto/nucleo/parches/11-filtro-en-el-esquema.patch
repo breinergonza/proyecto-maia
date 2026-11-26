@@ -1,0 +1,444 @@
+--- a/sevarti/contrato.py
++++ b/sevarti/contrato.py
+@@ -1,192 +1,194 @@
+-"""SEVARTI input contract for the anomaly model.
+-
+-The app hands the model six tables. Nothing downstream names a variable: every
+-decision comes from the schema, so experts add or remove variables by editing rows.
+-
+-* ``esquema``: one row per variable (type, unit, topic, role, stage, concept and rules), with
+-  optional ``categorias``: the label of each code of a categorical variable, for what people read.
+-* ``etapas``: follow-up stages as age windows, in corrected or chronological days, with an
+-  optional ``nombre``: the stage as people say it, for what the reports show.
+-* ``sujetos``: one row per subject (group, birth date or only its year, gestational age at birth).
+-* ``mediciones``: long format, one row per datum (subject, variable, raw value, date, age).
+-* ``episodios``: periods in days of life, with a start and an end (hospitalization...).
+-
+-A source that does not share exact birth dates sends the year (``anio_nacimiento``) and the
+-age of each datum as recorded; nothing here rebuilds the date from them.
+-* ``quiebres``: known changes in how data were recorded, with the date they started.
+-"""
+-from __future__ import annotations
+-
+-import json
+-from dataclasses import dataclass, replace
+-from pathlib import Path
+-
+-import numpy as np
+-import pandas as pd
+-
+-TIPOS = ('numeric', 'categorical', 'boolean', 'date', 'text')
+-ROLES = ('medicion', 'basal', 'contexto')  # measured in a stage / at or before birth / social environment
+-BASES = ('corregida', 'cronologica')
+-
+-ESQUEMA_DEFECTOS: dict[str, object] = dict(
+-    etiqueta=None, tema=None, unidad=None, rol='medicion', etapa=None, concepto=None,
+-    ventana=True,          # the datum is expected inside its stage window
+-    no_decreciente=False,  # cumulative measures (length, head circumference)
+-    tolerancia=0.0,        # allowed decrease, in the variable unit
+-    codigos_especiales='', # declared placeholder codes, separated by ';'
+-    categorias='',         # labels of categorical codes: 'code=label', separated by ';'
+-    rango_min=np.nan, rango_max=np.nan,  # declared range: informative only, never a filter
+-)
+-COLUMNAS = dict(
+-    esquema=('variable', 'tipo', *ESQUEMA_DEFECTOS),
+-    etapas=('etapa', 'orden', 'edad_min', 'edad_max', 'base'),  # + optional nombre
+-    sujetos=('sujeto', 'grupo', 'fecha_nacimiento', 'eg_semanas'),  # + optional anio_nacimiento
+-    mediciones=('sujeto', 'variable', 'valor', 'fecha', 'edad_dias'),
+-    episodios=('sujeto', 'tipo', 'edad_inicio', 'edad_fin'),  # days of life; a missing start is birth
+-    quiebres=('quiebre', 'fecha'),
+-)
+-
+-
+-def edad_corregida(edad_dias: pd.Series, eg_semanas: pd.Series) -> pd.Series:
+-    """Chronological age minus weeks of prematurity: 40 weeks of gestation is corrected age 0."""
+-    return edad_dias - (40 - eg_semanas) * 7
+-
+-
+-def nacimiento_referencia(sujetos: pd.DataFrame) -> pd.Series:
+-    """When each subject was born, as precisely as the source tells: the date, or the first day
+-    of the year when only the year is known. For ordering subjects in time and placing them
+-    against known breaks, never for computing ages."""
+-    fecha = pd.to_datetime(sujetos.fecha_nacimiento, errors='coerce')
+-    anio = pd.to_numeric(sujetos.get('anio_nacimiento'), errors='coerce') if 'anio_nacimiento' in sujetos \
+-        else pd.Series(np.nan, index=sujetos.index)
+-    del_anio = pd.to_datetime(anio.astype('Int64').astype(str) + '-01-01', errors='coerce')
+-    return fecha.fillna(del_anio)
+-
+-
+-def nombres_etapa(etapas: pd.DataFrame) -> dict[str, str]:
+-    """Each stage's readable name; the stage itself when the source does not give one."""
+-    nombres = etapas.nombre if 'nombre' in etapas else pd.Series(index=etapas.index, dtype=object)
+-    return {e: n if isinstance(n, str) and n else e for e, n in zip(etapas.etapa, nombres)}
+-
+-
+-def codigos_declarados(texto: object) -> tuple[float, ...]:
+-    if not isinstance(texto, str) or not texto.strip():
+-        return ()
+-    return tuple(float(c) for c in texto.split(';') if c.strip())
+-
+-
+-def etiquetas_categoria(esquema: pd.DataFrame) -> dict[str, dict[float, str]]:
+-    """Each categorical variable's code labels; variables without labels are left out."""
+-    salida: dict[str, dict[float, str]] = {}
+-    textos = esquema.categorias if 'categorias' in esquema else pd.Series('', index=esquema.index)
+-    for variable, texto in zip(esquema.variable, textos):
+-        pares = {}
+-        for parte in texto.split(';') if isinstance(texto, str) else ():
+-            codigo, _, etiqueta = parte.partition('=')
+-            try:
+-                pares[float(codigo)] = etiqueta.strip()
+-            except ValueError:
+-                continue
+-        if pares:
+-            salida[variable] = pares
+-    return salida
+-
+-
+-def normalizar_esquema(esquema: pd.DataFrame) -> pd.DataFrame:
+-    """Fill optional schema columns and reject a schema the model cannot read."""
+-    out = esquema.copy()
+-    for col, defecto in ESQUEMA_DEFECTOS.items():
+-        if col not in out:
+-            out[col] = defecto
+-        elif defecto is not None:
+-            out[col] = out[col].fillna(defecto)
+-    problemas = []
+-    if out.variable.duplicated().any():
+-        problemas.append(f'variables repetidas: {sorted(out.variable[out.variable.duplicated()])}')
+-    if not out.tipo.isin(TIPOS).all():
+-        problemas.append(f'tipos desconocidos: {sorted(set(out.tipo) - set(TIPOS))}')
+-    if not out.rol.isin(ROLES).all():
+-        problemas.append(f'roles desconocidos: {sorted(set(out.rol) - set(ROLES))}')
+-    if problemas:
+-        raise ValueError('El esquema no cumple el contrato SEVARTI: ' + '; '.join(problemas))
+-    out['ventana'] = out.ventana.astype(bool)
+-    out['no_decreciente'] = out.no_decreciente.astype(bool)
+-    return out[list(COLUMNAS['esquema'])].reset_index(drop=True)
+-
+-
+-@dataclass(frozen=True)
+-class Sevarti:
+-    esquema: pd.DataFrame
+-    etapas: pd.DataFrame
+-    sujetos: pd.DataFrame
+-    mediciones: pd.DataFrame
+-    episodios: pd.DataFrame
+-    quiebres: pd.DataFrame
+-    corte: pd.Timestamp | None = None  # extraction date: nothing can happen after it
+-
+-    def __post_init__(self) -> None:
+-        for tabla, columnas in COLUMNAS.items():
+-            faltan = [c for c in columnas if c not in getattr(self, tabla)] if tabla != 'esquema' else []
+-            if faltan:
+-                raise ValueError(f'La tabla {tabla} no tiene las columnas {faltan}')
+-        object.__setattr__(self, 'esquema', normalizar_esquema(self.esquema))
+-        if not self.mediciones.index.is_unique:  # every score points back to exactly one datum
+-            object.__setattr__(self, 'mediciones', self.mediciones.reset_index(drop=True))
+-        if not self.etapas.base.isin(BASES).all():
+-            raise ValueError(f'Las etapas solo pueden medirse en edad {BASES}')
+-        unknown_stage = set(self.esquema.etapa.dropna()) - set(self.etapas.etapa)
+-        if unknown_stage:
+-            raise ValueError(f'El esquema usa etapas que no están definidas: {sorted(unknown_stage)}')
+-
+-    def subconjunto(self, sujetos: pd.Index | pd.Series | list) -> Sevarti:
+-        keep = set(sujetos)
+-        return replace(
+-            self,
+-            sujetos=self.sujetos[self.sujetos.sujeto.isin(keep)],
+-            mediciones=self.mediciones[self.mediciones.sujeto.isin(keep)],
+-            episodios=self.episodios[self.episodios.sujeto.isin(keep)],
+-        )
+-
+-    def sin_variable(self, variable: str) -> Sevarti:
+-        return replace(self, esquema=self.esquema[self.esquema.variable != variable],
+-                       mediciones=self.mediciones[self.mediciones.variable != variable])
+-
+-    def con_variable(self, fila: dict[str, object], datos: pd.DataFrame) -> Sevarti:
+-        """A new variable is one schema row plus its data rows: no code changes."""
+-        esquema = pd.concat([self.esquema[self.esquema.variable != fila['variable']], pd.DataFrame([fila])],
+-                            ignore_index=True)
+-        mediciones = pd.concat([self.mediciones[self.mediciones.variable != fila['variable']], datos],
+-                               ignore_index=True)
+-        return replace(self, esquema=esquema, mediciones=mediciones)
+-
+-    def resumen(self) -> pd.DataFrame:
+-        """Aggregated size of each table, safe to show."""
+-        return pd.DataFrame({
+-            'filas': [len(self.esquema), len(self.etapas), len(self.sujetos), len(self.mediciones),
+-                      len(self.episodios), len(self.quiebres)],
+-        }, index=list(COLUMNAS))
+-
+-
+-# ---------------------------------------------------------------- file hand-off
+-# How the app delivers the data: one Parquet file per table plus ``corte.json``.
+-
+-def guardar(sev: Sevarti, carpeta: Path) -> Path:
+-    carpeta.mkdir(parents=True, exist_ok=True)
+-    for tabla in COLUMNAS:
+-        df = getattr(sev, tabla)
+-        if tabla == 'mediciones':  # raw values are mixed (numbers, codes, text): kept as text
+-            df = df.assign(valor=df.valor.map(lambda v: None if pd.isna(v) else str(v)))
+-        df.to_parquet(carpeta / f'{tabla}.parquet', index=False)
+-    corte = None if sev.corte is None else str(pd.Timestamp(sev.corte).date())
+-    (carpeta / 'corte.json').write_text(json.dumps({'corte': corte}), encoding='utf-8')
+-    return carpeta
+-
+-
+-def leer(carpeta: Path) -> Sevarti:
+-    faltan = [t for t in COLUMNAS if not (carpeta / f'{t}.parquet').exists()]
+-    if faltan:
+-        raise FileNotFoundError(f'En {carpeta} faltan las tablas SEVARTI: {faltan}')
+-    tablas = {t: pd.read_parquet(carpeta / f'{t}.parquet') for t in COLUMNAS}
+-    corte_json = carpeta / 'corte.json'
+-    corte = json.loads(corte_json.read_text(encoding='utf-8')).get('corte') if corte_json.exists() else None
+-    return Sevarti(**tablas, corte=None if corte is None else pd.Timestamp(corte))
++"""SEVARTI input contract for the anomaly model.
++
++The app hands the model six tables. Nothing downstream names a variable: every
++decision comes from the schema, so experts add or remove variables by editing rows.
++
++* ``esquema``: one row per variable (type, unit, topic, role, stage, concept and rules), with
++  optional ``categorias``: the label of each code of a categorical variable, for what people read.
++* ``etapas``: follow-up stages as age windows, in corrected or chronological days, with an
++  optional ``nombre``: the stage as people say it, for what the reports show.
++* ``sujetos``: one row per subject (group, birth date or only its year, gestational age at birth).
++* ``mediciones``: long format, one row per datum (subject, variable, raw value, date, age).
++* ``episodios``: periods in days of life, with a start and an end (hospitalization...).
++
++A source that does not share exact birth dates sends the year (``anio_nacimiento``) and the
++age of each datum as recorded; nothing here rebuilds the date from them.
++* ``quiebres``: known changes in how data were recorded, with the date they started.
++"""
++from __future__ import annotations
++
++import json
++from dataclasses import dataclass, replace
++from pathlib import Path
++
++import numpy as np
++import pandas as pd
++
++TIPOS = ('numeric', 'categorical', 'boolean', 'date', 'text')
++ROLES = ('medicion', 'basal', 'contexto')  # measured in a stage / at or before birth / social environment
++BASES = ('corregida', 'cronologica')
++
++ESQUEMA_DEFECTOS: dict[str, object] = dict(
++    etiqueta=None, tema=None, unidad=None, rol='medicion', etapa=None, concepto=None,
++    ventana=True,          # the datum is expected inside its stage window
++    no_decreciente=False,  # cumulative measures (length, head circumference)
++    tolerancia=0.0,        # allowed decrease, in the variable unit
++    codigos_especiales='', # declared placeholder codes, separated by ';'
++    categorias='',         # labels of categorical codes: 'code=label', separated by ';'
++    rango_min=np.nan, rango_max=np.nan,  # declared range: informative only, never a filter
++    usar_como_filtro=False,  # the experts offer it as a filter when a sample is built (dictionary column)
++)
++COLUMNAS = dict(
++    esquema=('variable', 'tipo', *ESQUEMA_DEFECTOS),
++    etapas=('etapa', 'orden', 'edad_min', 'edad_max', 'base'),  # + optional nombre
++    sujetos=('sujeto', 'grupo', 'fecha_nacimiento', 'eg_semanas'),  # + optional anio_nacimiento
++    mediciones=('sujeto', 'variable', 'valor', 'fecha', 'edad_dias'),
++    episodios=('sujeto', 'tipo', 'edad_inicio', 'edad_fin'),  # days of life; a missing start is birth
++    quiebres=('quiebre', 'fecha'),
++)
++
++
++def edad_corregida(edad_dias: pd.Series, eg_semanas: pd.Series) -> pd.Series:
++    """Chronological age minus weeks of prematurity: 40 weeks of gestation is corrected age 0."""
++    return edad_dias - (40 - eg_semanas) * 7
++
++
++def nacimiento_referencia(sujetos: pd.DataFrame) -> pd.Series:
++    """When each subject was born, as precisely as the source tells: the date, or the first day
++    of the year when only the year is known. For ordering subjects in time and placing them
++    against known breaks, never for computing ages."""
++    fecha = pd.to_datetime(sujetos.fecha_nacimiento, errors='coerce')
++    anio = pd.to_numeric(sujetos.get('anio_nacimiento'), errors='coerce') if 'anio_nacimiento' in sujetos \
++        else pd.Series(np.nan, index=sujetos.index)
++    del_anio = pd.to_datetime(anio.astype('Int64').astype(str) + '-01-01', errors='coerce')
++    return fecha.fillna(del_anio)
++
++
++def nombres_etapa(etapas: pd.DataFrame) -> dict[str, str]:
++    """Each stage's readable name; the stage itself when the source does not give one."""
++    nombres = etapas.nombre if 'nombre' in etapas else pd.Series(index=etapas.index, dtype=object)
++    return {e: n if isinstance(n, str) and n else e for e, n in zip(etapas.etapa, nombres)}
++
++
++def codigos_declarados(texto: object) -> tuple[float, ...]:
++    if not isinstance(texto, str) or not texto.strip():
++        return ()
++    return tuple(float(c) for c in texto.split(';') if c.strip())
++
++
++def etiquetas_categoria(esquema: pd.DataFrame) -> dict[str, dict[float, str]]:
++    """Each categorical variable's code labels; variables without labels are left out."""
++    salida: dict[str, dict[float, str]] = {}
++    textos = esquema.categorias if 'categorias' in esquema else pd.Series('', index=esquema.index)
++    for variable, texto in zip(esquema.variable, textos):
++        pares = {}
++        for parte in texto.split(';') if isinstance(texto, str) else ():
++            codigo, _, etiqueta = parte.partition('=')
++            try:
++                pares[float(codigo)] = etiqueta.strip()
++            except ValueError:
++                continue
++        if pares:
++            salida[variable] = pares
++    return salida
++
++
++def normalizar_esquema(esquema: pd.DataFrame) -> pd.DataFrame:
++    """Fill optional schema columns and reject a schema the model cannot read."""
++    out = esquema.copy()
++    for col, defecto in ESQUEMA_DEFECTOS.items():
++        if col not in out:
++            out[col] = defecto
++        elif defecto is not None:
++            out[col] = out[col].fillna(defecto)
++    problemas = []
++    if out.variable.duplicated().any():
++        problemas.append(f'variables repetidas: {sorted(out.variable[out.variable.duplicated()])}')
++    if not out.tipo.isin(TIPOS).all():
++        problemas.append(f'tipos desconocidos: {sorted(set(out.tipo) - set(TIPOS))}')
++    if not out.rol.isin(ROLES).all():
++        problemas.append(f'roles desconocidos: {sorted(set(out.rol) - set(ROLES))}')
++    if problemas:
++        raise ValueError('El esquema no cumple el contrato SEVARTI: ' + '; '.join(problemas))
++    out['ventana'] = out.ventana.astype(bool)
++    out['no_decreciente'] = out.no_decreciente.astype(bool)
++    out['usar_como_filtro'] = out.usar_como_filtro.astype(bool)
++    return out[list(COLUMNAS['esquema'])].reset_index(drop=True)
++
++
++@dataclass(frozen=True)
++class Sevarti:
++    esquema: pd.DataFrame
++    etapas: pd.DataFrame
++    sujetos: pd.DataFrame
++    mediciones: pd.DataFrame
++    episodios: pd.DataFrame
++    quiebres: pd.DataFrame
++    corte: pd.Timestamp | None = None  # extraction date: nothing can happen after it
++
++    def __post_init__(self) -> None:
++        for tabla, columnas in COLUMNAS.items():
++            faltan = [c for c in columnas if c not in getattr(self, tabla)] if tabla != 'esquema' else []
++            if faltan:
++                raise ValueError(f'La tabla {tabla} no tiene las columnas {faltan}')
++        object.__setattr__(self, 'esquema', normalizar_esquema(self.esquema))
++        if not self.mediciones.index.is_unique:  # every score points back to exactly one datum
++            object.__setattr__(self, 'mediciones', self.mediciones.reset_index(drop=True))
++        if not self.etapas.base.isin(BASES).all():
++            raise ValueError(f'Las etapas solo pueden medirse en edad {BASES}')
++        unknown_stage = set(self.esquema.etapa.dropna()) - set(self.etapas.etapa)
++        if unknown_stage:
++            raise ValueError(f'El esquema usa etapas que no están definidas: {sorted(unknown_stage)}')
++
++    def subconjunto(self, sujetos: pd.Index | pd.Series | list) -> Sevarti:
++        keep = set(sujetos)
++        return replace(
++            self,
++            sujetos=self.sujetos[self.sujetos.sujeto.isin(keep)],
++            mediciones=self.mediciones[self.mediciones.sujeto.isin(keep)],
++            episodios=self.episodios[self.episodios.sujeto.isin(keep)],
++        )
++
++    def sin_variable(self, variable: str) -> Sevarti:
++        return replace(self, esquema=self.esquema[self.esquema.variable != variable],
++                       mediciones=self.mediciones[self.mediciones.variable != variable])
++
++    def con_variable(self, fila: dict[str, object], datos: pd.DataFrame) -> Sevarti:
++        """A new variable is one schema row plus its data rows: no code changes."""
++        esquema = pd.concat([self.esquema[self.esquema.variable != fila['variable']], pd.DataFrame([fila])],
++                            ignore_index=True)
++        mediciones = pd.concat([self.mediciones[self.mediciones.variable != fila['variable']], datos],
++                               ignore_index=True)
++        return replace(self, esquema=esquema, mediciones=mediciones)
++
++    def resumen(self) -> pd.DataFrame:
++        """Aggregated size of each table, safe to show."""
++        return pd.DataFrame({
++            'filas': [len(self.esquema), len(self.etapas), len(self.sujetos), len(self.mediciones),
++                      len(self.episodios), len(self.quiebres)],
++        }, index=list(COLUMNAS))
++
++
++# ---------------------------------------------------------------- file hand-off
++# How the app delivers the data: one Parquet file per table plus ``corte.json``.
++
++def guardar(sev: Sevarti, carpeta: Path) -> Path:
++    carpeta.mkdir(parents=True, exist_ok=True)
++    for tabla in COLUMNAS:
++        df = getattr(sev, tabla)
++        if tabla == 'mediciones':  # raw values are mixed (numbers, codes, text): kept as text
++            df = df.assign(valor=df.valor.map(lambda v: None if pd.isna(v) else str(v)))
++        df.to_parquet(carpeta / f'{tabla}.parquet', index=False)
++    corte = None if sev.corte is None else str(pd.Timestamp(sev.corte).date())
++    (carpeta / 'corte.json').write_text(json.dumps({'corte': corte}), encoding='utf-8')
++    return carpeta
++
++
++def leer(carpeta: Path) -> Sevarti:
++    faltan = [t for t in COLUMNAS if not (carpeta / f'{t}.parquet').exists()]
++    if faltan:
++        raise FileNotFoundError(f'En {carpeta} faltan las tablas SEVARTI: {faltan}')
++    tablas = {t: pd.read_parquet(carpeta / f'{t}.parquet') for t in COLUMNAS}
++    corte_json = carpeta / 'corte.json'
++    corte = json.loads(corte_json.read_text(encoding='utf-8')).get('corte') if corte_json.exists() else None
++    return Sevarti(**tablas, corte=None if corte is None else pd.Timestamp(corte))
+--- a/pruebas/test_diccionario.py
++++ b/pruebas/test_diccionario.py
+@@ -51,7 +51,9 @@
+ # ---------------------------------------------------------------- the draft
+ 
+ def test_el_borrador_reproduce_el_esquema_de_las_reglas(meta, borrador):
+-    pd.testing.assert_frame_equal(D.esquema(borrador), SV.normalizar_esquema(K.esquema_sevarti(meta)))
++    # the draft only adds the "Usar como filtro" marks (they are not part of what the rules produced)
++    pd.testing.assert_frame_equal(D.esquema(borrador).drop(columns='usar_como_filtro'),
++                                  SV.normalizar_esquema(K.esquema_sevarti(meta)).drop(columns='usar_como_filtro'))
+     assert (borrador.variables.estado == D.LISTA).all()
+ 
+ 
+@@ -60,7 +62,10 @@
+     on the same simulated base."""
+     nuevo, esperado = SV.leer(SV.guardar(sev, tmp_path / 'nuevo')), SV.leer(CARPETA / 'esperado_kmc')
+     for tabla in SV.COLUMNAS:
+-        pd.testing.assert_frame_equal(getattr(nuevo, tabla), getattr(esperado, tabla), obj=tabla)
++        a, b = getattr(nuevo, tabla), getattr(esperado, tabla)
++        if tabla == 'esquema':   # the files of before have no "Usar como filtro" marks
++            a, b = a.drop(columns='usar_como_filtro'), b.drop(columns='usar_como_filtro')
++        pd.testing.assert_frame_equal(a, b, obj=tabla)
+     assert nuevo.corte == esperado.corte
+ 
+ 
+@@ -321,7 +326,8 @@
+     ruta = tmp_path / 'entradas' / 'diccionario.xlsx'
+     sev = K.cargar_sevarti(ruta)
+     assert ruta.exists() and 'se creó' in capsys.readouterr().out
+-    pd.testing.assert_frame_equal(sev.esquema, SV.leer(CARPETA / 'esperado_kmc').esquema)
++    pd.testing.assert_frame_equal(sev.esquema.drop(columns='usar_como_filtro'),
++                                  SV.leer(CARPETA / 'esperado_kmc').esquema.drop(columns='usar_como_filtro'))
+     assert (D.leer(ruta).variables.estado == D.LISTA).all()
+ 
+ 
+--- a/pruebas/test_filtro_en_el_esquema.py
++++ b/pruebas/test_filtro_en_el_esquema.py
+@@ -0,0 +1,17 @@
++"""The "Usar como filtro" mark travels from the dictionary into the SEVARTI schema, and a schema made before the column
++reads as "no variable marked" (the platform then offers the filters it always did)."""
++from sevarti import contrato as SV
++from sevarti import diccionario as D
++from sevarti import kmc as K
++
++
++def test_la_marca_del_diccionario_llega_al_esquema(meta):
++    esquema = D.esquema(K.borrador(meta))
++    assert 'usar_como_filtro' in esquema and esquema.usar_como_filtro.dtype == bool
++    assert set(esquema.variable[esquema.usar_como_filtro]) == set(K.FILTROS_POR_DEFECTO)
++
++
++def test_un_esquema_anterior_a_la_columna_se_lee_sin_marcas(meta):
++    anterior = D.esquema(K.borrador(meta)).drop(columns='usar_como_filtro')
++    leido = SV.normalizar_esquema(anterior)
++    assert not leido.usar_como_filtro.any() and leido.usar_como_filtro.dtype == bool

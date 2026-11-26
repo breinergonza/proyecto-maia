@@ -1,0 +1,102 @@
+--- a/pruebas/conftest.py
++++ b/pruebas/conftest.py
+@@ -13,12 +13,10 @@
+ from anomalias import modelo as MA  # noqa: E402
+ from archivos import carpetas as CA  # noqa: E402
+ from archivos.carpetas import Carpetas  # noqa: E402
+-from clinico import crecimiento as CR  # noqa: E402
+ from clinico import modelo as AC  # noqa: E402
++from datos_nucleo import CFG, CONFIG_RAPIDA  # noqa: E402
+ 
+-CONFIG_RAPIDA = MA.Config(rondas=80)
+ 
+-
+ @pytest.fixture
+ def proyecto(tmp_path, monkeypatch):
+     """The project folder of the command line tools, in a temporary place."""
+@@ -69,25 +67,6 @@
+ 
+ # ------------------------------------------------------------ clinical fixtures
+ 
+-REGLA_SIMPLE = ('eg_semanas', 'peso_nacer')
+-CFG = AC.ConfigClinica(
+-    desenlaces=(
+-        AC.Desenlace('readm', 'readmisión antes de los 3 meses', '40 sem', 'mayor_que_cero', 'readm_3m',
+-                     comparar=REGLA_SIMPLE),
+-        AC.Desenlace('no_vuelve', 'no vuelve a los 3 meses', '40 sem', 'no_vuelve', comparar=REGLA_SIMPLE),
+-        AC.Desenlace('oxigeno', 'oxígeno a los 3 meses', '40 sem', 'en_codigos', 'oxigeno_3m', codigos=(1.0,),
+-                     comparar=REGLA_SIMPLE),
+-        AC.Desenlace('desarrollo', 'desarrollo bajo a los 6 meses', '3 m EC', 'percentil_bajo', 'desarrollo_6m',
+-                     comparar=REGLA_SIMPLE),
+-    ),
+-    sexo='sexo', codigos_sexo=(('M', 1), ('F', 2)),
+-    medidas=(CR.Medida('peso', 'peso', factor=0.001, restringido=True), CR.Medida('talla', 'talla'),
+-             CR.Medida('perimetro_cefalico', 'perimetro_cefalico')),
+-    etapas_crecimiento=('40 sem', '3 m EC', '6 m EC', '12 m EC'),
+-    rondas=150, min_casos=20,
+-)
+-
+-
+ def _con_desenlaces(sev):
+     """Outcomes with a known cause on top of the simulated cohort: readmission depends on the
+     household income and oxygen on the days in ICU (both known at 40 weeks, neither in the
+--- a/pruebas/test_alertas.py
++++ b/pruebas/test_alertas.py
+@@ -13,7 +13,7 @@
+ from sevarti import contrato as SV
+ from sevarti import diccionario as D
+ from sevarti import kmc as K
+-from conftest import CFG
++from datos_nucleo import CFG
+ 
+ 
+ # ------------------------------------------------------------------ growth
+--- a/pruebas/test_operacion.py
++++ b/pruebas/test_operacion.py
+@@ -11,7 +11,7 @@
+ from anomalias import operacion as OP
+ from archivos import libros as LB
+ from sevarti import contrato as SV
+-from conftest import CONFIG_RAPIDA
++from datos_nucleo import CONFIG_RAPIDA
+ 
+ 
+ def test_modelo_guardado_puntua_igual_y_trae_su_ficha(modelo, particion, puntuado, tmp_path):
+--- a/pruebas/datos_nucleo.py
++++ b/pruebas/datos_nucleo.py
+@@ -0,0 +1,35 @@
++"""Constantes compartidas por las pruebas de nucleo.
++
++Viven en un módulo de nombre único (y no en conftest.py) porque con varios conftest.py en la misma
++sesión de pytest el nombre ``conftest`` apunta al último cargado y ``from conftest import ...`` falla.
++"""
++import sys
++from pathlib import Path
++
++sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # los paquetes se importan desde la carpeta del proyecto
++
++from anomalias import modelo as MA  # noqa: E402
++from clinico import crecimiento as CR  # noqa: E402
++from clinico import modelo as AC  # noqa: E402
++
++CONFIG_RAPIDA = MA.Config(rondas=80)
++
++# ------------------------------------------------------------ configuración clínica
++
++REGLA_SIMPLE = ('eg_semanas', 'peso_nacer')
++CFG = AC.ConfigClinica(
++    desenlaces=(
++        AC.Desenlace('readm', 'readmisión antes de los 3 meses', '40 sem', 'mayor_que_cero', 'readm_3m',
++                     comparar=REGLA_SIMPLE),
++        AC.Desenlace('no_vuelve', 'no vuelve a los 3 meses', '40 sem', 'no_vuelve', comparar=REGLA_SIMPLE),
++        AC.Desenlace('oxigeno', 'oxígeno a los 3 meses', '40 sem', 'en_codigos', 'oxigeno_3m', codigos=(1.0,),
++                     comparar=REGLA_SIMPLE),
++        AC.Desenlace('desarrollo', 'desarrollo bajo a los 6 meses', '3 m EC', 'percentil_bajo', 'desarrollo_6m',
++                     comparar=REGLA_SIMPLE),
++    ),
++    sexo='sexo', codigos_sexo=(('M', 1), ('F', 2)),
++    medidas=(CR.Medida('peso', 'peso', factor=0.001, restringido=True), CR.Medida('talla', 'talla'),
++             CR.Medida('perimetro_cefalico', 'perimetro_cefalico')),
++    etapas_crecimiento=('40 sem', '3 m EC', '6 m EC', '12 m EC'),
++    rondas=150, min_casos=20,
++)
