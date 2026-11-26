@@ -1,0 +1,138 @@
+{
+  "version": "9eea708fbf",
+  "version_codigo": "4",
+  "entrenado": "2026-11-23T13:29:50",
+  "corte_datos": "2026-07-24",
+  "sujetos": 62043,
+  "datos": 13094438,
+  "variables_esquema": 318,
+  "modelos_capa2": 132,
+  "omitidas_capa2": {},
+  "config": {
+    "z_alerta": 3.5,
+    "z_entrenamiento": 6.0,
+    "recorte": 0.01,
+    "z_recorte": 3.5,
+    "min_sujetos": 200,
+    "min_valores_ref": 20,
+    "frecuente": 0.01,
+    "ceros": 0.3,
+    "alpha": 0.05,
+    "cuantiles": [
+      0.25,
+      0.5,
+      0.75
+    ],
+    "min_nivel": 20,
+    "max_niveles": 64,
+    "rondas": 300,
+    "tasa": 0.08,
+    "hojas": 31,
+    "min_hoja": 40,
+    "semilla": 7,
+    "dispositivo": "cuda",
+    "hilos": 8,
+    "periodo": "Q",
+    "base_periodos": 8,
+    "min_n_grupo": 30,
+    "efecto_proporcion": 0.1,
+    "cusum_h": 8.0
+  },
+  "validacion": {
+    "sujetos": {
+      "entrenamiento": 40711,
+      "calibración": 7330,
+      "prueba": 8955
+    },
+    "recall_pct": {
+      "unidad": {
+        "1. Valor": 68.1,
+        "2. Contexto": 88.4,
+        "3. Trayectoria": 2.3,
+        "cualquiera": 91.6,
+        "rango del diccionario": 56.1
+      },
+      "código": {
+        "1. Valor": 97.6,
+        "2. Contexto": 93.9,
+        "3. Trayectoria": 11.4,
+        "cualquiera": 99.3,
+        "rango del diccionario": 97.3
+      },
+      "dígitos": {
+        "1. Valor": 56.8,
+        "2. Contexto": 83.0,
+        "3. Trayectoria": 22.8,
+        "cualquiera": 84.2,
+        "rango del diccionario": 42.4
+      },
+      "desvío de 3 DE": {
+        "1. Valor": 28.6,
+        "2. Contexto": 87.9,
+        "3. Trayectoria": 15.8,
+        "cualquiera": 90.1,
+        "rango del diccionario": 24.9
+      },
+      "valor de otro sujeto": {
+        "1. Valor": 0.6,
+        "2. Contexto": 50.9,
+        "3. Trayectoria": 5.5,
+        "cualquiera": 53.3,
+        "rango del diccionario": 1.0
+      },
+      "etapas intercambiadas": {
+        "1. Valor": 35.3,
+        "2. Contexto": 66.7,
+        "3. Trayectoria": 62.8,
+        "cualquiera": 76.8,
+        "rango del diccionario": 5.9
+      }
+    },
+    "alertas_por_1000_limpios": {
+      "1. Valor": 4.4,
+      "2. Contexto": 56.32,
+      "3. Trayectoria": 7.17,
+      "cualquiera": 64.84,
+      "rango del diccionario": 14.71
+    },
+    "alertas_por_1000_prueba": {
+      "1. Valor": 5.82,
+      "2. Contexto": 59.42,
+      "3. Trayectoria": 6.81,
+      "cualquiera": 67.38
+    },
+    "curva_alpha": {
+      "0.001": {
+        "capa 2 por 1.000 limpios": 4.91,
+        "total por 1.000 limpios": 15.19,
+        "errores encontrados (%)": 72.94
+      },
+      "0.002": {
+        "capa 2 por 1.000 limpios": 5.77,
+        "total por 1.000 limpios": 15.93,
+        "errores encontrados (%)": 73.83
+      },
+      "0.005": {
+        "capa 2 por 1.000 limpios": 8.99,
+        "total por 1.000 limpios": 18.89,
+        "errores encontrados (%)": 75.58
+      },
+      "0.01": {
+        "capa 2 por 1.000 limpios": 14.01,
+        "total por 1.000 limpios": 23.59,
+        "errores encontrados (%)": 77.35
+      },
+      "0.02": {
+        "capa 2 por 1.000 limpios": 23.89,
+        "total por 1.000 limpios": 33.07,
+        "errores encontrados (%)": 79.64
+      },
+      "0.05": {
+        "capa 2 por 1.000 limpios": 56.32,
+        "total por 1.000 limpios": 64.84,
+        "errores encontrados (%)": 83.58
+      }
+    },
+    "minutos_ajuste": 10.0
+  }
+}

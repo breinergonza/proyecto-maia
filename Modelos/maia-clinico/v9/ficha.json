@@ -1,0 +1,241 @@
+{
+  "version": "c299096a71",
+  "version_codigo": "4",
+  "entrenado": "2026-11-23T13:32:22",
+  "corte_datos": "2026-07-24",
+  "sujetos": 62043,
+  "config": {
+    "desenlaces": [
+      {
+        "clave": "desarrollo_12m",
+        "nombre": "desarrollo psicomotor bajo a los 12 meses",
+        "momento": "6 m EC",
+        "regla": "percentil_bajo",
+        "variable": "v430b",
+        "codigos": [],
+        "negativos": [],
+        "percentil": 0.1,
+        "solo_desde": null,
+        "concepto": null,
+        "etapa": null,
+        "comparar": [
+          "eg_semanas",
+          "ern_peso",
+          "v196a"
+        ]
+      },
+      {
+        "clave": "talla_baja_12m_desde_40",
+        "nombre": "talla baja para la edad a los 12 meses (riesgo calculado a 40 sem)",
+        "momento": "40 sem",
+        "regla": "z_bajo",
+        "variable": null,
+        "codigos": [],
+        "negativos": [],
+        "percentil": 0.1,
+        "solo_desde": null,
+        "concepto": "talla",
+        "etapa": "12 m EC",
+        "comparar": [
+          "eg_semanas",
+          "ern_peso",
+          "v196a"
+        ]
+      },
+      {
+        "clave": "talla_baja_12m_desde_3",
+        "nombre": "talla baja para la edad a los 12 meses (riesgo calculado a 3 m EC)",
+        "momento": "3 m EC",
+        "regla": "z_bajo",
+        "variable": null,
+        "codigos": [],
+        "negativos": [],
+        "percentil": 0.1,
+        "solo_desde": null,
+        "concepto": "talla",
+        "etapa": "12 m EC",
+        "comparar": [
+          "eg_semanas",
+          "ern_peso",
+          "v196a"
+        ]
+      },
+      {
+        "clave": "talla_baja_12m_desde_6",
+        "nombre": "talla baja para la edad a los 12 meses (riesgo calculado a 6 m EC)",
+        "momento": "6 m EC",
+        "regla": "z_bajo",
+        "variable": null,
+        "codigos": [],
+        "negativos": [],
+        "percentil": 0.1,
+        "solo_desde": null,
+        "concepto": "talla",
+        "etapa": "12 m EC",
+        "comparar": [
+          "eg_semanas",
+          "ern_peso",
+          "v196a"
+        ]
+      },
+      {
+        "clave": "talla_baja_12m_desde_9",
+        "nombre": "talla baja para la edad a los 12 meses (riesgo calculado a 9 m EC)",
+        "momento": "9 m EC",
+        "regla": "z_bajo",
+        "variable": null,
+        "codigos": [],
+        "negativos": [],
+        "percentil": 0.1,
+        "solo_desde": null,
+        "concepto": "talla",
+        "etapa": "12 m EC",
+        "comparar": [
+          "eg_semanas",
+          "ern_peso",
+          "v196a"
+        ]
+      }
+    ],
+    "sexo": "ern_sexo",
+    "codigos_sexo": [
+      [
+        "1",
+        1
+      ],
+      [
+        "2",
+        2
+      ]
+    ],
+    "medidas": [
+      {
+        "concepto": "peso",
+        "indicador": "peso",
+        "factor": 0.001,
+        "restringido": true,
+        "por_talla": null,
+        "z_bajo": -2.0,
+        "caida": 1.0,
+        "z_improbable_min": null,
+        "z_improbable_max": null
+      },
+      {
+        "concepto": "talla",
+        "indicador": "talla",
+        "factor": 1.0,
+        "restringido": false,
+        "por_talla": null,
+        "z_bajo": -2.0,
+        "caida": 1.0,
+        "z_improbable_min": null,
+        "z_improbable_max": null
+      },
+      {
+        "concepto": "perimetro_cefalico",
+        "indicador": "perimetro_cefalico",
+        "factor": 1.0,
+        "restringido": false,
+        "por_talla": null,
+        "z_bajo": -2.0,
+        "caida": 1.0,
+        "z_improbable_min": null,
+        "z_improbable_max": null
+      }
+    ],
+    "etapas_crecimiento": [
+      "40 sem",
+      "3 m EC",
+      "6 m EC",
+      "9 m EC",
+      "12 m EC"
+    ],
+    "descartados": [],
+    "rondas": 600,
+    "tasa": 0.05,
+    "hojas": 31,
+    "min_hoja": 50,
+    "hilos": 8,
+    "semilla": 11,
+    "dispositivo": "cuda",
+    "min_casos": 30,
+    "dias_recientes": 90,
+    "fraccion_calibracion": 0.15,
+    "fraccion_alta": 0.1
+  },
+  "calibrado_con": {
+    "desarrollo_12m": "nacidos de 2023 a 2025",
+    "talla_baja_12m_desde_40": "nacidos de 2023 a 2025",
+    "talla_baja_12m_desde_3": "nacidos de 2023 a 2025",
+    "talla_baja_12m_desde_6": "nacidos de 2023 a 2025",
+    "talla_baja_12m_desde_9": "nacidos de 2023 a 2025"
+  },
+  "omitidos": {},
+  "variables_tardias": [
+    "ec_3m",
+    "ec_9m",
+    "v301d"
+  ],
+  "validacion": {
+    "desarrollo psicomotor bajo a los 12 meses": {
+      "momento": "6 m EC",
+      "niños": 2343,
+      "casos": 109,
+      "% casos": 4.652,
+      "AUC": 0.77,
+      "AUC regla simple": 0.621,
+      "precisión promedio": 0.208,
+      "casos en el riesgo más alto (%)": 42.202,
+      "del riesgo más alto, con el evento (%)": 19.658,
+      "casos en el riesgo más alto, regla simple (%)": 27.523
+    },
+    "talla baja para la edad a los 12 meses (riesgo calculado a 40 sem)": {
+      "momento": "40 sem",
+      "niños": 2072,
+      "casos": 365,
+      "% casos": 17.616,
+      "AUC": 0.79,
+      "AUC regla simple": 0.61,
+      "precisión promedio": 0.429,
+      "casos en el riesgo más alto (%)": 29.863,
+      "del riesgo más alto, con el evento (%)": 52.657,
+      "casos en el riesgo más alto, regla simple (%)": 15.89
+    },
+    "talla baja para la edad a los 12 meses (riesgo calculado a 3 m EC)": {
+      "momento": "3 m EC",
+      "niños": 2625,
+      "casos": 510,
+      "% casos": 19.429,
+      "AUC": 0.858,
+      "AUC regla simple": 0.602,
+      "precisión promedio": 0.596,
+      "casos en el riesgo más alto (%)": 36.275,
+      "del riesgo más alto, con el evento (%)": 70.611,
+      "casos en el riesgo más alto, regla simple (%)": 15.882
+    },
+    "talla baja para la edad a los 12 meses (riesgo calculado a 6 m EC)": {
+      "momento": "6 m EC",
+      "niños": 2420,
+      "casos": 461,
+      "% casos": 19.05,
+      "AUC": 0.905,
+      "AUC regla simple": 0.59,
+      "precisión promedio": 0.732,
+      "casos en el riesgo más alto (%)": 42.516,
+      "del riesgo más alto, con el evento (%)": 80.992,
+      "casos en el riesgo más alto, regla simple (%)": 13.232
+    },
+    "talla baja para la edad a los 12 meses (riesgo calculado a 9 m EC)": {
+      "momento": "9 m EC",
+      "niños": 2210,
+      "casos": 417,
+      "% casos": 18.869,
+      "AUC": 0.928,
+      "AUC regla simple": 0.603,
+      "precisión promedio": 0.797,
+      "casos en el riesgo más alto (%)": 46.763,
+      "del riesgo más alto, con el evento (%)": 88.235,
+      "casos en el riesgo más alto, regla simple (%)": 13.909
+    }
+  }
+}

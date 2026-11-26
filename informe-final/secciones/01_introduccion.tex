@@ -1,0 +1,8 @@
+\section{Introducción}
+\label{sec:introduccion}
+
+El Método Madre Canguro (MMC) acompaña a los niños prematuros y de bajo peso durante sus primeros meses de vida. En ese seguimiento se revisan el crecimiento, los antecedentes clínicos y la asistencia a los controles para reconocer posibles dificultades \cite{r1,r2,r3}. Sin embargo, trabajar con registros reunidos durante varios años plantea problemas: hay datos faltantes, cambios de unidades, errores de captura y modificaciones en la forma de registrar la información. Si no se revisan, estos problemas también afectan a los modelos que se entrenan con esos datos.
+
+Para este trabajo utilizamos una cohorte del Observatorio Canguro con 62.043 niños, 13.884.056 mediciones y 339 variables catalogadas; 318 estaban en uso según el diccionario del corte del 24 de julio de 2026 \cite{r4}. Aunque la cifra total es amplia, no todos los niños tienen información suficiente para cada análisis. Por eso, el número de casos que entra en entrenamiento o evaluación cambia según el desenlace y la visita disponible.
+
+Nos planteamos si, al revisar primero la calidad del registro y después analizar la información reunida hasta cada visita, podríamos anticipar talla baja y desarrollo psicomotor bajo a los 12 meses EC mejor que con una referencia clínica sencilla. Diseñamos KMCPred como una herramienta de apoyo: muestra estimaciones y explicaciones para facilitar la revisión por profesionales, pero no realiza diagnósticos ni recomienda tratamientos por cuenta propia. Antes de utilizarla en la atención real se necesita validación externa.

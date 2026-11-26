@@ -1,0 +1,28 @@
+\section{Discusión}
+\label{sec:discusion}
+
+\subsection{Interpretación clínica y contraste con trabajos relacionados}
+\label{sec:5.1}
+
+Los trabajos revisados sobre crecimiento en programas canguro \cite{r5,r7} nos llevaron a prestar atención a la trayectoria entre visitas, en lugar de depender de una sola medida. Los estudios sobre neurodesarrollo \cite{r8,r9,r10} también respaldan el uso de información temprana, aunque no permiten comparar directamente sus resultados con los nuestros. Lo que consideramos más valioso de KMCPred es haber reunido la revisión del dato, la predicción por visita y la consulta de resultados en una misma herramienta.
+
+\subsection{Arquitectura, pruebas y reproducibilidad}
+\label{sec:5.2}
+
+Para que otra persona pueda reproducir un resultado, necesitamos saber qué datos, versión del diccionario, modelo y parámetros se utilizaron. KMCPred conserva esa información mediante MLflow, los paquetes de modelos y sus registros de ejecución (Figura~\ref{fig:2}). Además, superó 534 pruebas de la aplicación web distribuidas en 48 archivos y 783 pruebas de Python; una prueba quedó omitida. Esto respalda el funcionamiento técnico revisado, pero no equivale a una evaluación clínica con pacientes.
+
+En la operación habitual, el sistema lee la base institucional, organiza los datos, identifica registros dudosos, entrena y calibra modelos y registra los resultados. El paquete se aprueba antes de calcular de nuevo los riesgos. Los procesos programados siguen el calendario semestral de actualización de la fuente. Se documentaron cuatro corridas completas sobre los 62.043 niños, aunque todavía no contamos con una prueba que mida el comportamiento con varios usuarios simultáneos.
+
+Las pruebas disponibles muestran que es posible navegar por la plataforma y utilizar sus funciones principales.
+
+\subsection{Evaluación económica y sostenibilidad}
+\label{sec:5.3}
+
+Estimamos el coste de desarrollo de KMCPred en 48.485.707 COP para 16 semanas de trabajo. La mayor parte corresponde al tiempo del equipo (40 millones; 82,5 \%), seguido de infraestructura (3,02 millones), software (1,06 millones) e imprevistos (4,41 millones). De ese total, 2,53 millones (5,2 \%) se clasificaron como aportes en efectivo y el resto se valoró como trabajo o recursos en especie. El uso de software abierto y de un servidor propio permite evitar pagos por cada predicción, pero no significa que operar la plataforma sea gratuito. El presupuesto incluye una máquina virtual en la nube como referencia; el coste real de mantener el despliegue en Coolify no se ha medido.
+
+\subsection{Limitaciones, equidad y validez clínica}
+\label{sec:5.4}
+
+El proyecto tiene limitaciones que deben ser consideradas, entre ellas que solo el 46 \% de los niños con registro inicial llega al control de 12 meses, y el cambio de sistema en 2022 puede afectar la comparación entre periodos. También necesitamos entender mejor cómo varía el desempeño entre grupos de niños y con el paso del tiempo. Aunque se exportaron indicadores de estabilidad y equidad, los archivos no identifican con suficiente detalle el modelo y la corrida; algunas series contienen entre 21 y 45 niños por trimestre y ciertos subgrupos apenas cuatro.
+
+Las explicaciones de TreeSHAP describen asociaciones que el modelo encontró en los datos; no prueban causas. Por eso, ningún porcentaje de riesgo debe utilizarse por sí solo para decidir tratamientos o remisiones. Los registros institucionales se mantienen bajo acceso controlado y los ejemplos públicos son sintéticos. Aún necesitamos completar la revisión ciega por profesionales y, más adelante, una validación prospectiva que permita valorar el sistema en condiciones de uso real.
