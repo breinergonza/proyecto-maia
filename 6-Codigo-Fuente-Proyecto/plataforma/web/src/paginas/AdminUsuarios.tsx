@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm } from '../../node_modules/react-hook-form/dist'
 import { z } from 'zod'
 import { pedir } from '../api/cliente'
 import type { Rol, Usuario, UsuarioCambio } from '../api/tipos'

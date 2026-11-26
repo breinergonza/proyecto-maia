@@ -19,7 +19,7 @@ import { PanelesPestana, Pestanas } from '../components/ui/Pestanas'
 import { seccionesDeRiesgo } from '../components/ficha/RiesgoA12Meses'
 import { RangoEsperado } from '../components/graficos'
 import { estadoDe, familiaDe, familiasConRiesgo } from '../lib/familias'
-import { aproximado, dec, edad, etiquetaCampo, indicador, medida } from '../lib/formato'
+import { aproximado, dec, edad, etiquetaCampo, indicador, medida, unidad as unidadLegible } from '../lib/formato'
 import { alerta, AYUDA_DOS_CIFRAS, ayudaAlerta, ayudaZ, CAYO, frenteOms, motivoExtra } from '../lib/lenguaje'
 
 const SUJETO = 'calculo'
@@ -433,7 +433,7 @@ function Campos({ campos, valores, cambiar, masTexto, antes }: {
 function CampoDato({ c, valor, cambiar }: { c: CampoFormulario; valor: string; cambiar: (v: string) => void }) {
   const id = `v-${c.variable}`
   const conRango = c.minimo != null && c.maximo != null
-  const rango = conRango ? `Habitual: ${dec(c.minimo)} a ${dec(c.maximo)}${c.unidad ? ` ${c.unidad}` : ''}.` : undefined
+  const rango = conRango ? `Habitual: ${dec(c.minimo)} a ${dec(c.maximo)}${c.unidad ? ` ${unidadLegible(c.unidad)}` : ''}.` : undefined
   const etiqueta = etiquetaCampo(c.etiqueta, c.tipo === 'numero' ? c.unidad : undefined)
   let control: ReactNode
   if (c.tipo === 'lista' || c.tipo === 'si_no') {

@@ -291,7 +291,7 @@ export function CrecimientoOms({ crecimiento, grilla = 'sm:grid-cols-3 xl:grid-c
                   x: p.edad_corregida as number, y: p.z as number, marcado: p.bajo_2de || p.caida_1de,
                   titulo: `${edad(p.edad_corregida)} de edad corregida`,
                   detalle: [
-                    `${indicador(k)}: ${p.valor == null ? '—' : `${aproximado(p.valor)}${p.unidad ? ` ${p.unidad}` : ''}`}`,
+                    `${indicador(k)}: ${p.valor == null ? '—' : `${aproximado(p.valor)}${p.unidad ? ` ${unidadLegible(p.unidad)}` : ''}`}`,
                     `${frenteOms(p.z)}: ${desviaciones(p.z as number)} frente a la OMS`,
                     ...(p.bajo_2de ? [BAJO_EDAD] : []), ...(p.caida_1de ? [CAYO] : []),
                   ],

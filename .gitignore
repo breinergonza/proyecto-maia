@@ -1,11 +1,28 @@
-# Data per child never leaves the team: risks, review sheets, trained models and system state.
-/insumo-datos/salidas/
-/insumo-datos/interno/
-/insumo-datos/privado/
-/insumo-datos/entradas/retroalimentacion/
-/insumo-datos/__pycache__/
-/insumo-datos/.pytest_cache/
-/insumo-datos/.ipynb_checkpoints/
-/insumo-datos/.codegraph/
-/insumo-datos/~$*
+# Datos sensibles y salidas generadas en insumo-datos (no salen del equipo)
+/4-Insumos-Proyecto/insumo-datos/salidas/
+/4-Insumos-Proyecto/insumo-datos/interno/
+/4-Insumos-Proyecto/insumo-datos/privado/
+/4-Insumos-Proyecto/insumo-datos/entradas/retroalimentacion/
+
+# Entorno, cachés de Python, pruebas y notebooks (1-Notebooks/, 4-Insumos-Proyecto/insumo-datos/, etc.)
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+.codegraph/
+
+# Archivos temporales de compilación LaTeX (4-Insumos-Proyecto/avances-1-latex/, insumo-proyecto-latex/, 5-informe-final-latex/)
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+build.log
+
+# Sistema operativo y archivos temporales de Office
 .DS_Store
+~$*

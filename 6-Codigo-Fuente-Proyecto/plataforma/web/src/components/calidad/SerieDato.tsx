@@ -1,11 +1,12 @@
 // El dato en su contexto: la serie del niño para ese concepto (p. ej. su peso en cada visita) con el rango esperado
 // sombreado sobre el punto revisado o, si no hay serie, el valor frente a su rango esperado.
 import type { DatoRevision } from '../../api/tipos'
-import { aproximado, medida } from '../../lib/formato'
+import { aproximado, medida, unidad as unidadLegible } from '../../lib/formato'
 import { escalaRedonda, MiniSerie, RangoEsperado, type PuntoSerie } from '../graficos'
 
 export function SerieDato({ dato }: { dato: DatoRevision }) {
-  const unidad = dato.unidad ? ` ${dato.unidad}` : ''
+  // como se escribe en clínica, igual que en la fila de la cola: «GRAMOS» → «g»
+  const unidad = dato.unidad ? ` ${unidadLegible(dato.unidad)}` : ''
   const nombre = dato.etiqueta ?? dato.variable
   const este = dato.serie.find((p) => p.es_este)
   const { rango_bajo: bajo, rango_alto: alto } = dato
