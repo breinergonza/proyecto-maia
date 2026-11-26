@@ -1,0 +1,12 @@
+--- a/pruebas/test_modelo.py
++++ b/pruebas/test_modelo.py
+@@ -93,6 +93,9 @@
+ 
+ def test_atipico_que_el_contexto_explica_no_alerta_salvo_fuera_del_rango(modelo, particion):
+     _, _, te, _ = particion
++    # (plataforma) el parche 08 sube el alpha por defecto a 0,05 (producción); esta prueba mira la capa 1
++    # frente al contexto con el alpha con que se escribió
++    modelo = replace(modelo, cfg=replace(modelo.cfg, alpha=0.005))
+     d, _ = MA.preparar(te)
+     ref = modelo.refs1['talla_3m']
+     filas = d.index[d.variable == 'talla_3m'][:40]

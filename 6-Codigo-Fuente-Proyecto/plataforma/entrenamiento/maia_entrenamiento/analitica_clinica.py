@@ -129,11 +129,11 @@ def _riesgo_alto(r: np.ndarray) -> np.ndarray:
 
 def crecimiento_largo(modelo, p) -> pd.DataFrame:
     """Los puntajes z de crecimiento de la validación en largo: ``sujeto``, ``etapa``, ``indicador``, ``variable``,
-    ``x`` (edad corregida en meses), ``z`` y ``valor``; sin los datos improbables."""
+    ``x`` (edad corregida en meses), ``z`` y ``valor``; sin los datos a revisar (improbables o de otra edad)."""
     c = modelo.crecimiento(p)
     if c is None or not len(c):
         return pd.DataFrame(columns=['sujeto', 'etapa', 'indicador', 'variable', 'x', 'z', 'valor'])
-    c = c[~c.improbable.fillna(False).astype(bool) & c.z.notna()]
+    c = c[~c.revisar.fillna(False).astype(bool) & c.z.notna()]
     return pd.DataFrame({
         'sujeto': c.sujeto.astype(str).to_numpy(), 'etapa': c.etapa.to_numpy(), 'indicador': c.concepto.astype(str).to_numpy(),
         'variable': c.variable.to_numpy(), 'x': (pd.to_numeric(c.ec_dias, errors='coerce') / AN.DIAS_POR_MES).to_numpy(),

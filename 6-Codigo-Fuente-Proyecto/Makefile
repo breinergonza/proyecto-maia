@@ -130,7 +130,9 @@ sincronizar-nucleo:  ## trae la versión nueva de 4-Insumos-Proyecto/insumo-dato
 	rsync -a --exclude '.git' --exclude 'salidas/' --exclude 'interno/' --exclude 'privado/' --exclude '__pycache__/' \
 	  --exclude 'entradas/retroalimentacion/' --exclude 'entradas/diccionario.xlsx' --exclude '*.parquet' --exclude '*.pkl' \
 	  --exclude 'pyproject.toml' --exclude 'parches/' "$(INSUMO)/" nucleo/
-	for p in nucleo/parches/*.patch; do patch -p1 -d nucleo --forward --binary < "$$p" || exit 1; done
+	# los archivos que crean los parches (hunk @@ -0,0) se borran antes: rsync no los quita y patch los duplicaría
+	for f in $$(awk '/^\+\+\+ b\//{f=substr($$2,3)} /^@@ -0,0 /{print f}' nucleo/parches/*.patch); do rm -f "nucleo/$$f"; done
+	for p in nucleo/parches/*.patch; do patch -p1 -d nucleo --forward --binary --no-backup-if-mismatch < "$$p" || exit 1; done
 	uv run pytest nucleo/pruebas -q
 
 railway-api:  ## despliega la API en Railway (servicio "api"; ver infra/railway/README.md)

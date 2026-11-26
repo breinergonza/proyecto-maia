@@ -91,6 +91,29 @@ def test_cero_o_negativo_en_variable_logaritmica_es_atipico(modelo, particion):
     assert p1.loc[filas, 'atipico'].all()
 
 
+def test_atipico_que_el_contexto_explica_no_alerta_salvo_fuera_del_rango(modelo, particion):
+    _, _, te, _ = particion
+    # (plataforma) el parche 08 sube el alpha por defecto a 0,05 (producción); esta prueba mira la capa 1
+    # frente al contexto con el alpha con que se escribió
+    modelo = replace(modelo, cfg=replace(modelo.cfg, alpha=0.005))
+    d, _ = MA.preparar(te)
+    ref = modelo.refs1['talla_3m']
+    filas = d.index[d.variable == 'talla_3m'][:40]
+    med = te.mediciones.copy()
+    med['valor'] = med.valor.astype(object)
+    med.loc[filas, 'valor'] = ref.mediana + 4 * ref.escala
+    te2 = replace(te, mediciones=med)
+    r = modelo.puntuar(te2).datos.loc[filas]
+    assert r.atipico.all()
+    explicado = r.z2.notna() & ~r.alerta2
+    assert explicado.any() and not explicado.all()
+    assert r.alerta1.equals(~explicado)
+    assert (r.motivo1[explicado] == '').all()
+    esquema = te.esquema.copy()
+    esquema.loc[esquema.variable == 'talla_3m', 'rango_max'] = ref.mediana + 3 * ref.escala
+    assert modelo.puntuar(replace(te2, esquema=esquema)).datos.loc[filas, 'alerta1'].all()
+
+
 # ------------------------------------------------------------- training mask
 
 def test_rango_declarado_no_se_usa_como_filtro(particion):
@@ -298,6 +321,23 @@ def test_cambio_entre_visitas_se_mide_segun_el_tiempo_transcurrido():
     assert ref.escala(np.array([0.0]))[0] < ref.escala(np.array([50.0]))[0]
     mismo_dia = (40 - ref.velocidad * 0) / ref.escala(np.array([0.0]))[0]
     assert abs(mismo_dia) > 3.5  # 40 g apart on the same day is a copy or typing error
+
+
+def test_cambio_copiado_no_achica_la_escala_del_cambio():
+    rng = np.random.default_rng(8)
+    n = 6000
+    # discharge weight to programme-entry weight, 1 to 3 days apart: for years the entry weight
+    # was copied from the discharge one (change exactly 0); weighed again, they differ by tens of grams
+    dias = rng.integers(1, 4, n).astype(float)
+    copiado = rng.random(n) < 0.45
+    delta = np.where(copiado, 0.0, rng.normal(0, 60, n).round(-1))
+    g = pd.DataFrame({'dias': dias, 'delta': delta})
+    g['velocidad'] = g.delta / g.dias
+    ref = MA._ref_transicion(g, MA.Config())
+    z = (g.delta - ref.velocidad * g.dias) / ref.escala(g.dias.to_numpy())
+    assert (z[~copiado].abs() > 3.5).mean() < 0.01   # a real second weighing is not atypical
+    assert (z[copiado].abs() > 3.5).mean() == 0       # nor is a copy
+    assert abs(400 / ref.escala(np.array([2.0]))[0]) > 3.5  # 400 g in two days still is
 
 
 def test_capa2_no_es_mas_fina_que_el_paso_de_la_variable(modelo):

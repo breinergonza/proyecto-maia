@@ -40,6 +40,8 @@ from sevarti.contrato import Sevarti, codigos_declarados, edad_corregida, nacimi
 VERSION_CODIGO = '4'  # bump when a saved model can no longer be read or scored the same way
 TOLERANCIA_EDAD_DIAS = 14  # recorded age against the age computed from the date
 SUFIJO_CODIGO = 'código especial'
+MOTIVO_VENTANA = 'fuera de la ventana de la etapa'
+MOTIVO_CAMBIO = 'cambio atípico para el tiempo transcurrido'
 
 
 @dataclass(frozen=True)
@@ -52,7 +54,7 @@ class Config:
     min_valores_ref: int = 20       # layers 1 and 3 need this many values for a reference
     frecuente: float = 0.01         # layer 1: a value this common is not rare, whatever its z
     ceros: float = 0.3              # layer 1: with this share of zeros the scale comes from the rest
-    alpha: float = 0.005            # layer 2 conformal criterion p <= 0.005 (5 per 1,000); needs >= 1/alpha = 200 calibration data
+    alpha: float = 0.05             # layer 2 false-alert target per datum (50 per 1,000)
     cuantiles: tuple[float, float, float] = (0.25, 0.5, 0.75)
     min_nivel: int = 20             # categorical levels rarer than this become missing
     max_niveles: int = 64           # categorical inputs with more levels are dropped (free text)
@@ -574,6 +576,11 @@ def _ref_transicion(g: pd.DataFrame, cfg: Config) -> RefTransicion | None:
     grupos = pd.qcut(g.dias.rank(method='first'), bandas, labels=False) if bandas > 1 else pd.Series(0, index=g.index)
     centros, escalas = [], []
     for _, idx in g.groupby(grupos).groups.items():
+        # a change of exactly 0 is a value copied from the previous datum, not a second measurement:
+        # when copies are common they would shrink the spread of the real changes to almost nothing
+        medido = idx[(g.delta.loc[idx] != 0).to_numpy()]
+        if (g.delta.loc[idx] == 0).mean() >= cfg.ceros and len(medido) >= cfg.min_valores_ref:
+            idx = medido
         _, esc = _escala_robusta(resto.loc[idx])
         if esc > 0:
             centros.append(float(g.dias.loc[idx].median()))
@@ -614,7 +621,7 @@ def puntuar_trayectoria(datos: pd.DataFrame, x: pd.Series, sev: Sevarti, refs: d
     lo, hi = d.etapa.map(et.edad_min).astype(float), d.etapa.map(et.edad_max).astype(float)
     fuera = (edad < lo) | (edad > hi)
     fuera = d.index[fuera.to_numpy()]
-    out.loc[fuera[(out.loc[fuera, 'motivo3'] == '').to_numpy()], 'motivo3'] = 'fuera de la ventana de la etapa'
+    out.loc[fuera[(out.loc[fuera, 'motivo3'] == '').to_numpy()], 'motivo3'] = MOTIVO_VENTANA
 
     p = _pares(datos, x, sev.etapas)
     propios = refs | {tr: r for tr, r in ajustar_trayectoria(datos, x, sev.etapas, cfg).items() if tr not in refs}
@@ -626,12 +633,16 @@ def puntuar_trayectoria(datos: pd.DataFrame, x: pd.Series, sev: Sevarti, refs: d
             med[idx] = propios[tr].velocidad
             esc[idx] = propios[tr].escala(dias[idx])
     p['z'] = (p.delta - med * dias) / esc
+    # what each datum of a pair was expected to be, given the other one and the days between them
+    p['esperado_b'] = x.reindex(p.fila_a).to_numpy() + med * dias
+    p['esperado_a'] = x.reindex(p.fila_b).to_numpy() - med * dias
+    p['margen'] = cfg.z_alerta * esc
     no_dec = p.variable_b.map(esq.no_decreciente).fillna(False).astype(bool)
     tol = p.variable_b.map(esq.tolerancia).fillna(0).astype(float)
     todos = np.ones(len(p), dtype=bool)
     reglas = (('etapas en desorden', p.desorden.to_numpy(), todos),
               ('disminuye y no debería', (no_dec & (p.delta < -tol)).to_numpy(), todos),
-              ('cambio atípico para el tiempo transcurrido', (p.z.abs() > cfg.z_alerta).to_numpy(), p.z.notna().to_numpy()))
+              (MOTIVO_CAMBIO, (p.z.abs() > cfg.z_alerta).to_numpy(), p.z.notna().to_numpy()))
     zpar = p.z.abs().to_numpy()
     zfila = pd.concat([pd.Series(zpar, index=p.fila_a), pd.Series(zpar, index=p.fila_b)]).groupby(level=0).max()
     for motivo, malo, valido in reglas:
@@ -903,6 +914,12 @@ class ModeloAnomalias:
         out = datos.join(p1).join(p2).join(p3)
         for col in ('alerta1', 'alerta2', 'alerta3'):
             out[col] = out[col].fillna(False).astype(bool)
+        # a value that is rare for the variable alone but expected in its own context (a very
+        # preterm child's birth weight) is not an alert; outside the declared range it still is
+        explicado = (out.atipico.fillna(False).astype(bool) & out.z2.notna() & ~out.alerta2
+                     & ~fuera_de_rango(out, sev.esquema))
+        out['alerta1'] &= ~explicado
+        out.loc[explicado, 'motivo1'] = ''
         grupo = puntuar_grupo(datos, p1, p2, self.refs1, sev, cfg)
         return Resultado(out, rechazos, grupo, pares)
 
@@ -1046,8 +1063,8 @@ BASE_COMPARACION = 'rango del diccionario'
 
 
 def fuera_de_rango(datos: pd.DataFrame, esquema: pd.DataFrame) -> pd.Series:
-    """The check the source already runs: outside the declared range. The model never uses
-    it; it is the baseline the model has to beat."""
+    """The check the source already runs: outside the declared range. It is the baseline the
+    model has to beat; the model only uses it to keep a layer-1 alert the context would explain."""
     e = esquema.set_index('variable')
     lo = datos.variable.map(e.rango_min).astype(float)
     hi = datos.variable.map(e.rango_max).astype(float)

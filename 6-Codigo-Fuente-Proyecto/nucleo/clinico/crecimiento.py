@@ -98,10 +98,13 @@ def puntaje_z(y: np.ndarray, L: np.ndarray, M: np.ndarray, S: np.ndarray, restri
 
 
 def puntajes_z(datos: pd.DataFrame, x: pd.Series, sexo: pd.Series, medidas: tuple[Medida, ...],
-               ref: pd.DataFrame, etapas_validas: set[str]) -> pd.DataFrame:
-    """One row per growth datum of the given stages: concept, corrected age and z-score.
+               ref: pd.DataFrame, etapas_validas: set[str], etapas: pd.DataFrame | None = None) -> pd.DataFrame:
+    """One row per subject, stage and measure: concept, corrected age and z-score.
     ``datos`` is the prepared long table (it carries ``concepto``, ``ec_dias``); ``x`` the
-    values to use (data errors already blanked); ``sexo`` is 1 or 2 per subject."""
+    values to use (data errors already blanked); ``sexo`` is 1 or 2 per subject. With the
+    stages table, ``en_ventana`` says whether the datum's age falls in its stage's age window
+    (a 12-month visit recorded at age 0 does not). When the dictionary gives a stage two
+    variables of the same measure, the stage keeps one: in its window first, then the latest."""
     partes = []
     for med in medidas:
         d = datos[(datos.concepto == med.concepto) & datos.etapa.isin(etapas_validas)]
@@ -121,7 +124,16 @@ def puntajes_z(datos: pd.DataFrame, x: pd.Series, sexo: pd.Series, medidas: tupl
                                     'concepto': med.nombre, 'ec_dias': edad, 'z': z}, index=d.index))
     cols = ['sujeto', 'variable', 'etapa', 'concepto', 'ec_dias', 'z']
     out = pd.concat(partes) if partes else pd.DataFrame(columns=cols)
-    return out.dropna(subset=['z'])
+    out = out.dropna(subset=['z'])
+    out['en_ventana'] = True
+    if etapas is not None and len(out):
+        et = etapas.set_index('etapa')
+        edad = np.where(out.etapa.map(et.base) == 'corregida', out.ec_dias,
+                        datos.edad_dias.reindex(out.index) if 'edad_dias' in datos else out.ec_dias)
+        lo, hi = out.etapa.map(et.edad_min).astype(float), out.etapa.map(et.edad_max).astype(float)
+        out['en_ventana'] = ~((edad < lo) | (edad > hi)).to_numpy()
+    out = out.sort_values(['en_ventana', 'ec_dias'], kind='stable')
+    return out[~out.duplicated(['sujeto', 'etapa', 'concepto'], keep='last')].sort_index()
 
 
 def limites_improbable(concepto: str, medidas: tuple[Medida, ...] = (),
@@ -138,8 +150,9 @@ def alertas_crecimiento(z: pd.DataFrame, medidas: tuple[Medida, ...] = (),
                         z_improbable: float = Z_IMPROBABLE) -> pd.DataFrame:
     """Per growth datum: below its measure's ``z_bajo`` SD, or ``caida`` SD lower than the subject's
     previous datum of the same concept (WHO's -2 and 1 for a concept no measure names). A value beyond
-    its measure's implausible limits (WHO's flags per indicator, ``limites_improbable``) is not a clinical
-    alert but a datum to check (``improbable``); it is left out of the next visit's drop too."""
+    its measure's implausible limits (WHO's flags per indicator, ``limites_improbable``), or one whose age
+    is outside its visit's window (``en_ventana`` False), is not a clinical alert but a datum to check
+    (``revisar``); it is left out of the next visit's drop too."""
     z = z.sort_values(['sujeto', 'concepto', 'ec_dias'])
     umbral = {m.nombre: (m.z_bajo, m.caida) for m in medidas}
     bajo_de = z.concepto.map(lambda c: umbral.get(c, (Z_BAJO, CAIDA))[0]).astype(float)
@@ -148,14 +161,18 @@ def alertas_crecimiento(z: pd.DataFrame, medidas: tuple[Medida, ...] = (),
     lo_de = z.concepto.map(lambda c: limites[c][0]).astype(float)
     hi_de = z.concepto.map(lambda c: limites[c][1]).astype(float)
     improbable = (z.z < lo_de) | (z.z > hi_de)
-    creible = z.z.where(~improbable)
+    otra_edad = ~z.en_ventana.astype(bool) if 'en_ventana' in z else pd.Series(False, index=z.index)
+    revisar = improbable | otra_edad
+    creible = z.z.where(~revisar)
     previo = creible.groupby([z.sujeto, z.concepto]).shift()
-    out = z.assign(z_previo=previo, improbable=improbable, bajo=creible < bajo_de, cae=(previo - creible) > caida_de)
+    out = z.assign(z_previo=previo, improbable=improbable, revisar=revisar,
+                   bajo=creible < bajo_de, cae=(previo - creible) > caida_de)
     out['motivo'] = [
         (f'menos de {lo:g} DE: revisar el dato' if v < lo else f'más de {hi:+g} DE: revisar el dato') if i else
+        'la edad no corresponde a la visita: revisar el dato' if o else
         f'por debajo de {b:g} DE y cayó más de {c:g} DE' if es_bajo and cae else
         f'por debajo de {b:g} DE' if es_bajo else
         f'cayó más de {c:g} DE desde la visita anterior' if cae else ''
-        for v, lo, hi, i, es_bajo, cae, b, c in zip(out.z, lo_de, hi_de, out.improbable, out.bajo, out.cae,
-                                                     bajo_de, caida_de)]
+        for v, lo, hi, i, o, es_bajo, cae, b, c in zip(out.z, lo_de, hi_de, out.improbable, otra_edad, out.bajo,
+                                                        out.cae, bajo_de, caida_de)]
     return out

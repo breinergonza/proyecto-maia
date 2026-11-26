@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Activity, ArrowRight, Baby, BrainCircuit, Eye, EyeOff, HeartPulse, Info, Lock, Mail, ScanSearch, ShieldCheck, TrendingUp, Users } from 'lucide-react'
 import { useState, type CSSProperties, type ReactNode } from 'react'
-import { useForm } from '../../node_modules/react-hook-form/dist'
+import { useForm } from 'react-hook-form'
 import { Navigate, useLocation, useNavigate } from 'react-router'
 import { z } from 'zod'
 import { ErrorApi } from '../api/cliente'

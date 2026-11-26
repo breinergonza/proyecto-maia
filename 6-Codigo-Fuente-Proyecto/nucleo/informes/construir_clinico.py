@@ -260,17 +260,17 @@ md('''**Qué vemos.** Hay que leer dos cosas por grupo. Si el riesgo medio queda
 md("""
 ## 7. Crecimiento contra la curva de la OMS
 
-Desde las 40 semanas, cada peso, talla y perímetro cefálico se pasa a puntaje z por edad corregida con los estándares de la OMS. Antes de las 40 semanas la OMS no aplica y ese tramo no se evalúa; desde las 40 semanas cubre todas las visitas del seguimiento. Los datos que el modelo de anomalías reconoce como errores no entran, y un valor a más de 6 DE (la regla de la OMS para valores biológicamente improbables) se manda a revisar como dato, no como hallazgo clínico.
+Desde las 40 semanas, cada peso, talla y perímetro cefálico se pasa a puntaje z por edad corregida con los estándares de la OMS. Antes de las 40 semanas la OMS no aplica y ese tramo no se evalúa; desde las 40 semanas cubre todas las visitas del seguimiento. Los datos que el modelo de anomalías reconoce como errores no entran, y un valor a más de 6 DE (la regla de la OMS para valores biológicamente improbables), o una medida con una edad que no es la de su visita, se manda a revisar como dato, no como hallazgo clínico. Si el diccionario le da a una visita dos variables de la misma medida, cuenta una: la de la ventana de la visita y, entre esas, la más tardía.
 """)
 
 code("""
 c = lector.crecimiento(p_todo)
 resumen = c.groupby(['etapa', 'concepto']).agg(datos=('z', 'size'), z_mediano=('z', 'median'),
-                                               bajo=('bajo', 'mean'), cae=('cae', 'mean'), improbable=('improbable', 'mean'))
-resumen[['% por debajo de -2 DE', '% cae más de 1 DE', '% improbable']] = 100 * resumen[['bajo', 'cae', 'improbable']]
+                                               bajo=('bajo', 'mean'), cae=('cae', 'mean'), revisar=('revisar', 'mean'))
+resumen[['% por debajo de -2 DE', '% cae más de 1 DE', '% revisar el dato']] = 100 * resumen[['bajo', 'cae', 'revisar']]
 orden_etapas = [e for e in CONFIG.etapas_crecimiento if e in resumen.index.get_level_values(0)]
 resumen = resumen.reindex(orden_etapas, level=0)
-display(resumen[['datos', 'z_mediano', '% por debajo de -2 DE', '% cae más de 1 DE', '% improbable']])
+display(resumen[['datos', 'z_mediano', '% por debajo de -2 DE', '% cae más de 1 DE', '% revisar el dato']])
 ancho = resumen['% por debajo de -2 DE'].unstack()
 fig, ax = plt.subplots(figsize=(8, 3.6))
 for i, concepto in enumerate(ancho.columns):
@@ -282,7 +282,7 @@ ax.set_ylim(0, ancho.max().max() * 1.35)
 ax.legend(loc='upper center', ncols=len(ancho.columns), frameon=False)
 plt.show()
 peso_12 = resumen.loc[('12 m EC', 'peso'), '% por debajo de -2 DE'] if ('12 m EC', 'peso') in resumen.index else np.nan
-md(f'''**Qué vemos.** {fmt(int((c.bajo | c.cae).sum()))} datos de crecimiento quedan por debajo de -2 DE o caen más de 1 DE, y {fmt(int(c.improbable.sum()))} quedan a más de 6 DE: esos no son un hallazgo clínico sino un dato para revisar. A los 12 meses el {pct(peso_12, 1)} de los pesos queda por debajo de -2 DE de la OMS: eso es lo que el modelo de anomalías nunca habría marcado, porque en esta base es común. La caída de más de 1 DE entre visitas es la señal más temprana: aparece antes de que el niño cruce el -2.''')
+md(f'''**Qué vemos.** {fmt(int((c.bajo | c.cae).sum()))} datos de crecimiento quedan por debajo de -2 DE o caen más de 1 DE, y {fmt(int(c.improbable.sum()))} quedan a más de 6 DE y {fmt(int((c.revisar & ~c.improbable).sum()))} tienen una edad que no es la de su visita: esos no son un hallazgo clínico sino un dato para revisar. A los 12 meses el {pct(peso_12, 1)} de los pesos queda por debajo de -2 DE de la OMS: eso es lo que el modelo de anomalías nunca habría marcado, porque en esta base es común. La caída de más de 1 DE entre visitas es la señal más temprana: aparece antes de que el niño cruce el -2.''')
 """)
 
 # ---------------------------------------------------------------- 8. uso

@@ -152,6 +152,19 @@ def test_metricas_basicas():
     assert (np.diff(ys) >= 0).all() and ys.min() >= 0 and ys.max() <= 1
 
 
+def test_riesgo_calibrado_nunca_es_0_ni_100():
+    rng = np.random.default_rng(9)
+    p = rng.random(3000)
+    y = (rng.random(3000) < p ** 3).astype(int)
+    y[p < 0.3] = 0                 # a whole low tail without a single case
+    y[np.argsort(p)[-3:]] = 1      # and the three highest, all cases
+    xs, ys = AC.isotonica(p, y)
+    assert (np.diff(ys) >= 0).all()
+    assert 0 < ys.min() < 0.01 and 0.5 < ys.max() < 1    # three cases out of three is not certainty
+    bajo = p < 0.3
+    assert abs(np.interp(0.15, xs, ys) - y[bajo].mean()) < 0.01   # large groups keep their own rate
+
+
 def test_conteo_de_una_visita_que_no_ocurrio_no_es_desenlace(clinico):
     """A source may fill the readmission count with 0 for children who never came to that visit."""
     sev, *_, modelo = clinico
@@ -218,6 +231,31 @@ def test_dato_de_crecimiento_imposible_se_revisa_no_alerta():
     a = CR.alertas_crecimiento(z).set_index('ec_dias')
     assert a.loc[90, 'improbable'] and not a.loc[90, 'bajo'] and 'revisar el dato' in a.loc[90, 'motivo']
     assert not a.loc[180, 'cae']           # compared with the last credible value (-1.0), not with -9
+
+
+def test_medida_con_la_edad_de_otra_visita_se_revisa_no_alerta():
+    z = pd.DataFrame({'sujeto': ['a'] * 3, 'concepto': 'peso', 'ec_dias': [90, 0, 270],
+                      'z': [-1.0, -3.5, -1.3], 'etapa': ['3 m EC', '12 m EC', '9 m EC'],
+                      'en_ventana': [True, False, True]})   # a 12-month visit recorded at age 0
+    a = CR.alertas_crecimiento(z).set_index('etapa')
+    assert a.loc['12 m EC', 'revisar'] and not a.loc['12 m EC', 'bajo'] and not a.loc['12 m EC', 'cae']
+    assert 'revisar el dato' in a.loc['12 m EC', 'motivo'] and 'edad' in a.loc['12 m EC', 'motivo']
+    assert not a.loc['9 m EC', 'cae'] and a.loc['9 m EC', 'z_previo'] == -1.0   # compared with the credible one
+    assert not a.loc['3 m EC', 'revisar']
+
+
+def test_una_medida_por_visita_y_edad_fuera_de_la_ventana():
+    datos = pd.DataFrame({'sujeto': ['a', 'a', 'b'], 'variable': ['peso_40', 'peso_salida_pc', 'peso_12m'],
+                          'etapa': ['40 sem', '40 sem', '12 m EC'], 'concepto': 'peso',
+                          'ec_dias': [10.0, 3.0, 20.0], 'edad_dias': [70.0, 63.0, 80.0]})
+    x = pd.Series([3500.0, 3300.0, 3600.0], index=datos.index)
+    sexo = pd.Series({'a': 1, 'b': 2})
+    etapas = pd.DataFrame({'etapa': ['40 sem', '12 m EC'], 'orden': [1, 2], 'edad_min': [-21, 315],
+                           'edad_max': [35, 450], 'base': 'corregida'})
+    medida = CR.Medida('peso', 'peso', factor=0.001, restringido=True)
+    z = CR.puntajes_z(datos, x, sexo, (medida,), CR.leer_referencia(), {'40 sem', '12 m EC'}, etapas).set_index('sujeto')
+    assert len(z.loc[['a']]) == 1 and z.loc['a', 'variable'] == 'peso_40'   # the visit's latest weight
+    assert z.loc['a', 'en_ventana'] and not z.loc['b', 'en_ventana']      # 20 days is not a 12-month visit
 
 
 def test_comparacion_justa_con_empates():
@@ -407,8 +445,8 @@ def test_desenlace_de_crecimiento_a_los_12_meses(clinico):
     p = modelo.preparar(sev)
     y = modelo.etiqueta(p, TALLA_12M)
     assert set(y.index) == set(modelo.asistieron(p, '40 sem'))
-    z = p.z[(p.z.concepto == 'talla') & (p.z.etapa == '12 m EC')].groupby('sujeto').z.first()
-    z = z[z.abs() <= CR.Z_IMPROBABLE].reindex(y.index)
+    z = p.z[(p.z.concepto == 'talla') & (p.z.etapa == '12 m EC') & p.z.en_ventana].groupby('sujeto').z.first()
+    z = z[z.abs() <= CR.Z_IMPROBABLE].reindex(y.index)   # an implausible z or an age outside the visit is not known
     pd.testing.assert_series_equal(y.dropna(), (z.dropna() < -2).astype(float), check_names=False)
     assert y.notna().sum() < len(y) and y.sum() > 0         # unknown without the 12-month length
 

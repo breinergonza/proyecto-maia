@@ -100,18 +100,25 @@ def precision_promedio(y: np.ndarray, p: np.ndarray) -> float:
 
 
 def isotonica(p: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Isotonic calibration (pool adjacent violators): knots to read with ``np.interp``."""
+    """Isotonic calibration (pool adjacent violators): knots to read with ``np.interp``.
+
+    Each block of children with the same calibrated level is a binomial count, and its
+    level is the Jeffreys estimate (cases + 1/2) / (children + 1), not the raw share: a block
+    with no case is not a 0% risk, nor three cases out of three a 100% one. Large blocks keep
+    their own share. Adjacent blocks with the same share are one block."""
     o = np.argsort(p)
     p, y = np.asarray(p, dtype=float)[o], np.asarray(y, dtype=float)[o]
     valores, pesos, lo, hi = [], [], [], []
     for pi, yi in zip(p, y):
         valores.append(yi), pesos.append(1.0), lo.append(pi), hi.append(pi)
-        while len(valores) > 1 and valores[-2] > valores[-1]:
+        while len(valores) > 1 and valores[-2] >= valores[-1]:
             w = pesos[-2] + pesos[-1]
             v = (valores[-2] * pesos[-2] + valores[-1] * pesos[-1]) / w
             valores[-2:], pesos[-2:], lo[-2:], hi[-2:] = [v], [w], [lo[-2]], [hi[-1]]
+    w = np.asarray(pesos)
+    nivel = np.maximum.accumulate((np.asarray(valores) * w + 0.5) / (w + 1))
     xs = np.ravel(np.column_stack([lo, hi]))
-    ys = np.repeat(valores, 2)
+    ys = np.repeat(nivel, 2)
     return xs, ys
 
 
@@ -232,7 +239,8 @@ class ModeloClinico:
         mapa = dict(self.cfg.codigos_sexo)
         s = datos[datos.variable == self.cfg.sexo].drop_duplicates('sujeto').set_index('sujeto').valor
         sexo = s.astype(str).str.replace(r'\.0$', '', regex=True).map(mapa)
-        z = CR.puntajes_z(datos, x, sexo, self.cfg.medidas, CR.leer_referencia(), set(self.cfg.etapas_crecimiento))
+        z = CR.puntajes_z(datos, x, sexo, self.cfg.medidas, CR.leer_referencia(), set(self.cfg.etapas_crecimiento),
+                          sev.etapas)
         return Preparado(sev, datos, x, sexo, z)
 
     def _variables_tardias(self, sev: Sevarti, datos: pd.DataFrame) -> list[str]:
@@ -323,9 +331,11 @@ class ModeloClinico:
         sujetos = self._poblacion(p, des)
         if des.regla == 'no_vuelve':
             return self._no_vuelve(p, des, sujetos)
-        if des.regla == 'z_bajo':   # known for children measured at that visit; an implausible z is a data error
+        if des.regla == 'z_bajo':   # known for children measured at that visit; an implausible z, or an age
+                                    # that is not the visit's, is a data error
             minimo, maximo = CR.limites_improbable(des.concepto, self.cfg.medidas)
-            z = p.z[(p.z.concepto == des.concepto) & (p.z.etapa == des.etapa) & p.z.z.between(minimo, maximo)]
+            z = p.z[(p.z.concepto == des.concepto) & (p.z.etapa == des.etapa) & p.z.z.between(minimo, maximo)
+                    & p.z.en_ventana]
             z = z.groupby('sujeto').z.first()
             limite = next((m.z_bajo for m in self.cfg.medidas if m.nombre == des.concepto), CR.Z_BAJO)
             return (z < limite).astype(float).reindex(sujetos)
@@ -681,7 +691,7 @@ def crecimiento_desde(modelo: ModeloClinico, p: Preparado, desde: pd.Timestamp |
     """Growth alerts of the data recorded since a date (all of them without one)."""
     c = modelo.crecimiento(p)
     c = c.join(p.datos[['t']])
-    c = c[c.bajo | c.cae | c.improbable]
+    c = c[c.bajo | c.cae | c.revisar]
     if desde is not None:
         c = c[c.t >= desde]
     return c

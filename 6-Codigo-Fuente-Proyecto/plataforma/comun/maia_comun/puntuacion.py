@@ -103,14 +103,20 @@ def _motivos(texto) -> str:
     return json.dumps(lista, ensure_ascii=False)
 
 
+# La cola del núcleo junta en una fila la visita con una edad que no es la suya, sin variable (''). La medición es
+# el filtro de «Mediciones por revisar» y vacía se confundiría con «todas»: esa fila lleva esta clave.
+VARIABLE_EDAD_VISITA = 'edad_a_la_visita'
+
+
 def tabla_alertas(cola: pd.DataFrame, corrida_id: int) -> pd.DataFrame:
+    def numero(s: pd.Series) -> pd.Series:   # el núcleo ya no redondea lo esperado
+        return pd.to_numeric(s, errors='coerce').round(2)
     return pd.DataFrame({
-        'corrida_id': corrida_id, 'sujeto': cola.sujeto.astype(str), 'variable': cola.variable.astype(str),
+        'corrida_id': corrida_id, 'sujeto': cola.sujeto.astype(str),
+        'variable': cola.variable.astype(str).replace('', VARIABLE_EDAD_VISITA),
         'etiqueta': cola.etiqueta.map(_texto), 'unidad': cola.unidad.map(_texto), 'etapa': cola.etapa.map(_texto),
         'fecha': _fecha(cola.fecha), 'valor': cola.valor.map(_texto),
-        'esperado': pd.to_numeric(cola.esperado, errors='coerce'),
-        'rango_bajo': pd.to_numeric(cola.rango_bajo, errors='coerce'),
-        'rango_alto': pd.to_numeric(cola.rango_alto, errors='coerce'),
+        'esperado': numero(cola.esperado), 'rango_bajo': numero(cola.rango_bajo), 'rango_alto': numero(cola.rango_alto),
         'capas': cola.capas.map(_arreglo_pg), 'motivo': cola.motivos.map(_texto),
         'fuerza': pd.to_numeric(cola.fuerza, errors='coerce'), 'prioridad': cola.prioridad.astype(int),
     })
@@ -133,7 +139,8 @@ def tabla_crecimiento(c: pd.DataFrame, p: AC.Preparado, corrida_id: int) -> pd.D
         'indicador': c.concepto.astype(str), 'variable': c.variable.map(_texto), 'fecha': _fecha(c.t), 'edad_corregida': pd.to_numeric(c.ec_dias),
         'valor': pd.to_numeric(p.x.reindex(c.index), errors='coerce'), 'z': pd.to_numeric(c.z),
         'bajo_2de': c.bajo.fillna(False).astype(bool), 'caida_1de': c.cae.fillna(False).astype(bool),
-        'improbable': c.improbable.fillna(False).astype(bool),
+        # dato a revisar: z improbable o una edad que no es la de la visita (``revisar`` del núcleo)
+        'improbable': c.revisar.fillna(False).astype(bool),
     })
 
 
@@ -196,7 +203,7 @@ def correr(motor: Engine, sev: Sevarti, modelos: Modelos, corrida_id: int, silen
     try:
         paso('modelo de anomalías')
         res = modelos.anomalias.puntuar(sev)
-        cola = OP.cola_revision(res, sev.esquema, modelos.anomalias.cfg, desde)
+        cola = OP.cola_revision(res, sev, modelos.anomalias, desde)
         _guardar(motor, 'resultados.alertas_dato', tabla_alertas(cola, corrida_id))
         grupos = tabla_grupos(res, sev, modelos.anomalias.cfg, corrida_id, desde)
         _guardar(motor, 'resultados.alarmas_grupo', grupos)
@@ -229,7 +236,7 @@ def correr(motor: Engine, sev: Sevarti, modelos: Modelos, corrida_id: int, silen
             'desenlaces_observados': int(len(observados)),
             'crecimiento_bajo_2de': int(crec.bajo.fillna(False).sum()) if len(crec) else 0,
             'crecimiento_caida_1de': int(crec.cae.fillna(False).sum()) if len(crec) else 0,
-            'crecimiento_improbable': int(crec.improbable.fillna(False).sum()) if len(crec) else 0,
+            'crecimiento_improbable': int(crec.revisar.fillna(False).sum()) if len(crec) else 0,
             'desde': None if desde is None else str(desde.date()), 'silencio': silencio,
             'corte': None if sev.corte is None else str(pd.Timestamp(sev.corte).date()),
         }
@@ -265,7 +272,7 @@ def escribir_libros(sev: Sevarti, modelos: Modelos, res: MA.Resultado, cola: pd.
         'No usados': res.rechazos.assign(etiqueta=res.rechazos.variable.map(etiqueta).fillna(res.rechazos.variable)),
     }, notas=(f'Datos que entraron {periodo}, hasta el corte del {nombre}. Modelo {modelos.ficha_anomalias["version"]}.',))
     c = crec.join(p.datos[['t']])
-    c = c[c.bajo | c.cae | c.improbable]
+    c = c[c.bajo | c.cae | c.revisar]
     if desde is not None:
         c = c[c.t >= desde]
     tabla = riesgos.sort_values(['desenlace', 'riesgo'], ascending=[True, False])
@@ -308,7 +315,7 @@ def inferir(sev: Sevarti, modelos: Modelos) -> dict[str, pd.DataFrame]:
     """Sin guardar nada y sin capa 4 (necesita la historia de todo el programa). Los riesgos son los de la última
     visita de cada niño, esté o no abierta la ventana de la siguiente."""
     res = modelos.anomalias.puntuar(sev)
-    cola = OP.cola_revision(res, sev.esquema, modelos.anomalias.cfg)
+    cola = OP.cola_revision(res, sev, modelos.anomalias)
     p = modelos.clinico.preparar(sev)
     riesgos = modelos.clinico.riesgos(p, con_motivos=True, solo_pendientes=False)
     crec = modelos.clinico.crecimiento(p)

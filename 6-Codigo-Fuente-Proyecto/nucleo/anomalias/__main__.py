@@ -59,7 +59,7 @@ def revisar(args: argparse.Namespace) -> None:
           f'{desde.date() if desde is not None else "el principio"}...', flush=True)
     t0 = time.time()
     res = modelo.puntuar(sev)
-    cola = OP.cola_revision(res, sev.esquema, modelo.cfg, desde)
+    cola = OP.cola_revision(res, sev, modelo, desde)
     grupo = res.grupo
     if desde is not None:
         grupo = grupo[pd.to_datetime(grupo.periodo) >= desde.to_period(modelo.cfg.periodo).start_time]

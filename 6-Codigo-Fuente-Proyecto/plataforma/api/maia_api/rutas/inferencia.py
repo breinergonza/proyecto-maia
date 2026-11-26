@@ -193,7 +193,7 @@ def formulario(_: Usuario = Depends(EXPERTO)) -> dict:
 
 
 EG_EJEMPLO = 32.0   # semanas de gestación del niño de ejemplo: un prematuro típico del programa
-RONDAS_EJEMPLO = 3  # veces que el ejemplo se corrige con lo que espera el detector de anomalías
+RONDAS_EJEMPLO = 6  # veces que el ejemplo se corrige con lo que espera el detector de anomalías (un dato por vez)
 
 
 def _valor_habitual(c: dict, crecimiento: dict[str, tuple[str, float]], ref: pd.DataFrame, corregida: float):
@@ -225,7 +225,9 @@ def ejemplo(u: Usuario = Depends(EXPERTO)) -> dict:
     (cada una a la mitad de su ventana, pero antes de que abra la siguiente), se llenan las primeras hasta donde
     todavía queda un desenlace por predecir (con todas llenas no hay riesgo que mostrar) y lo que el detector de
     anomalías del paquete encuentre raro (p. ej. la mediana OMS al nacer, que es la de un bebé a término) se cambia
-    por lo que él espera."""
+    por lo que él espera, un dato por vez: el primero de la cola cuyo valor esperado cambia lo escrito. Cada dato se
+    corrige una sola vez y queda fijo, porque dos datos marcados uno por el otro (el peso al nacer y el de la salida,
+    por un cambio atípico) se esperan cada uno desde el otro y corregirlos por turnos solo intercambia el problema."""
     modelos, manifest, carpeta = _activo()
     form = formulario(u)
     base = carpeta / 'sevarti_base'
@@ -262,6 +264,7 @@ def ejemplo(u: Usuario = Depends(EXPERTO)) -> dict:
         generales.setdefault(cfg.sexo, (0.0, nino))
     por_visita = [valores(v['campos'], vidas[v['etapa']]) for v in form['visitas']]
     corregidos: dict[str, object] = {}
+    escritos = {k: valor for fuente in [generales, *por_visita] for k, (_, valor) in fuente.items()}
 
     def peticion(n: int) -> dict:
         """El niño con sus n primeras visitas, nacido un mes antes de la última."""
@@ -281,16 +284,21 @@ def ejemplo(u: Usuario = Depends(EXPERTO)) -> dict:
         q = peticion(n)
         return _calcular(PeticionInferencia.model_validate(q), q['mediciones'], base, modelos)
 
+    def redondo(x: float) -> float:
+        return round(x) if abs(x) >= 10 else round(x, 1)
+
     n = len(por_visita)
     try:
         while n > 1 and calcular(n)['riesgos'].empty:
             n -= 1
         for _ in range(RONDAS_EJEMPLO):
             alertas = calcular(n)['alertas_dato']
-            esperados = {a.variable: a.esperado for a in alertas.itertuples() if pd.notna(a.esperado)}
-            if not esperados:
+            primera = next((a for a in alertas.sort_values('prioridad').itertuples()
+                            if pd.notna(a.esperado) and a.variable in escritos and a.variable not in corregidos
+                            and redondo(a.esperado) != escritos[a.variable]), None)
+            if primera is None:
                 break
-            corregidos |= {k: round(x) if abs(x) >= 10 else round(x, 1) for k, x in esperados.items()}
+            corregidos[primera.variable] = redondo(primera.esperado)
     except (ValueError, KeyError):
         # sin esos ajustes el ejemplo igual sirve para llenar el formulario
         registro.warning('No se pudo ajustar el niño de ejemplo', exc_info=True)

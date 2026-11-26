@@ -32,7 +32,7 @@ class EnvolturaAnomalias(mlflow.pyfunc.PythonModel):
         for carpeta in model_input['carpeta_sevarti']:
             sev = leer(Path(carpeta))
             res = self.modelo.puntuar(sev)
-            partes.append(OP.cola_revision(res, sev.esquema, self.modelo.cfg))
+            partes.append(OP.cola_revision(res, sev, self.modelo))
         return pd.concat(partes, ignore_index=True) if partes else pd.DataFrame()
 
 

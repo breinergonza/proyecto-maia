@@ -165,10 +165,63 @@ def _fuerza(d: pd.DataFrame, cfg: MA.Config) -> pd.Series:
     return pd.concat(partes, axis=1).max(axis=1).replace(np.inf, 99.0)
 
 
-def cola_revision(res: MA.Resultado, esquema: pd.DataFrame, cfg: MA.Config,
+MOTIVO_VENTANA = MA.MOTIVO_VENTANA
+EDAD_DE_LA_VISITA = 'Edad a la visita'
+
+
+def _esperado(a: pd.DataFrame, pares: pd.DataFrame | None, refs1: dict[str, MA.RefValor],
+              cfg: MA.Config) -> tuple[pd.Series, pd.Series, pd.Series]:
+    """What was expected of each flagged datum, from the check that flagged it: the subject's
+    other data (layer 2), else the neighbouring datum and the days between them (layer 3),
+    else what is usual for the variable (layer 1). Empty when what was flagged is not the
+    value itself (stages out of order, a decrease)."""
+    esperado, bajo, alto = (pd.Series(np.nan, index=a.index) for _ in range(3))
+    for var, idx in a[a.alerta1].groupby('variable').groups.items():
+        ref = refs1.get(var)
+        if ref is not None:
+            esperado[idx] = MA._desde_z(0.0, ref)
+            bajo[idx], alto[idx] = MA._desde_z(-cfg.z_alerta, ref), MA._desde_z(cfg.z_alerta, ref)
+    cambio = a.index[(a.alerta3 & (a.motivo3 == MA.MOTIVO_CAMBIO)).to_numpy()]
+    if len(cambio) and pares is not None and 'margen' in pares:
+        # a datum blamed for a change is judged on its most atypical pair
+        lados = pd.concat([pd.DataFrame({'fila': pares.fila_b, 'z': pares.z.abs(), 'e': pares.esperado_b, 'm': pares.margen}),
+                           pd.DataFrame({'fila': pares.fila_a, 'z': pares.z.abs(), 'e': pares.esperado_a, 'm': pares.margen})])
+        lados = lados.dropna(subset=['z']).sort_values('z', ascending=False).drop_duplicates('fila').set_index('fila')
+        cambio = cambio.intersection(lados.index)
+        esperado[cambio] = lados.e[cambio]
+        bajo[cambio], alto[cambio] = lados.e[cambio] - lados.m[cambio], lados.e[cambio] + lados.m[cambio]
+    dos = a.index[a.alerta2.to_numpy()]
+    esperado[dos], bajo[dos], alto[dos] = a.esperado[dos], a.rango_bajo[dos], a.rango_alto[dos]
+    return esperado, bajo, alto
+
+
+def _una_fila_por_visita(out: pd.DataFrame, a: pd.DataFrame, etapas: pd.DataFrame) -> pd.DataFrame:
+    """A visit outside its age window is one problem (the date or the age), not one per measure:
+    the data flagged only for that become one row with the age at the visit and the window."""
+    solo = (out.motivos == MOTIVO_VENTANA).to_numpy()
+    if not solo.any():
+        return out
+    et = etapas.set_index('etapa')
+    v = a[solo]
+    edad = np.where(v.etapa.map(et.base) == 'corregida', v.ec_dias, v.edad_dias)
+    g = out[solo].assign(edad=edad).groupby(['sujeto', 'etapa', 'fecha'], as_index=False, sort=False).agg(
+        grupo=('grupo', 'first'), edad=('edad', 'first'), fuerza=('fuerza', 'max'))
+    visitas = pd.DataFrame({
+        'sujeto': g.sujeto, 'grupo': g.grupo, 'variable': '', 'etiqueta': EDAD_DE_LA_VISITA, 'unidad': 'días',
+        'etapa': g.etapa, 'fecha': g.fecha, 'valor': g.edad.round(),
+        'esperado': np.nan, 'rango_bajo': g.etapa.map(et.edad_min).astype(float),
+        'rango_alto': g.etapa.map(et.edad_max).astype(float),
+        'capas': '3', 'n_capas': 1, 'motivos': MOTIVO_VENTANA, 'fuerza': g.fuerza,
+    })
+    return pd.concat([out[~solo], visitas], ignore_index=True)
+
+
+def cola_revision(res: MA.Resultado, sev: Sevarti, modelo: MA.ModeloAnomalias,
                   desde: pd.Timestamp | None = None) -> pd.DataFrame:
     """One row per datum to review, whatever layers flagged it, most urgent first: data
-    flagged by more layers, then data further past their threshold."""
+    flagged by more layers, then data further past their threshold. A visit outside its
+    age window is one row."""
+    cfg = modelo.cfg
     d = res.datos
     alerta = d.alerta1 | d.alerta2 | d.alerta3
     if desde is not None:
@@ -177,21 +230,23 @@ def cola_revision(res: MA.Resultado, esquema: pd.DataFrame, cfg: MA.Config,
     capas = pd.DataFrame({i: a[f'alerta{i}'] for i in (1, 2, 3)})
     motivo2 = np.where(a.alerta2, 'lejos de lo esperado para este caso', '')
     motivos = pd.DataFrame({'1': a.motivo1.where(a.alerta1, ''), '2': motivo2, '3': a.motivo3.where(a.alerta3, '')})
-    esq = esquema.set_index('variable')
+    esq = sev.esquema.set_index('variable')
     etiqueta = esq.etiqueta
-    # the expected range never goes past what the variable can hold (a weight below zero)
-    bajo = a.rango_bajo.clip(lower=a.variable.map(esq.rango_min).astype(float))
-    alto = a.rango_alto.clip(upper=a.variable.map(esq.rango_max).astype(float))
+    # nothing expected goes past what the variable can hold (a weight below zero)
+    lo = a.variable.map(esq.rango_min).astype(float)
+    hi = a.variable.map(esq.rango_max).astype(float)
+    esperado, bajo, alto = (s.clip(lower=lo, upper=hi) for s in _esperado(a, res.pares, modelo.refs1, cfg))
     out = pd.DataFrame({
         'sujeto': a.sujeto, 'grupo': a.grupo, 'variable': a.variable, 'etiqueta': a.variable.map(etiqueta).fillna(a.variable),
         'unidad': a.variable.map(esq.unidad),
         'etapa': a.etapa, 'fecha': a.t.dt.date, 'valor': a.valor,
-        'esperado': a.esperado.round(2), 'rango_bajo': bajo.round(2), 'rango_alto': alto.round(2),
+        'esperado': esperado, 'rango_bajo': bajo, 'rango_alto': alto,
         'capas': [', '.join(str(i) for i, v in zip((1, 2, 3), fila) if v) for fila in capas.to_numpy()],
         'n_capas': capas.sum(axis=1),
         'motivos': ['; '.join(m for m in fila if m) for fila in motivos.to_numpy()],
         'fuerza': _fuerza(a, cfg).round(2),
     })
+    out = _una_fila_por_visita(out, a, sev.etapas)
     out = out.sort_values(['n_capas', 'fuerza'], ascending=False)
     out.insert(0, 'prioridad', np.arange(1, len(out) + 1))
     return out.reset_index(drop=True)

@@ -557,7 +557,9 @@ export interface paths {
          *     (cada una a la mitad de su ventana, pero antes de que abra la siguiente), se llenan las primeras hasta donde
          *     todavía queda un desenlace por predecir (con todas llenas no hay riesgo que mostrar) y lo que el detector de
          *     anomalías del paquete encuentre raro (p. ej. la mediana OMS al nacer, que es la de un bebé a término) se cambia
-         *     por lo que él espera.
+         *     por lo que él espera, un dato por vez: el primero de la cola cuyo valor esperado cambia lo escrito. Cada dato se
+         *     corrige una sola vez y queda fijo, porque dos datos marcados uno por el otro (el peso al nacer y el de la salida,
+         *     por un cambio atípico) se esperan cada uno desde el otro y corregirlos por turnos solo intercambia el problema.
          */
         get: operations["ejemplo_api_inferencia_ejemplo_get"];
         put?: never;

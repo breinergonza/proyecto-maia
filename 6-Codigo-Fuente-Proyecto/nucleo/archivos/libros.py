@@ -298,7 +298,8 @@ REVISION = Libro(
         'El sistema revisó los datos de la base y marcó los que podrían estar mal anotados. Revisen la historia '
         'del paciente y corrijan en la base lo que sea un error.',
         'La hoja "Datos" va en orden de prioridad: primero los que marcaron más revisiones distintas y los que '
-        'quedaron más lejos de lo esperado.',
+        'quedaron más lejos de lo esperado. Una visita con una edad que no corresponde a esa visita va en una sola '
+        'fila, con la edad anotada y la ventana de edad de la visita.',
         'La hoja "Grupos" muestra cambios de un grupo completo en un periodo, por ejemplo más datos faltantes '
         'que de costumbre. La hoja "No usados" lista los datos que no se pudieron analizar y por qué.',
     ),
@@ -308,9 +309,13 @@ REVISION = Libro(
             _QUE,
             Columna('valor', 'Valor anotado', 'El valor que quedó registrado.', 12, numero=True),
             _UNIDAD,
-            Columna('esperado', 'Valor esperado', 'Lo que se esperaba para este paciente, según sus otros datos.', 12, formato='0.0'),
-            Columna('rango_bajo', 'Esperado desde', 'Límite bajo de lo esperado.', 12, formato='0.0'),
-            Columna('rango_alto', 'Esperado hasta', 'Límite alto de lo esperado.', 12, formato='0.0'),
+            Columna('esperado', 'Valor esperado', 'Lo que se esperaba según la revisión que lo marcó: los otros datos '
+                    'del paciente, su dato anterior o lo usual de esa pregunta. Vacío si lo marcado no es el valor '
+                    '(por ejemplo, visitas en desorden).', 12, formato='0.0'),
+            Columna('rango_bajo', 'Esperado desde', 'Límite bajo de lo esperado. En una visita fuera de su ventana, '
+                    'la edad más temprana de esa visita.', 12, formato='0.0'),
+            Columna('rango_alto', 'Esperado hasta', 'Límite alto de lo esperado. En una visita fuera de su ventana, '
+                    'la edad más tardía de esa visita.', 12, formato='0.0'),
             Columna('motivos', 'Por qué se marcó', 'Qué vio el sistema.', 44, largo=True),
             Columna('n_capas', 'Revisiones que lo marcaron (de 3)',
                     'El sistema revisa cada dato de tres formas: el valor solo, el valor frente al resto de los '
@@ -347,7 +352,8 @@ RIESGOS = Libro(
         'calibró el sistema. Por qué: los datos del niño que más subieron su riesgo.',
         'El archivo trae a todos los niños. A cuántos se llama o se cita lo decide el equipo, no el sistema.',
         'La hoja "Crecimiento" lista las medidas por debajo de la curva de la OMS o que cayeron desde la visita '
-        'anterior. "Revisar el dato" quiere decir que el valor es tan extremo que probablemente está mal anotado.',
+        'anterior. "Revisar el dato" quiere decir que el valor es tan extremo, o la edad anotada tan lejos de la '
+        'de esa visita, que probablemente está mal anotado.',
     ),
     hojas=(
         Hoja('Riesgo', 'Un niño por fila y por desenlace, el riesgo más alto primero', (
@@ -369,7 +375,8 @@ RIESGOS = Libro(
                     formato='0.00'),
             Columna('z_previo', 'Puntaje z anterior', 'El de la visita anterior, para ver la caída.', 12,
                     formato='0.00'),
-            Columna('motivo', 'Qué pasó', 'Por debajo de la curva, cayó desde la visita anterior, o revisar el dato.',
+            Columna('motivo', 'Qué pasó', 'Por debajo de la curva, cayó desde la visita anterior, o revisar el dato '
+                    '(valor extremo o edad que no es la de esa visita).',
                     44, largo=True),
         )),
         Hoja('Resumen', 'Cuántos niños hay y su riesgo promedio, por desenlace', (

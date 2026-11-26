@@ -6,8 +6,8 @@ escribió el código. Léalo antes de la primera instalación en el equipo con G
 
 ## Origen del núcleo
 
-* `nucleo/` es una copia de `4-Insumos-Proyecto/insumo-datos/` (antes `insumo-datos/` en la raíz) en el commit `f3224765b0477c5963ea197ec97285bb4cbb9277`
-  (19 de octubre de 2026). Los módulos conservan sus nombres (`sevarti`, `anomalias`, `clinico`, `retroalimentacion`,
+* `nucleo/` es una copia de `4-Insumos-Proyecto/insumo-datos/` (antes `insumo-datos/` en la raíz), sincronizada el
+  26 de noviembre de 2026 (antes, el commit `f3224765` del 19 de octubre). Los módulos conservan sus nombres (`sevarti`, `anomalias`, `clinico`, `retroalimentacion`,
   `archivos`) porque los modelos guardados con pickle los referencian.
 * Cambios sobre esa copia, como parches en `nucleo/parches/` (los vuelve a aplicar `make sincronizar-nucleo`):
   * `01-raiz-configurable.patch`: `archivos/carpetas.py` lee la raíz de datos de `MAIA_RAIZ` (en los contenedores,
@@ -49,12 +49,35 @@ escribió el código. Léalo antes de la primera instalación en el equipo con G
   * `12-readme-plataforma.patch`: el `README.md` de la copia dice en qué se aparta del original (marcas
     «(plataforma)»: los parches, la semilla de D68, «Usar como filtro», `z_<medida>` y los límites de la OMS). Sin él,
     `make sincronizar-nucleo` volvería a copiar el README de `insumo-datos` tal cual.
+  * `13-prueba-alpha-produccion.patch` (2026-11-26): `pruebas/test_modelo.py` del original trae una prueba nueva
+    (el contexto explica un atípico) escrita para el alpha de antes (0,005); con el 0,05 del parche 08 todo alerta.
+    La prueba puntúa con una copia del modelo con `alpha=0.005`; el modelo no cambia. Solo aplica sobre el
+    original (la copia actual del núcleo no tiene esa prueba).
+  * `14-pruebas-datos-nucleo.patch` (2026-11-26): las pruebas comparten `CFG` y `CONFIG_RAPIDA` desde
+    `pruebas/datos_nucleo.py` (lo crea el parche) y no desde `conftest.py`: con varios `conftest.py` en la misma
+    sesión de pytest, `from conftest import` toma el último cargado y la suite completa falla. Antes era un cambio
+    suelto del núcleo que la sincronización borraba.
 * `nucleo/pyproject.toml` es nuevo (empaqueta el núcleo para el workspace de uv).
-* Con los parches, el núcleo pasa 213 pruebas (1 omitida; `uv run pytest nucleo/pruebas`, 2026-11-25).
-* **`nucleo/` está atrasado frente a `insumo-datos`** (2026-10-28): allí ya hay `en_ventana`/`revisar` en
-  `clinico/crecimiento.py` y `modelo.py`. Los parches 03 y 04 se generaron contra una copia fresca de `insumo-datos`
-  y aplican limpio después de 01 y 02; falta correr `make sincronizar-nucleo` y revisar. Ese objetivo excluye
-  `*.parquet`, así que los esperados de `pruebas/esperado_kmc` deben copiarse aparte.
+* Con los parches, el núcleo pasa 209 pruebas (1 omitida; `uv run pytest nucleo/pruebas`, 2026-11-26).
+* **Núcleo sincronizado con `insumo-datos` (2026-11-26).** `make sincronizar-nucleo` aplica los 15 parches; repetirlo
+  deja el núcleo idéntico. El Makefile borra antes los archivos que crean los parches (rsync no los quita y `patch`
+  los duplicaba) y no deja `.orig`. Lo que trae el original y cómo lo toma la plataforma:
+  * `cola_revision(res, sev, modelo, desde)`: lo esperado sale de la revisión que marcó el dato y una visita con una
+    edad que no es la suya es una sola fila sin variable. `tabla_alertas` le pone la clave `edad_a_la_visita` (si
+    no, el filtro «Medición» la confundiría con «todas») y redondea a 2 decimales, como antes hacía el núcleo.
+  * Crecimiento: `revisar` = z improbable o edad fuera de la ventana de la visita. La columna `improbable` de
+    `resultados.crecimiento` guarda `revisar` (no se grafica ni se cuenta), igual que el libro de riesgos y la
+    analítica de validación.
+  * Capa 1: un valor raro que el contexto explica ya no alerta, salvo fuera del rango declarado.
+  * El niño de ejemplo de «Estimar riesgo» se corrige un dato por vez y cada uno una sola vez: con el alpha de
+    producción (0,05) y lo esperado por pares de la capa 3, corregir todo junto (o por turnos) hacía oscilar
+    el peso al nacer y el de la salida, y el ejemplo mostraba dos datos raros.
+  * Calibración isotónica con la estimación de Jeffreys (nunca 0 % ni 100 %) y desenlaces de readmisión y
+    oxígeno solo desde el sistema de 2022 en el borrador del diccionario: valen al volver a entrenar. Los modelos
+    guardados con el núcleo anterior cargan y puntúan con el nuevo (probado con los simulados de
+    `nucleo/interno`), pero conservan su calibración hasta reentrenarlos.
+  * Los esperados de `pruebas/esperado_kmc` son `*.parquet`, que la sincronización no copia: si el original los
+    cambia, hay que copiarlos aparte.
 
 ## Versiones
 
