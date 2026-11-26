@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # Trainer con GPU: CLI maia + núcleo + LightGBM compilado con CUDA. Se construye solo en el equipo con GPU NVIDIA
-# (necesita el NVIDIA Container Toolkit para correr). Contexto de build: proyecto-codigo/.
+# (necesita el NVIDIA Container Toolkit para correr). Contexto de build: 6-Codigo-Fuente-Proyecto/.
 FROM nvidia/cuda:12.6.3-devel-ubuntu24.04
 
 ENV DEBIAN_FRONTEND=noninteractive

@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-# API FastAPI (CPU). La misma imagen corre en local (docker compose) y en Railway. Contexto de build: proyecto-codigo/.
+# API FastAPI (CPU). La misma imagen corre en local (docker compose) y en Railway. Contexto de build: 6-Codigo-Fuente-Proyecto/.
 FROM python:3.13-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \

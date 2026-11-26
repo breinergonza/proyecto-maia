@@ -1,11 +1,11 @@
-# Observatorio Canguro (MAIA): tareas del equipo local. Ejecutar desde proyecto-codigo/.
+# Observatorio Canguro (MAIA): tareas del equipo local. Ejecutar desde 6-Codigo-Fuente-Proyecto/.
 # "make" sin argumentos muestra la ayuda.
 
 SHELL := /bin/bash
 .DEFAULT_GOAL := ayuda
 COMPOSE := docker compose --env-file .env -f infra/local/docker-compose.yml
 FECHA := $(shell date +%Y-%m-%d_%H%M)
-INSUMO ?= ../insumo-datos
+INSUMO ?= ../4-Insumos-Proyecto/insumo-datos
 
 # La CLI "maia" corre en el contenedor trainer (necesita GPU NVIDIA). En un equipo sin NVIDIA (p. ej. macOS) use
 # SIN_GPU=1: corre en el equipo con uv, en CPU, contra los servicios del compose publicados en localhost.
@@ -124,7 +124,7 @@ respaldo:  ## copia de la base (pg_dump) y de los buckets de MinIO en respaldos/
 	  'mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null && mc mirror --quiet local /respaldo/minio'
 	@echo "Respaldo en respaldos/$(FECHA)"
 
-sincronizar-nucleo:  ## trae la versión nueva de insumo-datos (solo lectura) y vuelve a aplicar nucleo/parches
+sincronizar-nucleo:  ## trae la versión nueva de 4-Insumos-Proyecto/insumo-datos (solo lectura) y vuelve a aplicar nucleo/parches
 	@test -d "$(INSUMO)" || (echo "No encuentro $(INSUMO); use INSUMO=/ruta/a/insumo-datos" && exit 1)
 	# el Diccionario semilla es de la plataforma (D68: solo los desenlaces a 12 meses activos); no se pisa
 	rsync -a --exclude '.git' --exclude 'salidas/' --exclude 'interno/' --exclude 'privado/' --exclude '__pycache__/' \

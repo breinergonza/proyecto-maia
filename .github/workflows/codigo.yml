@@ -1,15 +1,15 @@
-# Integración continua del código (proyecto-codigo/): lint y pruebas de Python, pruebas y build del frontend.
+# Integración continua del código (6-Codigo-Fuente-Proyecto/): lint y pruebas de Python, pruebas y build del frontend.
 # Equivale a "make verificar-todo", con un Postgres de servicio en lugar del compose local.
 name: Código
 
 on:
   push:
     paths:
-      - 'proyecto-codigo/**'
+      - '6-Codigo-Fuente-Proyecto/**'
       - '.github/workflows/codigo.yml'
   pull_request:
     paths:
-      - 'proyecto-codigo/**'
+      - '6-Codigo-Fuente-Proyecto/**'
       - '.github/workflows/codigo.yml'
   workflow_dispatch:
 
@@ -27,7 +27,7 @@ jobs:
     timeout-minutes: 40
     defaults:
       run:
-        working-directory: proyecto-codigo
+        working-directory: 6-Codigo-Fuente-Proyecto
 
     services:
       postgres:
@@ -60,7 +60,7 @@ jobs:
         with:
           version: '0.11.7'
           enable-cache: true
-          cache-dependency-glob: proyecto-codigo/uv.lock
+          cache-dependency-glob: 6-Codigo-Fuente-Proyecto/uv.lock
 
       - name: OpenMP para LightGBM
         # libgomp1 viene en la imagen de ubuntu de GitHub (con gcc); se instala solo si faltara.
@@ -86,7 +86,7 @@ jobs:
     timeout-minutes: 20
     defaults:
       run:
-        working-directory: proyecto-codigo/plataforma/web
+        working-directory: 6-Codigo-Fuente-Proyecto/plataforma/web
 
     steps:
       - name: Descargar repositorio
@@ -97,7 +97,7 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: proyecto-codigo/plataforma/web/package-lock.json
+          cache-dependency-path: 6-Codigo-Fuente-Proyecto/plataforma/web/package-lock.json
 
       - name: Instalar dependencias
         run: npm ci --no-audit --no-fund

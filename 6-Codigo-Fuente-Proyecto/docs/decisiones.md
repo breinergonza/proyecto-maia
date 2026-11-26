@@ -6,7 +6,7 @@ escribió el código. Léalo antes de la primera instalación en el equipo con G
 
 ## Origen del núcleo
 
-* `nucleo/` es una copia de `insumo-datos/` en el commit `f3224765b0477c5963ea197ec97285bb4cbb9277`
+* `nucleo/` es una copia de `4-Insumos-Proyecto/insumo-datos/` (antes `insumo-datos/` en la raíz) en el commit `f3224765b0477c5963ea197ec97285bb4cbb9277`
   (19 de octubre de 2026). Los módulos conservan sus nombres (`sevarti`, `anomalias`, `clinico`, `retroalimentacion`,
   `archivos`) porque los modelos guardados con pickle los referencian.
 * Cambios sobre esa copia, como parches en `nucleo/parches/` (los vuelve a aplicar `make sincronizar-nucleo`):
@@ -40,6 +40,10 @@ escribió el código. Léalo antes de la primera instalación en el equipo con G
     variable se ofrece como filtro al armar una muestra. Incluye `pruebas/test_usar_como_filtro.py`.
   * `11-filtro-en-el-esquema.patch`: lleva esa marca al esquema de SEVARTI (`sevarti/contrato.py`). Incluye
     `pruebas/test_filtro_en_el_esquema.py`.
+  * 10 y 11 rebasados (2026-11-26): sus partes de `archivos/libros.py` y `pruebas/test_diccionario.py` reescribían
+    el archivo entero y pasaban de CRLF a LF, así que dejaron de aplicar cuando cambió el original. Ahora llevan
+    solo su cambio (la columna `opcional` y quitar `usar_como_filtro` al comparar con los esperados) y conservan
+    CRLF. Los 13 parches aplican sobre el `insumo-datos` actual.
   * `11-comparar-con-puntaje-z.patch` (D72): «Comparar con» acepta `z_<medida>`, el puntaje z de una medida de
     crecimiento en uso en la visita del cálculo (`clinico/configuracion.py` y `clinico/modelo.py`).
   * `12-readme-plataforma.patch`: el `README.md` de la copia dice en qué se aparta del original (marcas
@@ -104,7 +108,7 @@ Todas las versiones de Python están fijadas en `uv.lock` y las de JavaScript en
    sigue identificando por fuente y fecha: dos extracciones con la misma fecha y filtros distintos se reemplazan.
    Detalle en `docs/extraccion.md`. `maia corrida` ahora carga el corte que acaba de extraer, no el último de MinIO.
 12. **Integración continua (2026-10-28).** `.github/workflows/codigo.yml` corre ruff, pytest (Postgres 16 de
-   servicio, `MAIA_LGBM_DEVICE=cpu`) y vitest + build del frontend en cada push o PR que toque `proyecto-codigo/`. No
+   servicio, `MAIA_LGBM_DEVICE=cpu`) y vitest + build del frontend en cada push o PR que toque `6-Codigo-Fuente-Proyecto/`. No
    reemplaza `make verificar-gpu` ni la construcción de las imágenes.
 
 13. **Administración de las ejecuciones (2026-10-28).** El perfil admin configura desde la web lo que antes era

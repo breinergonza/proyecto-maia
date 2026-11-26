@@ -149,7 +149,7 @@ Reglas que no se rompen:
 ### 1. Variables de entorno
 
 ```bash
-cd proyecto-codigo
+cd 6-Codigo-Fuente-Proyecto
 make env          # crea .env desde .env.example (no sobrescribe uno existente)
 ```
 
@@ -288,7 +288,7 @@ El orden importa: Railway recibe modelos que se entrenan en el equipo local, as�
 
 | Paso | Comando o acción | Cómo saber que quedó bien |
 |---|---|---|
-| A1 | Clonar o copiar `proyecto-maia` y entrar a `proyecto-codigo/` | Existe `Makefile` |
+| A1 | Clonar o copiar `proyecto-maia` y entrar a `6-Codigo-Fuente-Proyecto/` | Existe `Makefile` |
 | A2 | `make env` y editar `.env` ([Configuración local](#configuración-local)) | No queda ningún `cambiar` (`grep cambiar .env` no muestra nada) |
 | A3 | Guardar `KMC_PW` en el llavero | `secret-tool lookup maia kmc_pw` la muestra |
 | A4 | `make arrancar` | `make estado`: todo sano; http://localhost:8080 muestra el ingreso |
@@ -305,7 +305,7 @@ El orden importa: Railway recibe modelos que se entrenan en el equipo local, as�
 
 ### Fase B · Railway (una sola vez)
 
-Requisitos: cuenta de Railway y su CLI (`npm i -g @railway/cli`). Todo desde `proyecto-codigo/`. Los comandos
+Requisitos: cuenta de Railway y su CLI (`npm i -g @railway/cli`). Todo desde `6-Codigo-Fuente-Proyecto/`. Los comandos
 completos, con cada variable, están en [`infra/railway/README.md`](infra/railway/README.md).
 
 | Paso | Comando o acción |
@@ -362,7 +362,7 @@ unset RCLAVE
 | Código de la API o de la web | `make railway-api` / `make railway-web` (y `make arrancar` en local, que reconstruye) |
 | Modelos simulados nuevos | `make demo-entrenar`, `make demo-exportar` y la Fase D; luego una corrida en la web |
 | Modelos con datos reales | Solo en local: `make corrida` |
-| Núcleo nuevo en `insumo-datos` | `make sincronizar-nucleo` (copia, vuelve a aplicar `nucleo/parches` y corre sus pruebas; no pisa el Diccionario semilla `nucleo/entradas/diccionario.xlsx`, D68) |
+| Núcleo nuevo en `4-Insumos-Proyecto/insumo-datos` | `make sincronizar-nucleo` (copia, vuelve a aplicar `nucleo/parches` y corre sus pruebas; no pisa el Diccionario semilla `nucleo/entradas/diccionario.xlsx`, D68) |
 | Esquema de la base | Migración nueva en `plataforma/comun/maia_comun/alembic/versions` (la última es `0014_rol_experto_datos`); la API la aplica al arrancar (`make migrar` la aplica a mano) |
 
 ---
@@ -383,7 +383,7 @@ flowchart LR
 * **Corrida automática.** Lo recomendado: guardar la conexión en **Datos y modelos › Configuración**, crear la
   programación en **Configuración › Programar ejecuciones automáticas** y dejar encendido `make programador`. Sin la
   web, con `KMC_PW` en el llavero, agregue a `crontab -e`:
-  `0 6 * * 1 cd /ruta/proyecto-codigo && make corrida-si-hay-corte-nuevo >> respaldos/cron.log 2>&1`
+  `0 6 * * 1 cd /ruta/6-Codigo-Fuente-Proyecto && make corrida-si-hay-corte-nuevo >> respaldos/cron.log 2>&1`
   (corre cada lunes y solo trabaja si la base cambió).
 * **Revisión.** El experto en datos responde **Mediciones por revisar** y el experto clínico **Revisión clínica de
   casos**. Al final de **Revisión clínica de casos**, administración ve qué parte de lo marcado por cada capa era un
@@ -409,8 +409,8 @@ make verificar-todo                           # ruff + pruebas de Python + prueb
 ### Estructura
 
 ```
-proyecto-codigo/
-├── nucleo/                    copia de insumo-datos (contrato SEVARTI y los dos modelos) + parches/
+6-Codigo-Fuente-Proyecto/
+├── nucleo/                    copia de 4-Insumos-Proyecto/insumo-datos (contrato SEVARTI y los dos modelos) + parches/
 ├── plataforma/
 │   ├── comun/                 configuración, base de datos (Alembic), MinIO, paquetes firmados, correo, puntuación
 │   ├── entrenamiento/         CLI "maia": extraer, simular, entrenar, registrar, exportar, publicar, corrida
@@ -466,7 +466,7 @@ Más contexto (versiones, desvíos del plan, lo que no se pudo verificar al escr
 
 ## Reglas que el código respeta
 
-* Todo el código vive en `proyecto-codigo/`; `insumo-datos/` solo se lee (`make sincronizar-nucleo`).
+* Todo el código vive en `6-Codigo-Fuente-Proyecto/`; `4-Insumos-Proyecto/insumo-datos/` solo se lee (`make sincronizar-nucleo`).
 * `iden_codigo` nunca se lee: los niños se identifican con códigos seudonimizados.
 * Los pickles solo se cargan desde paquetes verificados (firma HMAC-SHA256, hash de cada archivo, versión de
   LightGBM y del código).

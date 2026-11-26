@@ -1,4 +1,4 @@
-# Entorno local completo (equipo Ubuntu con GPU NVIDIA). Desde proyecto-codigo/:
+# Entorno local completo (equipo Ubuntu con GPU NVIDIA). Desde 6-Codigo-Fuente-Proyecto/:
 #   make arrancar          levanta postgres, minio, mlflow, mailpit, api y web
 #   make demo-entrenar     usa el trainer (con GPU) sobre datos simulados
 # Puertos: web 8080 · MLflow 5000 · consola MinIO 9001 · Mailpit 8025 · Postgres 5432 · MinIO API 9000

@@ -50,16 +50,17 @@ Con el acompañamiento de la Fundación Canguro y del profesor José Tiberio Her
 
 | Carpeta | Contenido |
 |---|---|
-| [`proyecto-codigo/`](proyecto-codigo/README.md) | Plataforma completa: núcleo de modelos, CLI `maia`, API FastAPI, web React e infraestructura (Docker, Railway, on-premise) |
-| [`insumo-datos/`](insumo-datos/README.md) | Núcleo de datos y modelos (contrato SEVARTI, anomalías y alertas clínicas) e informes; la plataforma usa una copia con parches en `proyecto-codigo/nucleo/` |
-| [`Datos/`](Datos/README.md) | Diccionario de datos (`diccionario.xlsx`, copia de `insumo-datos/entradas/`) |
-| [`Modelos/`](Modelos/README.md) | Modelos entrenados `maia-anomalias/v8` y `maia-clinico/v9`: ficha de cada uno y enlace de descarga del `.pkl` |
-| [`Notebooks/`](Notebooks/README.md) | Cuadernos de análisis de datos, modelo de anomalías y alertas clínicas, con su `.html` (copia de `insumo-datos/informes/`) |
-| `insumo-plan/` | Insumos de planeación |
-| `avances-1-latex/` | Informe de avance |
-| [`informe-final/`](informe-final/README.md) | Informe final en LaTeX (IEEEtran) |
-| [`proyecto-latex/`](proyecto-latex/README.md) | Artículo previo en LaTeX |
-| `.github/workflows/` | Integración continua: `codigo.yml` (lint, pruebas y build de `proyecto-codigo/`) y `compilar-avance.yml` (PDF del avance) |
+| [`1-Notebooks/`](1-Notebooks/README.md) | Cuadernos de análisis de datos, modelo de anomalías y alertas clínicas, con su `.html` (copia de `4-Insumos-Proyecto/insumo-datos/informes/`) |
+| [`2-Modelos/`](2-Modelos/README.md) | Modelos entrenados `maia-anomalias/v8` y `maia-clinico/v9`: ficha de cada uno y enlace de descarga del `.pkl` |
+| [`3-Datos/`](3-Datos/README.md) | Diccionario de datos (`diccionario.xlsx`, copia de `4-Insumos-Proyecto/insumo-datos/entradas/`) |
+| `4-Insumos-Proyecto/` | Insumos con los que se construyó el proyecto (las cuatro filas siguientes) |
+| ├─ [`insumo-datos/`](4-Insumos-Proyecto/insumo-datos/README.md) | Núcleo de datos y modelos (contrato SEVARTI, anomalías y alertas clínicas) e informes; la plataforma usa una copia con parches en `6-Codigo-Fuente-Proyecto/nucleo/` |
+| ├─ `insumo-plan/` | Insumos de planeación: propuesta, plan del modelo y decisiones abiertas del Observatorio (`.docx`) |
+| ├─ `avances-1-latex/` | Informe de avance (LaTeX, PDF y Word) |
+| └─ [`insumo-proyecto-latex/`](4-Insumos-Proyecto/insumo-proyecto-latex/README.md) | Artículo previo en LaTeX |
+| [`5-Informe-final-latex/`](5-Informe-final-latex/README.md) | Informe final en LaTeX (IEEEtran), con su PDF y el original en Word |
+| [`6-Codigo-Fuente-Proyecto/`](6-Codigo-Fuente-Proyecto/README.md) | Plataforma completa: núcleo de modelos, CLI `maia`, API FastAPI, web React e infraestructura (Docker, Railway, on-premise) |
+| `.github/workflows/` | Integración continua: `codigo.yml` (lint, pruebas y build de `6-Codigo-Fuente-Proyecto/`) y `compilar-avance.yml` (PDF del avance de `4-Insumos-Proyecto/insumo-proyecto-latex/`) |
 
 ## Enlaces relevantes
 
@@ -67,16 +68,16 @@ Con el acompañamiento de la Fundación Canguro y del profesor José Tiberio Her
 |---|---|
 | Aplicación desplegada | https://maia.canbby.com (instancia pública; el ingreso exige usuario y contraseña) |
 | Repositorio | https://github.com/breinergonza/proyecto-maia |
-| Informe final (PDF) | [`informe-final/articulo.pdf`](informe-final/articulo.pdf) |
-| Manual de usuario | [`proyecto-codigo/docs/manual_usuario.md`](proyecto-codigo/docs/manual_usuario.md) |
-| Decisiones técnicas | [`proyecto-codigo/docs/decisiones.md`](proyecto-codigo/docs/decisiones.md) |
+| Informe final (PDF) | [`5-Informe-final-latex/articulo.pdf`](5-Informe-final-latex/articulo.pdf) |
+| Manual de usuario | [`6-Codigo-Fuente-Proyecto/docs/manual_usuario.md`](6-Codigo-Fuente-Proyecto/docs/manual_usuario.md) |
+| Decisiones técnicas | [`6-Codigo-Fuente-Proyecto/docs/decisiones.md`](6-Codigo-Fuente-Proyecto/docs/decisiones.md) |
 | Documentación de la API | `/api/docs` de la aplicación (local: http://localhost:8080/api/docs) |
 | Fundación Canguro | [Sitio institucional de la Fundación](https://fundacioncanguro.co/) |
 | Estándares de crecimiento OMS | https://www.who.int/tools/child-growth-standards |
 
 ## Dependencias
 
-**Sistema** (detalle en [`proyecto-codigo/README.md`](proyecto-codigo/README.md#requisitos)):
+**Sistema** (detalle en [`6-Codigo-Fuente-Proyecto/README.md`](6-Codigo-Fuente-Proyecto/README.md#requisitos)):
 
 - Docker Engine con Compose v2 y `make`.
 - [`uv`](https://docs.astral.sh/uv/) ≥ 0.11 para el entorno de Python.
@@ -96,7 +97,7 @@ Con el acompañamiento de la Fundación Canguro y del profesor José Tiberio Her
 
 **Servicios (contenedores):** PostgreSQL 16, MinIO, MLflow 3, Mailpit, nginx.
 
-Las versiones exactas están fijadas en `proyecto-codigo/uv.lock` y `proyecto-codigo/plataforma/web/package-lock.json`.
+Las versiones exactas están fijadas en `6-Codigo-Fuente-Proyecto/uv.lock` y `6-Codigo-Fuente-Proyecto/plataforma/web/package-lock.json`.
 
 ## Entorno de ejecución
 
@@ -139,10 +140,10 @@ archivos ni imágenes; el acceso a datos reales lo concede la Fundación Canguro
 
 ## Instrucciones básicas de uso
 
-Todo se hace desde `proyecto-codigo/`. La guía completa está en [`proyecto-codigo/README.md`](proyecto-codigo/README.md).
+Todo se hace desde `6-Codigo-Fuente-Proyecto/`. La guía completa está en [`6-Codigo-Fuente-Proyecto/README.md`](6-Codigo-Fuente-Proyecto/README.md).
 
 ```bash
-cd proyecto-codigo
+cd 6-Codigo-Fuente-Proyecto
 make env              # crea .env; cambie todo lo que dice "cambiar"
 make arrancar         # postgres, minio, mlflow, mailpit, api y web
 make estado           # todo debe estar "healthy" o "running"
@@ -168,7 +169,7 @@ Otros comandos útiles: `make detener`, `make registros`, `make respaldo`, `make
 
 Primero se monta el equipo local (entrena los modelos) y después la demostración en Railway. El detalle, con la
 verificación de cada paso, está en
-[`proyecto-codigo/README.md`](proyecto-codigo/README.md#despliegue-completo-paso-a-paso).
+[`6-Codigo-Fuente-Proyecto/README.md`](6-Codigo-Fuente-Proyecto/README.md#despliegue-completo-paso-a-paso).
 
 1. **Local:** `make env` → editar `.env` → guardar `KMC_PW` en el llavero (nunca en archivos) → `make arrancar` →
    `make verificar-gpu` → crear usuarios en *Administración → Usuarios y permisos*.
@@ -177,13 +178,13 @@ verificación de cada paso, está en
 3. **Base real:** `make corrida` (o `make corrida-silencio` para guardar riesgos sin mostrarlos).
 4. **Railway (una vez):** crear proyecto con Postgres, servicios `api` y `web`, volumen `/datos/paquetes`, variables
    (`MAIA_SOLO_SIMULADO=true` y la misma `MAIA_PAQUETE_CLAVE` del `.env` local) y dominio público
-   ([`infra/railway/README.md`](proyecto-codigo/infra/railway/README.md)).
+   ([`infra/railway/README.md`](6-Codigo-Fuente-Proyecto/infra/railway/README.md)).
 5. **Código a Railway:** `make railway-api` y `make railway-web`.
 6. **Publicar el paquete simulado** en Railway con `maia publicar --url https://<dominio-web> --fuente simulado`.
 7. **Verificar:** `https://<dominio-web>/api/salud` responde `"db": true`; ingresar y ejecutar una corrida.
 
 Alternativa con un solo servidor con GPU:
-[`proyecto-codigo/infra/on-premise/README.md`](proyecto-codigo/infra/on-premise/README.md).
+[`6-Codigo-Fuente-Proyecto/infra/on-premise/README.md`](6-Codigo-Fuente-Proyecto/infra/on-premise/README.md).
 
 ## Ejemplos de uso
 
@@ -224,4 +225,4 @@ psicomotor bajo a los 12 meses (desde los 6 meses), con el riesgo estimado, su p
 pesaron (TreeSHAP). El experto en datos revisa las alertas de calidad en *Mediciones por revisar* y el experto
 clínico, los casos en *Revisión clínica de casos*.
 
-**Informe:** `cd informe-final && latexmk -pdf articulo.tex`.
+**Informe:** `cd 5-Informe-final-latex && latexmk -pdf articulo.tex`.

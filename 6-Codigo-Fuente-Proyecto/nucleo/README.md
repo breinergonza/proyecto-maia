@@ -1,10 +1,10 @@
 # Análisis de datos del Observatorio Canguro
 
-> **En `proyecto-codigo/`** esta carpeta es una copia de `insumo-datos` con los cambios de `parches/` (los aplica
-> `make sincronizar-nucleo`). Lo que la copia cambia frente al original se marca aquí con «(plataforma)»: el
-> Diccionario semilla con dos desenlaces (D68), los límites de dato improbable de la OMS (parche 03), «Usar como
-> filtro» (parche 10) y «Comparar con» con puntaje z (parche 11). La plataforma usa Python 3.13 con `uv`
-> (`pyproject.toml`). `make sincronizar-nucleo` vuelve a copiar este README desde `insumo-datos`.
+> **En `6-Codigo-Fuente-Proyecto/`** esta carpeta es una copia de `4-Insumos-Proyecto/insumo-datos` con los cambios
+> de `parches/` (los aplica `make sincronizar-nucleo`). Lo que la copia cambia frente al original se marca aquí con
+> «(plataforma)»: el Diccionario semilla con dos desenlaces (D68), los límites de dato improbable de la OMS (parche
+> 03), «Usar como filtro» (parche 10) y «Comparar con» con puntaje z (parche 11). La plataforma usa Python 3.13 con
+> `uv` (`pyproject.toml`). `make sincronizar-nucleo` vuelve a copiar este README desde el original.
 
 Tres notebooks y dos herramientas de uso diario:
 
@@ -137,7 +137,7 @@ Para agregar un desenlace: una fila nueva en Desenlaces con estado "En prueba", 
 
 Abrir el notebook en `informes/` y ejecutar todas las celdas. El del modelo tarda alrededor de una hora: entrena un modelo por variable, mete errores en tres rondas y revisa toda la base.
 
-El de análisis se calculó entre el 12 y el 14 de octubre de 2026. El 15 la Fundación restringió la fecha exacta de nacimiento, la sede, la llave del paciente y las fechas de hospitalización; después volvió a habilitar todo salvo la llave (`iden_codigo`, que nunca se usa). El código sigue trabajando sin sede ni fecha de parto, y las secciones del análisis que las usan no corren tal cual: volver a usarlas es la decisión abierta b de [Decisiones abiertas del Observatorio](https://claude.ai/code/artifact/f3199f60-eb35-4318-8ff2-9de4d77cbfa3) (copia en `insumo-plan/2-Decisiones_abiertas_del_Observatorio.docx`, en la raíz del repositorio).
+El de análisis se calculó entre el 12 y el 14 de octubre de 2026. El 15 la Fundación restringió la fecha exacta de nacimiento, la sede, la llave del paciente y las fechas de hospitalización; después volvió a habilitar todo salvo la llave (`iden_codigo`, que nunca se usa). El código sigue trabajando sin sede ni fecha de parto, y las secciones del análisis que las usan no corren tal cual: volver a usarlas es la decisión abierta b de [Decisiones abiertas del Observatorio](https://claude.ai/code/artifact/f3199f60-eb35-4318-8ff2-9de4d77cbfa3) (copia en `4-Insumos-Proyecto/insumo-plan/2-Decisiones_abiertas_del_Observatorio.docx`, en la raíz del repositorio).
 
 Los textos de los notebooks se editan en `informes/construir_*.py`: se corre el script y luego se ejecuta el notebook.
 
@@ -172,7 +172,7 @@ Cada entrega (`revisar` aquí y `riesgos` abajo) cubre lo que entró desde el co
 
 Tienen las mismas opciones `--sevarti CARPETA` y `--modelo CARPETA` (antes de la orden). En `salidas/riesgos/<fecha>.xlsx` va cada niño pendiente con la probabilidad de cada desenlace (Riesgo %), su posición frente a los niños con que se calibró el modelo (de 0 a 100) y los datos que más le suben el riesgo (Por qué). La ficha del modelo (`interno/clinico/modelos/<versión>/ficha.json`) trae el AUC de cada desenlace frente a la regla simple, para saber cuánto vale cada riesgo. Los desenlaces y las medidas de crecimiento los configuran los expertos en el diccionario.
 
-**Desenlaces en prueba.** En `insumo-datos` el diccionario trae 14 desenlaces "En uso" (readmisión, no volver a la siguiente visita, oxígeno y desarrollo) y 38 "En prueba", para probarlos antes de usarlos. (plataforma) El Diccionario semilla de `proyecto-codigo` tiene los mismos 52, pero deja "En uso" solo `desarrollo_12m` (desarrollo psicomotor bajo a los 12 meses), "En prueba" la talla baja a los 12 meses calculada a las 40 semanas y a los 3, 6 y 9 meses (`talla_baja_12m_desde_{40,3,6,9}`) y los otros 47 en "No usar"; un experto los reactiva desde la página del Diccionario (D68). Los que el archivo trae:
+**Desenlaces en prueba.** En `4-Insumos-Proyecto/insumo-datos` el diccionario trae 14 desenlaces "En uso" (readmisión, no volver a la siguiente visita, oxígeno y desarrollo) y 38 "En prueba", para probarlos antes de usarlos. (plataforma) El Diccionario semilla de `6-Codigo-Fuente-Proyecto` tiene los mismos 52, pero deja "En uso" solo `desarrollo_12m` (desarrollo psicomotor bajo a los 12 meses), "En prueba" la talla baja a los 12 meses calculada a las 40 semanas y a los 3, 6 y 9 meses (`talla_baja_12m_desde_{40,3,6,9}`) y los otros 47 en "No usar"; un experto los reactiva desde la página del Diccionario (D68). Los que el archivo trae:
 
 - Eventos anotados en cada visita, con el riesgo calculado en la visita anterior: enfermedad infecciosa, ictericia, apnea e infección pulmonar antes de las 40 semanas; enfermedad respiratoria aguda antes de los 3, 6, 9 y 12 meses; oxígeno ambulatorio a los 6 y 9 meses.
 - Eventos cuya forma de anotarse cambió con el sistema de 2022, contados solo desde entonces porque la proporción de "sí" cayó entre 4 y 30 veces (displasia de caderas, de 11,7% a 1,3%): tono anormal, falla en el crecimiento, enfermedad gastrointestinal aguda, examen neurológico anormal, displasia de caderas y riesgo de parálisis cerebral. Varios tienen muy pocos casos; si no alcanzan, quedan sin modelo y la tabla dice por qué.
@@ -263,7 +263,7 @@ El anexo B del notebook de análisis explica cómo agregar variables, medidas re
 
 ## Lo que no viene de la Fundación
 
-Todo lo demás sale de la base, del diccionario, de `consumo.categoria` o de lo que indicó la Fundación (estancias desde `hd_diasurn` y `hd_totaldiashospital`, `EG_Semanas` para la edad corregida, variables restringidas, carga cada 6 meses). Las filas marcadas con una letra siguen abiertas y por ahora quedan como están; cada una se explica en [Decisiones abiertas del Observatorio](https://claude.ai/code/artifact/f3199f60-eb35-4318-8ff2-9de4d77cbfa3) (copia en `insumo-plan/2-Decisiones_abiertas_del_Observatorio.docx`, en la raíz del repositorio).
+Todo lo demás sale de la base, del diccionario, de `consumo.categoria` o de lo que indicó la Fundación (estancias desde `hd_diasurn` y `hd_totaldiashospital`, `EG_Semanas` para la edad corregida, variables restringidas, carga cada 6 meses). Las filas marcadas con una letra siguen abiertas y por ahora quedan como están; cada una se explica en [Decisiones abiertas del Observatorio](https://claude.ai/code/artifact/f3199f60-eb35-4318-8ff2-9de4d77cbfa3) (copia en `4-Insumos-Proyecto/insumo-plan/2-Decisiones_abiertas_del_Observatorio.docx`, en la raíz del repositorio).
 
 | Qué | De dónde | Dónde se usa |
 |---|---|---|

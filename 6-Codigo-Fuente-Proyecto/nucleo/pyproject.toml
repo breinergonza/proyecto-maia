@@ -1,7 +1,7 @@
 [project]
 name = "maia-nucleo"
 version = "0.1.0"
-description = "Núcleo del Observatorio Canguro: contrato SEVARTI, modelo de anomalías y alertas clínicas (copia de insumo-datos)"
+description = "Núcleo del Observatorio Canguro: contrato SEVARTI, modelo de anomalías y alertas clínicas (copia de 4-Insumos-Proyecto/insumo-datos)"
 requires-python = ">=3.13"
 dependencies = [
     "psycopg[binary]>=3.3",

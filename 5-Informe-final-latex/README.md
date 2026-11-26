@@ -1,6 +1,6 @@
 # Informe final KMCPred (LaTeX, IEEEtran)
 
-Conversión de `informe.docx` a LaTeX con la misma estructura de `../proyecto-latex/`.
+Conversión de `informe.docx` a LaTeX con la misma estructura de [`4-Insumos-Proyecto/insumo-proyecto-latex/`](../4-Insumos-Proyecto/insumo-proyecto-latex/README.md).
 
 ## Compilar
 

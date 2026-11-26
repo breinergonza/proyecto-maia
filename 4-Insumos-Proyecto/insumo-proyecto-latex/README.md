@@ -3,7 +3,7 @@
 **Alertas clínicas tempranas con IA interpretable en niños prematuros y de bajo peso**
 Informe final tipo artículo del curso *Proyecto: despliegue de soluciones* (MAIA, Uniandes), (IEEEtran.cls v1.7a).
 
-> **Versión previa.** El informe final entregado, con el nombre de la plataforma (KMCPred) y los resultados de los modelos publicados, está en [`../informe-final/`](../informe-final/README.md). Esta carpeta se conserva como antecedente y no se actualizó con esos cambios.
+> **Versión previa.** El informe final entregado, con el nombre de la plataforma (KMCPred) y los resultados de los modelos publicados, está en [`5-Informe-final-latex/`](../../5-Informe-final-latex/README.md). Esta carpeta se conserva como antecedente y no se actualizó con esos cambios.
 
 ## Compilar
 
@@ -37,7 +37,7 @@ Hoy el PDF tiene 9 páginas; el límite es 12.
 
 ## Pendientes antes de entregar
 
-Esta lista es de esta versión previa y quedó como estaba: el texto de esta carpeta todavía tiene esas marcas. Los resultados que se alcanzaron están en el informe final de [`../informe-final/`](../informe-final/README.md).
+Esta lista es de esta versión previa y quedó como estaba: el texto de esta carpeta todavía tiene esas marcas. Los resultados que se alcanzaron están en el informe final de [`5-Informe-final-latex/`](../../5-Informe-final-latex/README.md).
 
 El texto marca en **rojo** con `\pendiente{...}` lo que depende de resultados que todavía no existen. Buscar `\pendiente` y reemplazar:
 
@@ -49,7 +49,7 @@ El texto marca en **rojo** con `\pendiente{...}` lo que depende de resultados qu
 6. Resultados del despliegue y captura del tablero (sección 4.6).
 7. Cierre de las conclusiones con esos hallazgos (sección 6).
 
-Las cifras actuales son del corte del 24/07/2026 y salen de los informes de `insumo-datos/informes/`. Si se vuelve a correr el pipeline, hay que actualizarlas.
+Las cifras actuales son del corte del 24/07/2026 y salen de los informes de `4-Insumos-Proyecto/insumo-datos/informes/`. Si se vuelve a correr el pipeline, hay que actualizarlas.
 
 ## Referencias
 

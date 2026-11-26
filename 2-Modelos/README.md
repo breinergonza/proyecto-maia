@@ -28,7 +28,7 @@ Los modelos serializados (`modelo.pkl`) son demasiado pesados para subirlos al r
 
 1. Abra el `modelo.pkl.txt` de la versión que quiere revisar y copie la URL.
 2. Descargue el archivo desde esa URL.
-3. Guárdelo en la misma carpeta con el nombre `modelo.pkl` (sin el `.txt`), por ejemplo `Modelos/maia-clinico/v9/modelo.pkl`.
+3. Guárdelo en la misma carpeta con el nombre `modelo.pkl` (sin el `.txt`), por ejemplo `2-Modelos/maia-clinico/v9/modelo.pkl`.
 
 ### Otros archivos
 

@@ -11,7 +11,7 @@ __pycache__/
 .ipynb_checkpoints/
 .codegraph/
 
-# Archivos temporales de compilación LaTeX (4-Insumos-Proyecto/avances-1-latex/, insumo-proyecto-latex/, 5-informe-final-latex/)
+# Archivos temporales de compilación LaTeX (4-Insumos-Proyecto/avances-1-latex/, insumo-proyecto-latex/, 5-Informe-final-latex/)
 *.aux
 *.log
 *.out

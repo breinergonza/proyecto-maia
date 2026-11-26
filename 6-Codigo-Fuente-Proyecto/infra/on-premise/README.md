@@ -53,7 +53,7 @@ y sirve la aplicación. El archivo es [`docker-compose.on-premise.yml`](../../do
 
 1. **Projects → (proyecto) → New → Resource → Private Repository (GitHub App)**, o **Public Repository**:
    `breinergonza/proyecto-maia`, rama `main` (o la rama que se quiera desplegar).
-2. **Build Pack:** Docker Compose · **Base Directory:** `/proyecto-codigo` ·
+2. **Build Pack:** Docker Compose · **Base Directory:** `/6-Codigo-Fuente-Proyecto` ·
    **Docker Compose Location:** `/docker-compose.on-premise.yml`. Pulse **Reload Compose File**: aparecen siete
    servicios.
 3. En el servicio **web**, escriba el dominio (`https://maia.ejemplo.org`). El proxy emite el certificado.

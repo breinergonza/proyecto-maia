@@ -5,11 +5,11 @@ on:
     branches:
       - main
     paths:
-      - 'proyecto-latex/Avance_proyecto.tex'
-      - 'proyecto-latex/figuras/**'
-      - 'proyecto-latex/secciones/**'
-      - 'proyecto-latex/referencias.tex'
-      - 'proyecto-latex/IEEEtran.cls'
+      - '4-Insumos-Proyecto/insumo-proyecto-latex/Avance_proyecto.tex'
+      - '4-Insumos-Proyecto/insumo-proyecto-latex/figuras/**'
+      - '4-Insumos-Proyecto/insumo-proyecto-latex/secciones/**'
+      - '4-Insumos-Proyecto/insumo-proyecto-latex/referencias.tex'
+      - '4-Insumos-Proyecto/insumo-proyecto-latex/IEEEtran.cls'
 
   workflow_dispatch:
 
@@ -39,7 +39,7 @@ jobs:
 
       # 3. Compilar el archivo
       - name: Compilar Avance_proyecto.tex
-        working-directory: proyecto-latex
+        working-directory: 4-Insumos-Proyecto/insumo-proyecto-latex
         run: |
           latexmk \
             -pdf \
@@ -53,7 +53,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add proyecto-latex/Avance_proyecto.pdf
+          git add 4-Insumos-Proyecto/insumo-proyecto-latex/Avance_proyecto.pdf
 
           if git diff --cached --quiet; then
             echo "El PDF no tuvo cambios."

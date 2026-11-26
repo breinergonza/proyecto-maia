@@ -25,7 +25,7 @@ la raíz. Por eso la configuración va en **variables de servicio** (que Railway
 
 ## Una sola vez
 
-Requisitos: la CLI de Railway (`npm i -g @railway/cli`) y una cuenta. Todo se ejecuta desde `proyecto-codigo/`.
+Requisitos: la CLI de Railway (`npm i -g @railway/cli`) y una cuenta. Todo se ejecuta desde `6-Codigo-Fuente-Proyecto/`.
 
 ```bash
 railway login
@@ -93,7 +93,7 @@ make railway-api      # railway up --service api --detach
 make railway-web      # railway up --service web --detach
 ```
 
-`railway up` sube `proyecto-codigo/` sin lo que listan `.gitignore` y `.railwayignore` (datos, modelos, `.env`,
+`railway up` sube `6-Codigo-Fuente-Proyecto/` sin lo que listan `.gitignore` y `.railwayignore` (datos, modelos, `.env`,
 respaldos, `node_modules`). Revise ese archivo antes del primer despliegue.
 
 Al arrancar, la API aplica las migraciones, crea el usuario de administración y siembra una cohorte simulada de

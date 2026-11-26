@@ -1,5 +1,5 @@
 # Despliegue completo on-premise, en un servidor propio con GPU NVIDIA (guía: infra/on-premise/README.md).
-# En el orquestador: Build Pack "Docker Compose", Base Directory "/proyecto-codigo",
+# En el orquestador: Build Pack "Docker Compose", Base Directory "/6-Codigo-Fuente-Proyecto",
 # Docker Compose Location "/docker-compose.on-premise.yml".
 #
 # Solo la web queda publicada (dominio con HTTPS del proxy del servidor). MLflow y la consola de MinIO escuchan en 127.0.0.1 del

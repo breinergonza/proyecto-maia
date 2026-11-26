@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # Frontend: React compilado con Vite, servido por nginx, que además hace de proxy hacia la API (/api).
-# Contexto de build: proyecto-codigo/.
+# Contexto de build: 6-Codigo-Fuente-Proyecto/.
 
 FROM node:22-alpine AS build
 WORKDIR /web
