@@ -45,8 +45,6 @@ Escala: ✅ como el plan · 🟡 parcial · ❌ falta o se ve mal.
 5. Equidad (selector y mapa por desenlace), Estabilidad (banda, mínimo, cortes de tiempo), Población (faltantes y eventos).
 6. Anticipación y la interpretabilidad completa dependen de artefactos que el entrenamiento aún no produce.
 
-La propuesta visual de cada submódulo está en el lienzo de Claude Design «Analítica · Observatorio Canguro».
-
 ## Avance (2026-11-09, primera tanda)
 
 Hecho, verificado con capturas a 1440 px y 213 pruebas web en verde:
@@ -122,7 +120,7 @@ el código de `plataforma/web/src` y en `docs/decisiones.md`):
 
 | Punto | Antes (en esta evaluación) | Ahora | Dónde |
 | --- | --- | --- | --- |
-| Nombre de la plataforma | Observatorio Canguro | **KMCPred** («Sistema interpretable de alertas y predicción temprana de riesgos en niños prematuros y de bajo peso del Programa Madre Canguro»); «Observatorio Canguro» queda para la cohorte y la base de la Fundación. El lienzo de Claude Design conserva su nombre | D78, `lib/useTituloPagina.ts` |
+| Nombre de la plataforma | Observatorio Canguro | **KMCPred** («Sistema interpretable de alertas y predicción temprana de riesgos en niños prematuros y de bajo peso del Programa Madre Canguro»); «Observatorio Canguro» queda para la cohorte y la base de la Fundación | D78, `lib/useTituloPagina.ts` |
 | Entrada del menú | «Analítica» | Grupo **Evaluación de modelos** en la sección **Datos y modelos**, con los once análisis y **Entrenamientos propios** | `components/Marco.tsx` |
 | Quién la ve | Todos los perfiles | Consulta, Experto en datos y Administración (`ROLES_MODELOS`); el Experto clínico ya no | D77, `App.tsx` |
 | Encabezado | «Analítica › Submódulo» con su pregunta | Igual, con los nombres nuevos de los submódulos (abajo) | `paginas/AnaliticaLayout.tsx`, `paginas/analitica/submodulos.ts` |

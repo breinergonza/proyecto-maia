@@ -131,7 +131,7 @@ Para agregar un desenlace: una fila nueva en Desenlaces con estado "En prueba", 
 
 Abrir el notebook en `informes/` y ejecutar todas las celdas. El del modelo tarda alrededor de una hora: entrena un modelo por variable, mete errores en tres rondas y revisa toda la base.
 
-El de análisis se calculó entre el 12 y el 14 de octubre de 2026. El 15 la Fundación restringió la fecha exacta de nacimiento, la sede, la llave del paciente y las fechas de hospitalización; después volvió a habilitar todo salvo la llave (`iden_codigo`, que nunca se usa). El código sigue trabajando sin sede ni fecha de parto, y las secciones del análisis que las usan no corren tal cual: volver a usarlas es la decisión abierta b de [Decisiones abiertas del Observatorio](https://claude.ai/code/artifact/f3199f60-eb35-4318-8ff2-9de4d77cbfa3) (copia en `4-Insumos-Proyecto/insumo-plan/2-Decisiones_abiertas_del_Observatorio.docx`, en la raíz del repositorio).
+El de análisis se calculó entre el 12 y el 14 de octubre de 2026. El 15 la Fundación restringió la fecha exacta de nacimiento, la sede, la llave del paciente y las fechas de hospitalización; después volvió a habilitar todo salvo la llave (`iden_codigo`, que nunca se usa). El código sigue trabajando sin sede ni fecha de parto, y las secciones del análisis que las usan no corren tal cual: volver a usarlas es la decisión abierta b de *Decisiones abiertas del Observatorio* (`4-Insumos-Proyecto/insumo-plan/2-Decisiones_abiertas_del_Observatorio.docx`, en la raíz del repositorio).
 
 Los textos de los notebooks se editan en `informes/construir_*.py`: se corre el script y luego se ejecuta el notebook.
 
@@ -257,7 +257,7 @@ El anexo B del notebook de análisis explica cómo agregar variables, medidas re
 
 ## Lo que no viene de la Fundación
 
-Todo lo demás sale de la base, del diccionario, de `consumo.categoria` o de lo que indicó la Fundación (estancias desde `hd_diasurn` y `hd_totaldiashospital`, `EG_Semanas` para la edad corregida, variables restringidas, carga cada 6 meses). Las filas marcadas con una letra siguen abiertas y por ahora quedan como están; cada una se explica en [Decisiones abiertas del Observatorio](https://claude.ai/code/artifact/f3199f60-eb35-4318-8ff2-9de4d77cbfa3) (copia en `4-Insumos-Proyecto/insumo-plan/2-Decisiones_abiertas_del_Observatorio.docx`, en la raíz del repositorio).
+Todo lo demás sale de la base, del diccionario, de `consumo.categoria` o de lo que indicó la Fundación (estancias desde `hd_diasurn` y `hd_totaldiashospital`, `EG_Semanas` para la edad corregida, variables restringidas, carga cada 6 meses). Las filas marcadas con una letra siguen abiertas y por ahora quedan como están; cada una se explica en *Decisiones abiertas del Observatorio* (`4-Insumos-Proyecto/insumo-plan/2-Decisiones_abiertas_del_Observatorio.docx`, en la raíz del repositorio).
 
 | Qué | De dónde | Dónde se usa |
 |---|---|---|
