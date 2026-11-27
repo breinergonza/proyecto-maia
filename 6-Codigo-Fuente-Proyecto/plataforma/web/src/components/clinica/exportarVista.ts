@@ -5,6 +5,7 @@ import type { ClinicaResumen } from '../../api/tipos'
 import type { FilaCsv } from '../../lib/exportar'
 import { indicador as nombreIndicador, numero } from '../../lib/formato'
 import { aMomento } from './RiesgoPorCorte'
+import { nombreBajo } from './Trayectoria'
 
 export const COLUMNAS_VISTA = ['Sección', 'Dato', 'Valor']
 
@@ -48,6 +49,7 @@ export function filasDeLaVista(r: ClinicaResumen): FilaCsv[] {
 
   const { indicador, unidad, etapas } = r.trayectoria
   const crecimiento = `Crecimiento: ${nombreIndicador(indicador).toLowerCase()} (${esPuntajeZ(unidad) ? 'puntaje z' : unidad})`
+  const bajo = nombreBajo(indicador, unidad)
   for (const e of etapas) {
     const visita = nombreVisita(e.etapa)
     if (e.grupo) {
@@ -63,6 +65,7 @@ export function filasDeLaVista(r: ClinicaResumen): FilaCsv[] {
       if (e.grupo.bigote_bajo != null && e.grupo.bigote_alto != null) {
         agregar(crecimiento, `${visita}: mínimo y máximo no atípicos del grupo`, `${numero(e.grupo.bigote_bajo)} a ${numero(e.grupo.bigote_alto)}`)
       }
+      if (bajo && e.grupo.pct_bajo != null) agregar(crecimiento, `${visita}: % del grupo con ${bajo}`, numero(e.grupo.pct_bajo))
     }
     if (e.poblacion?.mediana != null && !esPoblacion) agregar(crecimiento, `${visita}: mediana de toda la población`, numero(e.poblacion.mediana))
     if (e.poblacion?.media != null && !esPoblacion) agregar(crecimiento, `${visita}: promedio de toda la población`, numero(e.poblacion.media))

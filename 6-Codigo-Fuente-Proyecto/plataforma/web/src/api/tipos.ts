@@ -653,6 +653,8 @@ export interface EtapaClinica {
   grupo: {
     n: number; p25: number | null; mediana: number | null; p75: number | null
     media?: number | null; de?: number | null; varianza?: number | null; bigote_bajo?: number | null; bigote_alto?: number | null
+    /** El % de los niños con dato con crecimiento bajo (z < −2), con 20 niños o más. */
+    pct_bajo?: number | null
   } | null
   poblacion: { n: number; mediana: number | null; media?: number | null } | null
 }

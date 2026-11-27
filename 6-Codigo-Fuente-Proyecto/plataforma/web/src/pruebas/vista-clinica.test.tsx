@@ -6,7 +6,7 @@ import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { FamiliaClinica, RespuestaClinica, Usuario } from '../api/tipos'
 import { filasDeLaVista } from '../components/clinica/exportarVista'
-import { DetalleNino, PuntoNino } from '../components/clinica/Trayectoria'
+import { DetalleNino, dibujoDe, filasDe, Globo, PuntoNino } from '../components/clinica/Trayectoria'
 import { montar, simularApi, usuario } from './util'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -29,12 +29,12 @@ const resumen = {
   trayectoria: {
     indicador: 'talla', unidad: 'puntaje z de la OMS',
     etapas: [
-      { etapa: '40 sem', grupo: { n: 298, p25: -1.4, mediana: -1, p75: -0.6, media: -1.05, de: 0.6, varianza: 0.36, bigote_bajo: -2.6, bigote_alto: 0.5 },
+      { etapa: '40 sem', grupo: { n: 298, p25: -1.4, mediana: -1, p75: -0.6, media: -1.05, de: 0.6, varianza: 0.36, bigote_bajo: -2.6, bigote_alto: 0.5, pct_bajo: 12.5 },
         poblacion: { n: 4000, mediana: -0.2, media: -0.25 } },
-      { etapa: '3 m EC', grupo: { n: 271, p25: -1.9, mediana: -1.5, p75: -1.1, media: -1.55, de: 0.62, varianza: 0.3844, bigote_bajo: -3.1, bigote_alto: 0.1 },
+      { etapa: '3 m EC', grupo: { n: 271, p25: -1.9, mediana: -1.5, p75: -1.1, media: -1.55, de: 0.62, varianza: 0.3844, bigote_bajo: -3.1, bigote_alto: 0.1, pct_bajo: 30.2 },
         poblacion: { n: 3900, mediana: -0.7, media: -0.75 } },
       { etapa: '6 m EC', grupo: null, poblacion: { n: 3500, mediana: -0.8, media: -0.82 } },
-      { etapa: '12 m EC', grupo: { n: 223, p25: -1.6, mediana: -1.2, p75: -0.8, media: -1.25, de: 0.58, varianza: 0.3364, bigote_bajo: -2.8, bigote_alto: 0.4 },
+      { etapa: '12 m EC', grupo: { n: 223, p25: -1.6, mediana: -1.2, p75: -0.8, media: -1.25, de: 0.58, varianza: 0.3364, bigote_bajo: -2.8, bigote_alto: 0.4, pct_bajo: 18 },
         poblacion: { n: 3680, mediana: -0.5, media: -0.55 } },
     ],
   },
@@ -190,7 +190,7 @@ describe('vista clínica', () => {
     const de = within(panel).getByRole('tab', { name: 'Desviación estándar' })
     expect(de).toHaveAttribute('aria-selected', 'true')
     const figura = within(panel).getByRole('figure')
-    expect(figura.getAttribute('aria-label')).toMatch(/40 sem\. Promedio -1,05, DE 0,6, 298 niños con dato/)
+    expect(figura.getAttribute('aria-label')).toMatch(/40 sem\. Promedio -1,05, DE 0,6, 298 niños con dato, 12,5 % con talla baja/)
     // los puntos: los niños en alerta más alejados del promedio de su visita, con su riesgo
     expect(figura.getAttribute('aria-label')).toMatch(/3 m EC\..*En alerta y más alejados: S-01633 \(-3,4; riesgo más de 99,9 %\), S-02210/)
     for (const t of ['2 DE por encima', 'Promedio', '2 DE por debajo', 'Promedio de toda la población', 'Riesgo más de 99,9 %', 'Riesgo menor, en alerta']) {
@@ -235,7 +235,7 @@ describe('vista clínica', () => {
     await userEvent.click(within(panel).getByRole('button', { name: 'Ver como tabla' }))
     const tabla = within(panel).getByRole('table')
     for (const t of ['Visita', 'Niños con dato', 'Promedio', 'DE', 'Varianza', 'Mínimo no atípico', 'Primer cuartil (25 %)', 'Mediana',
-      'Tercer cuartil (75 %)', 'Máximo no atípico', 'Promedio de la población', 'Mediana de la población']) {
+      'Tercer cuartil (75 %)', 'Máximo no atípico', 'Con talla baja (%)', 'Promedio de la población', 'Mediana de la población']) {
       expect(within(tabla).getByRole('columnheader', { name: t })).toBeInTheDocument()
     }
     // la tabla y el CSV son cifras del grupo: ningún niño uno por uno
@@ -422,7 +422,8 @@ describe('vista clínica: exportar', () => {
     expect(de('Crecimiento: talla para la edad (puntaje z)')).toContain('40 sem: niños del grupo con dato: 298')
     expect(de('Crecimiento: talla para la edad (puntaje z)')).toEqual(expect.arrayContaining([
       '40 sem: promedio del grupo: -1,05', '40 sem: DE del grupo: 0,6', '40 sem: varianza del grupo: 0,36',
-      '40 sem: mínimo y máximo no atípicos del grupo: -2,6 a 0,5', '40 sem: promedio de toda la población: -0,25']))
+      '40 sem: mínimo y máximo no atípicos del grupo: -2,6 a 0,5', '40 sem: % del grupo con talla baja: 12,5',
+      '40 sem: promedio de toda la población: -0,25']))
     // una visita sin dato del grupo no inventa una mediana
     expect(de('Crecimiento: talla para la edad (puntaje z)').some((x) => x.startsWith('6 m EC: mediana del grupo'))).toBe(false)
     // ningún niño individual sale en el archivo
@@ -518,5 +519,44 @@ describe('vista clínica: los puntos de la gráfica de crecimiento', () => {
     expect(screen.getByText(/riesgo estimado más de 99,9 %/)).toBeInTheDocument()
     expect(screen.getByText(/a 3 DE por debajo del promedio de su visita/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Abrir ficha del niño' })).toHaveAttribute('href', '/ninos/S-01633')
+  })
+})
+
+describe('vista clínica: el globo de la gráfica de crecimiento', () => {
+  const [cuarenta, , , doce] = filasDe(resumen.trayectoria.etapas)
+  const punto = { sujeto: 'S-01633', x: '3 m EC', z: -3.4, riesgo: 0.9996, fuerte: true, dx: -13, rotulo: true, distancia: 3.0 }
+  const globo = (props: Partial<Parameters<typeof Globo>[0]>) =>
+    render(<Globo active unidad="puntaje z de la OMS" pestana="de" conPoblacion bajo="talla baja" senalado={null} {...props} />)
+
+  it('al pasar por una visita resume esa visita en pocas líneas, aunque Recharts le junte un niño de otra visita', () => {
+    // Recharts empareja los puntos por posición: a la cuarta visita le llega el cuarto niño de la lista, sea de donde sea
+    globo({ payload: [{ payload: dibujoDe(doce, 'de') }, { payload: punto }] })
+    const g = screen.getByRole('status')
+    expect(g).toHaveTextContent('12 m EC · 223 niños')
+    expect(g).toHaveTextContent('Promedio -1,25 · DE 0,58')
+    expect(g).toHaveTextContent('18,0 % con talla baja')
+    expect(g).toHaveTextContent('Toda la población: -0,55')
+    expect(g).not.toHaveTextContent(/Niño|S-01633/)
+    expect(g.querySelectorAll('p').length).toBeLessThanOrEqual(4)
+  })
+
+  it('en la pestaña Varianza dice la mediana y la varianza; sin caja, la mediana y por qué no hay caja', () => {
+    const { unmount } = globo({ pestana: 'var', payload: [{ payload: dibujoDe(cuarenta, 'var') }] })
+    expect(screen.getByRole('status')).toHaveTextContent('Mediana -1 · varianza 0,36')
+    unmount()
+    const [pocos] = filasDe([{ etapa: '9 m EC', grupo: { n: 3, p25: null, mediana: -1.5, p75: null }, poblacion: null }])
+    globo({ payload: [{ payload: dibujoDe(pocos, 'de') }] })
+    const g = screen.getByRole('status')
+    expect(g).toHaveTextContent('9 m EC · 3 niños')
+    expect(g).toHaveTextContent('Mediana -1,5 · sin caja: menos de 20 niños')
+    expect(g).not.toHaveTextContent('con talla baja')
+  })
+
+  it('al pasar por un punto dice ese niño, su dato y su riesgo', () => {
+    globo({ senalado: punto, payload: [{ payload: dibujoDe(doce, 'de') }] })
+    const g = screen.getByRole('status')
+    expect(g).toHaveTextContent('Niño S-01633 · 3 m EC')
+    expect(g).toHaveTextContent('z -3,4 · riesgo más de 99,9 %')
+    expect(g).not.toHaveTextContent('12 m EC')
   })
 })
