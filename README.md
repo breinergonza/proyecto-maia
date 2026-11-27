@@ -51,6 +51,29 @@ La solución completa (API, aplicación web, entrenamiento reproducible y trazab
 
 Con el acompañamiento de la Fundación Canguro y del profesor José Tiberio Hernández (responsable de Analítica).
 
+## Acceso a la aplicación para evaluadores
+
+La aplicación KMCPred se encuentra disponible en:
+
+**https://maia.canbby.com**
+
+Se han creado cuentas de evaluación con perfiles diferenciados para comprobar las funcionalidades del sistema.
+
+| Usuario | Perfil | Funcionalidades |
+|---|---|---|
+| [evaluador.consulta@canbby.com] | Consulta | Seguimiento clínico, comparación de cohortes y evaluación de modelos |
+| [evaluador.expertoclinico@canbby.com] | Experto clínico | Consulta individual y estimación de riesgo, únicamente con datos autorizados o simulados |
+| [evaluador.expertodatos@canbby.com] | Experto en datos | Revisión de anomalías y evaluación técnica de modelos |
+
+### Instrucciones de ingreso
+
+1. Abrir https://maia.canbby.com.
+2. Introducir el correo de la cuenta asignada.
+3. Escribir la contraseña recibida por un canal privado.
+4. Seleccionar **Iniciar sesión**.
+
+**Seguridad:** Las contraseñas no se publican en este repositorio público. Los accesos deben limitarse a las funciones y los datos autorizados para la evaluación académica.
+
 ---
 
 ## Contenido
