@@ -241,7 +241,9 @@ def extremos_de(s: Session, corrida: int, familia: str, indicador: str, ids: lis
 
 def riesgo_de(s: Session, corrida: int, corte_id: int, familia: str, ids: list[str] | None, dic: Dic) -> list[dict]:
     """Por corte (visita desde la que se predice), cuántos niños del grupo tienen riesgo calculado y cuántos están en
-    alerta (percentil de ``PERCENTIL_ALTO`` o más)."""
+    alerta (percentil de ``PERCENTIL_ALTO`` o más), y la visita que esos niños esperan (``siguiente``: la que sigue en
+    el corte, como en el núcleo; ``None`` si no hay otra): el núcleo calcula el riesgo solo de los niños cuya próxima
+    visita todavía no se venció."""
     de = ' AND sujeto = ANY(:ids)' if ids is not None else ''
     filas = _filas(s, f"""
         SELECT momento, clave, count(*) AS calculados, count(*) FILTER (WHERE percentil >= :alto) AS en_alerta
@@ -249,14 +251,27 @@ def riesgo_de(s: Session, corrida: int, corte_id: int, familia: str, ids: list[s
         WHERE corrida_id = :c AND NOT silencio AND (clave = :f OR clave LIKE :l){de}
         GROUP BY momento, clave""", c=corrida, f=familia, l=familia.replace('_', r'\_') + _DESDE, alto=PERCENTIL_ALTO,
                    **({'ids': ids} if ids is not None else {}))
-    mapa = etapas(s, corte_id)
+    mapa = etapas(s, corte_id)   # ya viene en orden clínico
+    siguiente = dict(zip(mapa, list(mapa)[1:], strict=False))
     estados = dict(zip(dic.desenlaces.clave, dic.desenlaces.estado, strict=False)) if not dic.desenlaces.empty else {}
     filas.sort(key=lambda f: (mapa.get(f['momento'], {}).get('orden', 99), f['clave']))
     return [{'momento': f['momento'], 'momento_nombre': nombre_etapa(mapa, f['momento']), 'clave': f['clave'],
+             'siguiente': siguiente.get(f['momento']),
              'estado': estados.get(f['clave']) or CL.estado_de(f['clave']),
              'calculados': int(f['calculados']), 'en_alerta': int(f['en_alerta']),
              'pct_en_alerta': round(100 * f['en_alerta'] / f['calculados'], 1)}
             for f in filas]
+
+
+def ninos_con_riesgo(s: Session, corrida: int, familia: str, ids: list[str] | None) -> int:
+    """Cuántos niños del grupo tienen riesgo calculado de la familia: los que tienen una visita pendiente. Cada niño
+    cuenta una vez aunque tenga riesgo de más de un corte o submodelo (los mismos filtros que ``riesgo_de``)."""
+    de = ' AND sujeto = ANY(:ids)' if ids is not None else ''
+    return int(s.execute(text(f"""
+        SELECT count(DISTINCT sujeto) FROM resultados.riesgos
+        WHERE corrida_id = :c AND NOT silencio AND (clave = :f OR clave LIKE :l){de}"""),
+        {'c': corrida, 'f': familia, 'l': familia.replace('_', r'\_') + _DESDE,
+         **({'ids': ids} if ids is not None else {})}).scalar_one())
 
 
 def riesgo_con_modelo(s: Session, corrida: int, familia: str) -> bool:
@@ -344,6 +359,7 @@ def resumen(consulta: ConsultaClinica, s: Session = Depends(sesion), u: Usuario 
         'trayectoria': trayectoria,
         'riesgo': riesgo_de(s, corrida.id, corrida.corte_id, familia, grupo, dic) if familia else [],
         'riesgo_con_modelo': riesgo_con_modelo(s, corrida.id, familia) if familia else False,
+        'riesgo_ninos': ninos_con_riesgo(s, corrida.id, familia, grupo) if familia else 0,
         'alerta_percentil': PERCENTIL_ALTO,
         'ninos': ninos,
         'extremos': extremos,

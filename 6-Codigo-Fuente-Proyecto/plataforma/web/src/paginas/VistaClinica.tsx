@@ -128,6 +128,7 @@ function Contenido({ r, activa, elegir }: { r: ClinicaResumen; activa: string; e
         </div>
         <div className="flex flex-col gap-3 xl:min-h-0">
           <RiesgoPorCorte filas={r.riesgo} conModelo={r.riesgo_con_modelo} alertaPercentil={r.alerta_percentil}
+            ninosGrupo={r.grupo.n} pendientes={r.riesgo_ninos}
             desenlace={r.familias.find((f) => f.clave === r.familia)?.nombre} className="shrink-0" />
           {r.ninos && <NinosMasRiesgo ninos={r.ninos} riesgos={r.riesgo} medida={r.trayectoria.indicador === 'talla' ? 'Último puntaje Z de talla para la edad' : 'Último puntaje Z de la medida'}
             alertaPercentil={r.alerta_percentil} esPoblacion={esPoblacion} className="xl:min-h-0 xl:flex-1" />}

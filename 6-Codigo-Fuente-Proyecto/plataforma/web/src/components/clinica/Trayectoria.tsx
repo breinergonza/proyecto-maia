@@ -16,7 +16,7 @@ import { Termino } from '../Termino'
 import type { EtapaClinica, ExtremoClinico } from '../../api/tipos'
 import { cn } from '../../lib/cn'
 import { MINIMO_NINOS_DISTRIBUCION } from '../../lib/exportar'
-import { dec, dec2, indicador as nombreIndicador, num, pct, riesgo as textoRiesgo } from '../../lib/formato'
+import { dec, dec2, indicador as nombreIndicador, ninos, num, pct, riesgo as textoRiesgo } from '../../lib/formato'
 import { Grafica } from '../grafica'
 import { COLOR, SERIES_COLOR } from '../graficos'
 import { GraficaNavegable, resumenDe } from '../graficos/navegacion'
@@ -28,7 +28,6 @@ const esPuntajeZ = (unidad: string) => /(^|\s)z(\s|$)/i.test(unidad)
 /** «talla baja» o «crecimiento bajo»: lo que cuenta el umbral −2; ``null`` si la medida no va en puntaje z. */
 export const nombreBajo = (indicador: string, unidad: string) =>
   esPuntajeZ(unidad) ? (indicador === 'talla' ? 'talla baja' : 'crecimiento bajo') : null
-const ninos = (n: number) => `${num(n)} ${n === 1 ? 'niño' : 'niños'}`
 /** «más de 99,9 %»: el riesgo que se pinta en coral lleno. */
 const esRiesgoMaximo = (r: number) => 100 * r >= 99.95
 /** Los puntos de una visita se reparten a izquierda y derecha de la caja para no taparse. */

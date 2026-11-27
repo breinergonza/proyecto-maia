@@ -43,10 +43,11 @@ const resumen = {
     { sujeto: 'S-02210', etapa: '3 m EC', z: -3.0, riesgo: 0.57, percentil: 95 },
   ],
   riesgo: [
-    { momento: '40 sem', clave: 'talla_baja_12m_desde_40sem', estado: 'en_prueba', calculados: 290, en_alerta: 58, pct_en_alerta: 20 },
-    { momento: '3 m EC', clave: 'talla_baja_12m_desde_3m', estado: 'en_prueba', calculados: 268, en_alerta: 61, pct_en_alerta: 22.8 },
+    { momento: '40 sem', siguiente: '3 m EC', clave: 'talla_baja_12m_desde_40sem', estado: 'en_prueba', calculados: 290, en_alerta: 58, pct_en_alerta: 20 },
+    { momento: '3 m EC', siguiente: '6 m EC', clave: 'talla_baja_12m_desde_3m', estado: 'en_prueba', calculados: 268, en_alerta: 61, pct_en_alerta: 22.8 },
   ],
   riesgo_con_modelo: true,
+  riesgo_ninos: 300,
   alerta_percentil: 90,
   ninos: [
     { sujeto: 'S-01633', semanas: null, momento: '3 m EC', riesgo: 0.61, percentil: 97, ultima_z: -1.9 },
@@ -248,16 +249,16 @@ describe('vista clínica', () => {
     expect(within(sexta).getAllByText('—').length).toBeGreaterThan(0)
   })
 
-  it('el riesgo estimado nombra el desenlace y dice, por visita de cálculo, cuántos de los niños con riesgo calculado están en alerta; «En prueba» una vez', async () => {
+  it('el riesgo estimado nombra el desenlace, parte del grupo elegido y dice, por visita pendiente, cuántos niños son y qué % de ellos está en alerta; «En prueba» una vez', async () => {
     api('experto')
     montar('/')
     const panel = (await screen.findByRole('heading', { name: 'Riesgo estimado de talla baja a los 12 meses' })).closest('section')!
     expect(within(panel).getAllByRole('listitem').map((l) => l.textContent)).toEqual([
-      'Calculado a las 40 semanas: 58 de 290 niños en alerta (20,0 %)',
-      'Calculado a los 3 meses: 61 de 268 niños en alerta (22,8 %)',
+      'Visita de 3 meses: 290 niños · 58 en alerta: 20,0 % de los 290',
+      'Visita de 6 meses: 268 niños · 61 en alerta: 22,8 % de los 268',
     ])
-    // el denominador se explica: solo los niños que siguen en seguimiento a esa visita tienen riesgo calculado
-    expect(within(panel).getByText(/siguen en seguimiento/)).toBeInTheDocument()
+    // el % es de los niños con esa visita pendiente, no del grupo: se dice desde el grupo elegido
+    expect(within(panel).getByText(/^De los 312 niños del grupo, 300 tienen una visita pendiente\. Solo a ellos se les calcula el riesgo: todavía se puede actuar antes de esa visita\./)).toBeInTheDocument()
     expect(within(panel).getByText(/En alerta: riesgo entre el 10 % más alto de los niños más recientes con desenlace conocido, con quienes se calibró el modelo\. Por eso, en un grupo pueden ser más o menos del 10 %\./)).toBeInTheDocument()
     expect(within(panel).getAllByText(/En prueba/)).toHaveLength(1)
   })
@@ -269,6 +270,9 @@ describe('vista clínica', () => {
     const panel = (await screen.findByRole('heading', { name: 'Riesgo estimado de talla baja a los 12 meses' })).closest('section')!
     expect(within(panel).getAllByText(/En prueba/)).toHaveLength(1)
     expect(within(panel).getByText('En prueba, salvo a los 6 meses')).toBeInTheDocument()
+    // sin una visita siguiente en el corte, dice desde qué visita se calculó
+    expect(within(panel).getAllByRole('listitem').at(-1)?.textContent)
+      .toBe('Calculado a los 6 meses: 120 niños · 12 en alerta: 10,0 % de los 120')
   })
 
   it('un desenlace sin modelo en el paquete activo lo dice en lugar de mostrar riesgo', async () => {

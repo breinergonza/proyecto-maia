@@ -140,6 +140,10 @@ def test_contrato(cliente, tokens, corrida, datos):  # noqa: F811
     assert r['alerta_percentil'] == ALTO
     assert [(f['momento'], f['clave'], f['estado']) for f in r['riesgo']] == [
         ('3 m EC', 'talla_baja_12m_desde_3', 'en_prueba'), ('6 m EC', 'talla_baja_12m_desde_6', 'en_prueba')]
+    # la visita que esos niños esperan: la siguiente del corte, la que el equipo agenda
+    assert [f['siguiente'] for f in r['riesgo']] == ['6 m EC', '12 m EC']
+    # los niños con una visita pendiente: cada uno una vez, aunque tenga riesgo de más de una visita o submodelo
+    assert r['riesgo_ninos'] == ri[ri.clave.isin([f['clave'] for f in r['riesgo']])].sujeto.nunique()
     for f in r['riesgo']:
         filas = ri[ri.clave == f['clave']]
         assert f['calculados'] == len(filas) and f['en_alerta'] == int((filas.percentil >= ALTO).sum())
@@ -188,6 +192,8 @@ def test_un_filtro_cambia_cada_bloque(cliente, tokens, corrida, datos):  # noqa:
     ri = datos['riesgos']
     for f, antes in zip(v['riesgo'], todos['riesgo']):
         assert f['calculados'] == int((ri.clave.eq(f['clave']) & ri.sujeto.isin(ids)).sum()) < antes['calculados']
+    claves = [f['clave'] for f in v['riesgo']]
+    assert v['riesgo_ninos'] == ri[ri.clave.isin(claves) & ri.sujeto.isin(ids)].sujeto.nunique() < todos['riesgo_ninos']
     assert v['ninos'] and all(x['sujeto'] in ids for x in v['ninos'])
 
 

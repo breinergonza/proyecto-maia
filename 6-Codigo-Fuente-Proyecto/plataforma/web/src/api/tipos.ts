@@ -660,8 +660,12 @@ export interface EtapaClinica {
 }
 /** Un punto de la gráfica de crecimiento: un niño en alerta de los que más se alejan del promedio de su visita (D79). */
 export interface ExtremoClinico { sujeto: string; etapa: string; z: number; riesgo: number; percentil: number }
-/** ``pct_en_alerta``: niños en alerta entre los que tienen riesgo calculado. */
-export interface RiesgoCorte { momento: string; clave: string; estado: 'en_uso' | 'en_prueba'; calculados: number; en_alerta: number; pct_en_alerta: number }
+/** ``pct_en_alerta``: niños en alerta entre los que tienen riesgo calculado. ``siguiente``: la visita que esos niños
+ *  esperan (la que sigue a ``momento`` en el corte); falta si no hay otra. */
+export interface RiesgoCorte {
+  momento: string; siguiente?: string | null; clave: string; estado: 'en_uso' | 'en_prueba'
+  calculados: number; en_alerta: number; pct_en_alerta: number
+}
 export interface NinoEnAlerta { sujeto: string; semanas: number | null; momento: string; riesgo: number; percentil: number; ultima_z: number | null }
 export interface ClinicaResumen {
   insuficiente?: false
@@ -676,6 +680,8 @@ export interface ClinicaResumen {
   riesgo: RiesgoCorte[]
   /** La corrida calcula el riesgo de este desenlace para algún niño (aunque ninguno del grupo lo tenga ahora). */
   riesgo_con_modelo: boolean
+  /** Niños del grupo con riesgo calculado, es decir con una visita pendiente; cada uno una vez. */
+  riesgo_ninos?: number
   /** Un niño está en alerta si su percentil de riesgo es mayor o igual a este. */
   alerta_percentil: number
   /** ``null`` para quien no ve niños individuales. */
