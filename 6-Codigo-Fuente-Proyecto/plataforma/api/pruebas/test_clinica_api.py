@@ -127,6 +127,8 @@ def test_contrato(cliente, tokens, corrida, datos):  # noqa: F811
         # la pestaña «Desviación estándar»: promedio, DE y varianza de los niños (muestrales, como pandas)
         assert e['grupo']['media'] == pytest.approx(v.mean()) and e['grupo']['de'] == pytest.approx(v.std())
         assert e['grupo']['varianza'] == pytest.approx(v.var())
+        # el globo de cada visita: qué parte de los niños con dato tiene crecimiento bajo (z < −2, como el Tablero)
+        assert e['grupo']['pct_bajo'] == pytest.approx(100 * (v < -2).mean())
         # la de cuartiles: los bigotes llegan al valor más bajo y más alto que no es atípico (1,5 veces la caja)
         q1, q3 = v.quantile(.25), v.quantile(.75)
         assert e['grupo']['bigote_bajo'] == pytest.approx(v[v >= q1 - 1.5 * (q3 - q1)].min())
@@ -201,7 +203,7 @@ def test_celdas_de_menos_de_5_dan_su_cifra(cliente, tokens, corrida, datos):  # 
     # la mediana sale con cualquier número de niños; la mitad central pide 20 con dato en la visita (mínimo estadístico, D52)
     assert doce['grupo']['mediana'] is not None and doce['grupo']['p25'] is None and doce['grupo']['p75'] is None
     # y lo mismo la caja de la desviación estándar y los bigotes: con 3 niños dicen poco del grupo
-    for k in ('media', 'de', 'varianza', 'bigote_bajo', 'bigote_alto'):
+    for k in ('media', 'de', 'varianza', 'bigote_bajo', 'bigote_alto', 'pct_bajo'):
         assert doce['grupo'][k] is None, k
     assert doce['poblacion']['mediana'] is not None
     assert r['riesgo'] and all(1 <= c['calculados'] < 5 for c in r['riesgo'])   # solo 3 varones tienen riesgo de esa familia

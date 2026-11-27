@@ -166,23 +166,25 @@ def observado_de(s: Session, corrida: int, familia: str, ids: list[str] | None, 
 def trayectoria_de(s: Session, corrida: int, corte_id: int, indicador: str, ids: list[str] | None,
                  dic: Dic) -> dict:
     """Por visita (en orden clínico), del puntaje z del grupo: la mediana, los cuartiles, el promedio, la desviación
-    estándar y la varianza (muestrales) y los bigotes (el valor más bajo y más alto que no es atípico: a no más de 1,5
-    veces el alto de la caja de los cuartiles); de la población, la mediana y el promedio. Cuentan los niños con dato;
+    estándar y la varianza (muestrales), los bigotes (el valor más bajo y más alto que no es atípico: a no más de 1,5
+    veces el alto de la caja de los cuartiles) y el porcentaje con crecimiento bajo (``bajo_2de``, como el Tablero); de
+    la población, la mediana y el promedio. Cuentan los niños con dato;
     los datos improbables no. La mediana sale con cualquier número de niños; lo demás pide al menos 20 con dato en la
     visita, como toda distribución (D52): con menos, dice poco del grupo."""
     por = {'p': {'c': corrida, 'i': indicador}, 'g': {'c': corrida, 'i': indicador, 'ids': ids}}
     # una talla por niño y visita (la última válida): las cifras son de niños, no de mediciones
     sql = """
-        WITH cr AS (SELECT etapa, z FROM {fuente}),
+        WITH cr AS (SELECT etapa, z, bajo_2de FROM {fuente}),
         q AS (SELECT etapa, count(*) AS n, percentile_cont(0.25) WITHIN GROUP (ORDER BY z) AS p25,
                      percentile_cont(0.5) WITHIN GROUP (ORDER BY z) AS mediana,
                      percentile_cont(0.75) WITHIN GROUP (ORDER BY z) AS p75,
-                     avg(z) AS media, stddev_samp(z) AS de, var_samp(z) AS varianza
+                     avg(z) AS media, stddev_samp(z) AS de, var_samp(z) AS varianza,
+                     100.0 * avg(CASE WHEN bajo_2de THEN 1 ELSE 0 END) AS pct_bajo
               FROM cr GROUP BY etapa)
         SELECT q.*, min(cr.z) FILTER (WHERE cr.z >= q.p25 - 1.5 * (q.p75 - q.p25)) AS bigote_bajo,
                max(cr.z) FILTER (WHERE cr.z <= q.p75 + 1.5 * (q.p75 - q.p25)) AS bigote_alto
         FROM q JOIN cr USING (etapa)
-        GROUP BY q.etapa, q.n, q.p25, q.mediana, q.p75, q.media, q.de, q.varianza"""
+        GROUP BY q.etapa, q.n, q.p25, q.mediana, q.p75, q.media, q.de, q.varianza, q.pct_bajo"""
     propia = ' AND indicador = :i AND z IS NOT NULL'
     poblacion = {f['etapa']: f for f in _filas(s, sql.format(fuente=crecimiento_por_nino(propia)), **por['p'])}
     grupo = poblacion if ids is None else {f['etapa']: f for f in _filas(
@@ -201,7 +203,7 @@ def trayectoria_de(s: Session, corrida: int, corte_id: int, indicador: str, ids:
             return float(f[k]) if con_cuartiles and f[k] is not None else None
         return {'n': n, 'p25': cifra('p25'), 'mediana': float(f['mediana']), 'p75': cifra('p75'),
                 'media': cifra('media'), 'de': cifra('de'), 'varianza': cifra('varianza'),
-                'bigote_bajo': cifra('bigote_bajo'), 'bigote_alto': cifra('bigote_alto')}
+                'bigote_bajo': cifra('bigote_bajo'), 'bigote_alto': cifra('bigote_alto'), 'pct_bajo': cifra('pct_bajo')}
 
     visitas = sorted(set(poblacion) | set(grupo), key=lambda e: (mapa.get(e, {}).get('orden', 99), str(e)))
     return {'indicador': indicador, 'nombre': INDICADORES[indicador], 'unidad': UNIDAD, 'referencia': 'OMS',
