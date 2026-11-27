@@ -77,7 +77,7 @@ Esta tabla dice dónde está cada cosa que pide la entrega y cómo comprobarla.
 |---|---|---|
 | Carpeta **Notebooks** | [`1-Notebooks/`](1-Notebooks/README.md) | Tres cuadernos (análisis, entrenamiento y pruebas de cada modelo) con su `.html` ya ejecutado |
 | Carpeta **Modelos** | [`2-Modelos/`](2-Modelos/README.md) | `maia-anomalias/v8` y `maia-clinico/v9`: ficha de cada modelo y enlace de descarga del `.pkl` |
-| Carpeta **Datos** | [`3-Datos/`](3-Datos/README.md) | `diccionario.xlsx`: la estructura de los datos usados (sin datos de pacientes) |
+| Carpeta **Datos** | [`3-Datos/`](3-Datos/README.md) | `diccionario.xlsx` (estructura de los datos usados, sin datos de pacientes) y `Modelo-Datos-Solucion/`, con el DDL y el DML de la base |
 | Nombre del proyecto e integrantes | [Introducción](#introducción) e [Integrantes](#integrantes) | Inicio de este documento |
 | **Funcionamiento** (35) | [Sección 5](#5-funcionamiento) | Aplicación en <https://maia.canbby.com>, prueba de humo local en tres comandos y 1.324 pruebas automáticas |
 | **Documentación del despliegue** (15) | [Sección 6](#6-documentación-del-despliegue) | Dependencias, entornos, pasos de despliegue, credenciales de ejemplo y ejemplos de uso |
@@ -95,7 +95,7 @@ al abrir el repositorio.
 proyecto-maia/
 ├── 1-Notebooks/                 Notebooks: análisis, entrenamiento y pruebas
 ├── 2-Modelos/                   Modelos: modelos finales y sus fichas
-├── 3-Datos/                     Datos: estructura de los datos usados
+├── 3-Datos/                     Datos: estructura de los datos usados y modelo de datos (DDL y DML)
 ├── 4-Insumos-Proyecto/          Núcleo de datos y modelos, plan, avances y artículo previo
 ├── 5-Informe-final-latex/       Informe final (IEEEtran) con su PDF
 ├── 6-Codigo-Fuente-Proyecto/    Plataforma: núcleo, CLI, API, web e infraestructura
@@ -148,6 +148,14 @@ equipo que entrena. Por eso la carpeta entrega la **estructura** de los datos, n
   [`sevarti/contrato.py`](6-Codigo-Fuente-Proyecto/nucleo/sevarti/contrato.py).
 * **Muestra para probar.** `make demo-entrenar` genera una cohorte simulada de 5.000 niños con esa misma
   estructura. Con ella se puede ejecutar todo sin acceso a datos reales.
+* **Modelo de datos de la solución.** [`3-Datos/Modelo-Datos-Solucion/`](3-Datos/Modelo-Datos-Solucion/README.md)
+  tiene la base PostgreSQL como scripts SQL, generados desde las migraciones y probados en PostgreSQL 16:
+  * `DDL/`: bases y roles, extensiones, los esquemas `sevarti`, `resultados` y `app` (37 tablas), llaves e índices,
+    un script consolidado y el historial de las 14 migraciones.
+  * `DML/`: datos iniciales, una cohorte de 30 niños inventados, las operaciones de la aplicación (`INSERT`,
+    `UPDATE`, `DELETE`) y consultas frecuentes.
+
+  Su README trae los diagramas entidad-relación de cada esquema.
 
 ---
 
