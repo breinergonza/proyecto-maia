@@ -16,7 +16,7 @@ import { Termino } from '../Termino'
 import type { EtapaClinica, ExtremoClinico } from '../../api/tipos'
 import { cn } from '../../lib/cn'
 import { MINIMO_NINOS_DISTRIBUCION } from '../../lib/exportar'
-import { dec, dec2, indicador as nombreIndicador, ninos, num, pct, riesgo as textoRiesgo } from '../../lib/formato'
+import { dec, dec2, indicador as nombreIndicador, ninos, num, pct, pctSinSigno, riesgo as textoRiesgo } from '../../lib/formato'
 import { Grafica } from '../grafica'
 import { COLOR, SERIES_COLOR } from '../graficos'
 import { GraficaNavegable, resumenDe } from '../graficos/navegacion'
@@ -381,7 +381,7 @@ export function Trayectoria({ indicador, unidad, etapas, extremos, muestra, conP
   const medida = !conCaja ? 'mediana del grupo' : vista === 'de' ? 'promedio y desviación estándar del grupo' : 'mediana, cuartiles y varianza del grupo'
   const etiqueta = `${titulo}: ${medida}${conPoblacion ? ', frente a toda la población' : ''}, en ${unidad}. ${items.join('; ')}`
 
-  const cifra = (f: Fila, v: number | null) => (f.conCaja ? dec2(v) : f.sinCaja ? 'sin cifra' : null)
+  const cifra = (f: Fila, v: number | null, formato = dec2) => (f.conCaja ? formato(v) : f.sinCaja ? 'sin cifra' : null)
   const tabla = filas.map((f) => ({
     Visita: f.x,
     'Niños con dato': f.n,
@@ -393,7 +393,7 @@ export function Trayectoria({ indicador, unidad, etapas, extremos, muestra, conP
     Mediana: f.mediana == null ? null : dec2(f.mediana),
     'Tercer cuartil (75 %)': cifra(f, f.q3),
     'Máximo no atípico': cifra(f, f.alto),
-    ...(bajo ? { [`Con ${bajo} (%)`]: cifra(f, f.pctBajo) } : {}),
+    ...(bajo ? { [`Con ${bajo} (%)`]: cifra(f, f.pctBajo, pctSinSigno) } : {}),
     ...(conPoblacion ? {
       'Promedio de la población': f.poblacionMedia == null ? null : dec2(f.poblacionMedia),
       'Mediana de la población': f.poblacion == null ? null : dec2(f.poblacion),

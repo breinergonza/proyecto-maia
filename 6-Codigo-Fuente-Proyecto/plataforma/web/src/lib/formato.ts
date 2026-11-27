@@ -27,6 +27,8 @@ export const aproximado = (v: number | null | undefined) => {
   return new Intl.NumberFormat('es-CO', { maximumFractionDigits: a >= 100 ? 0 : a >= 10 ? 1 : 2 }).format(v)
 }
 export const pct = (v: number | null | undefined) => (v == null ? '—' : `${nf1.format(v)} %`)
+/** Un porcentaje sin el signo, para una columna que ya dice «(%)»: el mismo decimal fijo que ``pct`` (18,0). */
+export const pctSinSigno = (v: number | null | undefined) => (v == null ? '—' : nf1.format(v))
 /** «1 niño», «58 niños». */
 export const ninos = (n: number) => `${num(n)} ${n === 1 ? 'niño' : 'niños'}`
 /** Riesgo (0 a 1) como porcentaje. Un modelo nunca está seguro: lo que se redondearía a 0,0 % o a 100,0 % se dice

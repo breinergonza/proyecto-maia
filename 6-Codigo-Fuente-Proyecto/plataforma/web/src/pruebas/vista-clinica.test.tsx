@@ -244,6 +244,8 @@ describe('vista clínica', () => {
     expect(within(tabla).getByText('298')).toBeInTheDocument()
     expect(within(tabla).getByText('271')).toBeInTheDocument()
     expect(within(tabla).getByText('223')).toBeInTheDocument()
+    // el % con talla baja con un decimal fijo, como en el globo y el resto de la app («18,0», no «18»)
+    expect(within(tabla).getByText('18,0')).toBeInTheDocument()
     // la visita sin dato del grupo se ve vacía, no inventada
     const sexta = within(tabla).getByRole('row', { name: /6 m EC/ })
     expect(within(sexta).getAllByText('—').length).toBeGreaterThan(0)
