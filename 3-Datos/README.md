@@ -1,10 +1,11 @@
 # Datos
 
-El contenido de esta carpeta es **una copia de [`4-Insumos-Proyecto/insumo-datos/entradas/`](../4-Insumos-Proyecto/insumo-datos/entradas/)**. Se duplica aquí para facilitar la revisión de la entrega.
+Esta carpeta tiene dos cosas:
 
-Si hay alguna diferencia, la fuente de referencia es `4-Insumos-Proyecto/insumo-datos/entradas/`.
+- [`Modelo-Datos-Solucion/`](Modelo-Datos-Solucion/README.md): el modelo de datos de la base PostgreSQL de la solución. En `DDL/`, los scripts que crean las bases, los esquemas, las 37 tablas, las llaves y los índices; en `DML/`, los datos iniciales, una cohorte de 30 niños inventados, las operaciones de la aplicación y consultas frecuentes. Generado desde las migraciones del código y probado en PostgreSQL 16.
+- `diccionario.xlsx`: el diccionario de variables, **una copia de [`4-Insumos-Proyecto/insumo-datos/entradas/`](../4-Insumos-Proyecto/insumo-datos/entradas/)** que se duplica aquí para facilitar la revisión de la entrega. Si hay alguna diferencia, la fuente de referencia es `4-Insumos-Proyecto/insumo-datos/entradas/`.
 
-Incluye:
+Sobre el diccionario:
 
 - `diccionario.xlsx`: diccionario de datos (hojas Instrucciones, Variables, Visitas, Episodios, Quiebres, Desenlaces, Crecimiento y Curva OMS). Trae 318 variables en estado «Lista» y 52 desenlaces: 14 «En uso» y 38 «En prueba». No tiene datos de pacientes.
 
